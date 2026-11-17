@@ -10,8 +10,10 @@
 #include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
+#include "editor/ui/EdImGuiRenderer.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
+#include <utility>
 #include <algorithm>
 #include <array>
 #include <set>
@@ -393,7 +395,7 @@ namespace faf::editor
         (void)std::snprintf(text, sizeof(text), "%d-way turn", facts.symmetry.turns);
         chips.emplace_back(text);
       } else {
-        chips.emplace_back(kSymmetryNames[static_cast<int>(facts.symmetry.symmetry)]);
+        chips.emplace_back(kSymmetryNames[std::to_underlying(facts.symmetry.symmetry)]);
       }
       Chips(chips);
     }
@@ -614,7 +616,7 @@ namespace faf::editor
       if (groupOpen) {
         for (const auto& [type, list] : types) {
           ImGui::PushID(type.c_str());
-          const bool typeHidden = hidden.count(type) != 0;
+          const bool typeHidden = hidden.contains(type);
           // A type row: its eye, its colour, its name and count; open it for the markers.
           if (EyeButton("##eye", typeHidden)) {
             if (typeHidden) {
@@ -901,7 +903,7 @@ namespace faf::editor
           blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr
         ) {
           const moho::SFootprint& footprint = *blueprint->Physics.ResolvedFootprint;
-          fallback.caps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+          fallback.caps = std::to_underlying(footprint.mOccupancyCaps);
           fallback.maxSlope = footprint.mMaxSlope;
           fallback.minWaterDepth = footprint.mMinWaterDepth;
           fallback.maxWaterDepth = footprint.mMaxWaterDepth;
@@ -1023,8 +1025,9 @@ namespace faf::editor
           resources.push_back({marker.name, x, z});
         }
       }
-      TerrainCheckSettings settings;
-      settings.limit = land.maxSlope > 0.0f ? land.maxSlope : settings.limit;
+      TerrainCheckSettings settings = mTerrainCheck;
+      static constexpr int kClassWindow[4] = {1, 2, 3, 5};
+      settings.window = kClassWindow[std::clamp(mTerrainCheckClass, 1, 4) - 1];
       std::size_t found = 0;
       for (CheckIssue& issue : CheckTerrainGround(heights, points, resources, settings)) {
         mCheckIssues.push_back(std::move(issue));
@@ -1262,6 +1265,58 @@ namespace faf::editor
     }
   }
 
+  void EdShell::DrawCheckSettings()
+  {
+    // FAF Studio's terrain checks panel: the thresholds of the terrain checks and which parts of the check run. A
+    // change runs the check again when it has run.
+    if (!ImGui::TreeNode("Check settings")) {
+      return;
+    }
+    bool changed = false;
+    changed |= ImGui::Checkbox("Marker validators", &mCheckValidators);
+    EdSetItemTooltip("Mass and hydrocarbon markers tested with their building's footprint by the game's build rules");
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Symmetry", &mCheckSymmetry);
+    EdSetItemTooltip("Markers and props without a partner at their symmetric copies (the Tools panel's symmetry)");
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Paths", &mCheckPaths);
+    EdSetItemTooltip("Kept paths with more than 2%% of their length steeper than their maximum grade");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcLimit", &mTerrainCheck.limit, 0.2f, 1.5f, "Blocking slope (rise per run) %.2f");
+    EdSetItemTooltip("The slope rating that stops land units (the engine's rule: 0.75)");
+    ImGui::SetNextItemWidth(-1.0f);
+    static constexpr const char* kClasses[4] = {
+      "Land, small (1x1)", "Land, medium (2x2)", "Land, large (3x3)", "Experimental (5x5)"
+    };
+    char classFormat[96];
+    (void)std::snprintf(
+      classFormat, sizeof(classFormat), "Unit class %%d: %s", kClasses[std::clamp(mTerrainCheckClass, 1, 4) - 1]
+    );
+    changed |= FillSliderInt("##tcClass", &mTerrainCheckClass, 1, 4, classFormat);
+    EdSetItemTooltip("The footprint the slope rating is taken over: 1 small .. 4 experimental");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcWade", &mTerrainCheck.wade, 0.0f, 3.0f, "Land units wade through water up to %.1f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcRadius", &mTerrainCheck.startRadius, 3.0f, 30.0f, "Base area radius (units) %.0f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |=
+      FillSliderFloat("##tcShare", &mTerrainCheck.blockedShare, 0.0f, 0.5f, "Blocked share allowed in a base %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat(
+      "##tcDetour", &mTerrainCheck.detour, 1.0f, 10.0f, "Route longer than %.1f x straight is reported"
+    );
+    if (ImGui::SmallButton("Defaults")) {
+      mTerrainCheck = TerrainCheckSettings{};
+      mTerrainCheckClass = 2;
+      mCheckValidators = mCheckSymmetry = mCheckPaths = true;
+      changed = true;
+    }
+    if (changed && mCheckRan) {
+      mRunCheck = true;
+    }
+    ImGui::TreePop();
+  }
+
   void EdShell::RunCheck()
   {
     mCheckIssues.clear();
@@ -1283,7 +1338,7 @@ namespace faf::editor
     input.groundAt = &CheckGround;
     input.groundContext = map->mTerrainRes;
     const HeightBrush brush = mTools.CurrentHeightBrush();
-    input.symmetry = brush.symmetry;
+    input.symmetry = mCheckSymmetry ? brush.symmetry : Symmetry::None;
     input.turns = brush.turns;
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
@@ -1306,6 +1361,12 @@ namespace faf::editor
         }
       }
       for (CheckIssue& issue : CheckMapBasics(basics)) {
+        mCheckIssues.push_back(std::move(issue));
+      }
+    }
+    // The resources by the build rules: can an extractor or a hydrocarbon plant be built there?
+    if (resourceFit && mCheckValidators) {
+      for (CheckIssue& issue : resourceFit()) {
         mCheckIssues.push_back(std::move(issue));
       }
     }
@@ -1339,6 +1400,38 @@ namespace faf::editor
         !compiled.text.empty()
       ) {
         mCheckIssues.push_back(compiled);
+      }
+    }
+    // The kept paths whose grade can be limited: more than 2 % of the length steeper than their grade (Studio's
+    // terrainchecks.lua CheckPaths).
+    if (mCheckPaths) {
+      const auto ground = [map](const float x, const float z) {
+        return CheckGround(map->mTerrainRes, x, z);
+      };
+      const float water = facts.water ? facts.waterElevation : -1e9f;
+      for (const KeptPath& path : mDocument.PathsNow().set.paths) {
+        if (KeptPathOffsetMode(path.mode) || path.mode == KeptPathMode::River || path.points.size() < 2) {
+          continue;
+        }
+        const KeptPathReport report = ReportKeptPath(path, ground, water);
+        if (report.over > 0.02f && !report.flagged.empty()) {
+          char text[200];
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "%.0f%% of its length is steeper than %.2f (worst %.2f)",
+            static_cast<double>(report.over * 100.0f),
+            static_cast<double>(path.grade),
+            static_cast<double>(report.max)
+          );
+          CheckIssue issue;
+          issue.level = CheckIssue::Level::Warning;
+          issue.marker = "path " + (path.name.empty() ? path.id : path.name);
+          issue.text = text;
+          issue.x = report.worstX;
+          issue.z = report.worstZ;
+          mCheckIssues.push_back(std::move(issue));
+        }
       }
     }
     // The props under the same symmetry: each one's partner of its blueprint at its copies, and the reclaim that isn't.
@@ -1391,8 +1484,7 @@ namespace faf::editor
         int noFootprint = 0;
         for (const SaveEntry& army : mDocument.SaveData().Armies()) {
           UnitGroup group;
-          std::string error;
-          if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+          if (!ParseUnitGroup(army.Get("Units"), group)) {
             continue;
           }
           std::vector<const SaveUnit*> units;
@@ -1473,9 +1565,9 @@ namespace faf::editor
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {
       if (issue.file.empty()) {
-        pins.push_back({issue.x, issue.z, static_cast<int>(issue.level)});
+        pins.push_back({issue.x, issue.z, std::to_underlying(issue.level)});
       }
-      ++counts[static_cast<int>(issue.level)];
+      ++counts[std::to_underlying(issue.level)];
     }
     mTools.SetCheckPins(std::move(pins));
     gpg::Logf("editor: check: %d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
@@ -1558,6 +1650,7 @@ namespace faf::editor
     ImGui::RadioButton("Hover", &mTools.PathingLayer(), 2);
     ImGui::SameLine();
     ImGui::RadioButton("Amphibious", &mTools.PathingLayer(), 3);
+    DrawCheckSettings();
     HelpNote(
       "The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
       "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "
@@ -1587,7 +1680,7 @@ namespace faf::editor
     };
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {
-      ++counts[static_cast<int>(issue.level)];
+      ++counts[std::to_underlying(issue.level)];
     }
     ImGui::Text("%d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
     {
@@ -1637,7 +1730,7 @@ namespace faf::editor
       draw->AddCircleFilled(
         ImVec2(row.x + line * 0.4f, row.y + line * 0.5f),
         line * 0.28f,
-        ImGui::GetColorU32(kColors[static_cast<int>(issue.level)])
+        ImGui::GetColorU32(kColors[std::to_underlying(issue.level)])
       );
       const std::string title = issue.file.empty() ? issue.marker : issue.file + " line " + std::to_string(issue.line);
       draw->AddText(ImVec2(row.x + line * 1.1f, row.y), ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
@@ -1786,9 +1879,8 @@ namespace faf::editor
       // The tables must also read as the Adaptive tool reads them.
       if (issue.text.empty() && mScriptFile == 2) {
         AdaptiveTables tables;
-        std::string error;
-        if (!ParseAdaptiveTables(mScriptBuffer, tables, error)) {
-          mScriptMessage = "compiles, but the Adaptive tool can't read it: " + error;
+        if (const auto read = ParseAdaptiveTables(mScriptBuffer, tables); !read) {
+          mScriptMessage = "compiles, but the Adaptive tool can't read it: " + read.error();
         }
       }
       gpg::Logf("editor: %s check: %s", fileName.c_str(), mScriptMessage.c_str());
@@ -2156,6 +2248,17 @@ namespace faf::editor
     }
   }
 
+  void EdShell::ClearLookThumbs()
+  {
+    for (const auto& [id, image] : mLookThumbs) {
+      if (image != 0U) {
+        EdImGuiRenderer::DestroyImage(image);
+      }
+    }
+    mLookThumbs.clear();
+    mLookThumbWanted.clear();
+  }
+
   void EdShell::DrawLooks()
   {
     if (!Section("Looks")) {
@@ -2186,7 +2289,7 @@ namespace faf::editor
       first = false;
       bool on = (mLookSections & bit) != 0u;
       if (ImGui::Checkbox(label, &on)) {
-        mLookSections = on ? (mLookSections | bit) : (mLookSections & ~static_cast<unsigned>(bit));
+        mLookSections = on ? (mLookSections | bit) : (mLookSections & ~std::to_underlying(bit));
         retry = true;
       }
     };
@@ -2202,6 +2305,16 @@ namespace faf::editor
       "How much of the look: 0 keeps the map's own, 1 is the look. Numbers mix; textures switch at 0.5."
     );
     ImGui::Checkbox("Try on click", &mLookTryOnClick);
+    ImGui::SameLine();
+    ImGui::Checkbox("Pictures", &mLookThumbsShown);
+    EdSetItemTooltip("Each look's picture: this map painted in its layers' colours under that look's sun.");
+    if (mLookThumbsShown) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Redraw")) {
+        mLookThumbsRedraw = true;
+      }
+      EdSetItemTooltip("Paint the pictures again from the map as it is now");
+    }
     if (retry && !mLookTried.empty()) {
       request(LookRequest::What::Try, mLookTried);
     }
@@ -2214,18 +2327,37 @@ namespace faf::editor
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     const float swatch = ImGui::GetTextLineHeight();
+    const float picture = mLookThumbsShown ? std::floor(swatch * 2.5f) : 0.0f;
+    const float rowHeight = mLookThumbsShown ? picture : swatch;
+    // Rows on screen ask for their pictures anew each frame, so the ones in view are drawn first.
+    mLookThumbWanted.clear();
     const auto row = [&](const std::string& id, const std::string& title, const std::string& detail) {
       ImGui::PushID(id.c_str());
-      const ImVec2 at = ImGui::GetCursorScreenPos();
+      const ImVec2 corner = ImGui::GetCursorScreenPos();
       const bool chosen = id == mLookChosen || id == mLookTried;
-      if (ImGui::Selectable("##look", chosen, ImGuiSelectableFlags_AllowOverlap)) {
+      if (ImGui::Selectable("##look", chosen, ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, rowHeight))) {
         mLookChosen = id;
         if (mLookTryOnClick) {
           request(LookRequest::What::Try, id);
         }
       }
-      // Its colours once read: sky horizon and zenith, sun, water.
       ImDrawList* const draw = ImGui::GetWindowDrawList();
+      ImVec2 at(corner.x, corner.y + (rowHeight - swatch) * 0.5f);
+      if (mLookThumbsShown) {
+        const auto thumb = mLookThumbs.find(id);
+        if (thumb != mLookThumbs.end() && thumb->second != 0U) {
+          draw->AddImage(
+            static_cast<ImTextureID>(thumb->second), corner, ImVec2(corner.x + picture, corner.y + picture)
+          );
+        } else {
+          draw->AddRectFilled(corner, ImVec2(corner.x + picture, corner.y + picture), ChipU32(), 3.0f);
+        }
+        if (thumb == mLookThumbs.end() && ImGui::IsItemVisible()) {
+          mLookThumbWanted.push_back(id);
+        }
+        at.x += picture + Em(6.0f);
+      }
+      // Its colours once read: sky horizon and zenith, sun, water.
       if (const auto known = mLookSwatches.find(id); known != mLookSwatches.end()) {
         for (int c = 0; c < 4; ++c) {
           const float* const rgb = known->second.colours[c];
@@ -2250,7 +2382,11 @@ namespace faf::editor
       ImGui::PopID();
     };
     if (
-      ImGui::BeginChild("##looks", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 9.0f), ImGuiChildFlags_Borders)
+      ImGui::BeginChild(
+        "##looks",
+        ImVec2(0.0f, (rowHeight + ImGui::GetStyle().ItemSpacing.y) * (mLookThumbsShown ? 5.0f : 9.0f)),
+        ImGuiChildFlags_Borders
+      )
     ) {
       // The shipped moods and biomes (FAF Studio's library), their thumbnails their colours: sky, sun, shade.
       for (const LookMood& mood : LookMoods()) {
@@ -2258,11 +2394,11 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (!filter.empty() && key.find(filter) == std::string::npos) {
+        if (!filter.empty() && !key.contains(filter)) {
           continue;
         }
         const std::string id = std::string("mood:") + mood.id;
-        if (mLookSwatches.find(id) == mLookSwatches.end()) {
+        if (!mLookSwatches.contains(id)) {
           LookSwatch swatch;
           for (int c = 0; c < 3; ++c) {
             swatch.colours[0][c] = mood.fog[c];
@@ -2280,7 +2416,7 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (filter.empty() || key.find(filter) != std::string::npos) {
+        if (filter.empty() || key.contains(filter)) {
           row("mine:" + name, name, "yours");
         }
       }
@@ -2293,7 +2429,7 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (filter.empty() || key.find(filter) != std::string::npos) {
+        if (filter.empty() || key.contains(filter)) {
           row(maps[i], title, folder);
         }
       }
@@ -2332,7 +2468,7 @@ namespace faf::editor
       request(LookRequest::What::Save, {});
     }
     ImGui::EndDisabled();
-    if (mLookChosen.rfind("mine:", 0) == 0) {
+    if (mLookChosen.starts_with("mine:")) {
       ImGui::SameLine();
       if (ImGui::Button("Delete")) {
         request(LookRequest::What::Delete, mLookChosen);

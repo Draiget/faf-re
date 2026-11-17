@@ -26,9 +26,7 @@ namespace faf::editor
     if (pause.paused && !mDebugWasPaused) {
       mShowScript = true;
       mFocusScript = true;
-      mScriptFile = pause.file.find("_options.lua") != std::string::npos ? 1
-        : pause.file.find("_tables.lua") != std::string::npos            ? 2
-                                                                         : 0;
+      mScriptFile = pause.file.contains("_options.lua") ? 1 : pause.file.contains("_tables.lua") ? 2 : 0;
       LuaCodeScrollTo(pause.line);
       ImGui::SetNextWindowFocus();
     }

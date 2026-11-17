@@ -166,10 +166,10 @@ namespace
 
   struct Msvc8StringLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const fa::string& lhs,
       const fa::string& rhs
-    ) const noexcept
+    ) noexcept
     {
       return std::strcmp(lhs.c_str(), rhs.c_str()) < 0;
     }

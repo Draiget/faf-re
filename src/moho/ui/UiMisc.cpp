@@ -1,6 +1,8 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "gpg/gal/RenderProfiler.h"
 #include "lua/LuaIncrementalGc.h"
+#include <utility>
 
 namespace moho
 {
@@ -1192,6 +1194,7 @@ LuaPlus::LuaObject* moho::CreateLuaEventObject(
   LuaPlus::LuaState* const state
 )
 {
+  FAF_PROFILE_COUNT("ui.event.tables", 1); // FAF instrumentation
   LuaPlus::LuaObject modifiers;
   modifiers.AssignNewTable(state, 6, 0);
 
@@ -1255,7 +1258,7 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
   }
 
   static LuaPlus::LuaState sLuaState(
-    LuaPlus::LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi)
+    LuaPlus::LuaState::LIB_BASE, std::to_underlying(moho::lua_incremental::ELuaVmRole::FrontendUi)
   );
   static CTaskStage sStage;
 

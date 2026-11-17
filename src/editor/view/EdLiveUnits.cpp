@@ -85,7 +85,7 @@ namespace faf::editor
   )
   {
     std::string name = cap;
-    if (name.rfind("RULEUTC_", 0) == 0) {
+    if (name.starts_with("RULEUTC_")) {
       name = name.substr(8);
     }
     if (const std::size_t toggle = name.rfind("Toggle"); toggle != std::string::npos && toggle + 6 == name.size()) {

@@ -1,6 +1,6 @@
 # Engine addition (issue #255, milestone "Linux client"): the game client on Linux.
 #
-# Included by cmake/FafLinux.cmake when FAF_LINUX_CLIENT is ON (default OFF while the client
+# Included by cmake/FafPosix.cmake when FAF_LINUX_CLIENT is ON (default OFF while the client
 # doesn't build yet; the headless and server targets are unchanged either way):
 #
 #   cmake --preset linux-clang-x64-release-plain -DFAF_LINUX_CLIENT=ON
@@ -20,7 +20,7 @@ set(_faf_client_windows_only
   "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
   # The Windows half of the SDL3 window layer; platform/posix/WindowSdlPosix.cpp is this one.
   "^platform/windows/"
-  # faf_sim compiles its own copy (cmake/FafLinux.cmake).
+  # faf_sim compiles its own copy (cmake/FafPosix.cmake).
   "^gpg/gal/MatrixPortable\\.cpp$"
   # The Windows entry point (src/platform/posix/ClientMainPosix.cpp takes its place, issue #256).
   # WinApp (the main loop), the app windows, the main frame, the viewports, CScApp and the
@@ -83,6 +83,9 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 if(FAF_FETCH_DEPENDENCIES)
   set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb freetype msdfgen
     libjuice libdatachannel usrsctp plog mbedtls imgui)
+  if(FAFRE_PLATFORM_MACOS) # MoltenVK (Vulkan over Metal) and DXC from source: no macOS builds of either ship
+    list(APPEND FAF_DEPENDENCIES_ONLY MoltenVK dxc-source dxc-spirv-headers dxc-spirv-tools dxc-directx-headers)
+  endif()
   include(FafDependencies)
 endif()
 
@@ -108,7 +111,7 @@ add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAud
 target_compile_options(FAudio-static PRIVATE -w)
 
 # Lowercase spellings of POSIX stand-in headers the client includes (the file system is
-# case-sensitive here, and a Windows checkout can't hold both spellings), as FafLinux.cmake writes
+# case-sensitive here, and a Windows checkout can't hold both spellings), as FafPosix.cmake writes
 # <windows.h>.
 file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/shlobj.h" "#pragma once\n#include <ShlObj.h>\n")
 
@@ -185,8 +188,9 @@ add_library(faf_client_imaging OBJECT
   "${PROJECT_SOURCE_DIR}/src/platform/posix/imaging/StbImage.cpp")
 target_include_directories(faf_client_imaging PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/winadapter"
-  "${PROJECT_SOURCE_DIR}/src"
-  "${FAF_DEPENDENCIES_DIR}/stb")
+  "${PROJECT_SOURCE_DIR}/src")
+# A pinned header-only library: its own warnings (sprintf, deprecated on macOS) stay out of the log.
+target_include_directories(faf_client_imaging SYSTEM PRIVATE "${FAF_DEPENDENCIES_DIR}/stb")
 target_link_libraries(faf_client_imaging PUBLIC faf_directxtex_linux)
 target_compile_options(faf_client_imaging PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
   -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
@@ -216,6 +220,27 @@ ProcessorCount(_faf_ffmpeg_jobs)
 if(_faf_ffmpeg_jobs EQUAL 0)
   set(_faf_ffmpeg_jobs 2)
 endif()
+if(FAFRE_PLATFORM_MACOS)
+  # Apple's compiler driver finds the SDK only through -isysroot (CMake passes CMAKE_OSX_SYSROOT to
+  # its own targets, not to FFmpeg's configure); the same architecture and oldest macOS as the engine.
+  set(_faf_ffmpeg_sysroot "${CMAKE_OSX_SYSROOT}")
+  if(NOT _faf_ffmpeg_sysroot)
+    # CMake leaves CMAKE_OSX_SYSROOT empty when the compiler finds the SDK by itself.
+    execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
+      OUTPUT_VARIABLE _faf_ffmpeg_sysroot OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+  endif()
+  set(_faf_ffmpeg_target_flags "-isysroot ${_faf_ffmpeg_sysroot} -arch ${CMAKE_OSX_ARCHITECTURES} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  set(_faf_ffmpeg_cflags "-w ${_faf_ffmpeg_target_flags}")
+  set(_faf_ffmpeg_ldflags "${_faf_ffmpeg_target_flags}")
+  # FFmpeg's configure also builds helper programs with a host compiler that takes no extra flags;
+  # SDKROOT gives that driver the SDK too.
+  set(_faf_ffmpeg_env "${CMAKE_COMMAND}" -E env "SDKROOT=${_faf_ffmpeg_sysroot}")
+else()
+  set(_faf_ffmpeg_env "")
+  # hypot bound to the version glibc 2.34 has (see the header).
+  set(_faf_ffmpeg_cflags "-w -include ${PROJECT_SOURCE_DIR}/cmake/deps/ffmpeg-linux-glibc.h")
+  set(_faf_ffmpeg_ldflags "")
+endif()
 set(_faf_ffmpeg_prefix "${CMAKE_BINARY_DIR}/deps/ffmpeg")
 set(_faf_ffmpeg_libs avformat avcodec swscale swresample avutil)
 set(_faf_ffmpeg_archives "")
@@ -228,12 +253,11 @@ ExternalProject_Add(faf_ffmpeg_build
   INSTALL_DIR "${_faf_ffmpeg_prefix}"
   DOWNLOAD_COMMAND ""
   UPDATE_COMMAND ""
-  CONFIGURE_COMMAND "${_faf_ffmpeg}/configure" --prefix=<INSTALL_DIR>
+  CONFIGURE_COMMAND ${_faf_ffmpeg_env} "${_faf_ffmpeg}/configure" --prefix=<INSTALL_DIR>
     "--cc=${CMAKE_C_COMPILER}" "--ar=${CMAKE_AR}" "--ranlib=${CMAKE_RANLIB}" "--nm=${CMAKE_NM}"
     --enable-pic --disable-autodetect --pkg-config=false
-    # hypot bound to the version glibc 2.34 has (see the header); -w keeps FFmpeg's own warnings out of
-    # the build log, as on Windows (cmake/FafWarnings.cmake).
-    "--extra-cflags=-w -include ${PROJECT_SOURCE_DIR}/cmake/deps/ffmpeg-linux-glibc.h"
+    # -w keeps FFmpeg's own warnings out of the build log, as on Windows (cmake/FafWarnings.cmake).
+    "--extra-cflags=${_faf_ffmpeg_cflags}" "--extra-ldflags=${_faf_ffmpeg_ldflags}"
     --disable-x86asm --disable-everything --disable-programs --disable-doc --disable-network
     --enable-static --disable-shared
     --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample
@@ -241,8 +265,8 @@ ExternalProject_Add(faf_ffmpeg_build
     --enable-parser=mpegvideo,mpegaudio,adx
     --enable-demuxer=mpegps,mpegvideo,adx,mp3
     --enable-protocol=file
-  BUILD_COMMAND "${FAF_MAKE}" -j${_faf_ffmpeg_jobs}
-  INSTALL_COMMAND "${FAF_MAKE}" install-headers install-libs
+  BUILD_COMMAND ${_faf_ffmpeg_env} "${FAF_MAKE}" -j${_faf_ffmpeg_jobs}
+  INSTALL_COMMAND ${_faf_ffmpeg_env} "${FAF_MAKE}" install-headers install-libs
   BUILD_BYPRODUCTS ${_faf_ffmpeg_archives})
 file(MAKE_DIRECTORY "${_faf_ffmpeg_prefix}/include")
 add_library(faf_ffmpeg INTERFACE)
@@ -256,6 +280,18 @@ target_include_directories(faf_ffmpeg SYSTEM INTERFACE "${_faf_ffmpeg_prefix}/in
 target_link_libraries(faf_ffmpeg INTERFACE m)
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
+if(FAFRE_PLATFORM_MACOS) # APFS is case-insensitive: <windows.h> finds the stand-in Windows.h
+  # gpg/gal/backends/common/ImageCodec.h spells <windows.h> for faf_client_imaging, where DirectX-Headers'
+  # adapter is that lowercase file; here it meets platform/posix/win32/Windows.h. Linux's case-sensitive
+  # build still turns a wrong spelling into an error.
+  target_compile_options(faf_client_objs PRIVATE -Wno-nonportable-include-path)
+endif()
+# The application shell's event tables cast their handlers as the 2.4 window library's did; the
+# same per-source exception as the Windows build (cmake/FafWarnings.cmake, src/CMakeLists.txt).
+foreach(_src IN LISTS FAF_SHELL_EVENT_TABLE_SOURCES)
+  set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/${_src}" TARGET_DIRECTORY faf_client_objs
+    APPEND PROPERTY COMPILE_OPTIONS ${FAF_SHELL_EVENT_TABLE_OPTIONS})
+endforeach()
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static faf_imgui_sdl  # FAudio names its static target FAudio-static, with no alias
@@ -283,4 +319,47 @@ target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.
 # SBatchTextureData, whose type info faf_sim registers). The sim's never need the client's, as
 # headless links faf_sim alone.
 target_link_libraries(faf_client PRIVATE faf_sim faf_client_objs faf_client_dxc faf_client_imaging faf_directxtex_linux)
-target_link_options(faf_client PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_client PRIVATE ${FAF_LINK_ALL_ERRORS})
+# The engine's own Lua hooks and effects, which the engine mounts from the `fafengine` folder next to
+# the executable at /fafengine, replaced on every build as the Windows build does (src/CMakeLists.txt).
+add_custom_command(TARGET faf_client POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:faf_client>/fafengine"
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
+          "$<TARGET_FILE_DIR:faf_client>/fafengine"
+  VERBATIM)
+if(FAFRE_PLATFORM_MACOS) # MoltenVK and a source-built DXC: neither ships for macOS
+  # The shader compiler: DXC v1.9.2609 (cmake/FafDependencies.cmake, dxc-source) built with DXC's own
+  # settings (cmake/caches/PredefinedParams.cmake: SPIR-V on, no LLVM targets), the dxcompiler library
+  # alone, for this architecture and oldest macOS. About four minutes on six cores, once per build tree.
+  # DxcGlue.cpp loads it from beside the executable.
+  set(_faf_dxc_prefix "${CMAKE_BINARY_DIR}/deps/dxc")
+  ExternalProject_Add(faf_dxc_build
+    SOURCE_DIR "${FAF_DEPENDENCIES_DIR}/dxc-source"
+    BINARY_DIR "${_faf_dxc_prefix}/build"
+    DOWNLOAD_COMMAND ""
+    UPDATE_COMMAND ""
+    CMAKE_ARGS
+      -C "${FAF_DEPENDENCIES_DIR}/dxc-source/cmake/caches/PredefinedParams.cmake"
+      -DCMAKE_BUILD_TYPE=Release
+      "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}" "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+      "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
+      "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+      "-DDXC_SPIRV_HEADERS_DIR=${FAF_DEPENDENCIES_DIR}/dxc-spirv-headers"
+      "-DDXC_SPIRV_TOOLS_DIR=${FAF_DEPENDENCIES_DIR}/dxc-spirv-tools"
+      "-DDIRECTX_HEADER_INCLUDE_DIR=${FAF_DEPENDENCIES_DIR}/dxc-directx-headers/include"
+      -DLLVM_ENABLE_ASSERTIONS=OFF -DSPIRV_BUILD_TESTS=OFF -DSPIRV_SKIP_TESTS=ON -DHLSL_INCLUDE_TESTS=OFF
+      -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
+      # DXC is a pinned dependency: its own warnings stay out of the build log, as FFmpeg's do.
+      -DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w
+    BUILD_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --target dxcompiler -j${_faf_ffmpeg_jobs}
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS "${_faf_dxc_prefix}/build/lib/libdxcompiler.dylib")
+  add_dependencies(faf_client faf_dxc_build)
+  # Vulkan on macOS: MoltenVK next to the executable (gpg/gal/backends/vulkan/VulkanLoader.cpp), and DXC.
+  add_custom_command(TARGET faf_client POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${FAF_DEPENDENCIES_DIR}/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib"
+      "${_faf_dxc_prefix}/build/lib/libdxcompiler.dylib"
+      "$<TARGET_FILE_DIR:faf_client>"
+    VERBATIM)
+endif()

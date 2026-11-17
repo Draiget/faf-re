@@ -74,7 +74,7 @@ namespace faf::editor
   )
   {
     for (auto& [path, entry] : mEntries) {
-      if (path.find(name) == std::string::npos || entry.failed || !entry.sheet) {
+      if (!path.contains(name) || entry.failed || !entry.sheet) {
         continue;
       }
       std::uint32_t pitch = 0;
@@ -163,7 +163,7 @@ namespace faf::editor
     while (count > 0 && !mWanted.empty()) {
       const std::string path = mWanted.front();
       mWanted.erase(mWanted.begin());
-      if (mEntries.count(path) != 0) {
+      if (mEntries.contains(path)) {
         continue;
       }
       --count;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <expected>
 #include <string>
 
 #include "moho/render/font/MsdfFontCook.h"
@@ -20,22 +21,22 @@ namespace moho
    * its memory, work and time limited (`MSDF_MakeModCookOptions`).
    *
    * It reads nothing but the header and the table directory, and never calls a font library, so it runs
-   * before any parser sees the file. False with `reason` set for anything else.
+   * before any parser sees the file. The reason for anything else.
    */
-  [[nodiscard]] bool MSDF_CheckFontStructure(const void* bytes, std::size_t byteCount, std::string& reason);
+  [[nodiscard]] std::expected<void, std::string> MSDF_CheckFontStructure(const void* bytes, std::size_t byteCount);
 
   /**
    * Whether Lua may load a font from this path: under `/mods/<mod>/fonts/`, a `.ttf` or `.otf`, and nothing that
    * could climb out of the folder. The path still goes through the virtual file system, so it never reaches
    * past the mounted game folders anyway.
    */
-  [[nodiscard]] bool MSDF_IsAllowedModFontPath(const char* path, std::string& reason);
+  [[nodiscard]] std::expected<void, std::string> MSDF_IsAllowedModFontPath(const char* path);
 
   /**
    * Whether an atlas that passed `MSDF_LoadAtlas`, so one with sound counts and rectangles, can have come
    * from these options: its size and range, codepoints that were asked for, and quads of a sane size. A
    * cache file is shared by every game on the machine, so it isn't trusted to have kept to them.
    */
-  [[nodiscard]] bool
-  MSDF_CheckCookedAtlas(const SMsdfFontAtlas& atlas, const SMsdfCookOptions& options, std::string& reason);
+  [[nodiscard]] std::expected<void, std::string>
+  MSDF_CheckCookedAtlas(const SMsdfFontAtlas& atlas, const SMsdfCookOptions& options);
 } // namespace moho

@@ -3045,7 +3045,7 @@ namespace moho
 
     const fa::string meshResourcePath(meshName);
     const std::string meshPathStd = meshResourcePath.to_std();
-    if (meshPathStd.find("<none>") == std::string::npos) {
+    if (!meshPathStd.contains("<none>")) {
       const bool keepActor = LuaPlus::LuaStackObject(state, 3).GetBoolean();
       const bool allowExplicitPlaceholder = !keepActor;
 

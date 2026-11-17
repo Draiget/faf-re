@@ -79,3 +79,7 @@ git -c core.autocrlf=false apply --unsafe-paths --whitespace=nowarn <repo>\depen
 ```
 
 Add `--check --reverse` to test whether it is already applied.
+
+## wildmagic3p8_faf_apple_endian.patch
+
+Applied after `wildmagic3p8_faf_required.patch`. Wild Magic 3.8 defines `WM3_BIG_ENDIAN` for every `__APPLE__` target, from the PowerPC Macs it was written for. Intel and Apple silicon Macs are little-endian, and the macro byte-swaps file I/O in `Wm3System.cpp` and changes the limb order of the exact rational arithmetic (`Wm3TInteger.inl`, `Wm3TRational.inl`). The patch defines it only where the compiler reports a big-endian target (`__BIG_ENDIAN__`).

@@ -38,25 +38,27 @@ namespace faf::editor
     const std::filesystem::path folder = std::filesystem::temp_directory_path() / "faf_editor_terrain_extras";
     std::filesystem::create_directories(folder);
     const HeightImage ramp = Ramp(17, 17);
-    std::string error;
-    ASSERT_TRUE(WriteHeightImage(folder / "ramp.r32", ramp, error)) << error;
+    const auto wroteR32 = WriteHeightImage(folder / "ramp.r32", ramp);
+    ASSERT_TRUE(wroteR32) << wroteR32.error();
     EXPECT_EQ(std::filesystem::file_size(folder / "ramp.r32"), 17U * 17U * 4U);
-    HeightImage back;
-    ASSERT_TRUE(ReadHeightImage(folder / "ramp.r32", 0, 0, back, error)) << error;
-    ASSERT_EQ(back.words.size(), ramp.words.size());
+    const auto back = ReadHeightImage(folder / "ramp.r32", 0, 0);
+    ASSERT_TRUE(back) << back.error();
+    ASSERT_EQ(back->words.size(), ramp.words.size());
     for (std::size_t i = 0; i < ramp.words.size(); ++i) {
-      EXPECT_NEAR(back.words[i], ramp.words[i], 1);
+      EXPECT_NEAR(back->words[i], ramp.words[i], 1);
     }
-    ASSERT_TRUE(WriteHeightImage(folder / "ramp8.png", ramp, error, true)) << error;
-    HeightImage eight;
-    ASSERT_TRUE(ReadHeightImage(folder / "ramp8.png", 0, 0, eight, error)) << error;
+    const auto wrotePng8 = WriteHeightImage(folder / "ramp8.png", ramp, true);
+    ASSERT_TRUE(wrotePng8) << wrotePng8.error();
+    const auto eight = ReadHeightImage(folder / "ramp8.png", 0, 0);
+    ASSERT_TRUE(eight) << eight.error();
     // 8 bits spread back over 16: within one step of 257.
-    EXPECT_NEAR(eight.words.back(), 65535, 257);
-    EXPECT_NEAR(eight.words.front(), 0, 257);
-    ASSERT_TRUE(WriteHeightImage(folder / "ramp.tif", ramp, error)) << error;
-    HeightImage tiff;
-    ASSERT_TRUE(ReadHeightImage(folder / "ramp.tif", 0, 0, tiff, error)) << error;
-    EXPECT_EQ(tiff.words, ramp.words);
+    EXPECT_NEAR(eight->words.back(), 65535, 257);
+    EXPECT_NEAR(eight->words.front(), 0, 257);
+    const auto wroteTiff = WriteHeightImage(folder / "ramp.tif", ramp);
+    ASSERT_TRUE(wroteTiff) << wroteTiff.error();
+    const auto tiff = ReadHeightImage(folder / "ramp.tif", 0, 0);
+    ASSERT_TRUE(tiff) << tiff.error();
+    EXPECT_EQ(tiff->words, ramp.words);
     std::filesystem::remove_all(folder);
   }
 

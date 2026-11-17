@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include <print>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -101,9 +102,8 @@ namespace
     a.in = in;
     a.extra = extra;
     auto g = std::make_shared<Grid>();
-    std::string e;
-    if (!RunOp(op, a, *g, e)) {
-      std::printf("op %s(%s) failed: %s\n", op.c_str(), params.c_str(), e.c_str());
+    if (const auto ran = RunOp(op, a, *g); !ran) {
+      std::println("op {}({}) failed: {}", op, params, ran.error());
       return nullptr;
     }
     return g;
@@ -379,13 +379,13 @@ namespace
     for (std::size_t i = 0; i < gLines.size(); ++i) {
       const std::string& l = gLines[i];
       if (!inside) {
-        if (l.find("Cases = [[") == 0) {
+        if (l.starts_with("Cases = [[")) {
           inside = true;
           gBegin = i + 1;
         }
         continue;
       }
-      if (l.find("]]") == 0) {
+      if (l.starts_with("]]")) {
         gEnd = i;
         break;
       }
@@ -459,9 +459,7 @@ namespace
       if (gCases[i].golden != now[i]) {
         ++wrong;
         if (!update)
-          std::printf(
-            "golden %s: file %s, now %s\n", gCases[i].label.c_str(), gCases[i].golden.c_str(), now[i].c_str()
-          );
+          std::println("golden {}: file {}, now {}", gCases[i].label, gCases[i].golden, now[i]);
       }
     }
     if (update) {
@@ -479,7 +477,7 @@ namespace
     } else {
       CHECK(wrong == 0, "%d golden checksums differ (run with --update after checking the change)", wrong);
     }
-    std::printf("goldens: %zu cases, %d differ%s\n", gCases.size(), wrong, update ? " (updated)" : "");
+    std::println("goldens: {} cases, {} differ{}", gCases.size(), wrong, update ? " (updated)" : "");
   }
 
   static double Sum(
@@ -520,8 +518,8 @@ namespace
       const double before = Sum(H->v), after = Sum(r->v);
       CHECK(std::fabs(before - after) / before < 2e-3, "hydraulic closed: mass changed %g -> %g", before, after);
       CHECK(
-        extra.count("wear") && extra.count("deposit") && extra.count("flow") && extra.count("water") &&
-          extra.count("sediment"),
+        extra.contains("wear") && extra.contains("deposit") && extra.contains("flow") && extra.contains("water") &&
+          extra.contains("sediment"),
         "extra outputs missing"
       );
       const Stats w = Measure(extra["wear"]), d = Measure(extra["deposit"]);
@@ -604,7 +602,7 @@ namespace
       CHECK(outside == 0, "the brush changed %d samples far outside its window", outside);
     }
 
-    std::printf("properties done\n");
+    std::println("properties done");
   }
 
   // ---- the map boundary
@@ -692,8 +690,8 @@ namespace
         const GridPtr r = Make(c.op, c.params, {{"a", H}});
         const double after = EdgeStep(*r);
         const double ratio = EdgeChangeRatio(*H, *r);
-        std::printf(
-          "boundary tilt %+.2f %-18s edge step %.3f -> %.3f, edge change / inner change %.2f\n",
+        std::println(
+          "boundary tilt {:+.2f} {:18} edge step {:.3f} -> {:.3f}, edge change / inner change {:.2f}",
           tilt,
           c.name,
           before,
@@ -768,8 +766,12 @@ namespace
       }
       b /= cnt;
       a /= cnt;
-      std::printf(
-        "brush mode %d: edge step %.3f -> %.3f, edge change / inner change %.2f\n", mode, b, a, EdgeChangeRatio(*H, cur)
+      std::println(
+        "brush mode {}: edge step {:.3f} -> {:.3f}, edge change / inner change {:.2f}",
+        mode,
+        b,
+        a,
+        EdgeChangeRatio(*H, cur)
       );
       CHECK(a <= b * 1.2 + 0.05, "brush mode %d: a step at the map border: %.3f -> %.3f", mode, b, a);
     }
@@ -1222,8 +1224,8 @@ namespace
       double worst = 0.0;
       for (std::size_t i = 0; i < a.size(); ++i)
         worst = std::max(worst, std::fabs(static_cast<double>(a[i]) - b[i]) / 128.0);
-      std::printf(
-        "brush shape: outside %d, mean |change| %.4f, worst change under a 1e-3 mask change %.4f\n",
+      std::println(
+        "brush shape: outside {}, mean |change| {:.4f}, worst change under a 1e-3 mask change {:.4f}",
         ca.outside,
         ca.meanAbs,
         worst
@@ -1285,8 +1287,8 @@ namespace
       double prof[5];
       for (int b = 0; b < 5; ++b)
         prof[b] = sum[b] / cnt[b];
-      std::printf(
-        "radial profile of |change| (plane, 5 rings of the radius): %.4f %.4f %.4f %.4f %.4f\n",
+      std::println(
+        "radial profile of |change| (plane, 5 rings of the radius): {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}",
         prof[0],
         prof[1],
         prof[2],
@@ -1355,7 +1357,7 @@ namespace
         }
       }
       const double ratio = (axis / na) / std::max(1e-9, diag / nd);
-      std::printf("isotropy: mean |change| along the axes / along the diagonals = %.2f\n", ratio);
+      std::println("isotropy: mean |change| along the axes / along the diagonals = {:.2f}", ratio);
       CHECK(
         ratio > 0.7 && ratio < 1.43, "the erosion has a preferred direction on the grid: axes / diagonals = %.2f", ratio
       );
@@ -1376,9 +1378,9 @@ namespace
         const Change ch = Compare(base, after, n, s.centres, 12.0, 12.5);
         const double r0 = Roughness(base, n, s.centres, 12.0), r1 = Roughness(after, n, s.centres, 12.0);
         const double peak0 = Peak(base), peak1 = Peak(after);
-        std::printf(
-          "stroke over a %s: outside %d, peak %.2f -> %.2f, sd in the brush %.3f -> %.3f (%.1f%%), mean|change| %.3f, "
-          "cv %.2f, net %.1f gross %.1f, relief %.4f -> %.4f\n",
+        std::println(
+          "stroke over a {}: outside {}, peak {:.2f} -> {:.2f}, sd in the brush {:.3f} -> {:.3f} ({:.1f}%), "
+          "mean|change| {:.3f}, cv {:.2f}, net {:.1f} gross {:.1f}, relief {:.4f} -> {:.4f}",
           kind == 0 ? "mountain" : (kind == 1 ? "ridge" : "smooth ridge"),
           ch.outside,
           peak0,
@@ -1421,8 +1423,8 @@ namespace
           volume,
           100.0 * ch.net / volume
         );
-        std::printf(
-          "   mass: net %.1f of the %.0f above the base in the brush (%.2f%%)\n",
+        std::println(
+          "   mass: net {:.1f} of the {:.0f} above the base in the brush ({:.2f}%)",
           ch.net,
           volume,
           100.0 * ch.net / volume
@@ -1455,8 +1457,8 @@ namespace
             best = std::max(best, a / std::max(1e-12, v0));
           }
         }
-        std::printf(
-          "   comb: strongest correlation of the high passed change at a lag of 3 .. 12 samples: %.2f\n", best
+        std::println(
+          "   comb: strongest correlation of the high passed change at a lag of 3 .. 12 samples: {:.2f}", best
         );
         CHECK(best < 0.5, "the change along the stroke repeats at a regular spacing (correlation %.2f): a comb", best);
       }
@@ -1585,8 +1587,8 @@ namespace
       const GridPtr varied = Make(c.op, (std::string(c.base) + "," + c.vary).c_str(), {{"a", H}});
       double m0 = 0.0, m1 = 0.0;
       const double v0 = RegionalVariation(*H, *plain, &m0), v1 = RegionalVariation(*H, *varied, &m1);
-      std::printf(
-        "variation %-10s regional variation %.3f -> %.3f (mean change %.3f -> %.3f)\n", c.name, v0, v1, m0, m1
+      std::println(
+        "variation {:10} regional variation {:.3f} -> {:.3f} (mean change {:.3f} -> {:.3f})", c.name, v0, v1, m0, m1
       );
       CHECK(
         v1 > v0 * 1.08, "%s: the variation options do not make the erosion more uneven (%.3f -> %.3f)", c.name, v0, v1
@@ -1639,8 +1641,8 @@ namespace
       double worstPlain = 0.0;
       for (std::size_t i = 0; i < M->v.size(); ++i)
         worstPlain = std::max(worstPlain, std::fabs(static_cast<double>(plain->v[i]) - M->v[i]));
-      std::printf(
-        "range %-10s plain %.2f .. %.2f (max change %.2f), kept %.2f .. %.2f, input %.2f .. %.2f\n",
+      std::println(
+        "range {:10} plain {:.2f} .. {:.2f} (max change {:.2f}), kept {:.2f} .. {:.2f}, input {:.2f} .. {:.2f}",
         c.name,
         Measure(*plain).min,
         Measure(*plain).max,
@@ -1656,7 +1658,7 @@ namespace
       const GridPtr plain = Make(c.op, c.base, {{"a", M}});
       const GridPtr kept = Make(c.op, (std::string(c.base) + ",conserve=1").c_str(), {{"a", M}});
       const double t0 = Total(*M), t1 = Total(*plain), t2 = Total(*kept);
-      std::printf("volume %-10s lost %.4f%% -> %.6f%%\n", c.name, 100.0 * (t0 - t1) / t0, 100.0 * (t0 - t2) / t0);
+      std::println("volume {:10} lost {:.4f}% -> {:.6f}%", c.name, 100.0 * (t0 - t1) / t0, 100.0 * (t0 - t2) / t0);
       CHECK(std::fabs(t0 - t2) / t0 < 1e-3, "%s: conserve=1 left a volume change of %g", c.name, (t0 - t2) / t0);
     }
     // protect: the summits keep more of their height
@@ -1675,7 +1677,7 @@ namespace
         d1 += M->v[i] - prot->v[i];
         ++cnt;
       }
-      std::printf("protect %-10s the top 5%% lose %.3f -> %.3f on average\n", c.name, d0 / cnt, d1 / cnt);
+      std::println("protect {:10} the top 5% lose {:.3f} -> {:.3f} on average", c.name, d0 / cnt, d1 / cnt);
       CHECK(
         d1 <= d0 * 0.8 + 1e-3, "%s: protect=1 does not spare the summits (%.3f -> %.3f)", c.name, d0 / cnt, d1 / cnt
       );
@@ -1694,7 +1696,7 @@ namespace
       double mf = 0.0, mo = 0.0;
       RegionalVariation(*slope, *fixedRule, &mf);
       RegionalVariation(*slope, *oldRule, &mo);
-      std::printf("droplet speed rule: mean change accel=1 %.4f, accel=0 %.4f\n", mf, mo);
+      std::println("droplet speed rule: mean change accel=1 {:.4f}, accel=0 {:.4f}", mf, mo);
       CHECK(
         mf > 20.0 * mo && mf > 0.05, "droplets still dig (almost) nothing on a slope: %.4f vs the old rule %.4f", mf, mo
       );
@@ -1799,9 +1801,9 @@ namespace
       const GridPtr many = Make("erode_droplet", "density=2,seed=3,rounds=32,creep=0", {{"a", S}});
       const double rf = MeanAbsLaplacian(*few), rm = MeanAbsLaplacian(*many);
       const double mf = ShareMoved(*S, *few, 0.5f), mm = ShareMoved(*S, *many, 0.5f);
-      std::printf(
-        "droplet rounds 4 -> 32 on smooth hills: fine relief %.4f -> %.4f (input %.4f), samples moved > 0.5: %.3f -> "
-        "%.3f\n",
+      std::println(
+        "droplet rounds 4 -> 32 on smooth hills: fine relief {:.4f} -> {:.4f} (input {:.4f}), samples moved > 0.5: "
+        "{:.3f} -> {:.3f}",
         rf,
         rm,
         base,
@@ -1819,7 +1821,7 @@ namespace
       };
       for (int i = 0; i < 3; ++i)
         change[i] = MeanChange(*H, *Make("erode_stream", params[i], {{"a", H}}));
-      std::printf("stream k 0.02 / 0.1 / 0.5: mean change %.4f %.4f %.4f\n", change[0], change[1], change[2]);
+      std::println("stream k 0.02 / 0.1 / 0.5: mean change {:.4f} {:.4f} {:.4f}", change[0], change[1], change[2]);
       CHECK(
         change[1] > 1.15 * change[0] && change[2] > 1.15 * change[1],
         "the stream erodibility no longer scales the change: %.4f %.4f %.4f",
@@ -1832,7 +1834,7 @@ namespace
       const GridPtr narrow = Make("erode_stream", "iterations=8,area_min=20,k=0.1,width_vary=0", {{"a", H}});
       const GridPtr wide = Make("erode_stream", "iterations=8,area_min=20,k=0.1,width_vary=1", {{"a", H}});
       const double sn = ShareMoved(*H, *narrow, 0.02f), sw = ShareMoved(*H, *wide, 0.02f);
-      std::printf("stream valley width growth 0 -> 1: samples moved > 0.02: %.3f -> %.3f\n", sn, sw);
+      std::println("stream valley width growth 0 -> 1: samples moved > 0.02: {:.3f} -> {:.3f}", sn, sw);
       CHECK(sw > 1.05 * sn, "valleys of big rivers are not wider with width_vary: %.3f vs %.3f", sw, sn);
     }
     {
@@ -1843,7 +1845,7 @@ namespace
         diff += std::fabs(every1->v[i] - every3->v[i]);
       diff /= static_cast<double>(every1->v.size());
       const double change = MeanChange(*H, *every1);
-      std::printf("stream route_every 1 vs 3: mean difference %.4f of a mean change %.4f\n", diff, change);
+      std::println("stream route_every 1 vs 3: mean difference {:.4f} of a mean change {:.4f}", diff, change);
       CHECK(
         diff < 0.5 * change,
         "recomputing the rivers every 3 steps changes the result too much: %.4f vs %.4f",
@@ -2025,9 +2027,9 @@ namespace
     for (int k = 0; k < 2; ++k)
       mass[k] = MeanChange(*M, *cur[k]);
     for (int k = 0; k < 2; ++k)
-      std::printf(
-        "veins %-10s pass 1/2/3: 1 cell Laplacian share %.3f %.3f %.3f, 1..4 cell band %.3f %.3f %.3f, cover %.2f %.2f "
-        "%.2f, axes %.2f diagonals %.2f (mean change %.3f)\n",
+      std::println(
+        "veins {:10} pass 1/2/3: 1 cell Laplacian share {:.3f} {:.3f} {:.3f}, 1..4 cell band {:.3f} {:.3f} {:.3f}, "
+        "cover {:.2f} {:.2f} {:.2f}, axes {:.2f} diagonals {:.2f} (mean change {:.3f})",
         k == 0 ? "creep 0" : "creep 2",
         vs[k][0].lap1,
         vs[k][1].lap1,
@@ -2097,8 +2099,8 @@ namespace
       const GridPtr d4 = Make("erode_droplet", "density=4,seed=1,creep=2", {{"a", M}});
       const double a1 = MeasureVeins(*M, *c1).lap1, a4 = MeasureVeins(*M, *c4).lap1, ad = MeasureVeins(*M, *d4).lap1,
                    a2 = vs[1][0].lap1;
-      std::printf(
-        "veins creep 1 / 2 / 4: 1 cell Laplacian share %.3f %.3f %.3f; density 4 creep 2: %.3f\n", a1, a2, a4, ad
+      std::println(
+        "veins creep 1 / 2 / 4: 1 cell Laplacian share {:.3f} {:.3f} {:.3f}; density 4 creep 2: {:.3f}", a1, a2, a4, ad
       );
       CHECK(a1 > a2 && a2 > a4, "more creep does not smooth the grooves more (%.3f %.3f %.3f)", a1, a2, a4);
       CHECK(
@@ -2115,7 +2117,7 @@ namespace
       const GridPtr S = Make("affine", "mul=0.6,add=30", {{"a", P}});
       const GridPtr r = Make("erode_droplet", "density=0.05,seed=1,creep=8", {{"a", S}});
       const double before = MeanAbsLaplacian(*S), after = MeanAbsLaplacian(*r);
-      std::printf("veins creep leaves the input's own relief: fine relief %.4f -> %.4f\n", before, after);
+      std::println("veins creep leaves the input's own relief: fine relief {:.4f} -> {:.4f}", before, after);
       CHECK(after > 0.9 * before, "creep smoothed the input's own detail (%.4f -> %.4f)", before, after);
     }
     // creep 0 is the old solver: the golden `droplet_creep0` carries the checksum `droplet` had before creep existed
@@ -2155,8 +2157,9 @@ namespace
       area[c] += 1.0;
       tot += d;
     }
-    std::printf(
-      "flank share after 3 passes: crest %.2f (of the area %.2f), upper flank %.2f (%.2f), lower flank %.2f (%.2f)\n",
+    std::println(
+      "flank share after 3 passes: crest {:.2f} (of the area {:.2f}), upper flank {:.2f} ({:.2f}), lower flank {:.2f} "
+      "({:.2f})",
       cut[0] / tot,
       area[0] / sel.size(),
       cut[1] / tot,
@@ -2182,7 +2185,7 @@ namespace
   {
     const GridPtr H = LabTerrain(n, 60.0 * n / 513.0);
     const Stats hs = Measure(*H);
-    std::printf("terrain %dx%d  min %.1f max %.1f mean %.1f sd %.1f\n", n, n, hs.min, hs.max, hs.mean, hs.sd);
+    std::println("terrain {}x{}  min {:.1f} max {:.1f} mean {:.1f} sd {:.1f}", n, n, hs.min, hs.max, hs.mean, hs.sd);
     DumpRelief(dir + "/base.png", *H, hs.min, hs.max);
     for (const Preset& p : kPresets) {
       if (!only.empty() && only != p.name)
@@ -2194,8 +2197,8 @@ namespace
       );
       const double dt = Now() - t0;
       const Stats s = Measure(*r);
-      std::printf(
-        "%-10s %.3f s   min %.1f max %.1f mean %.2f sd %.2f   wear %.3g deposit %.3g\n",
+      std::println(
+        "{:10} {:.3f} s   min {:.1f} max {:.1f} mean {:.2f} sd {:.2f}   wear {:.3g} deposit {:.3g}",
         p.name,
         dt,
         s.min,
@@ -2211,7 +2214,7 @@ namespace
           if (r->v[i] < r->v[im])
             im = i;
         const int mx = static_cast<int>(im % r->w), mz = static_cast<int>(im / r->w);
-        std::printf("   lowest at (%d,%d) = %.2f, was %.2f%c", mx, mz, r->v[im], H->v[im], 10);
+        std::print("   lowest at ({},{}) = {:.2f}, was {:.2f}{:c}", mx, mz, r->v[im], H->v[im], 10);
       }
       DumpRelief(dir + "/" + p.name + ".png", *r, hs.min, hs.max);
       DumpMask(dir + "/" + p.name + "_wear.png", extra["wear"]);
@@ -2235,7 +2238,7 @@ namespace
       if (name == p.name)
         pr = &p;
     if (pr == nullptr) {
-      std::printf("no such preset%c", 10);
+      std::print("no such preset{:c}", 10);
       return;
     }
     const GridPtr full = Make(pr->op, pr->params, {{"a", H}});
@@ -2250,7 +2253,7 @@ namespace
     Params parsed;
     ParseParams(params, parsed);
     auto scaled = [&](const char* key, double def, double div, double lo) {
-      const double v = parsed.num.count(key) ? parsed.num[key] : def;
+      const double v = parsed.num.contains(key) ? parsed.num[key] : def;
       char b[64];
       std::snprintf(b, sizeof(b), ",%s=%g", key, std::max(lo, std::floor(v / div + 0.5)));
       params += b;
@@ -2282,8 +2285,9 @@ namespace
     }
     const double mf = sf / cnt, mu = su / cnt;
     const double vf = sff / cnt - mf * mf, vu = suu / cnt - mu * mu, cv = sfu / cnt - mf * mu;
-    std::printf(
-      "scale study %s n=%d step=%d: full diff mean %.3f rms %.3f | coarse diff mean %.3f rms %.3f | correlation %.3f%c",
+    std::print(
+      "scale study {} n={} step={}: full diff mean {:.3f} rms {:.3f} | coarse diff mean {:.3f} rms {:.3f} | "
+      "correlation {:.3f}{:c}",
       pr->name,
       n,
       step,

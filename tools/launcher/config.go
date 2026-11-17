@@ -148,7 +148,7 @@ type ContractConfig struct {
 
 // ServerConfig configures ModeServer.
 type ServerConfig struct {
-	// Address is the game server, IPv4 host:port. %VAR% and $VAR expand, so a
+	// Address is the game server: IPv4 a.b.c.d:port or IPv6 [address]:port. %VAR% and $VAR expand, so a
 	// scenario names no address itself.
 	Address string `yaml:"address"`
 	// Delivery is how each game gets its connection string: "gpgnet" (default,

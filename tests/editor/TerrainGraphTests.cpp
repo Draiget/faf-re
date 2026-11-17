@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <set>
 #include <sstream>
 #include <string>
@@ -128,9 +129,9 @@ namespace
   )
   {
     NodeGraph graph(TerrainNodeTypes());
-    StudioGraphFacts facts;
-    std::string error;
-    ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
+    const auto read = ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph);
+    ASSERT_TRUE(read) << read.error();
+    const StudioGraphFacts& facts = *read;
     EXPECT_EQ(facts.name, "Rolling hills (two noises, hydraulic erosion)");
     EXPECT_EQ(facts.seed, 4);
     // Every node, with Studio's ids: the height chain and the texturing (ground kinds into their output).
@@ -142,8 +143,9 @@ namespace
     EXPECT_EQ(faf::editor::TerrainParamText(*graph.Find(3), "mode"), "normal") << "a choice by its id";
     EXPECT_EQ(graph.Links().size(), 18U) << "the height chain's 6, the texturing's 12";
     EXPECT_EQ(facts.droppedLinks, 0);
-    EXPECT_FALSE(ReadStudioGraph("Graph = { nodes = { { id = 1, ", graph, facts, error));
-    EXPECT_NE(error.find("line"), std::string::npos) << error;
+    const auto bad = ReadStudioGraph("Graph = { nodes = { { id = 1, ", graph);
+    ASSERT_FALSE(bad);
+    EXPECT_NE(bad.error().find("line"), std::string::npos) << bad.error();
   }
 
   TEST(
@@ -152,9 +154,9 @@ namespace
   )
   {
     NodeGraph graph(TerrainNodeTypes());
-    StudioGraphFacts facts;
-    std::string error;
-    ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
+    const auto read = ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph);
+    ASSERT_TRUE(read) << read.error();
+    const StudioGraphFacts& facts = *read;
     const TerrainGround ground = Ground();
     TerrainRun run(1);
     const auto report = run.Evaluate(graph, facts.seed, ground);
@@ -208,9 +210,9 @@ namespace
   )
   {
     NodeGraph graph(TerrainNodeTypes());
-    StudioGraphFacts facts;
-    std::string error;
-    ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
+    const auto read = ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph);
+    ASSERT_TRUE(read) << read.error();
+    const StudioGraphFacts& facts = *read;
     const TerrainGround ground = Ground();
     TerrainRun preview(4);
     const auto report = preview.Evaluate(graph, facts.seed, ground);
@@ -236,9 +238,9 @@ namespace
     for (const auto& entry : shipped) {
       EXPECT_FALSE(entry.name.empty()) << entry.id;
       NodeGraph graph(TerrainNodeTypes());
-      StudioGraphFacts facts;
-      std::string error;
-      ASSERT_TRUE(ReadStudioGraph(entry.text, graph, facts, error)) << entry.id << ": " << error;
+      const auto read = ReadStudioGraph(entry.text, graph);
+      ASSERT_TRUE(read) << entry.id << ": " << read.error();
+      const StudioGraphFacts& facts = *read;
       EXPECT_FALSE(graph.Nodes().empty()) << entry.id;
       complete += facts.unknownTypes.empty() ? 1 : 0;
       missing.insert(facts.unknownTypes.begin(), facts.unknownTypes.end());
@@ -247,8 +249,8 @@ namespace
     for (const std::string& type : missing) {
       list += " " + type;
     }
-    std::printf(
-      "[ shipped  ] %d of %zu graphs read whole; node types still to come:%s\n", complete, shipped.size(), list.c_str()
+    std::println(
+      "[ shipped  ] {} of {} graphs read whole; node types still to come:{}", complete, shipped.size(), list
     );
   }
 
@@ -282,7 +284,7 @@ namespace
     }();
     int ran = 0;
     for (const auto& type : TerrainNodeTypes().All()) {
-      if (type->category == "raw" || skip.count(type->name) != 0) {
+      if (type->category == "raw" || skip.contains(type->name)) {
         continue;
       }
       NodeGraph graph(TerrainNodeTypes());
@@ -381,7 +383,8 @@ namespace
     // On a PBR shader with a roughness multiplier in layer 8 the build writes it too: rock rough, the rest neutral.
     ground.roughness = true;
     faf::editor::TerrainBuildWrites writes;
-    ASSERT_TRUE(run.BuildWrites(graph, ground, shape, writes, error)) << error;
+    auto built = run.BuildWrites(graph, ground, shape, writes);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_TRUE(writes.kindsTypes) << "the node's \"Set the terrain types too\" is on by default";
     ASSERT_EQ(writes.layers.size(), 1U);
     EXPECT_EQ(writes.layers[0].layer, 8);
@@ -390,7 +393,8 @@ namespace
     EXPECT_LT(*lowest, 0.45f) << "snow (0.2) is linked too: shiny on the top";
     EXPECT_GE(*lowest, 0.31f) << "no shinier than snow at the amount: 0.5 - 0.3 x 0.6";
     ground.roughness = false;
-    ASSERT_TRUE(run.BuildWrites(graph, ground, shape, writes, error)) << error;
+    built = run.BuildWrites(graph, ground, shape, writes);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_TRUE(writes.layers.empty()) << "no roughness layer on other shaders";
 
     // A graph without Output: ground kinds paints nothing.
@@ -451,8 +455,8 @@ namespace
     const auto report = run.Evaluate(graph, 1, ground);
     EXPECT_EQ(report.errors.count(lonely), 1U) << "an output with nothing linked shows an error";
     faf::editor::TerrainBuildWrites writes;
-    std::string error;
-    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    auto built = run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes);
+    ASSERT_TRUE(built) << built.error();
     ASSERT_EQ(writes.layers.size(), 2U) << "layer 3 and rock's layer";
     EXPECT_EQ(writes.layers[0].layer, 3);
     EXPECT_EQ(writes.layers[0].mode, faf::editor::MaskWriteMode::AddTo);
@@ -472,7 +476,8 @@ namespace
     set(scatter, "count", 50);
     const auto again = run.Evaluate(graph, 1, ground);
     EXPECT_EQ(again.errors.count(scatter), 0U) << "its density mask is optional";
-    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    built = run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes);
+    ASSERT_TRUE(built) << built.error();
     ASSERT_EQ(writes.scatters.size(), 1U);
     const auto& s = writes.scatters[0];
     EXPECT_EQ(s.density.w, 0) << "everywhere";
@@ -488,12 +493,13 @@ namespace
     // The same node scattering decals: their textures as its entries, written (no note any more).
     set(scatter, "kind", 1); // decals
     (void)run.Evaluate(graph, 1, ground);
-    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    built = run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes);
+    ASSERT_TRUE(built) << built.error();
     ASSERT_EQ(writes.scatters.size(), 1U);
     EXPECT_TRUE(writes.scatters[0].decals);
     EXPECT_EQ(writes.scatters[0].entries.size(), 2U);
     EXPECT_TRUE(std::none_of(writes.notes.begin(), writes.notes.end(), [](const std::string& n) {
-      return n.find("decals") != std::string::npos;
+      return n.contains("decals");
     }));
     set(scatter, "kind", 0); // props again for what follows
 
@@ -505,7 +511,8 @@ namespace
     ASSERT_EQ(graph.Link(noise, 0, rough, 0), LinkResult::Ok);
     ground.roughness = true;
     (void)run.Evaluate(graph, 1, ground);
-    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    built = run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_EQ(std::count(writes.mapTextures.begin(), writes.mapTextures.end(), 0), 1) << "the normal map";
     EXPECT_EQ(std::count(writes.mapTextures.begin(), writes.mapTextures.end(), 3), 1) << "the macrotexture";
     EXPECT_EQ(
@@ -513,7 +520,7 @@ namespace
         writes.notes.begin(),
         writes.notes.end(),
         [](const std::string& note) {
-      return note.find("atlas") != std::string::npos;
+      return note.contains("atlas");
     }
       ),
       1
@@ -591,12 +598,11 @@ namespace
     TerrainGround ground = Ground();
     int loads = 0;
     std::string asked;
-    ground.loadExternal = [&](const std::string& file, field::Grid& out, std::string& error) {
+    ground.loadExternal = [&](const std::string& file, field::Grid& out) -> std::expected<void, std::string> {
       ++loads;
       asked = file;
       if (file == "missing.png") {
-        error = "missing.png: no such file";
-        return false;
+        return std::unexpected("missing.png: no such file");
       }
       out = field::Grid(129, 129, 1.0f, 0.0f, 0.0f);
       for (int z = 0; z < 129; ++z) {
@@ -604,7 +610,7 @@ namespace
           out.At(x, z) = 10.0f + static_cast<float>(x) * 0.5f;
         }
       }
-      return true;
+      return {};
     };
     ground.externalKey = "a.png|1";
     NodeGraph graph(TerrainNodeTypes());
@@ -747,11 +753,10 @@ namespace
     // Layer 2 paints the right half of a 64 x 64 mask over the 128-unit map; the image is a ramp 0..1 left to right.
     TerrainGround ground = Ground();
     int maskReads = 0;
-    ground.layerMask = [&](const int layer, field::Grid& out, std::string& error) {
+    ground.layerMask = [&](const int layer, field::Grid& out) -> std::expected<void, std::string> {
       ++maskReads;
       if (layer != 2) {
-        error = "layer " + std::to_string(layer) + " is empty here";
-        return false;
+        return std::unexpected("layer " + std::to_string(layer) + " is empty here");
       }
       const float cell = 128.0f / 64.0f;
       out = field::Grid(64, 64, cell, cell * 0.5f, cell * 0.5f);
@@ -760,13 +765,12 @@ namespace
           out.At(x, z) = x >= 32 ? 1.0f : 0.0f;
         }
       }
-      return true;
+      return {};
     };
     ground.paintKey = "1";
-    ground.loadImage = [](const std::string& file, field::Grid& out, std::string& error) {
+    ground.loadImage = [](const std::string& file, field::Grid& out) -> std::expected<void, std::string> {
       if (file != "ramp.png") {
-        error = file + ": no such file";
-        return false;
+        return std::unexpected(file + ": no such file");
       }
       out = field::Grid(129, 129, 1.0f, 0.0f, 0.0f);
       for (int z = 0; z < 129; ++z) {
@@ -774,7 +778,7 @@ namespace
           out.At(x, z) = static_cast<float>(x) / 128.0f;
         }
       }
-      return true;
+      return {};
     };
     NodeGraph graph(TerrainNodeTypes());
     const int layer = graph.AddNode("stratum", 0, 0);
@@ -927,9 +931,9 @@ namespace
         continue;
       }
       NodeGraph g(TerrainNodeTypes());
-      StudioGraphFacts facts;
-      std::string error;
-      ASSERT_TRUE(ReadStudioGraph(shipped.text, g, facts, error)) << error;
+      const auto read = ReadStudioGraph(shipped.text, g);
+      ASSERT_TRUE(read) << read.error();
+      const StudioGraphFacts& facts = *read;
       EXPECT_EQ(facts.symmetry, want->second) << shipped.id;
       expected.erase(want);
     }
@@ -938,9 +942,9 @@ namespace
     NodeGraph back(TerrainNodeTypes());
     int seed = 0;
     std::string name;
-    std::string error;
     std::string symmetry;
-    ASSERT_TRUE(faf::editor::LoadTerrainGraph(saved, back, seed, name, error, &symmetry)) << error;
+    const auto loaded = faf::editor::LoadTerrainGraph(saved, back, seed, name, &symmetry);
+    ASSERT_TRUE(loaded) << loaded.error();
     EXPECT_EQ(symmetry, "mirror_xz");
   }
 
@@ -950,14 +954,15 @@ namespace
   )
   {
     NodeGraph graph(TerrainNodeTypes());
-    StudioGraphFacts facts;
-    std::string error;
-    ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
+    const auto read = ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph);
+    ASSERT_TRUE(read) << read.error();
+    const StudioGraphFacts& facts = *read;
     const std::string text = faf::editor::SaveTerrainGraph(graph, 77, "My hills");
     NodeGraph back(TerrainNodeTypes());
     int seed = 0;
     std::string name;
-    ASSERT_TRUE(faf::editor::LoadTerrainGraph(text, back, seed, name, error)) << error;
+    const auto loaded = faf::editor::LoadTerrainGraph(text, back, seed, name);
+    ASSERT_TRUE(loaded) << loaded.error();
     EXPECT_EQ(seed, 77);
     EXPECT_EQ(name, "My hills");
     EXPECT_EQ(back.Nodes().size(), graph.Nodes().size());

@@ -70,7 +70,7 @@ namespace faf::editor
   namespace
   {
     // The panels' scales the toolbar's - and + (and Ctrl+- / Ctrl+=) step between.
-    constexpr float kUiScaleSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+    constexpr float kUiScaleSteps[] = {kMinUiScale, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, kMaxUiScale};
   } // namespace
 
   void EdShell::StepUiScale(
@@ -105,28 +105,26 @@ namespace faf::editor
       ) {
         mapWideDone = true;
         const std::string what = value[0].c_str();
-        const int kind = what.rfind("lighting", 0) == 0 ? 1
-          : what.rfind("specular", 0) == 0              ? 2
-          : what.rfind("macro", 0) == 0                 ? 3
-                                                        : 0;
+        const int kind = what.starts_with("lighting") ? 1
+          : what.starts_with("specular")              ? 2
+          : what.starts_with("macro")                 ? 3
+                                                      : 0;
         const auto fileAfter = [&](const char* const key) {
           const std::size_t at = what.find(key);
           return at == std::string::npos ? std::string() : what.substr(at + std::string(key).size());
         };
         if (const std::string out = fileAfter(",export="); !out.empty()) {
           mTools.AskMapTexture(
-            kind,
-            what.find(",make,") != std::string::npos ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export,
-            out
+            kind, what.contains(",make,") ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export, out
           );
         } else if (const std::string in = fileAfter(",import="); !in.empty()) {
           mTools.AskMapTexture(kind, EdTools::MapTextureOp::Import, in);
         } else {
           mTools.AskMapTexture(
             kind,
-            what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
+            what.contains(",clear") ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
             {},
-            what.find(",stale") != std::string::npos
+            what.contains(",stale")
           );
         }
         gpg::Logf("editor: /mapwide %s", what.c_str());
@@ -140,11 +138,11 @@ namespace faf::editor
         pickDone = true;
         const std::string kinds = std::string(",") + value[0].c_str() + ",";
         PickFilter& pickable = mTools.Pickable();
-        pickable.markers = kinds.find(",markers,") != std::string::npos;
-        pickable.pathNodes = kinds.find(",pathnodes,") != std::string::npos;
-        pickable.units = kinds.find(",units,") != std::string::npos;
-        pickable.props = kinds.find(",props,") != std::string::npos;
-        pickable.decals = kinds.find(",decals,") != std::string::npos;
+        pickable.markers = kinds.contains(",markers,");
+        pickable.pathNodes = kinds.contains(",pathnodes,");
+        pickable.units = kinds.contains(",units,");
+        pickable.props = kinds.contains(",props,");
+        pickable.decals = kinds.contains(",decals,");
         gpg::Logf("editor: /pickfilter %s", value[0].c_str());
       }
     }
@@ -164,7 +162,7 @@ namespace faf::editor
           mTools.AskLayerMove(from - 1, to - 1);
           gpg::Logf("editor: /movelayer %d to %d", from, to);
           // `,undo`: Edit > Undo two seconds after, as a click would.
-          if (std::string(value[0].c_str()).find(",undo") != std::string::npos) {
+          if (std::string(value[0].c_str()).contains(",undo")) {
             moveUndoAt = ImGui::GetTime() + 2.0;
           }
         }
@@ -239,9 +237,9 @@ namespace faf::editor
           CheckIssue issue;
           issue.marker = "test run";
           issue.text = line.size() > 400 ? line.substr(0, 400) + "..." : line;
-          if (!lowerFolder.empty() && lower.find(lowerFolder) != std::string::npos) {
+          if (!lowerFolder.empty() && lower.contains(lowerFolder)) {
             issue.level = CheckIssue::Level::Error;
-          } else if (lower.find(".lua") != std::string::npos || lower.find("traceback") != std::string::npos) {
+          } else if (lower.contains(".lua") || lower.contains("traceback")) {
             issue.level = CheckIssue::Level::Warning;
           } else {
             issue.level = CheckIssue::Level::Note;
@@ -249,11 +247,11 @@ namespace faf::editor
           mTestRunIssues.push_back(std::move(issue));
         }
         std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(), [](const CheckIssue& a, const CheckIssue& b) {
-          return static_cast<int>(a.level) < static_cast<int>(b.level);
+          return std::to_underlying(a.level) < std::to_underlying(b.level);
         });
         int counts[3] = {0, 0, 0};
         for (const CheckIssue& issue : mTestRunIssues) {
-          ++counts[static_cast<int>(issue.level)];
+          ++counts[std::to_underlying(issue.level)];
         }
         gpg::Logf(
           "editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes",
@@ -862,6 +860,49 @@ namespace faf::editor
     if (mCommands == nullptr || !ImGui::BeginPopup("##viewmenu")) {
       return;
     }
+    using Kind = ViewMenuAction::Kind;
+    const ViewMenuPoint& at = mViewMenuPoint;
+    const auto act = [this](const Kind kind, std::string arg = {}, std::vector<std::string> path = {}) {
+      mViewMenuAction = {kind, std::move(arg), std::move(path)};
+    };
+    // The header (FAF Studio's menus.lua): where, how high, and what stands there.
+    if (at.valid) {
+      ImGui::TextDisabled(
+        "%.1f, %.1f  height %.2f", static_cast<double>(at.x), static_cast<double>(at.z), static_cast<double>(at.height)
+      );
+      if (!at.what.empty()) {
+        ImGui::TextUnformatted(at.what.c_str());
+      }
+      ImGui::Separator();
+    }
+    // Its own entries: a resource to its build grid; a unit to another army or group.
+    if (at.markerType == "Mass" || at.markerType == "Hydrocarbon") {
+      if (ImGui::MenuItem("Snap to the build grid")) {
+        act(Kind::SnapToGrid, at.marker);
+      }
+    }
+    if (!at.unitName.empty()) {
+      if (ImGui::BeginMenu("Set army")) {
+        for (const std::string& army : at.armies) {
+          if (ImGui::MenuItem(army.c_str(), nullptr, army == at.unitArmy, army != at.unitArmy)) {
+            act(Kind::SetArmy, army);
+          }
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Move to group")) {
+        for (const std::vector<std::string>& path : at.groups) {
+          std::string label;
+          for (const std::string& part : path) {
+            label += (label.empty() ? "" : " / ") + part;
+          }
+          if (ImGui::MenuItem(label.empty() ? "(the army's root)" : label.c_str())) {
+            act(Kind::MoveToGroup, at.unitArmy, path);
+          }
+        }
+        ImGui::EndMenu();
+      }
+    }
     for (const std::string& id : ViewMenuCommands(mViewMenuSelection)) {
       if (id.empty()) {
         ImGui::Separator();
@@ -877,6 +918,42 @@ namespace faf::editor
       }
       if (!why.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         EdSetTooltip("%s", why.c_str());
+      }
+    }
+    // Things put at the point.
+    if (at.valid && mDocument.GetState() == EdDocument::State::Open) {
+      ImGui::Separator();
+      if (ImGui::BeginMenu("Place marker here")) {
+        std::string group;
+        for (const MarkerType& type : MarkerTypes()) {
+          if (group != type.group) {
+            group = type.group;
+            ImGui::SeparatorText(group.c_str());
+          }
+          if (ImGui::MenuItem(type.type)) {
+            act(Kind::PlaceMarker, type.type);
+          }
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::MenuItem("Add start position here")) {
+        act(Kind::PlaceMarker, "Blank Marker");
+      }
+      if (ImGui::MenuItem("Add area here")) {
+        act(Kind::AddArea);
+      }
+      if (!at.unitToPlace.empty() && ImGui::MenuItem(("Place " + at.unitToPlace + " here").c_str())) {
+        act(Kind::PlaceUnit);
+      }
+      if (!at.propToPlace.empty()) {
+        const std::size_t slash = at.propToPlace.find_last_of('/');
+        const std::string name = slash == std::string::npos ? at.propToPlace : at.propToPlace.substr(slash + 1);
+        if (ImGui::MenuItem(("Place " + name + " here").c_str())) {
+          act(Kind::PlaceProp);
+        }
+      }
+      if (ImGui::MenuItem("Focus the camera here")) {
+        act(Kind::FocusHere);
       }
     }
     ImGui::EndPopup();
@@ -934,6 +1011,17 @@ namespace faf::editor
   {
     for (const PanelFlag& flag : PanelFlags()) {
       this->*flag.shown = std::find(ids.begin(), ids.end(), PanelId(flag.window)) != ids.end();
+    }
+  }
+
+  void EdShell::ApplyShownPanels()
+  {
+    // A named layout was just read (ImGui's settings, the [FafEditor] Panels.<key> lines with them): the active
+    // workspace shows the panels it lists, before this frame's own list is kept over it.
+    const auto saved = ShownPanels().find(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key);
+    if (saved != ShownPanels().end()) {
+      ShowPanels(saved->second);
+      gpg::Logf("editor: layout: %zu panels shown in this workspace", saved->second.size());
     }
   }
 
@@ -1627,7 +1715,7 @@ namespace faf::editor
       std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
       const auto groupShown = [&](const bool paths) {
         for (const MarkerType& type : MarkerTypes()) {
-          if ((std::string(type.group) == "Path nodes") == paths && hidden.count(type.type) != 0) {
+          if ((std::string(type.group) == "Path nodes") == paths && hidden.contains(type.type)) {
             return false;
           }
         }
@@ -1985,7 +2073,7 @@ namespace faf::editor
           );
         }
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
-          if (marker.name.rfind("ARMY_", 0) != 0) {
+          if (!marker.name.starts_with("ARMY_")) {
             continue;
           }
           const std::vector<double> position = ValueNumbers(marker.Get("position"));
@@ -2286,7 +2374,7 @@ namespace faf::editor
         ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled("%zu", i + 1);
         ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
-        int role = static_cast<int>(slot.role);
+        int role = std::to_underlying(slot.role);
         ImGui::SetNextItemWidth(roleWidth);
         if (EdCombo("##role", &role, kRoles, 3)) {
           slot.role = static_cast<PlaySlot::Role>(role);
@@ -2614,12 +2702,11 @@ namespace faf::editor
       ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
     if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
-      std::string message;
-      if (mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName, message)) {
-        gpg::Logf("editor: %s", message.c_str());
+      if (const auto saved = mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName)) {
+        gpg::Logf("editor: %s", saved->c_str());
         ImGui::CloseCurrentPopup();
       } else {
-        gpg::Warnf("editor: %s", message.c_str());
+        gpg::Warnf("editor: %s", saved.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -2797,6 +2884,50 @@ namespace faf::editor
     if (ImGui::RadioButton("Campaign", mNewMap.campaign)) {
       mNewMap.campaign = true;
     }
+    // Any size (FAF Studio's custom map): a playable area of any km in the terrain that holds it.
+    bool anySize = mNewMap.widthKm > 0.0f;
+    ImGui::TextUnformatted("Any size");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::Checkbox("##anysize", &anySize)) {
+      mNewMap.widthKm = anySize ? 7.5f : 0.0f;
+      mNewMap.depthKm = anySize ? 7.5f : 0.0f;
+    }
+    if (anySize) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(70.0f));
+      FillDragFloat("##widthkm", &mNewMap.widthKm, 0.1f, 1.0f, 80.0f, "%.1f km");
+      ImGui::SameLine();
+      ImGui::TextUnformatted("x");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(70.0f));
+      FillDragFloat("##depthkm", &mNewMap.depthKm, 0.1f, 1.0f, 80.0f, "%.1f km");
+      for (const float preset : {7.5f, 15.0f, 30.0f}) {
+        ImGui::SameLine();
+        char label[16];
+        (void)std::snprintf(label, sizeof(label), "%g", static_cast<double>(preset));
+        if (ImGui::SmallButton(label)) {
+          mNewMap.widthKm = mNewMap.depthKm = preset;
+        }
+      }
+      const std::optional<std::array<int, 4>> area = NewMapPlayable(mNewMap);
+      const int tw = NewMapWidth(mNewMap);
+      const int td = NewMapDepth(mNewMap);
+      if (area) {
+        const int w = (*area)[2] - (*area)[0];
+        const int d = (*area)[3] - (*area)[1];
+        ImGui::TextDisabled(
+          "Terrain %d x %d; the playable area %d x %d in its middle (%d%% of it); starts inside the area.",
+          tw,
+          td,
+          w,
+          d,
+          static_cast<int>(100.0 * w * d / (static_cast<double>(tw) * td))
+        );
+      } else {
+        ImGui::TextDisabled("Terrain %d x %d, all of it playable.", tw, td);
+      }
+    }
+    ImGui::BeginDisabled(anySize);
     ImGui::TextUnformatted("Size");
     ImGui::SameLine(Em(110.0f));
     for (int i = 0; i < kNewMapSizeCount; ++i) {
@@ -2821,6 +2952,7 @@ namespace faf::editor
       }
       ImGui::PopID();
     }
+    ImGui::EndDisabled();
     ImGui::SetNextItemWidth(kWidth);
     FillSliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
     ImGui::SetNextItemWidth(kWidth);
@@ -2838,12 +2970,11 @@ namespace faf::editor
     if (ImGui::Button("Create", ImVec2(Em(120.0f), 0.0f))) {
       mNewMap.title = mNewMapTitle;
       mNewMap.folder = mNewMapFolder;
-      std::string message;
-      if (mDocument.CreateNew(mNewMap, message)) {
-        gpg::Logf("editor: %s", message.c_str());
+      if (const auto created = mDocument.CreateNew(mNewMap)) {
+        gpg::Logf("editor: %s", created->c_str());
         ImGui::CloseCurrentPopup();
       } else {
-        gpg::Warnf("editor: %s", message.c_str());
+        gpg::Warnf("editor: %s", created.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -2917,7 +3048,9 @@ namespace faf::editor
     ImGui::BeginDisabled(!mPackagePlan.errors.empty());
     if (ImGui::Button("Package", ImVec2(Em(120.0f), 0.0f))) {
       std::filesystem::path written;
-      const bool ok = mDocument.WritePackage(mPackagePlan, written, mPackageMessage);
+      const auto packaged = mDocument.WritePackage(mPackagePlan, written);
+      const bool ok = packaged.has_value();
+      mPackageMessage = ok ? *packaged : packaged.error();
       (ok ? gpg::Logf : gpg::Warnf)("editor: %s", mPackageMessage.c_str());
     }
     ImGui::EndDisabled();

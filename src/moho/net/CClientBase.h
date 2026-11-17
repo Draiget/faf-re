@@ -219,7 +219,7 @@ namespace moho
       CClientManagerImpl* manager,
       const char* name,
       int32_t ownerId,
-      BVIntSet& commandSources,
+      const BVIntSet& commandSources,
       uint32_t sourceId
     );
 

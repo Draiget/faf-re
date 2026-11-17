@@ -1,4 +1,5 @@
 #include "moho/mesh/MeshPrivate.h"
+#include <utility>
 
 bool moho::ren_ParallelCull = true;
 namespace
@@ -26,7 +27,7 @@ namespace
     const moho::EEntityType type
   ) noexcept
   {
-    return static_cast<std::uint32_t>(type);
+    return std::to_underlying(type);
   }
 
   template <class T>

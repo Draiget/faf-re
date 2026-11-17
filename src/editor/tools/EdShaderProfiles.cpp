@@ -101,7 +101,7 @@ namespace faf::editor
       const std::string low = Lower(name);
       const bool biplanar = low.size() == 11 && low[10] == 'b';
       if (
-        (low.size() != 10 && !biplanar) || low.rfind("terrain", 0) != 0 || (low[7] != '1' && low[7] != '2') ||
+        (low.size() != 10 && !biplanar) || !low.starts_with("terrain") || (low[7] != '1' && low[7] != '2') ||
         std::isdigit(static_cast<unsigned char>(low[8])) == 0 || std::isdigit(static_cast<unsigned char>(low[9])) == 0
       ) {
         return false;

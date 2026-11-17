@@ -146,13 +146,13 @@ namespace faf::editor
   {
     if (!text.empty()) {
       auto graph = std::make_unique<NodeGraph>(TerrainNodeTypes());
-      std::string error;
       if (studio) {
-        StudioGraphFacts facts;
-        if (!ReadStudioGraph(text, *graph, facts, error)) {
-          mStatus = "Can't read " + name + ": " + error;
+        const auto read = ReadStudioGraph(text, *graph);
+        if (!read) {
+          mStatus = "Can't read " + name + ": " + read.error();
           return;
         }
+        const StudioGraphFacts& facts = *read;
         mSeed = facts.seed;
         mSymmetry = facts.symmetry;
         mLoadNote.clear();
@@ -165,8 +165,8 @@ namespace faf::editor
         }
       } else {
         std::string savedName;
-        if (!LoadTerrainGraph(text, *graph, mSeed, savedName, error, &mSymmetry)) {
-          mStatus = "Can't read " + name + ": " + error;
+        if (const auto loaded = LoadTerrainGraph(text, *graph, mSeed, savedName, &mSymmetry); !loaded) {
+          mStatus = "Can't read " + name + ": " + loaded.error();
           return;
         }
         mLoadNote.clear();
@@ -177,6 +177,13 @@ namespace faf::editor
     RetireThumbs();
     mPreview.Clear();
     mReport = TerrainReport{};
+    mUndo.clear();
+    mRedo.clear();
+    mUndoTop.clear();
+    mUndoChanges = ~std::uint64_t{0};
+    if (mMaskNode != 0) {
+      ShowAsMask(0);
+    }
     mCanvas = EdNodeCanvas{};
     mCanvas.SetThumbnails([this](const GraphNode& node) -> std::uint64_t {
       const auto found = mThumbs.find(node.id);
@@ -284,6 +291,7 @@ namespace faf::editor
     mPreview.SetStep(step);
     mReport = mPreview.Evaluate(*mGraph, mSeed, ground);
     UpdateThumbnails();
+    UpdateMaskShown();
     char text[256];
     const int samples = (ground.width - 1) / step + 1;
     (void)std::snprintf(
@@ -355,6 +363,7 @@ namespace faf::editor
     const bool mapOpen
   )
   {
+    TrackUndo();
     if (!mapOpen) {
       mShownOnMap = false;
       return;
@@ -403,8 +412,14 @@ namespace faf::editor
       TerrainBuildWrites writes;
       std::string paintError;
       const field::Grid shape = hasHeights ? heights : field::Grid(ground.width, ground.height, 1.0f, 0.0f, 0.0f);
-      const bool collected =
-        report.errors.empty() && ground.hasPaint && full.BuildWrites(*mGraph, ground, shape, writes, paintError);
+      bool collected = false;
+      if (report.errors.empty() && ground.hasPaint) {
+        const auto built = full.BuildWrites(*mGraph, ground, shape, writes);
+        collected = built.has_value();
+        if (!built) {
+          paintError = built.error();
+        }
+      }
       const bool hasPaint = collected && !writes.Empty();
       if (!report.errors.empty()) {
         mStatus = "Build stopped: " + std::to_string(report.errors.size()) + " node(s) have errors (" +
@@ -472,8 +487,7 @@ namespace faf::editor
           continue;
         }
         if (
-          !needle.empty() &&
-          Lower(type->title + " " + type->name + " " + title + " " + type->help).find(needle) == std::string::npos
+          !needle.empty() && !Lower(type->title + " " + type->name + " " + title + " " + type->help).contains(needle)
         ) {
           continue;
         }
@@ -601,7 +615,8 @@ namespace faf::editor
       EdSetItemTooltip(
         "The symmetry of the result: the heights, the paint and the terrain types are made symmetric where the graph "
         "writes them (the master part copied over the rest), so erosion and noise after a Symmetrize node can't break "
-        "it. Scattered props aren't mirrored. \"Follow the map\" takes the editor's symmetry (the toolbar's)."
+        "it. Scattered props and decals are placed in its first part with their copies. \"Follow the map\" takes "
+        "the editor's symmetry (the toolbar's)."
       );
     }
     SameLineIfFits(CheckboxWidth("Show on the map"));
@@ -626,6 +641,20 @@ namespace faf::editor
       mRefreshAsked = true;
     }
     EdSetItemTooltip("Runs every node again, with the map's ground as it is now.");
+    SameLineIfFits(ButtonWidth(ICON_UNDO));
+    ImGui::BeginDisabled(mUndo.empty());
+    if (ImGui::Button(ICON_UNDO "##graphundo")) {
+      Undo();
+    }
+    ImGui::EndDisabled();
+    EdSetItemTooltip("Undo the last graph edit (Ctrl+Z over the graph)");
+    SameLineIfFits(ButtonWidth(ICON_REDO));
+    ImGui::BeginDisabled(mRedo.empty());
+    if (ImGui::Button(ICON_REDO "##graphredo")) {
+      Redo();
+    }
+    ImGui::EndDisabled();
+    EdSetItemTooltip("Redo (Ctrl+Y over the graph)");
     if (!mStatus.empty()) {
       // Wrapped: a build's status names everything it wrote and left out.
       ImGui::PushTextWrapPos(0.0f);
@@ -639,11 +668,25 @@ namespace faf::editor
   )
   {
     FreeRetired();
+    mGraphFocused = false;
     if (!ImGui::Begin(
           Panel("Graph###GenerateGraph"), &open, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
         )) {
       ImGui::End();
       return;
+    }
+    mGraphFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    if (mGraphFocused && !ImGui::IsAnyItemActive()) {
+      const ImGuiIO& io = ImGui::GetIO();
+      if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        if (io.KeyShift) {
+          Redo();
+        } else {
+          Undo();
+        }
+      } else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)) {
+        Redo();
+      }
     }
     DrawToolbar();
     if (
@@ -658,6 +701,449 @@ namespace faf::editor
     }
     ImGui::EndChild();
     ImGui::End();
+  }
+
+  void EdGenerate::TrackUndo()
+  {
+    // A drag or a slider is one step: taken when the mouse is up and nothing is being edited.
+    if (!mGraph || ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsAnyItemActive()) {
+      return;
+    }
+    if (mGraph->Changes() == mUndoChanges) {
+      return;
+    }
+    std::string now = mGraph->Save();
+    if (mUndoChanges != ~std::uint64_t{0} && now != mUndoTop) {
+      mUndo.push_back(std::move(mUndoTop));
+      if (mUndo.size() > 200) {
+        mUndo.erase(mUndo.begin());
+      }
+      mRedo.clear();
+    }
+    mUndoTop = std::move(now);
+    mUndoChanges = mGraph->Changes();
+  }
+
+  void EdGenerate::Undo()
+  {
+    TrackUndo();
+    if (mUndo.empty()) {
+      return;
+    }
+    mRedo.push_back(std::move(mUndoTop));
+    mUndoTop = std::move(mUndo.back());
+    mUndo.pop_back();
+    (void)mGraph->Restore(mUndoTop);
+    mUndoChanges = mGraph->Changes();
+    gpg::Logf("editor: generate: undo (%zu left)", mUndo.size());
+  }
+
+  void EdGenerate::Redo()
+  {
+    if (mRedo.empty()) {
+      return;
+    }
+    mUndo.push_back(std::move(mUndoTop));
+    mUndoTop = std::move(mRedo.back());
+    mRedo.pop_back();
+    (void)mGraph->Restore(mUndoTop);
+    mUndoChanges = mGraph->Changes();
+    gpg::Logf("editor: generate: redo (%zu left)", mRedo.size());
+  }
+
+  bool EdGenerate::GraphKeepsChord(
+    const std::string& chord
+  ) const
+  {
+    if (!mGraphFocused) {
+      return false;
+    }
+    for (const char* const kept :
+         {"Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "Ctrl+C", "Ctrl+V", "Ctrl+X", "Ctrl+D", "Delete", "Backspace", "F"}) {
+      if (chord == kept) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void EdGenerate::ShowAsMask(
+    const int node
+  )
+  {
+    mMaskNode = node;
+    mMaskFrom.reset();
+    if (node == 0) {
+      mMaskGrid = field::Grid{};
+      mMaskAsked = true;
+      return;
+    }
+    UpdateMaskShown();
+  }
+
+  bool EdGenerate::TakeMaskAsk(
+    field::Grid& out
+  )
+  {
+    if (!std::exchange(mMaskAsked, false)) {
+      return false;
+    }
+    out = mMaskNode != 0 ? mMaskGrid : field::Grid{};
+    return true;
+  }
+
+  void EdGenerate::UpdateMaskShown()
+  {
+    if (mMaskNode == 0 || !mGraph) {
+      return;
+    }
+    const GraphNode* node = mGraph->Find(mMaskNode);
+    if (node == nullptr) {
+      ShowAsMask(0);
+      return;
+    }
+    const TerrainValue* value = nullptr;
+    for (const PinDef& pin : node->type->outputs) {
+      if (const TerrainValue* v = mPreview.Value(node->id, pin.name); v != nullptr && v->grid != nullptr) {
+        value = v;
+        break;
+      }
+    }
+    if (value == nullptr || value->grid == mMaskFrom) {
+      return; // not run yet, or the same result
+    }
+    mMaskFrom = value->grid;
+    mMaskGrid = *value->grid;
+    // A height or another range: shown as 0..1 of its own range.
+    float lo = 1e30f;
+    float hi = -1e30f;
+    for (const float v : mMaskGrid.v) {
+      lo = std::min(lo, v);
+      hi = std::max(hi, v);
+    }
+    if ((lo < 0.0f || hi > 1.0f) && hi > lo) {
+      for (float& v : mMaskGrid.v) {
+        v = (v - lo) / (hi - lo);
+      }
+    }
+    mMaskAsked = true;
+    gpg::Logf(
+      "editor: generate: node %d shown as a mask (%d x %d, range %.2f..%.2f)",
+      mMaskNode,
+      mMaskGrid.w,
+      mMaskGrid.h,
+      static_cast<double>(lo),
+      static_cast<double>(hi)
+    );
+  }
+
+  namespace
+  {
+    /**
+     * The remap node's curve as a small editor (FAF Studio's curve inspector): drag a point, double-click adds one,
+     * right-click removes one; the ends stay at x 0 and 1. True when `text` changed.
+     */
+    bool CurveEditor(
+      std::string& text
+    )
+    {
+      std::vector<std::pair<float, float>> points;
+      {
+        std::istringstream in(text);
+        float x = 0.0f;
+        float y = 0.0f;
+        while (in >> x >> y) {
+          points.emplace_back(std::clamp(x, 0.0f, 1.0f), std::clamp(y, 0.0f, 1.0f));
+        }
+      }
+      if (points.size() < 2) {
+        points = {{0.0f, 0.0f}, {1.0f, 1.0f}};
+      }
+      std::sort(points.begin(), points.end());
+      const float side = std::max(Em(80.0f), std::min(ImGui::GetContentRegionAvail().x, Em(220.0f)));
+      const ImVec2 a = ImGui::GetCursorScreenPos();
+      const ImVec2 b(a.x + side, a.y + side);
+      ImGui::InvisibleButton(
+        "##curve", ImVec2(side, side), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight
+      );
+      const bool hovered = ImGui::IsItemHovered();
+      const bool active = ImGui::IsItemActive();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(a, b, IM_COL32(28, 28, 30, 255));
+      for (int i = 1; i < 4; ++i) {
+        const float t = side * static_cast<float>(i) / 4.0f;
+        dl->AddLine(ImVec2(a.x + t, a.y), ImVec2(a.x + t, b.y), IM_COL32(50, 50, 54, 255));
+        dl->AddLine(ImVec2(a.x, a.y + t), ImVec2(b.x, a.y + t), IM_COL32(50, 50, 54, 255));
+      }
+      dl->AddLine(ImVec2(a.x, b.y), ImVec2(b.x, a.y), IM_COL32(70, 70, 74, 255));
+      dl->AddRect(a, b, IM_COL32(90, 90, 96, 255));
+      const auto toScreen = [&](const float x, const float y) {
+        return ImVec2(a.x + x * side, b.y - y * side);
+      };
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      const float mx = std::clamp((mouse.x - a.x) / side, 0.0f, 1.0f);
+      const float my = std::clamp((b.y - mouse.y) / side, 0.0f, 1.0f);
+      int hover = -1;
+      for (std::size_t i = 0; i < points.size(); ++i) {
+        const ImVec2 p = toScreen(points[i].first, points[i].second);
+        if (std::hypot(p.x - mouse.x, p.y - mouse.y) <= Em(7.0f)) {
+          hover = static_cast<int>(i);
+        }
+      }
+      ImGuiStorage* storage = ImGui::GetStateStorage();
+      const ImGuiID dragKey = ImGui::GetID("##curvedrag");
+      int drag = storage->GetInt(dragKey, -1);
+      bool changed = false;
+      if (ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        drag = hover;
+      }
+      const int last = static_cast<int>(points.size()) - 1;
+      if (active && drag >= 0 && drag <= last) {
+        float x = mx;
+        if (drag == 0) {
+          x = 0.0f;
+        } else if (drag == last) {
+          x = 1.0f;
+        } else {
+          x = std::clamp(mx, points[drag - 1].first + 0.01f, points[drag + 1].first - 0.01f);
+        }
+        if (points[drag].first != x || points[drag].second != my) {
+          points[drag] = {x, my};
+          changed = true;
+        }
+      }
+      if (!active) {
+        drag = -1;
+      }
+      storage->SetInt(dragKey, drag);
+      if (hovered && hover < 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        points.emplace_back(mx, my);
+        std::sort(points.begin(), points.end());
+        changed = true;
+      }
+      if (hovered && hover > 0 && hover < last && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        points.erase(points.begin() + hover);
+        changed = true;
+      }
+      for (std::size_t i = 0; i + 1 < points.size(); ++i) {
+        dl->AddLine(
+          toScreen(points[i].first, points[i].second),
+          toScreen(points[i + 1].first, points[i + 1].second),
+          IM_COL32(250, 200, 80, 255),
+          2.0f
+        );
+      }
+      for (std::size_t i = 0; i < points.size(); ++i) {
+        dl->AddCircleFilled(
+          toScreen(points[i].first, points[i].second),
+          Em(4.0f),
+          static_cast<int>(i) == hover ? IM_COL32(255, 255, 255, 255) : IM_COL32(250, 200, 80, 255)
+        );
+      }
+      if (changed) {
+        text.clear();
+        char pair[48];
+        for (const auto& [x, y] : points) {
+          (void)std::snprintf(
+            pair, sizeof(pair), "%s%.3g %.3g", text.empty() ? "" : " ", static_cast<double>(x), static_cast<double>(y)
+          );
+          text += pair;
+        }
+      }
+      return changed;
+    }
+
+    /** The scatter's "blueprint:weight" list (';' or new lines between). */
+    std::vector<std::pair<std::string, int>> ScatterEntries(
+      const std::string& text
+    )
+    {
+      std::vector<std::pair<std::string, int>> entries;
+      std::size_t at = 0;
+      while (at < text.size()) {
+        const std::size_t end = std::min(text.find_first_of(";\n", at), text.size());
+        std::string item = text.substr(at, end - at);
+        at = end + 1;
+        item.erase(0, item.find_first_not_of(" \t\r"));
+        item.erase(item.find_last_not_of(" \t\r") + 1);
+        if (item.empty()) {
+          continue;
+        }
+        int weight = 100;
+        if (
+          const std::size_t colon = item.rfind(':'); colon != std::string::npos && colon + 1 < item.size() &&
+          std::isdigit(static_cast<unsigned char>(item[colon + 1])) != 0
+        ) {
+          weight = std::max(1, std::atoi(item.c_str() + colon + 1));
+          item.resize(colon);
+        }
+        entries.emplace_back(item, weight);
+      }
+      return entries;
+    }
+  } // namespace
+
+  void EdGenerate::DrawNodeHead(
+    GraphNode& node
+  )
+  {
+    const int id = node.id;
+    char name[128];
+    (void)std::snprintf(name, sizeof(name), "%s", node.name.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    (void)ImGui::InputTextWithHint("##nodename", ("Name: " + node.type->title).c_str(), name, sizeof(name));
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+      mGraph->SetName(id, name);
+    }
+    EdSetItemTooltip("The node's own name on its title bar (empty: the type's)");
+    bool wrote = false;
+    if (!node.type->inputs.empty() && !node.type->outputs.empty()) {
+      bool bypass = node.bypass;
+      if (ImGui::Checkbox("Bypass", &bypass)) {
+        mGraph->SetBypass(id, bypass);
+      }
+      EdSetItemTooltip(
+        "Passes the first input linked in straight through to the outputs, as if the node weren't there"
+      );
+      wrote = true;
+    }
+    if (!node.type->outputs.empty()) {
+      const bool shown = mMaskNode == id;
+      const char* const label = shown ? "Take it off the map" : "Show on the map as a mask";
+      if (wrote) {
+        SameLineIfFits(ButtonWidth(label));
+      }
+      if (ImGui::Button(label)) {
+        ShowAsMask(shown ? 0 : id);
+      }
+      EdSetItemTooltip("The node's first output on the terrain in red, scaled to its own range (the preview's run)");
+    }
+  }
+
+  void EdGenerate::DrawNodeHelpers(
+    GraphNode& node,
+    const int part
+  )
+  {
+    const NodeType& type = *node.type;
+    const int id = node.id;
+    const auto paramIndex = [&type](const char* name) -> int {
+      for (std::size_t p = 0; p < type.params.size(); ++p) {
+        if (type.params[p].name == name) {
+          return static_cast<int>(p);
+        }
+      }
+      return -1;
+    };
+    if (part == 1 && type.name == "remap") {
+      if (const int p = paramIndex("points"); p >= 0) {
+        ImGui::SeparatorText("Curve");
+        std::string text = node.params[static_cast<std::size_t>(p)].text;
+        if (CurveEditor(text)) {
+          ParamValue value = node.params[static_cast<std::size_t>(p)];
+          value.text = text;
+          mGraph->SetParam(id, static_cast<std::size_t>(p), value);
+        }
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("Drag a point; double-click adds one, right-click removes one.");
+        ImGui::PopTextWrapPos();
+      }
+    }
+    if (part == 0 && type.name.starts_with("erode_")) {
+      const std::string solver = type.name.substr(6);
+      bool first = true;
+      for (const ErosionPreset& preset : ErosionPresets()) {
+        if (solver != preset.solver) {
+          continue;
+        }
+        if (first) {
+          ImGui::SeparatorText("Presets");
+          first = false;
+        } else {
+          SameLineIfFits(ButtonWidth(preset.label));
+        }
+        if (ImGui::Button(preset.label)) {
+          const ErosionValues values = ErosionPresetValues(preset);
+          for (std::size_t p = 0; p < type.params.size(); ++p) {
+            if (const auto found = values.find(type.params[p].name); found != values.end()) {
+              ParamValue value = node.params[p];
+              value.value[0] = static_cast<float>(found->second);
+              mGraph->SetParam(id, p, value);
+            }
+          }
+          gpg::Logf("editor: generate: erosion preset %s on node %d", preset.id, id);
+        }
+      }
+    }
+    if (part == 1 && type.name == "out_scatter") {
+      if (const int p = paramIndex("entries"); p >= 0) {
+        ImGui::SeparatorText("Blueprints and weights");
+        std::vector<std::pair<std::string, int>> entries =
+          ScatterEntries(node.params[static_cast<std::size_t>(p)].text);
+        int total = 0;
+        for (const auto& entry : entries) {
+          total += entry.second;
+        }
+        bool changed = false;
+        int remove = -1;
+        if (
+          !entries.empty() &&
+          ImGui::BeginTable("##scatterlist", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerH)
+        ) {
+          ImGui::TableSetupColumn("Blueprint", ImGuiTableColumnFlags_WidthStretch);
+          ImGui::TableSetupColumn("Weight", ImGuiTableColumnFlags_WidthFixed, Em(110.0f));
+          ImGui::TableSetupColumn("##x", ImGuiTableColumnFlags_WidthFixed, Em(24.0f));
+          for (std::size_t i = 0; i < entries.size(); ++i) {
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            char blueprint[256];
+            (void)std::snprintf(blueprint, sizeof(blueprint), "%s", entries[i].first.c_str());
+            ImGui::SetNextItemWidth(-1.0f);
+            (void)ImGui::InputText("##bp", blueprint, sizeof(blueprint));
+            if (ImGui::IsItemDeactivatedAfterEdit() && blueprint[0] != '\0') {
+              entries[i].first = blueprint;
+              changed = true;
+            }
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-1.0f);
+            const std::string share = "%d (" + std::to_string(total > 0 ? entries[i].second * 100 / total : 0) + "%%)";
+            if (ImGui::DragInt("##w", &entries[i].second, 1.0f, 1, 1000, share.c_str())) {
+              changed = true;
+            }
+            ImGui::TableNextColumn();
+            if (ImGui::SmallButton("x")) {
+              remove = static_cast<int>(i);
+            }
+            ImGui::PopID();
+          }
+          ImGui::EndTable();
+        }
+        if (remove >= 0) {
+          entries.erase(entries.begin() + remove);
+          changed = true;
+        }
+        ImGui::SetNextItemWidth(-Em(60.0f));
+        (void)ImGui::InputTextWithHint("##scatteradd", "Blueprint to add (.bp)", mScatterAdd, sizeof(mScatterAdd));
+        ImGui::SameLine();
+        ImGui::BeginDisabled(mScatterAdd[0] == '\0');
+        if (ImGui::Button("Add##scatteradd")) {
+          entries.emplace_back(mScatterAdd, 100);
+          mScatterAdd[0] = '\0';
+          changed = true;
+        }
+        ImGui::EndDisabled();
+        if (changed) {
+          std::string text;
+          for (const auto& [blueprint, weight] : entries) {
+            text += (text.empty() ? "" : ";") + blueprint + ":" + std::to_string(std::max(1, weight));
+          }
+          ParamValue value = node.params[static_cast<std::size_t>(p)];
+          value.text = text;
+          mGraph->SetParam(id, static_cast<std::size_t>(p), value);
+        }
+      }
+    }
   }
 
   void EdGenerate::DrawParams(
@@ -759,7 +1245,11 @@ namespace faf::editor
         ImGui::PopTextWrapPos();
       }
       ImGui::Spacing();
+      DrawNodeHead(*node);
+      DrawNodeHelpers(*node, 0);
+      ImGui::Spacing();
       DrawParams(*node);
+      DrawNodeHelpers(*node, 1);
       ImGui::Spacing();
       ImGui::TextDisabled("Ran in %.1f ms", mPreview.NodeMs(node->id));
     } else {
@@ -792,7 +1282,9 @@ namespace faf::editor
       ImGui::TextDisabled(
         "Select a node to edit its settings. Right-click the graph or drop a link on empty space to add a node; the "
         "wheel "
-        "zooms, the right button drags the view, F frames, Del removes, Ctrl+D duplicates."
+        "zooms, the right button drags the view, F frames, Del removes, Ctrl+D duplicates, Ctrl+C / Ctrl+X / Ctrl+V "
+        "copy, cut and paste (into another graph too), Ctrl+Z / Ctrl+Y undo and redo. A frame's title bar drags the "
+        "nodes inside it."
       );
       ImGui::PopTextWrapPos();
     }

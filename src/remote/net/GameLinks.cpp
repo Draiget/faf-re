@@ -24,41 +24,50 @@ namespace faf::remote::net
     : mChannelConfig(channel)
   {}
 
-  bool CServerLinks::Open(
-    const SEndpoint& local,
-    std::string& error
+  std::expected<void, std::string> CServerLinks::Open(
+    const SEndpoint& local
   )
   {
     if (!mCookies.Init() || !FillRandom(&mAddressSalt, sizeof(mAddressSalt))) {
-      error = "the system gave no random secret for the handshake";
-      return false;
+      return std::unexpected("the system gave no random secret for the handshake");
     }
-    return mSocket.Open(local, error);
+    return mSocket.Open(local);
   }
 
   void CServerLinks::AllowAddress(
-    const std::uint32_t ip
+    const IpAddress& address
   )
   {
     mAllowlistOn = true;
-    mAllowed.insert(ip);
+    mAllowed.insert(AddressPrefix(address));
   }
 
   void CServerLinks::DisallowAddress(
-    const std::uint32_t ip
+    const IpAddress& address
   )
   {
     mAllowlistOn = true;
-    mAllowed.erase(ip);
+    mAllowed.erase(AddressPrefix(address));
   }
 
   bool CServerLinks::TakeAddressBudget(
-    const std::uint32_t ip,
+    const IpAddress& address,
     const std::uint64_t nowUs
   ) noexcept
   {
-    // Salted, so a flood can't pick addresses that share a player's bucket.
-    const std::uint64_t mixed = (static_cast<std::uint64_t>(ip) ^ mAddressSalt) * 0x9E3779B97F4A7C15ull;
+    // Salted, so a flood can't pick addresses that share a player's bucket. An IPv6 sender has its whole /64 to send
+    // from, so the /64 is what has a bucket.
+    const IpAddress prefix = AddressPrefix(address);
+    std::uint64_t mixed = mAddressSalt;
+    for (std::size_t half = 0; half < 2u; ++half) {
+      std::uint64_t word = 0;
+      for (std::size_t i = 0; i < 8u; ++i) {
+        word = (word << 8) | prefix[half * 8u + i];
+      }
+      mixed = (mixed ^ word) * 0x9E3779B97F4A7C15ull;
+      mixed ^= mixed >> 29;
+    }
+    mixed *= 0x9E3779B97F4A7C15ull;
     SAddressBucket& bucket = mAddressBuckets[static_cast<std::size_t>(mixed >> 52) % kAddressBuckets];
     if (nowUs > bucket.lastUs) {
       bucket.tokens = std::min(
@@ -111,7 +120,7 @@ namespace faf::remote::net
       return;
     }
     if (found->second.channel) {
-      mByAddress.erase(found->second.from.Key());
+      mByAddress.erase(found->second.from);
     }
     RetireChannel(uid, found->second);
     mPlayers.erase(found);
@@ -179,6 +188,7 @@ namespace faf::remote::net
     const std::uint8_t* const data,
     const std::size_t size,
     const SEndpoint& from,
+    const IpAddress& local,
     const std::uint64_t nowUs,
     IEvents& events
   )
@@ -197,14 +207,14 @@ namespace faf::remote::net
     if (found == mPlayers.end()) {
       ++mStats.refused;
       const auto reject = WriteReject(EHandshakeRefusal::NotAdmitted);
-      (void)mSocket.SendTo(reject.data(), reject.size(), from);
+      (void)mSocket.SendTo(reject.data(), reject.size(), from, &local);
       return;
     }
     SPlayer& player = found->second;
 
     // The Accept was lost: the same one again, as the keys behind it are already in use.
     if (player.channel && player.clientPublic == request.clientPublic && player.from == from) {
-      (void)mSocket.SendTo(player.accept.data(), player.accept.size(), from);
+      (void)mSocket.SendTo(player.accept.data(), player.accept.size(), from, &local);
       return;
     }
     // An old Connect sent again by someone else must not knock out the live channel.
@@ -219,13 +229,13 @@ namespace faf::remote::net
     if (!session) {
       ++mStats.refused;
       const auto reject = WriteReject(EHandshakeRefusal::NotAdmitted);
-      (void)mSocket.SendTo(reject.data(), reject.size(), from);
+      (void)mSocket.SendTo(reject.data(), reject.size(), from, &local);
       return;
     }
 
     const bool returning = player.channel != nullptr;
     if (returning) {
-      mByAddress.erase(player.from.Key());
+      mByAddress.erase(player.from);
     }
     // A new channel starts a new compression stream, once its client offers (plan WP10.13).
     RetireChannel(request.uid, player);
@@ -235,24 +245,25 @@ namespace faf::remote::net
     WipeKey(session->keys.send);
     WipeKey(session->keys.receive);
     player.from = from;
+    player.local = local;
     player.clientPublic = request.clientPublic;
     player.usedPublics.push_back(request.clientPublic);
     player.accept = std::move(session->accept);
     player.lost = false;
     // A valid token lists its address (plan WPR.48): a player behind a VPN comes in once and then as any other.
     if (mAllowlistOn) {
-      mAllowed.insert(from.ip);
+      mAllowed.insert(AddressPrefix(from.address));
     }
 
     // Someone else's channel at this address, as when one machine restarts a game on the port another left.
-    if (const auto other = mByAddress.find(from.Key()); other != mByAddress.end() && other->second != request.uid) {
+    if (const auto other = mByAddress.find(from); other != mByAddress.end() && other->second != request.uid) {
       if (const auto otherPlayer = mPlayers.find(other->second); otherPlayer != mPlayers.end()) {
         RetireChannel(other->second, otherPlayer->second);
       }
     }
-    mByAddress[from.Key()] = request.uid;
+    mByAddress[from] = request.uid;
 
-    (void)mSocket.SendTo(player.accept.data(), player.accept.size(), from);
+    (void)mSocket.SendTo(player.accept.data(), player.accept.size(), from, &local);
     events.OnJoined(request.uid, from, returning);
   }
 
@@ -260,6 +271,7 @@ namespace faf::remote::net
     const std::uint8_t* const data,
     const std::size_t size,
     const SEndpoint& from,
+    const IpAddress& local,
     const std::uint64_t nowUs,
     IEvents& events
   )
@@ -269,7 +281,7 @@ namespace faf::remote::net
       return;
     }
     if (data[0] == kDatagramTag) {
-      const auto address = mByAddress.find(from.Key());
+      const auto address = mByAddress.find(from);
       if (address == mByAddress.end()) {
         ++mStats.strangersDropped;
         return;
@@ -279,6 +291,7 @@ namespace faf::remote::net
         ++mStats.strangersDropped;
         return;
       }
+      player->second.local = local;
       (void)player->second.channel->Receive(data, size, nowUs);
       return;
     }
@@ -290,17 +303,19 @@ namespace faf::remote::net
     }
     // An address off the allowlist shares one small budget, then its own; a listed one has its own. The global
     // budget last, so what one address sends can't spend it.
-    const bool listed = !mAllowlistOn || mAllowed.contains(from.ip);
-    if ((!listed && !TakeUnlistedBudget(nowUs)) || !TakeAddressBudget(from.ip, nowUs) || !TakeHandshakeBudget(nowUs)) {
+    const bool listed = !mAllowlistOn || mAllowed.contains(AddressPrefix(from.address));
+    if (
+      (!listed && !TakeUnlistedBudget(nowUs)) || !TakeAddressBudget(from.address, nowUs) || !TakeHandshakeBudget(nowUs)
+    ) {
       return;
     }
     if (type == EHandshakeType::Hello) {
       const auto answer = AnswerHello(data, size, mCookies, from.Key(), nowUs);
       if (!answer.empty()) {
-        (void)mSocket.SendTo(answer.data(), answer.size(), from);
+        (void)mSocket.SendTo(answer.data(), answer.size(), from, &local);
       }
     } else {
-      HandleConnect(data, size, from, nowUs, events);
+      HandleConnect(data, size, from, local, nowUs, events);
     }
   }
 
@@ -311,13 +326,14 @@ namespace faf::remote::net
   {
     std::array<std::uint8_t, kReceiveBuffer> buffer{};
     SEndpoint from;
+    IpAddress local{};
     for (int count = 0; count < kMaxDatagramsPerPump; ++count) {
-      const int size = mSocket.ReceiveFrom(buffer.data(), buffer.size(), from);
+      const int size = mSocket.ReceiveFrom(buffer.data(), buffer.size(), from, &local);
       if (size < 0) {
         break;
       }
       ++mStats.datagramsIn;
-      HandleDatagram(buffer.data(), static_cast<std::size_t>(size), from, nowUs, events);
+      HandleDatagram(buffer.data(), static_cast<std::size_t>(size), from, local, nowUs, events);
     }
 
     for (auto& [uid, player] : mPlayers) {
@@ -325,7 +341,7 @@ namespace faf::remote::net
         continue;
       }
       while (player.channel && player.channel->TakeReliable(mMessage)) {
-        if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(ESeatMessage::CompressOffer)) {
+        if (!mMessage.empty() && mMessage[0] == std::to_underlying(ESeatMessage::CompressOffer)) {
           TakeCompressOffer(uid, player, mMessage); // the links' own (plan WP10.13)
           continue;
         }
@@ -337,7 +353,7 @@ namespace faf::remote::net
       mOut.clear();
       player.channel->Poll(nowUs, mOut);
       for (const std::vector<std::uint8_t>& datagram : mOut) {
-        (void)mSocket.SendTo(datagram.data(), datagram.size(), player.from);
+        (void)mSocket.SendTo(datagram.data(), datagram.size(), player.from, &player.local);
       }
       const ChannelState state = player.channel->State();
       if (!player.lost && (state == ChannelState::TimedOut || state == ChannelState::Failed)) {
@@ -475,11 +491,9 @@ namespace faf::remote::net
     , mHandshake(std::make_unique<CClientHandshake>(uid, token))
   {}
 
-  bool CClientLink::Open(
-    std::string& error
-  )
+  std::expected<void, std::string> CClientLink::Open()
   {
-    return mSocket.Open(SEndpoint{}, error);
+    return mSocket.Open(SEndpoint{});
   }
 
   void CClientLink::Reconnect()
@@ -598,7 +612,7 @@ namespace faf::remote::net
     if (!mChannel || !mChannel->TakeReliable(out)) {
       return false;
     }
-    if (out.empty() || out[0] != static_cast<std::uint8_t>(ESeatMessage::Compressed)) {
+    if (out.empty() || out[0] != std::to_underlying(ESeatMessage::Compressed)) {
       return true;
     }
     // Plan WP10.13: the stream hands the pieces out in the order they were compressed, so each decodes now.

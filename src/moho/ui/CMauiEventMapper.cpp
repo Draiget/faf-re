@@ -1,5 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "gpg/gal/RenderProfiler.h"
+
 namespace
 {
 
@@ -155,6 +157,7 @@ void moho::CMauiEventMapper::OnMouseMove(
   // Script reached from this event may destroy controls it is still walking;
   // see MauiEventDispatchGuard.
   const MauiEventDispatchGuard dispatchGuard;
+  const gpg::gal::CpuProfileScope profileMouse("UiMouseEvent"); // FAF instrumentation
 
   // ---- Step 1: Build typed Maui event payload from window-library mouse event ----
   moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromMouse(mouseEvent, mWindow);

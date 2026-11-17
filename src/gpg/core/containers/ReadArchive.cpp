@@ -1,5 +1,6 @@
 #include "ReadArchive.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstddef>
 #include <cstdio>
@@ -434,15 +435,15 @@ namespace
 
       switch (marker) {
       case '}':
-        return static_cast<int>(ArchiveToken::ObjectTerminator);
+        return std::to_underlying(ArchiveToken::ObjectTerminator);
       case 'N':
-        return static_cast<int>(ArchiveToken::NewObjectToken);
+        return std::to_underlying(ArchiveToken::NewObjectToken);
       case '0':
-        return static_cast<int>(ArchiveToken::NullPointerToken);
+        return std::to_underlying(ArchiveToken::NullPointerToken);
       case '*':
-        return static_cast<int>(ArchiveToken::ExistingPointerToken);
+        return std::to_underlying(ArchiveToken::ExistingPointerToken);
       case '{':
-        return static_cast<int>(ArchiveToken::ObjectStart);
+        return std::to_underlying(ArchiveToken::ObjectStart);
       default:
         ThrowSerializationError(
           STR_Printf("Error detected in archive: invalid marker token 0x%02x", static_cast<int>(marker))
@@ -1139,7 +1140,7 @@ void ReadArchive::Read(
   }
 
   const int marker = NextMarker();
-  if (marker != static_cast<int>(ArchiveToken::ObjectStart)) {
+  if (marker != std::to_underlying(ArchiveToken::ObjectStart)) {
     ArchiveToken tokenCopy = static_cast<ArchiveToken>(marker);
     const RRef tokenRef = RRef_ArchiveToken(&tokenCopy);
     const fa::string tokenLexical = tokenRef.mType ? tokenRef.GetLexical() : STR_Printf("%d", marker);
@@ -1162,7 +1163,7 @@ void ReadArchive::Read(
 
   type->serLoadFunc_(this, object, handle.version, const_cast<RRef*>(&ownerRef));
 
-  if (NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
+  if (NextMarker() != std::to_underlying(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: data for object of type \"%s\" did not terminate properly.", SafeTypeName(type)
     ));

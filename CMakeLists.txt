@@ -27,27 +27,24 @@ endif()
 # still fail the build, but no object is written, so nothing can link. For the Layout check workflow.
 option(FAF_SYNTAX_ONLY "Check faf_engine's sources without generating code" OFF)
 
-# Engine addition (dedicated-server plan WPL.2): the Linux build of the
-# simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
-# read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.
-# Nothing below this block runs for it.
-if(CMAKE_TOOLCHAIN_FILE MATCHES "/linux-clang-[^/]*\\.cmake$")
+# Engine addition (dedicated-server plan WPL.2): the Linux and macOS builds, chosen by their
+# toolchain files (cmake/toolchains/linux-clang-*.cmake, macos-clang-*.cmake, read by project())
+# and described in cmake/FafPosix.cmake. Nothing below this block runs for them.
+if(CMAKE_TOOLCHAIN_FILE MATCHES "/(linux|macos)-clang-[^/]*\\.cmake$")
   project(faf_engine LANGUAGES C CXX)
-  include(cmake/FafLinux.cmake)
+  include(cmake/FafPlatform.cmake)
+  include(cmake/FafPosix.cmake)
   return()
 endif()
 
 project(faf_engine LANGUAGES C CXX RC)
+include(cmake/FafPlatform.cmake)
 
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
   message(FATAL_ERROR "This build expects clang-cl: use a preset from CMakePresets.json.")
 endif()
 
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(FAF_TARGET_ARCH x64)
-else()
-  set(FAF_TARGET_ARCH x86)
-endif()
+# FAF_TARGET_ARCH (x86 or x64) comes from cmake/FafPlatform.cmake.
 if(FAF_TARGET_ARCH STREQUAL "x64")
   enable_language(ASM_MASM)
   # CMake maps the Embedded debug format to ml64's -Zi, which llvm-ml64 does
@@ -58,7 +55,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # --- Build-wide settings ------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 17)

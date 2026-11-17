@@ -112,10 +112,42 @@ namespace faf::editor
     }
   } // namespace
 
+  namespace
+  {
+    /** Units for `km` of a side (rounded to 4), and the smallest size of the list that holds them. */
+    int PlayableUnits(
+      const float km
+    )
+    {
+      const int units = static_cast<int>(std::lround(std::clamp(km, 1.0f, 80.0f) * kUnitsPerKmSide / 4.0f)) * 4;
+      return std::min(units, kNewMapSizes[kNewMapSizeCount - 1].units);
+    }
+    int TerrainHolding(
+      const int units
+    )
+    {
+      for (const NewMapSize& size : kNewMapSizes) {
+        if (size.units >= units) {
+          return size.units;
+        }
+      }
+      return kNewMapSizes[kNewMapSizeCount - 1].units;
+    }
+    float DepthKm(
+      const NewMapSettings& settings
+    )
+    {
+      return settings.depthKm > 0.0f ? settings.depthKm : settings.widthKm;
+    }
+  } // namespace
+
   int NewMapWidth(
     const NewMapSettings& settings
   )
   {
+    if (settings.widthKm > 0.0f) {
+      return TerrainHolding(PlayableUnits(settings.widthKm));
+    }
     return kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
   }
 
@@ -123,8 +155,30 @@ namespace faf::editor
     const NewMapSettings& settings
   )
   {
+    if (settings.widthKm > 0.0f) {
+      return TerrainHolding(PlayableUnits(DepthKm(settings)));
+    }
     return settings.sizeZ < 0 ? NewMapWidth(settings)
                               : kNewMapSizes[std::clamp(settings.sizeZ, 0, kNewMapSizeCount - 1)].units;
+  }
+
+  std::optional<std::array<int, 4>> NewMapPlayable(
+    const NewMapSettings& settings
+  )
+  {
+    if (settings.widthKm <= 0.0f) {
+      return std::nullopt;
+    }
+    const int w = PlayableUnits(settings.widthKm);
+    const int d = PlayableUnits(DepthKm(settings));
+    const int terrainW = NewMapWidth(settings);
+    const int terrainD = NewMapDepth(settings);
+    if (w >= terrainW && d >= terrainD) {
+      return std::nullopt;
+    }
+    const int x0 = (terrainW - w) / 2 / 4 * 4;
+    const int z0 = (terrainD - d) / 2 / 4 * 4;
+    return std::array<int, 4>{x0, z0, x0 + w, z0 + d};
   }
 
   std::vector<NewMapSpawn> NewMapSpawns(
@@ -132,10 +186,12 @@ namespace faf::editor
   )
   {
     const int players = Players(settings);
-    const double width = NewMapWidth(settings);
-    const double depth = NewMapDepth(settings);
-    const double cx = width * 0.5;
-    const double cz = depth * 0.5;
+    // In the playable area when the map has one (an any-size map), else on the whole terrain.
+    const std::optional<std::array<int, 4>> area = NewMapPlayable(settings);
+    const double width = area ? (*area)[2] - (*area)[0] : NewMapWidth(settings);
+    const double depth = area ? (*area)[3] - (*area)[1] : NewMapDepth(settings);
+    const double cx = (area ? (*area)[0] : 0) + width * 0.5;
+    const double cz = (area ? (*area)[1] : 0) + depth * 0.5;
     std::vector<NewMapSpawn> spawns;
     if (players == 1) {
       spawns.push_back({static_cast<float>(cx), static_cast<float>(cz)});
@@ -213,8 +269,14 @@ namespace faf::editor
             "    next_area_id = '1',\n"
             "    Props = {\n"
             "    },\n"
-            "    Areas = {\n"
-            "    },\n"
+            "    Areas = {\n";
+    if (const std::optional<std::array<int, 4>> area = NewMapPlayable(settings)) {
+      text += "        ['AREA_1'] = {\n";
+      text += "            ['rectangle'] = RECTANGLE( " + std::to_string((*area)[0]) + ", " +
+        std::to_string((*area)[1]) + ", " + std::to_string((*area)[2]) + ", " + std::to_string((*area)[3]) + " ),\n";
+      text += "        },\n";
+    }
+    text += "    },\n"
             "    MasterChain = {\n"
             "        ['_MASTERCHAIN_'] = {\n"
             "            Markers = {\n";
@@ -255,12 +317,27 @@ namespace faf::editor
     return text;
   }
 
-  std::string NewMapScriptText()
+  std::string NewMapScriptText(
+    const bool playableArea
+  )
   {
+    if (!playableArea) {
+      return "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n"
+             "\n"
+             "function OnPopulate()\n"
+             "\tScenarioUtils.InitializeArmies()\n"
+             "end\n"
+             "\n"
+             "function OnStart(self)\n"
+             "end\n";
+    }
+    // An any-size map: the game plays inside AREA_1 (the save file's rectangle).
     return "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n"
+           "local ScenarioFramework = import('/lua/ScenarioFramework.lua')\n"
            "\n"
            "function OnPopulate()\n"
            "\tScenarioUtils.InitializeArmies()\n"
+           "    ScenarioFramework.SetPlayableArea('AREA_1', false)\n"
            "end\n"
            "\n"
            "function OnStart(self)\n"

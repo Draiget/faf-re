@@ -15,7 +15,7 @@
 #include <set>
 #include <stdexcept>
 #include <thread>
-#include <windows.h>
+#include <Windows.h>
 #if FAFRE_PLATFORM_POSIX
 #include "platform/posix/NativePath.h"
 #endif
@@ -31,6 +31,8 @@ namespace moho::sfd
     long volume{};
     std::atomic<ErrorCallback> errorCallback{};
     std::atomic<std::uint32_t> errorParameter{};
+    // What the queues may hold before Decode fails the movie.
+    constexpr std::size_t queueLimit = 128 * 1024 * 1024;
   } // namespace
   void ReportError(
     const char* message
@@ -120,13 +122,18 @@ namespace moho::sfd
           audio.push_back(std::move(frame));
       }
       // A corrupt or radically noninterleaved file must not grow memory without bound.
-      std::size_t queuedBytes{};
-      for (const auto& frame : video)
-        queuedBytes += frame->bgra.size();
+      std::size_t queuedBytes = VideoBytes();
       for (const auto& frame : audio)
         queuedBytes += frame.samples.size() * sizeof(std::int16_t);
-      if (video.size() > 120 || audio.size() > 512 || queuedBytes > 128 * 1024 * 1024)
+      if (video.size() > 120 || audio.size() > 512 || queuedBytes > queueLimit)
         throw std::runtime_error("Excessive SFD stream interleave");
+    }
+    std::size_t VideoBytes() const
+    {
+      std::size_t bytes{};
+      for (const auto& frame : video)
+        bytes += frame->bgra.size();
+      return bytes;
     }
     void SupplyAudio()
     {
@@ -179,16 +186,21 @@ namespace moho::sfd
       SupplyAudio();
       double now = Time();
       // Keep about half a second ready. A worker pumps independently of rendering,
-      // including while the engine is loading or not requesting textures.
+      // including while the engine is loading or not requesting textures. Pictures stop sooner once
+      // they hold half of Decode's limit, which leaves the other half for what one decode adds: half a
+      // second of the main menu's 1824x1024 movie is 16 pictures of 7.1 MiB, 114 MiB, and the decoder
+      // now and then gives two pictures one timestamp. Sound keeps its half second, which the device
+      // plays on while this thread stalls; decoding for it queues the pictures in between too.
       for (unsigned budget = 0; !eof && !quitting && budget < 256; ++budget) {
-        const bool needVideo = video.empty() || video.back()->pts < now + 0.5;
+        // Late frames go as they come, before each decode, so that Decode's limit no longer counts the queued ones
+        // that were due when this pass read the clock: after a stall of this thread the catch-up would otherwise
+        // queue them all and pass it.
+        TakeDueFrames(now);
+        const bool needVideo = video.empty() || (video.back()->pts < now + 0.5 && VideoBytes() < queueLimit / 2);
         const bool needAudio = sink && sink->Submitted() < now + 0.5;
         if (!needVideo && !needAudio)
           break;
         Decode(lock);
-        // Late frames go as they come: after a stall of this thread the catch-up would otherwise
-        // queue them all and pass Decode's limit, about 25 frames of a 1280x1024 movie.
-        TakeDueFrames(now);
         SupplyAudio();
       }
       now = Time();
@@ -274,9 +286,8 @@ namespace moho::sfd
     s.endTime = 0;
     s.anchor = Clock::now();
     try {
-      std::string error;
-      if (!ReadMetadata(filename, s.metadata, error))
-        throw std::runtime_error(error);
+      if (auto read = ReadMetadata(filename, s.metadata); !read)
+        throw std::runtime_error(read.error());
       const auto& h = s.metadata.header;
       if (h.videos[0].effect != 0 || h.videos[0].colourType != 0 || h.videos[0].pictureType != 0) {
         throw std::runtime_error(

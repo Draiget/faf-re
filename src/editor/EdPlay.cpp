@@ -5,6 +5,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "gpg/core/utils/Unreachable.h"
+
 #include <Windows.h>
 #include <psapi.h>
 
@@ -286,7 +288,7 @@ end
       std::string text
     )
     {
-      if (text.rfind("<LOC", 0) == 0) {
+      if (text.starts_with("<LOC")) {
         const std::size_t end = text.find('>');
         if (end != std::string::npos) {
           text.erase(0, end + 1);
@@ -524,9 +526,8 @@ end
     PrepareRules();
   }
 
-  bool EdPlay::WriteCoopShim(
-    const std::filesystem::path& modsFolder,
-    std::string& error
+  std::expected<void, std::string> EdPlay::WriteCoopShim(
+    const std::filesystem::path& modsFolder
   )
   {
     static constexpr char kModInfo[] = R"lua(name = "Editor coop shim"
@@ -627,10 +628,9 @@ end
       !write(folder / "hook" / "lua" / "ScenarioFramework.lua", kFramework) ||
       !write(folder / "hook" / "lua" / "sim" / "ScenarioUtilities.lua", kUtilities)
     ) {
-      error = "couldn't write " + folder.string();
-      return false;
+      return std::unexpected("couldn't write " + folder.string());
     }
-    return true;
+    return {};
   }
 
   std::vector<std::string> EdPlay::PlayedMods() const
@@ -886,9 +886,9 @@ end
         if (section == "last") {
           current = &mLastSetup;
           mHaveLastSetup = true;
-        } else if (section.rfind("map ", 0) == 0 && section.size() > 4) {
+        } else if (section.starts_with("map ") && section.size() > 4) {
           current = &mMapSetups[section.substr(4)];
-        } else if (section.rfind("profile ", 0) == 0 && section.size() > 8) {
+        } else if (section.starts_with("profile ") && section.size() > 8) {
           current = &mProfiles[section.substr(8)];
         } else {
           current = nullptr;
@@ -1261,9 +1261,8 @@ end
       return "Playing";
     case moho::EWldFrameAction::Exit:
       return "Ending";
-    default:
-      return "";
     }
+    FAF_UNREACHABLE();
   }
 
   void EdPlay::ReadCommandLine()

@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
-#include <windows.h>
+#include <Windows.h>
 #include "gpg/core/utils/Logging.h"
 
 namespace gpg::gal

@@ -705,7 +705,7 @@ namespace faf::editor
       return 0xFF;
     }
     if (
-      name.size() >= 10 && name.rfind("terrain", 0) == 0 && std::isdigit(static_cast<unsigned char>(name[7])) != 0 &&
+      name.size() >= 10 && name.starts_with("terrain") && std::isdigit(static_cast<unsigned char>(name[7])) != 0 &&
       std::isdigit(static_cast<unsigned char>(name[8])) != 0 && std::isdigit(static_cast<unsigned char>(name[9])) != 0
     ) {
       if (name[8] != '5') {

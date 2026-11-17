@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <expected>
 #include <map>
 #include <optional>
 #include <random>
@@ -110,26 +111,30 @@ namespace
       }
     }
 
-    [[nodiscard]] bool Start(
+    [[nodiscard]] std::expected<void, std::string> Start(
       const SEndpoint& server,
       const SConfig& config,
-      const std::uint32_t seed,
-      std::string& error
+      const std::uint32_t seed
     )
     {
       mServer = server;
       mConfig = config;
       mRandom.seed(seed);
-      SEndpoint any;
-      any.ip = 0x7F000001u;
-      if (!mPlayerSide.Open(any, error) || !mServerSide.Open(any, error)) {
-        return false;
+      // The player's side on loopback; the server's side on any address of the server's family, so the relay
+      // reaches a server elsewhere, IPv6 included.
+      if (
+        auto opened = mPlayerSide.Open(SEndpoint(0x7F000001u, 0u)).and_then([this] {
+        return mServerSide.Open(SEndpoint{});
+      });
+        !opened
+      ) {
+        return opened;
       }
       mStartUs = SteadyUs();
       mThread = std::thread([this] {
         Run();
       });
-      return true;
+      return {};
     }
 
     [[nodiscard]] SEndpoint PlayerSide() const noexcept
@@ -245,6 +250,9 @@ namespace
     double leaveAt = -1.0;
     double rateEvery = 0.0; // > 0: every this many seconds, the view bytes of that interval as KB/s (plan WPR.7)
     double orderAt = -1.0;
+    // > 0: after the first order, another every this many seconds, each a short move beside the unit (so it stays
+    // out of the fight), with the latency figures of all of them summed up at the end.
+    double orderEvery = 0.0;
     double attackBlipAt = -1.0;
     double forgeIdAt = -1.0;
     double attackHiddenAt = -1.0;
@@ -463,6 +471,8 @@ namespace
         out.rateEvery = Argument(value);
       } else if (name == "--order-at") {
         out.orderAt = Argument(value);
+      } else if (name == "--order-every") {
+        out.orderEvery = Argument(value);
       } else if (name == "--attack-blip-at") {
         out.attackBlipAt = Argument(value);
       } else if (name == "--forge-id-at") {
@@ -835,8 +845,8 @@ namespace
     if (message[0] == static_cast<std::uint8_t>(ESeatMessage::LaunchInfo)) {
       ++out.launchInfos;
       if (out.rebuild != nullptr && !out.rebuild->HasRules()) {
-        std::string error;
-        if (out.rebuild->OnLaunchInfo(std::span<const std::uint8_t>(message).subspan(1), out.uid, error)) {
+        const auto loaded = out.rebuild->OnLaunchInfo(std::span<const std::uint8_t>(message).subspan(1), out.uid);
+        if (loaded) {
           std::printf(
             "probe %d: %.1f s: rebuild: rules from the server's launch info (%zu bytes)\n",
             out.uid,
@@ -844,7 +854,7 @@ namespace
             message.size() - 1u
           );
         } else {
-          std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, error.c_str());
+          std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, loaded.error().c_str());
         }
       }
       return;
@@ -1361,7 +1371,8 @@ int main(
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> "
       "[--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
-      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s>] [--attack-blip-at "
+      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s> [--order-every <s>]] "
+      "[--attack-blip-at "
       "<s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
       "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--no-view-compression] "
       "[--damage-at <s>] "
@@ -1378,18 +1389,17 @@ int main(
     return 3;
   }
 
-  std::string error;
   faf::probe::CProbeRebuild rebuild;
   rebuild.SetHostEffects(options.hostEffects);
   if (options.rebuild == "server") {
     // Plan WPR.55: no match file; the rules come with the server's LaunchInfo.
-    if (!rebuild.Start(error)) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, error.c_str());
+    if (auto started = rebuild.Start(); !started) {
+      std::printf("probe %d: rebuild: %s\n", options.uid, started.error().c_str());
       return 3;
     }
   } else if (!options.rebuild.empty()) {
-    if (!rebuild.Load(options.rebuild, options.uid, error)) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, error.c_str());
+    if (auto loaded = rebuild.Load(options.rebuild, options.uid); !loaded) {
+      std::printf("probe %d: rebuild: %s\n", options.uid, loaded.error().c_str());
       return 3;
     }
     std::printf("probe %d: rebuild: rules of %s loaded\n", options.uid, options.rebuild.c_str());
@@ -1397,16 +1407,18 @@ int main(
   CImpairedPath path;
   SEndpoint server = options.server;
   if (options.path.Any()) {
-    if (!path.Start(options.server, options.path, static_cast<std::uint32_t>(options.uid) + 1u, error)) {
-      std::printf("probe %d: %s\n", options.uid, error.c_str());
+    if (
+      auto started = path.Start(options.server, options.path, static_cast<std::uint32_t>(options.uid) + 1u); !started
+    ) {
+      std::printf("probe %d: %s\n", options.uid, started.error().c_str());
       return 3;
     }
     server = path.PlayerSide();
   }
   CClientLink link(options.uid, MakeToken(options.token), server);
   link.SetCompressionOffer(!options.noViewCompression);
-  if (!link.Open(error)) {
-    std::printf("probe %d: %s\n", options.uid, error.c_str());
+  if (auto opened = link.Open(); !opened) {
+    std::printf("probe %d: %s\n", options.uid, opened.error().c_str());
     return 3;
   }
 
@@ -1445,6 +1457,14 @@ int main(
   bool orderAnswered = false;
   bool orderApplied = false;
   bool ordered = options.orderAt >= 0.0;
+  // --order-every: each finished order's figures (beats from the view it was sent at to the beat that ran it, ms to
+  // the server's answer, ms to the first view holding it), when the next one is due, and orders given up on.
+  std::vector<double> orderBeatsOn;
+  std::vector<double> orderAnswerMs;
+  std::vector<double> orderViewMs;
+  double nextOrderAt = -1.0;
+  std::uint64_t ordersSent = 0;
+  std::uint64_t ordersUnseen = 0;
   std::uint32_t attackedBlip = 0u;
   int fuzzLeft = 0;
   bool flooding = false;
@@ -1466,6 +1486,9 @@ int main(
   // --rate-every: where the current interval started (time and view bytes so far) and when it ends.
   double rateFromAt = 0.0;
   std::uint64_t rateFromBytes = 0;
+  // The live channel's datagram bytes in and out at the interval's start (a new channel after a reconnect starts at 0).
+  std::uint64_t rateFromWireIn = 0;
+  std::uint64_t rateFromWireOut = 0;
   double rateNextAt = options.rateEvery;
   for (;;) {
     const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
@@ -1477,15 +1500,37 @@ int main(
     // needs is set by them). Counted from the first view, as the final KB/s is.
     if (options.rateEvery > 0.0 && elapsed >= rateNextAt) {
       const double span = elapsed - rateFromAt;
+      const faf::remote::net::ChannelStats* const channel = link.LiveChannelStats();
+      const std::uint64_t wireIn = channel != nullptr ? channel->bytesReceived : 0u;
+      const std::uint64_t wireOut = channel != nullptr ? channel->bytesSent : 0u;
+      const auto wireRate = [span](const std::uint64_t now, const std::uint64_t from) {
+        return span > 0.0 && now >= from ? static_cast<double>(now - from) / 1024.0 / span : 0.0;
+      };
+      // View bytes as decoded, the channel's datagram bytes in and out, its RTT (RFC 6298 smoothing over acked
+      // datagrams) and the share of its last 256 sent datagrams counted lost; then, so far on this channel, the
+      // server's datagrams received, those skipped and not (yet) filled by a late arrival, and those that came late.
       std::printf(
-        "probe %d: rate %.0f-%.0f s: %.1f KB/s\n",
+        "probe %d: rate %.0f-%.0f s: %.1f KB/s, wire in %.1f out %.1f KB/s, rtt latest %.1f smoothed %.1f min %.1f var "
+        "%.1f ms, loss %.1f%%, in datagrams %llu missing %llu reordered %llu\n",
         options.uid,
         rateFromAt,
         elapsed,
-        span > 0.0 && views.views > 0 ? static_cast<double>(views.bytes - rateFromBytes) / 1024.0 / span : 0.0
+        span > 0.0 && views.views > 0 ? static_cast<double>(views.bytes - rateFromBytes) / 1024.0 / span : 0.0,
+        wireRate(wireIn, rateFromWireIn),
+        wireRate(wireOut, rateFromWireOut),
+        channel != nullptr ? static_cast<double>(channel->rttLatestUs) / 1000.0 : -1.0,
+        channel != nullptr ? static_cast<double>(channel->rttSmoothedUs) / 1000.0 : -1.0,
+        channel != nullptr ? static_cast<double>(channel->rttMinUs) / 1000.0 : -1.0,
+        channel != nullptr ? static_cast<double>(channel->rttVarUs) / 1000.0 : -1.0,
+        channel != nullptr ? channel->lossRecent * 100.0 : -1.0,
+        static_cast<unsigned long long>(channel != nullptr ? channel->datagramsReceived : 0u),
+        static_cast<unsigned long long>(channel != nullptr ? channel->inboundMissing : 0u),
+        static_cast<unsigned long long>(channel != nullptr ? channel->inboundReordered : 0u)
       );
       rateFromAt = elapsed;
       rateFromBytes = views.bytes;
+      rateFromWireIn = wireIn;
+      rateFromWireOut = wireOut;
       rateNextAt = elapsed + options.rateEvery;
     }
 
@@ -2044,6 +2089,13 @@ int main(
             views.frame.beat,
             (elapsed - watch.sentAt) * 1000.0
           );
+          if (watch.answeredAt >= 0.0) {
+            orderBeatsOn.push_back(
+              static_cast<double>(static_cast<long long>(watch.answerBeat) - static_cast<long long>(watch.sentBeat))
+            );
+            orderAnswerMs.push_back((watch.answeredAt - watch.sentAt) * 1000.0);
+          }
+          orderViewMs.push_back((elapsed - watch.sentAt) * 1000.0);
         }
         if (!watch.moved && !(record->position == watch.from)) {
           watch.moved = true;
@@ -2124,33 +2176,48 @@ int main(
       std::printf("probe %d: %.1f s: sent forged beats and a forged end of game\n", options.uid, elapsed);
     }
     orderWanted = Due(options.orderAt, elapsed) || orderWanted;
+    if (options.orderEvery > 0.0 && nextOrderAt >= 0.0 && elapsed >= nextOrderAt) {
+      // The last order is done with: counted when its view came (above), else given up on.
+      if (watch.active && !watch.queued) {
+        ++ordersUnseen;
+      }
+      nextOrderAt = -1.0;
+      orderWanted = true;
+    }
     if (orderWanted && views.haveFrame && views.haveInfo) {
       if (const auto* const unit = OwnUnit(views); unit != nullptr) {
         orderWanted = false;
+        const bool repeat = options.orderEvery > 0.0;
+        watch = SOrderWatch{};
         watch.unit = unit->id;
         watch.commandId = (views.source << 24u) | nextCommand++;
         watch.from = unit->position;
         watch.active = true;
         watch.sentAt = elapsed;
         watch.sentBeat = views.frame.beat;
+        // Repeated orders step 8 world units east and west of where the unit stands, in turn.
+        const auto quantizer = faf::remote::wire::SPositionQuantizer::ForMap(views.mapX, views.mapZ);
+        const float stepX = (ordersSent % 2u) == 0u ? 8.0f : -8.0f;
+        const float targetX = repeat ? quantizer.x.Decode(unit->position[0]) + stepX : views.mapX * 0.5f;
+        const float targetZ = repeat ? quantizer.z.Decode(unit->position[2]) : views.mapZ * 0.5f;
         SendCommand(
           link,
           kOpIssueCommand,
           OrderPayload(
-            watch.unit,
-            watch.commandId,
-            moho::EUnitCommandType::UNITCOMMAND_Move,
-            kGroundTarget,
-            views.mapX * 0.5f,
-            views.mapZ * 0.5f
+            watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, kGroundTarget, targetX, targetZ
           )
         );
         asked.push_back("order");
+        ++ordersSent;
+        if (repeat) {
+          nextOrderAt = elapsed + options.orderEvery;
+        }
         std::printf(
-          "probe %d: %.1f s: ordered unit 0x%08x to the map's middle, command 0x%08x, at view beat %u\n",
+          "probe %d: %.1f s: ordered unit 0x%08x to %s, command 0x%08x, at view beat %u\n",
           options.uid,
           elapsed,
           watch.unit,
+          repeat ? "a spot beside it" : "the map's middle",
           watch.commandId,
           views.frame.beat
         );
@@ -2542,9 +2609,39 @@ int main(
       static_cast<unsigned long long>(path.Seen())
     );
   }
+  if (options.orderEvery > 0.0) {
+    const auto describe = [](std::vector<double>& values) {
+      if (values.empty()) {
+        return std::string("none");
+      }
+      std::sort(values.begin(), values.end());
+      const auto at = [&values](const double share) {
+        return values[std::min(
+          values.size() - 1u, static_cast<std::size_t>(static_cast<double>(values.size()) * share)
+        )];
+      };
+      char text[160];
+      std::snprintf(
+        text, sizeof(text), "median %.0f, 90%% %.0f, 99%% %.0f, worst %.0f", at(0.5), at(0.9), at(0.99), values.back()
+      );
+      return std::string(text);
+    };
+    std::printf(
+      "probe %d: orders: %llu sent, %zu seen in a view, %llu not seen before the next; beats on: %s; answer ms: %s; "
+      "first view ms: %s\n",
+      options.uid,
+      static_cast<unsigned long long>(ordersSent),
+      orderViewMs.size(),
+      static_cast<unsigned long long>(ordersUnseen),
+      describe(orderBeatsOn).c_str(),
+      describe(orderAnswerMs).c_str(),
+      describe(orderViewMs).c_str()
+    );
+  }
   if (refused) {
     return 1;
   }
-  const bool orderDone = !ordered || (orderAnswered && orderApplied && watch.queued);
+  const bool orderDone =
+    !ordered || (options.orderEvery > 0.0 ? !orderViewMs.empty() : orderAnswered && orderApplied && watch.queued);
   return joins > 0u && beatMessages > 0u && views.failed == 0u && orderDone ? 0 : 2;
 }

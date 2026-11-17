@@ -35,7 +35,7 @@ namespace moho
     Extract(SRangeExtractionPayload* outRange, const UserEntity* userEntity, float interpolationAlpha) const override;
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CounterIntelExtractor) == 0x04, "CounterIntelExtractor size must be 0x04");
 #endif
 } // namespace moho

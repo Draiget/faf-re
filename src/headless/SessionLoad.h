@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -23,10 +24,10 @@ namespace faf::headless
 {
   /**
    * `WLD_DoPreload`, `WLD_DoLoading`: the session loader builds rules, session Lua state and map on
-   * its worker thread. False, with `error` set, if the map doesn't load.
+   * its worker thread. The error if the map doesn't load.
    */
-  [[nodiscard]] bool
-  LoadSessionScenario(moho::SWldSessionInfo& sessionInfo, moho::SWldGameData& gameData, std::string& error);
+  [[nodiscard]] std::expected<void, std::string>
+  LoadSessionScenario(moho::SWldSessionInfo& sessionInfo, moho::SWldGameData& gameData);
 
   /**
    * The launch info, completed as `WLD_DoLoading` completes it from the world session. Returns the

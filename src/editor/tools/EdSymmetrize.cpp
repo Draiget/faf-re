@@ -61,19 +61,17 @@ namespace faf::editor
      * One grid through the op. Its samples lie at world (ox + x * cell, oz + z * cell), world being height samples;
      * the centre is in the same units.
      */
-    bool Run(
+    std::expected<void, std::string> Run(
       field::Grid& grid,
       const int fieldWidth,
       const int fieldHeight,
       const SymmetrizeOptions& options,
-      const bool nearest,
-      std::string& error
+      const bool nearest
     )
     {
       const char* const mode = OpMode(options.symmetry);
       if (mode == nullptr) {
-        error = "no symmetry chosen";
-        return false;
+        return std::unexpected("no symmetry chosen");
       }
       field::OpArgs args;
       args.p.str["mode"] = mode;
@@ -86,15 +84,14 @@ namespace faf::editor
       args.p.num["cz"] = options.centreZ >= 0.0f ? options.centreZ : 0.5 * (fieldHeight - 1);
       args.in["a"] = std::make_shared<const field::Grid>(grid);
       field::Grid out;
-      if (!field::RunOpCpu("symmetrize", args, out, error)) {
-        return false;
+      if (auto ran = field::RunOpCpu("symmetrize", args, out); !ran) {
+        return ran;
       }
       if (!out.SameShape(grid)) {
-        error = "symmetrize: the result has another size";
-        return false;
+        return std::unexpected("symmetrize: the result has another size");
       }
       grid.v = std::move(out.v);
-      return true;
+      return {};
     }
 
     /** A grid over the map of `n x m` cells whose middles lie where they cover. */
@@ -134,44 +131,40 @@ namespace faf::editor
     }
   }
 
-  bool SymmetrizeHeights(
+  std::expected<void, std::string> SymmetrizeHeights(
     std::uint16_t* const heights,
     const int width,
     const int height,
-    const SymmetrizeOptions& options,
-    std::string& error
+    const SymmetrizeOptions& options
   )
   {
     if (heights == nullptr || width < 2 || height < 2) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     field::Grid grid(width, height, 1.0f, 0.0f, 0.0f);
     for (std::size_t i = 0; i < grid.v.size(); ++i) {
       grid.v[i] = static_cast<float>(heights[i]);
     }
-    if (!Run(grid, width, height, options, false, error)) {
-      return false;
+    if (auto ran = Run(grid, width, height, options, false); !ran) {
+      return ran;
     }
     for (std::size_t i = 0; i < grid.v.size(); ++i) {
       heights[i] = static_cast<std::uint16_t>(std::lround(std::clamp(grid.v[i], 0.0f, 65535.0f)));
     }
-    return true;
+    return {};
   }
 
-  bool SymmetrizeMasks(
+  std::expected<void, std::string> SymmetrizeMasks(
     std::uint64_t* const texels,
     const int maskWidth,
     const int maskHeight,
     const int fieldWidth,
     const int fieldHeight,
-    const SymmetrizeOptions& options,
-    std::string& error
+    const SymmetrizeOptions& options
   )
   {
     if (texels == nullptr || maskWidth < 2 || maskHeight < 2) {
-      error = "no masks";
-      return false;
+      return std::unexpected("no masks");
     }
     const std::size_t count = static_cast<std::size_t>(maskWidth) * static_cast<std::size_t>(maskHeight);
     for (int stratum = 0; stratum < 8; ++stratum) {
@@ -180,30 +173,28 @@ namespace faf::editor
       for (std::size_t i = 0; i < count; ++i) {
         grid.v[i] = static_cast<float>((texels[i] >> shift) & 0xFFu);
       }
-      if (!Run(grid, fieldWidth, fieldHeight, options, false, error)) {
-        return false;
+      if (auto ran = Run(grid, fieldWidth, fieldHeight, options, false); !ran) {
+        return ran;
       }
       for (std::size_t i = 0; i < count; ++i) {
         const auto byte = static_cast<std::uint64_t>(std::lround(std::clamp(grid.v[i], 0.0f, 255.0f)));
         texels[i] = (texels[i] & ~(std::uint64_t{0xFF} << shift)) | (byte << shift);
       }
     }
-    return true;
+    return {};
   }
 
-  bool SymmetrizeCells(
+  std::expected<void, std::string> SymmetrizeCells(
     std::uint8_t* const cells,
     const int cellWidth,
     const int cellHeight,
     const int fieldWidth,
     const int fieldHeight,
-    const SymmetrizeOptions& options,
-    std::string& error
+    const SymmetrizeOptions& options
   )
   {
     if (cells == nullptr || cellWidth < 2 || cellHeight < 2) {
-      error = "no cells";
-      return false;
+      return std::unexpected("no cells");
     }
     SymmetrizeOptions codes = options;
     if (codes.combine == SymmetryCombine::Average) {
@@ -213,13 +204,13 @@ namespace faf::editor
     for (std::size_t i = 0; i < grid.v.size(); ++i) {
       grid.v[i] = static_cast<float>(cells[i]);
     }
-    if (!Run(grid, fieldWidth, fieldHeight, codes, true, error)) {
-      return false;
+    if (auto ran = Run(grid, fieldWidth, fieldHeight, codes, true); !ran) {
+      return ran;
     }
     for (std::size_t i = 0; i < grid.v.size(); ++i) {
       cells[i] = static_cast<std::uint8_t>(std::lround(std::clamp(grid.v[i], 0.0f, 255.0f)));
     }
-    return true;
+    return {};
   }
   const char* SymmetryOpModeName(
     const Symmetry symmetry

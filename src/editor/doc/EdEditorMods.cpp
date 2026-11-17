@@ -51,7 +51,7 @@ namespace faf::editor
       }
       if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front()) {
         value = value.substr(1, value.size() - 2);
-      } else if (value.size() >= 4 && value.rfind("[[", 0) == 0 && value.compare(value.size() - 2, 2, "]]") == 0) {
+      } else if (value.size() >= 4 && value.starts_with("[[") && value.ends_with("]]")) {
         value = value.substr(2, value.size() - 4);
       }
       out[key] = value;

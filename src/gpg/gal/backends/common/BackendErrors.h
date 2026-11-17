@@ -3,7 +3,7 @@
 // FAF addition, not in the shipped binary: error reporting shared by the
 // gal backends added for Direct3D 11, Direct3D 12 and Vulkan.
 
-#include <windows.h>
+#include <Windows.h>
 
 namespace gpg::gal::backend
 {

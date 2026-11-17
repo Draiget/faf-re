@@ -1,5 +1,6 @@
 #include "moho/sim/ESpecialFileTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -54,9 +55,9 @@ namespace moho
   )
   {
     typeInfo->mPrefix = "SFT_";
-    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_SaveGame"), static_cast<std::int32_t>(SaveGame));
-    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_Replay"), static_cast<std::int32_t>(Replay));
-    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_CampaignSave"), static_cast<std::int32_t>(CampaignSave));
+    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_SaveGame"), std::to_underlying(SaveGame));
+    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_Replay"), std::to_underlying(Replay));
+    typeInfo->AddEnum(typeInfo->StripPrefix("SFT_CampaignSave"), std::to_underlying(CampaignSave));
   }
 
   /**

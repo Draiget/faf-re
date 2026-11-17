@@ -273,7 +273,7 @@ namespace faf::editor
     }
     // Steps stop only in the map's own files (a source under /maps/), not inside the game's libraries.
     const std::string source = Lower(ar->source);
-    const bool mapFile = source.find("/maps/") != std::string::npos;
+    const bool mapFile = source.contains("/maps/");
     if (!atBreakpoint && !mapFile) {
       return;
     }

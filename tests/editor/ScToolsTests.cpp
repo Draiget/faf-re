@@ -94,10 +94,10 @@ namespace
     PadSettings settings;
     std::vector<PadMarker> markers = {{"ARMY_1", "Blank Marker", 40.0f, 40.0f}, {"Mass 01", "Mass", 52.0f, 40.0f}};
     PadResult first;
-    std::string error;
-    const int changed =
-      ApplyPads(words.data(), kSide, kSide, kScale, CollectPads(markers, settings), settings, {}, first, error);
-    ASSERT_GT(changed, 100) << error;
+    const auto changed =
+      ApplyPads(words.data(), kSide, kSide, kScale, CollectPads(markers, settings), settings, {}, first);
+    ASSERT_TRUE(changed) << changed.error();
+    ASSERT_GT(*changed, 100);
     // The start's core is flat: its samples share one height.
     const std::uint16_t middle = words[static_cast<std::size_t>(40 * kSide + 40)];
     EXPECT_EQ(words[static_cast<std::size_t>(36 * kSide + 44)], middle);
@@ -106,9 +106,10 @@ namespace
     // Move the start and apply again: the old pad is taken off first, then the new one made.
     markers[0].x = 70.0f;
     PadResult second;
-    ASSERT_GT(
-      ApplyPads(words.data(), kSide, kSide, kScale, CollectPads(markers, settings), settings, first, second, error), 0
-    );
+    const auto again =
+      ApplyPads(words.data(), kSide, kSide, kScale, CollectPads(markers, settings), settings, first, second);
+    ASSERT_TRUE(again) << again.error();
+    ASSERT_GT(*again, 0);
     EXPECT_NE(first.signature, second.signature);
     // Taking the second off gives the original ground back, word for word.
     (void)RemovePads(words.data(), kSide, kSide, kScale, second);
@@ -118,7 +119,7 @@ namespace
     }
     EXPECT_EQ(differ, 0U) << "pads off: the ground as it was";
     PadResult none;
-    EXPECT_EQ(ApplyPads(words.data(), kSide, kSide, kScale, {}, settings, {}, none, error), -1);
+    EXPECT_FALSE(ApplyPads(words.data(), kSide, kSide, kScale, {}, settings, {}, none));
   }
 
   TEST(
@@ -137,9 +138,10 @@ namespace
     const auto before = BlockedShares(words.data(), kSide, kSide, kScale, 0.75f);
     ASSERT_EQ(before.size(), 4U);
     EXPECT_GT(before[0], 0.0f) << "the cliff blocks land units";
-    std::string error;
     SlopeLimitSettings settings;
-    ASSERT_GT(LimitSlopes(words.data(), kSide, kSide, kScale, settings, error), 0) << error;
+    const auto changed = LimitSlopes(words.data(), kSide, kSide, kScale, settings);
+    ASSERT_TRUE(changed) << changed.error();
+    ASSERT_GT(*changed, 0);
     const auto after = BlockedShares(words.data(), kSide, kSide, kScale, 0.75f);
     EXPECT_LT(after[0], before[0]) << "less ground blocked for small land units";
   }

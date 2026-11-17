@@ -1,5 +1,6 @@
 #include "CReplayClient.h"
 
+#include <utility>
 #include <cstdint>
 #include <mutex>
 #include <new>
@@ -158,7 +159,7 @@ void CReplayClient::Process(
   gpg::BinaryReader reader(&input);
 
   switch (msg.GetType().raw()) {
-  case static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance): {
+  case std::to_underlying(ECmdStreamOp::CMDST_Advance): {
     std::int32_t beatDelta = 0;
     reader.ReadExact(beatDelta);
 
@@ -186,11 +187,11 @@ void CReplayClient::Process(
     break;
   }
 
-  case static_cast<std::uint8_t>(EClientMsg::CLIMSG_Dispatched):
+  case std::to_underlying(EClientMsg::CLIMSG_Dispatched):
     Start();
     break;
 
-  case static_cast<std::uint8_t>(EClientMsg::CLIMSG_Available): {
+  case std::to_underlying(EClientMsg::CLIMSG_Available): {
     CClientBase::Process(msg);
 
     std::int32_t dispatchedBeat = 0;
@@ -203,7 +204,7 @@ void CReplayClient::Process(
     break;
   }
 
-  case static_cast<std::uint8_t>(EClientMsg::CLIMSG_Ready):
+  case std::to_underlying(EClientMsg::CLIMSG_Ready):
     CClientBase::Process(msg);
     break;
 
@@ -243,7 +244,7 @@ void CReplayClient::Start()
       }
     }
 
-    if (replayType != static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    if (replayType != std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
       if (mCurrentSourceAllowed) {
         CClientBase::Process(mReplayMessage);
       }
@@ -308,20 +309,20 @@ void CReplayClient::SkipBeats(
     gpg::BinaryReader reader(&stream);
 
     const std::uint8_t replayType = mReplayMessage.GetType().raw();
-    if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_SetCommandSource)) {
+    if (replayType == std::to_underlying(ECmdStreamOp::CMDST_SetCommandSource)) {
       std::uint8_t sourceId = 0;
       if (mReplayMessage.GetMessageSize() >= 1) {
         reader.ReadExact(sourceId);
       }
       mCurrentSourceAllowed = mReplayMessage.GetMessageSize() >= 1 && mValidCommandSources.Contains(sourceId);
       currentSource = mCurrentSourceAllowed ? sourceId : kNoCommandSource;
-    } else if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
+    } else if (replayType == std::to_underlying(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
       if (mCurrentSourceAllowed && currentSource != kNoCommandSource) {
         (void)mValidCommandSources.Remove(currentSource);
         mValidCommandSources.Finalize();
         currentSource = kNoCommandSource;
       }
-    } else if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    } else if (replayType == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
       std::int32_t beatDelta = 0;
       reader.ReadExact(beatDelta);
       skipped += beatDelta;

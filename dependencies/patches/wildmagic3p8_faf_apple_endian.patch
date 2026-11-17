@@ -1,0 +1,14 @@
+diff -ruN a/Foundation/System/Wm3Platforms.h b/Foundation/System/Wm3Platforms.h
+--- a/Foundation/System/Wm3Platforms.h	2026-11-16 11:24:05
++++ b/Foundation/System/Wm3Platforms.h	2026-11-16 11:24:05
+@@ -100,7 +100,10 @@
+ //----------------------------------------------------------------------------
+ #elif defined(__APPLE__)
+ 
++// FAF: only PowerPC Macs are big-endian; Intel and Apple silicon Macs are little-endian.
++#if defined(__BIG_ENDIAN__)
+ #define WM3_BIG_ENDIAN
++#endif
+ 
+ #include <stdint.h>
+ typedef int64_t Integer64;

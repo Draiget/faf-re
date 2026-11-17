@@ -73,18 +73,20 @@ namespace faf::editor::field
     // ---- bilateral
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpBilateral(
+    std::expected<void, std::string> OpBilateral(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const int r = SamplesOf(a.p.N("radius", 6.0), *src, 1, 12);
       const float sr = std::max(1e-4f, static_cast<float>(a.p.N("sigma_r", 2.0)));
       const float inv = 1.0f / (sr * sr);
@@ -118,24 +120,26 @@ namespace faf::editor::field
         const float res = sum / wsum;
         return mask != nullptr ? Lerp(c, res, Clamp01(mask->At(x, z))) : res;
       });
-      return true;
+      return {};
     }
 
     // ---- diffuse (Perona-Malik)
     // --------------------------------------------------------------------------------------------------------------------
 
-    bool OpDiffuse(
+    std::expected<void, std::string> OpDiffuse(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const int iterations = std::max(0, std::min(5000, static_cast<int>(a.p.N("iterations", 20))));
       const float kappa = std::max(1e-4f, static_cast<float>(a.p.N("kappa", 0.4)));
       const float rate = std::max(0.0f, std::min(0.25f, static_cast<float>(a.p.N("rate", 0.2))));
@@ -182,24 +186,26 @@ namespace faf::editor::field
         std::swap(cur.v, next.v);
       }
       out.v = std::move(cur.v);
-      return true;
+      return {};
     }
 
     // ---- unsharp
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpUnsharp(
+    std::expected<void, std::string> OpUnsharp(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const double sigma = std::max(0.3, a.p.N("radius", 4.0) / static_cast<double>(src->cell));
       const float amount = static_cast<float>(a.p.N("amount", 1.0));
       const float thr = std::max(0.0f, static_cast<float>(a.p.N("threshold", 0.0)));
@@ -215,25 +221,26 @@ namespace faf::editor::field
           amt *= Clamp01(mask->At(x, z));
         return c + amt * d;
       });
-      return true;
+      return {};
     }
 
     // ---- edge
     // ------------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpEdge(
+    std::expected<void, std::string> OpEdge(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src0 = Need(a, "a", err);
-      if (src0 == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src0 == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string mode = a.p.S("mode", "sobel");
       if (mode != "sobel" && mode != "prewitt" && mode != "laplace" && mode != "dog") {
-        err = "edge: mode must be sobel, prewitt, laplace or dog";
-        return false;
+        return std::unexpected("edge: mode must be sobel, prewitt, laplace or dog");
       }
       const float gain = static_cast<float>(a.p.N("gain", 1.0));
       const bool sgn = a.p.N("signed", 0) != 0;
@@ -256,7 +263,7 @@ namespace faf::editor::field
           const float d = (b1.At(x, z) - b2.At(x, z)) * gain;
           return sgn ? Clamp01(0.5f + d) : Clamp01(std::fabs(d));
         });
-        return true;
+        return {};
       }
       const auto at = [&](const int x, const int z) {
         return src->At(std::max(0, std::min(w - 1, x)), std::max(0, std::min(h - 1, z)));
@@ -276,7 +283,7 @@ namespace faf::editor::field
           ((2.0f + wc) * 2.0f * cell);
         return Clamp01(std::sqrt(gx * gx + gz * gz) * gain);
       });
-      return true;
+      return {};
     }
 
     // ---- morph
@@ -363,15 +370,17 @@ namespace faf::editor::field
       });
     }
 
-    bool OpMorph(
+    std::expected<void, std::string> OpMorph(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string op = a.p.S("op", "dilate");
       static const char* const ops[] = {"dilate", "erode", "open", "close", "gradient", "tophat", "bothat"};
       int k = -1;
@@ -379,14 +388,12 @@ namespace faf::editor::field
         if (op == ops[i])
           k = i;
       if (k < 0) {
-        err = "morph: op must be dilate, erode, open, close, gradient, tophat or bothat";
-        return false;
+        return std::unexpected("morph: op must be dilate, erode, open, close, gradient, tophat or bothat");
       }
       const std::string sh = a.p.S("shape", "square");
       int shape = sh == "square" ? 0 : (sh == "disc" ? 1 : (sh == "cross" ? 2 : (sh == "diamond" ? 3 : -1)));
       if (shape < 0) {
-        err = "morph: shape must be square, disc, cross or diamond";
-        return false;
+        return std::unexpected("morph: shape must be square, disc, cross or diamond");
       }
       const int r = SamplesOf(a.p.N("radius", 4.0), *src, 1, shape == 0 ? 32 : 16);
       Grid t1, t2;
@@ -427,30 +434,30 @@ namespace faf::editor::field
         });
         break;
       }
-      return true;
+      return {};
     }
 
     // ---- convolve
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpConvolve(
+    std::expected<void, std::string> OpConvolve(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::vector<double>* kv = a.p.A("kernel");
       if (kv == nullptr || kv->empty()) {
-        err = "convolve: 'kernel' needs n x n numbers";
-        return false;
+        return std::unexpected("convolve: 'kernel' needs n x n numbers");
       }
       const int n = static_cast<int>(std::lround(std::sqrt(static_cast<double>(kv->size()))));
       if (n * n != static_cast<int>(kv->size()) || n % 2 == 0 || n > 15) {
-        err = "convolve: the kernel must be n x n numbers with n odd and at most 15";
-        return false;
+        return std::unexpected("convolve: the kernel must be n x n numbers with n odd and at most 15");
       }
       std::vector<float> k(kv->size());
       double sum = 0.0;
@@ -473,24 +480,26 @@ namespace faf::editor::field
         }
         return acc * mul + bias;
       });
-      return true;
+      return {};
     }
 
     // ---- blur_dir
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpBlurDir(
+    std::expected<void, std::string> OpBlurDir(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const double ang = a.p.N("angle", 0.0) * kPiD / 180.0;
       const float ux = static_cast<float>(std::cos(ang)), uz = static_cast<float>(std::sin(ang));
       const float len = std::max(0.0f, static_cast<float>(a.p.N("length", 20.0) / static_cast<double>(src->cell)));
@@ -498,7 +507,7 @@ namespace faf::editor::field
       const int half = std::max(0, std::min(256, static_cast<int>(std::ceil(len * 0.5f))));
       if (half == 0) {
         out.v = src->v;
-        return true;
+        return {};
       }
       std::vector<float> wt(static_cast<std::size_t>(2 * half + 1));
       float wsum = 0.0f;
@@ -525,28 +534,29 @@ namespace faf::editor::field
         const float res = acc / wsum;
         return mask != nullptr ? Lerp(src->At(x, z), res, Clamp01(mask->At(x, z))) : res;
       });
-      return true;
+      return {};
     }
 
     // ---- blur_slope
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpBlurSlope(
+    std::expected<void, std::string> OpBlurSlope(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const std::string mode = a.p.S("mode", "flat");
       if (mode != "flat" && mode != "steep") {
-        err = "blur_slope: mode must be flat or steep";
-        return false;
+        return std::unexpected("blur_slope: mode must be flat or steep");
       }
       const double sigma = std::max(0.3, a.p.N("radius", 6.0) / static_cast<double>(src->cell));
       const float lo = static_cast<float>(a.p.N("lo", 0.3));
@@ -565,24 +575,26 @@ namespace faf::editor::field
           wgt *= Clamp01(mask->At(x, z));
         return Lerp(src->At(x, z), blur.At(x, z), wgt);
       });
-      return true;
+      return {};
     }
 
     // ---- stratify
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpStratify(
+    std::expected<void, std::string> OpStratify(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const std::uint32_t seed = SeedOf(a);
       const float thick = std::max(0.2f, static_cast<float>(a.p.N("thickness", 3.0)));
       const float variation = Clamp01(static_cast<float>(a.p.N("variation", 0.5)));
@@ -630,25 +642,26 @@ namespace faf::editor::field
           m *= Clamp01(mask->At(x, z));
         return hgt + m * (hs - hh);
       });
-      return true;
+      return {};
     }
 
     // ---- occlusion
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpOcclusion(
+    std::expected<void, std::string> OpOcclusion(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string mode = a.p.S("mode", "cavity");
       if (mode != "cavity" && mode != "convex" && mode != "both") {
-        err = "occlusion: mode must be cavity, convex or both";
-        return false;
+        return std::unexpected("occlusion: mode must be cavity, convex or both");
       }
       const int m = mode == "cavity" ? 0 : (mode == "convex" ? 1 : 2);
       const int dirs = std::max(4, std::min(32, static_cast<int>(a.p.N("directions", 12))));
@@ -695,25 +708,26 @@ namespace faf::editor::field
           return Clamp01(occConvex * gain);
         return Clamp01(0.5f + 0.5f * (occConcave - occConvex) * gain);
       });
-      return true;
+      return {};
     }
 
     // ---- hillshade
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpHillshade(
+    std::expected<void, std::string> OpHillshade(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string mode = a.p.S("mode", "shade");
       if (mode != "shade" && mode != "lit" && mode != "shadow") {
-        err = "hillshade: mode must be shade, lit or shadow";
-        return false;
+        return std::unexpected("hillshade: mode must be shade, lit or shadow");
       }
       const int m = mode == "shade" ? 0 : (mode == "lit" ? 1 : 2);
       const double az = a.p.N("azimuth", 315.0) * kPiD / 180.0;
@@ -758,21 +772,23 @@ namespace faf::editor::field
         }
         return Clamp01(ambient + (1.0f - ambient) * std::max(0.0f, ndl));
       });
-      return true;
+      return {};
     }
 
     // ---- normal_map
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpNormalMap(
+    std::expected<void, std::string> OpNormalMap(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const float span = std::max(0.05f, static_cast<float>(a.p.N("span", 1.0)));
       const float strength = static_cast<float>(a.p.N("strength", 1.0));
       const float shiftUnits = static_cast<float>(a.p.N("shift", 0.0));
@@ -802,25 +818,26 @@ namespace faf::editor::field
         (*a.extra)["y"] = std::move(Y);
         (*a.extra)["z"] = std::move(Z);
       }
-      return true;
+      return {};
     }
 
     // ---- wetness
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpWetness(
+    std::expected<void, std::string> OpWetness(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string mode = a.p.S("mode", "wet");
       if (mode != "wet" && mode != "twi" && mode != "area") {
-        err = "wetness: mode must be wet, twi or area";
-        return false;
+        return std::unexpected("wetness: mode must be wet, twi or area");
       }
       const float pf = static_cast<float>(std::max(0.5, std::min(8.0, a.p.N("p", 1.1))));
       const float lo = static_cast<float>(a.p.N("lo", 3.0)), hi = static_cast<float>(a.p.N("hi", 11.0));
@@ -888,24 +905,26 @@ namespace faf::editor::field
           );
         return SmoothStep(lo, hi, t->At(x, z));
       });
-      return true;
+      return {};
     }
 
     // ---- rockiness
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpRockiness(
+    std::expected<void, std::string> OpRockiness(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* soil = Get(a, "b");
-      if (!SameOrNone(soil, *src, "b", err))
-        return false;
+      if (auto same = SameOrNone(soil, *src, "b"); !same)
+        return same;
       const float slo = static_cast<float>(a.p.N("slope_lo", 25.0)), shi = static_cast<float>(a.p.N("slope_hi", 50.0));
       const int n = std::max(1, std::min(16, static_cast<int>(std::lround(a.p.N("radius", 6.0) / src->cell))));
       const float gain = static_cast<float>(a.p.N("gain", 14.0));
@@ -937,25 +956,26 @@ namespace faf::editor::field
           v += breakup * (Fbm01(WorldX(g, x), WorldZ(g, z), seed, 14.0, 3) - 0.5f) * 2.0f;
         return Clamp01(v);
       });
-      return true;
+      return {};
     }
 
     // ---- color_ramp
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpColorRamp(
+    std::expected<void, std::string> OpColorRamp(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::vector<double>* sv = a.p.A("stops");
       if (sv == nullptr || sv->size() < 10 || sv->size() % 5 != 0) {
-        err = "color_ramp: 'stops' needs at least two stops of 5 numbers (position, r, g, b, a)";
-        return false;
+        return std::unexpected("color_ramp: 'stops' needs at least two stops of 5 numbers (position, r, g, b, a)");
       }
       struct Stop
       {
@@ -1012,7 +1032,7 @@ namespace faf::editor::field
         (*a.extra)["b"] = std::move(B);
         (*a.extra)["a"] = std::move(A);
       }
-      return true;
+      return {};
     }
 
     struct FiltOpRegistrar

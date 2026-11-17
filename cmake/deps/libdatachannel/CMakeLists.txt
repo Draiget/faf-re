@@ -74,7 +74,7 @@ target_compile_definitions(faf_datachannel PRIVATE RTC_EXPORTS USE_MBEDTLS=1 USE
 set_target_properties(faf_datachannel PROPERTIES CXX_STANDARD 17 FOLDER "dependencies")
 target_link_libraries(faf_datachannel PRIVATE faf_usrsctp faf_mbedtls faf_juice)
 
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
     target_compile_options(${_t} PRIVATE -w)
   endforeach()

@@ -2,9 +2,17 @@
 
 #include "PlatformDefines.h"
 
+// Every thread this code starts goes through platform/posix/FpEnvPosix.cpp's faf_pthread_create on
+// macOS, std::thread's included (libc++ starts it with an inline call to pthread_create in our own
+// objects): macOS gives a new thread a 512 KB stack where Linux gives 8 MB and Windows 1 MB, and
+// saving the sim needs more. Apple's linker has no --wrap, which does this on Linux.
+#if FAFRE_PLATFORM_MACOS // Apple's linker has no --wrap; macOS's default thread stack is 512 KB
+#define pthread_create faf_pthread_create
+#endif
+
 // Engine addition (dedicated-server plan WPL.5): the Windows names the shared simulation
 // code uses from <Windows.h> and the MSVC CRT, for builds without them (Linux). The Linux
-// build force-includes this header (cmake/FafLinux.cmake); Windows builds never see it.
+// build force-includes this header (cmake/FafPosix.cmake); Windows builds never see it.
 // Each name means what it means on Windows.
 
 #if !FAFRE_PLATFORM_WINDOWS && defined(__cplusplus)

@@ -6,6 +6,7 @@
 // documented in tools/retail-recorder/SPEC_FORMAT.md.
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,7 +47,7 @@ namespace difffuzz
       std::vector<Entry> entries;
     };
 
-    bool ReadSpec(const char* path, File& out, std::string& error);
+    [[nodiscard]] std::expected<File, std::string> ReadSpec(const char* path);
 
     constexpr int kMaxSpecWords = 32; // argument words one auto row may take
 

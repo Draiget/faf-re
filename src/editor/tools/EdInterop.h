@@ -2,7 +2,10 @@
 
 #include "editor/tools/EdHeightFile.h"
 
+#include <array>
+#include "editor/tools/EdHeightFile.h"
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -47,7 +50,26 @@ namespace faf::editor
     float feather = 0.0f;
     /** How the image is read between its samples when it isn't the map's size (FAF Studio's filters). */
     ResampleFilter filter = ResampleFilter::Bilinear;
+    // FAF Studio's further import options.
+    HeightReadOptions read; // the image's channel, a raw file's layout
+    bool invert = false;    // bright is low
+    bool stretch = true;    // Normalised: the image's own darkest .. brightest (off: the whole 0 .. 65535)
+    bool seaPin = false;    // the image value `seaValue` (0..1) lands on `seaLevel` (the map's water)
+    float seaValue = 0.3f;
+    float seaLevel = 25.0f;
+    int pads = 0; // 0 none, 1 keep the old ground round starts and resources, 2 flatten the new ground
+    float padRadius = 16.0f;
+    std::vector<std::array<float, 2>> padPoints; // the caller gives them (the markers)
+    bool symmetric = false;                      // the caller makes the result symmetric
+    std::string maskFile;                        // blend by a mask image (bright = the import, dark = the map stays)
+    std::vector<float> maskWeights;              // the caller loads it onto the map's grid (0..1); empty: none
+    bool regionPlayable = false;                 // the region is the playable area (the caller sets it)
   };
+  /**
+   * Reads back what an export wrote beside its image (`<file>.json`: heightPerWord, lowest, highest): the settings
+   * that put it back at the same heights (Absolute with that scale). The error when the text isn't one.
+   */
+  [[nodiscard]] std::expected<void, std::string> ImportFromSidecar(const std::string& json, ImportSettings& settings);
 
   /** The image flipped and turned as the settings say. */
   [[nodiscard]] HeightImage OrientHeights(const HeightImage& image, bool flipX, bool flipZ, int turns);
@@ -97,6 +119,55 @@ namespace faf::editor
    * ignored, with a height image's extension. Empty when none.
    */
   [[nodiscard]] std::string FindNamedMask(const std::vector<std::string>& files, const std::string& name);
+  /**
+   * The imported masks' slots (FAF Studio's interop Named, the mask generator's Imported mask): the height images
+   * beside `heightmap`, the heightmap itself left out, sorted by name; slot 1 is the first.
+   */
+  [[nodiscard]] std::vector<std::string> ImportedMaskFiles(const std::string& heightmap);
+
+  /** One file of Import / Export > Masks (FAF Studio's mask import): where it goes and how it is read. */
+  struct MaskImportFile
+  {
+    std::string path;
+    enum class Target
+    {
+      Layer,       // `layer`'s paint
+      TerrainType, // `typeCode` where the mask is above `threshold`
+      Splat,       // an RGBA splat: its R, G, B, A into `layer` .. `layer` + 3
+      Skip,
+    } target = Target::Layer;
+    int layer = 1;
+    int typeCode = 1;
+    float threshold = 0.5f;
+    int channel = 0; // 0 grey, 1..4 R G B A
+    bool invert = false;
+    bool stretch = false; // its own darkest .. brightest becomes 0 .. 1
+  };
+  /**
+   * What a file is for by its name (FAF Studio's interop name rules): layer<n> / mask<n> / stratum<n> -> layer n;
+   * "splat" -> the splat into layers 1-4; "type" -> a terrain type; a kind of ground in the name (grass, rock, sand,
+   * dirt, wet, snow ...) -> the layer whose kind it is (`layerKinds[1..8]`, lower case names, "" for none); else Skip.
+   */
+  [[nodiscard]] MaskImportFile GuessMaskImport(const std::string& path, const std::array<std::string, 9>& layerKinds);
+
+  /**
+   * What the reference maps look like (FAF Studio's mapsets.lua Stats, 342 maps): for a map size (0 all), the 5th,
+   * 25th, 50th, 75th and 95th percentiles of the relief (highest - lowest), the land's span, the mean slope (degrees)
+   * and the share steeper than 30 degrees.
+   */
+  struct ReferenceMapStats
+  {
+    int size = 0;
+    int n = 0;
+    std::array<float, 5> relief{};
+    std::array<float, 5> span{};
+    std::array<float, 5> slope{};
+    std::array<float, 5> steep{};
+  };
+  /** The numbers for a map `size` units across: the nearest size with 8 maps or more (up to 1024), else all maps. */
+  [[nodiscard]] const ReferenceMapStats& ReferenceStatsFor(int size);
+  /** A line comparing an import's relief and mean slope with the reference maps of its size (FAF Studio's Advice). */
+  [[nodiscard]] std::string ReferenceAdvice(int size, float relief, float meanSlope);
 
   /** A file's stamp for the live link: its size and its last write (0 for none). */
   struct FileStamp

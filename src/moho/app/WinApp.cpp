@@ -56,8 +56,10 @@
 #include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
 #endif
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4996)
+#endif
 
 /**
  * wx builds the application object through this: wxCreateApp (0x004F1E90)
@@ -160,11 +162,15 @@ namespace
     return tmp;
   }
 
+  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
+  // filter are Windows' (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
   /**
    * Address: 0x004A1E10 (FUN_004A1E10, j__strrchr)
    *
    * What it does:
    * Forwards one C-string reverse-character search to CRT `strrchr`.
+   * Only the registry path parser below calls it.
    */
   char* FindLastCharacterInCString(
     char* const text,
@@ -174,9 +180,6 @@ namespace
     return std::strrchr(text, character);
   }
 
-  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
-  // filter are Windows' (the Linux client, issue #255).
-#if FAFRE_PLATFORM_WINDOWS
   struct ParsedRegistryPath
   {
     HKEY rootKey = HKEY_CURRENT_USER;
@@ -1490,4 +1493,6 @@ void moho::WINX_ExitSplash()
   platform::window::HideSplash();
 }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif

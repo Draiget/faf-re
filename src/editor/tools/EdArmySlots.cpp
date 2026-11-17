@@ -74,7 +74,7 @@ namespace faf::editor
   {
     int highest = 0;
     for (const std::string& name : names) {
-      if (name.rfind("ARMY_", 0) == 0 && name.size() > 5) {
+      if (name.starts_with("ARMY_") && name.size() > 5) {
         char* end = nullptr;
         const long number = std::strtol(name.c_str() + 5, &end, 10);
         if (end != nullptr && *end == '\0' && number > highest) {

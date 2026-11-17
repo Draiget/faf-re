@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -116,9 +117,9 @@ namespace faf::editor
      * Starts making a new map folder `<vault>/maps/<settings.folder>` on the worker thread: the engine's empty
      * map of that size (CWldMap::MapNew, 0x00890D40) at the settings' height and sea, a preview, and the
      * scenario, save and script files with the start positions. Poll finishes it; the app then mounts the
-     * folder and opens it (TakeCreated). False, with `message`, when it can't start.
+     * folder and opens it (TakeCreated). What it started, or the error when it can't start.
      */
-    bool CreateNew(const NewMapSettings& settings, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> CreateNew(const NewMapSettings& settings);
 
     /** After Poll finished a CreateNew: the folder it wrote and its scenario's game path (once). */
     bool TakeCreated(std::filesystem::path& folder, std::string& scenarioPath);
@@ -162,10 +163,10 @@ namespace faf::editor
     /**
      * Saves the map over its own files, when it has them on disk (a map in the game's archives has none; it is
      * saved as a new folder instead): the `.scmap` and the Lua files that changed. Before the first save of a
-     * session the map's files are backed up outside the maps folder (SetBackups). `message` says what happened, for
+     * session the map's files are backed up outside the maps folder (SetBackups). What happened, or the error, for
      * the log and the status bar.
      */
-    bool Save(std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> Save();
 
     /** Where Save backs the map's files up first (`<root>/<map folder>/<time>/`) and how many backups a map keeps
      * (0: no backups). */
@@ -181,9 +182,9 @@ namespace faf::editor
     /**
      * Autosave: every file of the map (the `.scmap` and its Lua files, as Save would write them) into `folder`,
      * which is made; the document stays as it is (unsaved, its baselines unmoved), so a later Save still writes
-     * what changed. False with `error` when the map can't be written yet or a file fails.
+     * what changed. The error when the map can't be written yet or a file fails.
      */
-    bool WriteSnapshot(const std::filesystem::path& folder, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> WriteSnapshot(const std::filesystem::path& folder);
 
     /**
      * Asked before Open and CreateNew drop unsaved changes: the guard (the editor's "Save changes?" question)
@@ -217,20 +218,21 @@ namespace faf::editor
      * of the map's folder copied, renamed to the new base name (the folder name without its version) where
      * they started with the old one, `/maps/<old folder>/...` paths rewritten in its Lua files (scenario,
      * save, script), and the edited `.scmap` written there. Later saves go to the new folder. The game sees
-     * the new folder from its next start (its file system is mounted at startup).
+     * the new folder from its next start (its file system is mounted at startup). What happened, or the error.
      */
-    bool SaveAsNewFolder(const std::string& folder, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> SaveAsNewFolder(const std::string& folder);
     /**
      * The same into another folder (`parent`, not the vault's maps): the game doesn't see a map there, but Save writes
      * it from then on (the folder was picked for it). Empty `parent`: the vault's maps.
      */
-    bool SaveAsNewFolderIn(const std::filesystem::path& parent, const std::string& folder, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string>
+    SaveAsNewFolderIn(const std::filesystem::path& parent, const std::string& folder);
     /**
      * Play of unsaved edits: the open map, edits included, copied to `<vault>/maps/<map>_editor_playtest` (the files
      * and names as Save as new folder writes them; the document's own files, save target and saved state untouched).
-     * `scenario` gets the copy's scenario path for the session.
+     * `scenario` gets the copy's scenario path for the session. What was written, or the error.
      */
-    bool WritePlayCopy(std::string& scenario, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> WritePlayCopy(std::string& scenario);
     /** Removes the play copy (`folder` empty: the last one written); only a folder ending in the copy's suffix. */
     void RemovePlayCopy(std::string folder = {});
     [[nodiscard]] const std::string& PlayCopy() const noexcept
@@ -252,15 +254,16 @@ namespace faf::editor
     [[nodiscard]] std::filesystem::path MapDiskFile() const;
     /** The vault package of the map's folder as saved on disk (no folder: an error in the plan). */
     [[nodiscard]] PackagePlan PlanPackage() const;
-    /** Writes the plan's files as `<vault>/packages/<folder>.zip`, the folder at the zip's top; false with `message`.
-     */
-    bool WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const;
+    /** Writes the plan's files as `<vault>/packages/<folder>.zip`, the folder at the zip's top; what was written, or
+     * the error. */
+    [[nodiscard]] std::expected<std::string, std::string>
+    WritePackage(const PackagePlan& plan, std::filesystem::path& written) const;
 
     /**
      * File › Export › Lobby preview: the map's preview picture (the DDS in the file's preview chunk, as the lobby shows
-     * it) written as a PNG at its own size; false with `message`.
+     * it) written as a PNG at its own size; what was written, or the error.
      */
-    bool ExportPreview(const std::filesystem::path& file, std::string& message) const;
+    [[nodiscard]] std::expected<std::string, std::string> ExportPreview(const std::filesystem::path& file) const;
     /** Map > Regenerate preview: the preview chunk a save writes from now on (EdPreview); the map counts as changed. */
     void SetPreviewRecord(
       std::vector<char> record
@@ -1030,7 +1033,7 @@ namespace faf::editor
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveUndo;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveRedo;
     /** Writes `_save.lua` and `_script.lua` beside the map file when they changed (Save). */
-    bool WriteLuaFiles(const std::filesystem::path& folder, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> WriteLuaFiles(const std::filesystem::path& folder);
     /** The script's effect decorations block on when the save has Effect markers, off when it has none (both saves). */
     void SyncEffectScript();
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
@@ -1127,7 +1130,7 @@ namespace faf::editor
     std::filesystem::path mSaveTarget;
     std::string mPlayCopy; // the play copy's folder while one is on disk
     /** The map's files, edits included, copied to `<vault>/maps/<folder>` with their paths and names moved to it. */
-    bool
-    WriteFolderCopy(const std::string& folder, std::filesystem::path& newMapFile, int& copied, std::string& message);
+    [[nodiscard]] std::expected<void, std::string>
+    WriteFolderCopy(const std::string& folder, std::filesystem::path& newMapFile, int& copied);
   };
 } // namespace faf::editor

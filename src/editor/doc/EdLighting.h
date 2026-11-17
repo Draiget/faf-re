@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <expected>
 #include <string>
 
 namespace faf::editor
@@ -75,14 +76,15 @@ namespace faf::editor
 
   /** FAForeverMapEditor's lighting settings file (`.scmlighting`): JsonUtility's dump of its LightingData. */
   std::string LightingToScmlighting(const LightingState& lighting);
-  /** Reads a `.scmlighting` into `lighting` (every field it has); false with `error`. */
-  bool LightingFromScmlighting(const std::string& text, LightingState& lighting, std::string& error);
+  /** Reads a `.scmlighting` into `lighting` (every field it has); the error otherwise. */
+  [[nodiscard]] std::expected<void, std::string>
+  LightingFromScmlighting(const std::string& text, LightingState& lighting);
 
   /**
    * A map's lighting from its `.scmap` bytes: the header, preview and height field skipped, then the shader,
    * background, sky cubemap and environment cubemaps (one name below version 0x37, else a count of name pairs, as
-   * CWldTerrainRes::LoadEnvironmentLookups reads them), then CWldTerrainRes::LoadLightingAndFog's 23 floats. False with
-   * `error` for a file it can't follow.
+   * CWldTerrainRes::LoadEnvironmentLookups reads them), then CWldTerrainRes::LoadLightingAndFog's 23 floats. The
+   * error for a file it can't follow.
    */
-  bool LightingFromScmap(const std::string& bytes, LightingState& lighting, std::string& error);
+  [[nodiscard]] std::expected<LightingState, std::string> LightingFromScmap(const std::string& bytes);
 } // namespace faf::editor

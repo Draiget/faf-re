@@ -109,18 +109,18 @@ namespace
     WriteFile(map / "zz_test_save.lua", "save");
     WriteFile(map / "notes.txt", "not a map file");
     EXPECT_EQ(MapFolderFiles(map).size(), 3u) << "the .scmap and the .lua files";
-    fs::path made;
-    std::string error;
-    ASSERT_TRUE(BackupMapFolder(map, temp.path / "backups", 1, made, error)) << error;
-    EXPECT_EQ(made.parent_path(), temp.path / "backups" / "zz_test");
-    EXPECT_EQ(ReadFile(made / "zz_test_save.lua"), "save");
-    EXPECT_FALSE(fs::exists(made / "notes.txt"));
+    auto made = BackupMapFolder(map, temp.path / "backups", 1);
+    ASSERT_TRUE(made) << made.error();
+    EXPECT_EQ(made->parent_path(), temp.path / "backups" / "zz_test");
+    EXPECT_EQ(ReadFile(*made / "zz_test_save.lua"), "save");
+    EXPECT_FALSE(fs::exists(*made / "notes.txt"));
     // An older backup beside it goes when only one is kept.
     fs::create_directories(temp.path / "backups" / "zz_test" / "20000101-000000");
-    ASSERT_TRUE(BackupMapFolder(map, temp.path / "backups", 1, made, error)) << error;
+    made = BackupMapFolder(map, temp.path / "backups", 1);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_FALSE(fs::exists(temp.path / "backups" / "zz_test" / "20000101-000000"));
-    EXPECT_TRUE(fs::exists(made / "zz_test.scmap"));
-    EXPECT_FALSE(BackupMapFolder(temp.path / "nothing", temp.path / "backups", 1, made, error));
+    EXPECT_TRUE(fs::exists(*made / "zz_test.scmap"));
+    EXPECT_FALSE(BackupMapFolder(temp.path / "nothing", temp.path / "backups", 1));
   }
 
   TEST(
@@ -146,12 +146,11 @@ namespace
     ASSERT_EQ(found.size(), 1u);
     EXPECT_EQ(found[0].folder, autosave);
 
-    fs::path backup;
-    std::string error;
-    ASSERT_TRUE(RestoreAutosave(found[0], temp.path / "backups", 3, backup, error)) << error;
+    const auto backup = RestoreAutosave(found[0], temp.path / "backups", 3);
+    ASSERT_TRUE(backup) << backup.error();
     EXPECT_EQ(ReadFile(map / "zz_test.scmap"), "autosaved map");
     EXPECT_EQ(ReadFile(map / "zz_test_save.lua"), "autosaved save");
-    EXPECT_EQ(ReadFile(backup / "zz_test.scmap"), "old map") << "the files before are kept";
+    EXPECT_EQ(ReadFile(*backup / "zz_test.scmap"), "old map") << "the files before are kept";
     EXPECT_FALSE(fs::exists(map / "autosave.txt")) << "the note isn't a map file";
 
     RemoveAutosave(autosave);

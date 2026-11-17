@@ -101,11 +101,11 @@ namespace
     const RecipeStats st = RecipeStatsOf(context.heights->v, 20.0f, true);
     const int style = 1; // alpine: altitude always counts
     const RecipeKnobs knobs = RecipeKnobsOf(style);
-    std::vector<RecipeRole> roles;
+    const auto roles = RecipeRoles(context, plan, st, knobs, style);
+    ASSERT_TRUE(roles) << roles.error();
     std::string error;
-    ASSERT_TRUE(RecipeRoles(context, plan, st, knobs, style, roles, error)) << error;
     std::map<int, field::Grid> target;
-    ASSERT_TRUE(ResolveRecipe(context, plan, roles, knobs, style, target, error)) << error;
+    ASSERT_TRUE(ResolveRecipe(context, plan, *roles, knobs, style, target, error)) << error;
     ASSERT_EQ(target.count(1) + target.count(2) + target.count(3), 3U);
     // The weights where they belong: sand on the shore, rock on the steep ring, snow on the top.
     const float c = (kSide - 1) * 0.5f;
@@ -145,11 +145,11 @@ namespace
     const RecipePlan plan = PlanRecipe(kinds, textured, 8, false);
     const RecipeStats st = RecipeStatsOf(context.heights->v, 20.0f, true);
     const int desert = 2;
-    std::vector<RecipeRole> roles;
+    const auto roles = RecipeRoles(context, plan, st, RecipeKnobsOf(desert), desert);
+    ASSERT_TRUE(roles) << roles.error();
     std::string error;
-    ASSERT_TRUE(RecipeRoles(context, plan, st, RecipeKnobsOf(desert), desert, roles, error)) << error;
     std::map<int, field::Grid> target;
-    ASSERT_TRUE(ResolveRecipe(context, plan, roles, RecipeKnobsOf(desert), desert, target, error)) << error;
+    ASSERT_TRUE(ResolveRecipe(context, plan, *roles, RecipeKnobsOf(desert), desert, target, error)) << error;
     std::vector<std::uint64_t> texels(16, 0xFF); // layer 1 (snow) painted everywhere
     std::array<float, 9> shares{};
     (void)WriteRecipe(texels.data(), 4, 4, 64.0f, 0, 8, textured, target, shares);
@@ -193,7 +193,8 @@ namespace
     }
     ASSERT_GE(erosion, 0);
     const RecipeKnobs knobs = RecipeKnobsOf(erosion);
-    ASSERT_TRUE(RecipeErosionSelections(context, plan, knobs, selection, variants, error)) << error;
+    const auto eroded = RecipeErosionSelections(context, plan, knobs, selection, variants);
+    ASSERT_TRUE(eroded) << eroded.error();
     // The channels cover about the share asked for (the band's edge adds a little).
     const std::vector<float>& wet = selection[static_cast<std::size_t>(GroundKind::Wet)];
     ASSERT_EQ(wet.size(), static_cast<std::size_t>(kSide) * kSide);
@@ -208,11 +209,11 @@ namespace
     EXPECT_EQ(variants.count({static_cast<int>(GroundKind::Rock), 1}), 1U) << "the strongest wear: the second rock";
     EXPECT_EQ(variants.count({static_cast<int>(GroundKind::Grass), 1}), 1U) << "the ridge tops: a second grass";
     // The whole style resolves, and the second rock layer gets a share.
-    std::vector<RecipeRole> roles;
     const RecipeStats st = RecipeStatsOf(context.heights->v, 20.0f, true);
-    ASSERT_TRUE(RecipeRoles(context, plan, st, knobs, erosion, roles, error)) << error;
+    const auto roles = RecipeRoles(context, plan, st, knobs, erosion);
+    ASSERT_TRUE(roles) << roles.error();
     std::map<int, field::Grid> target;
-    ASSERT_TRUE(ResolveRecipe(context, plan, roles, knobs, erosion, target, error)) << error;
+    ASSERT_TRUE(ResolveRecipe(context, plan, *roles, knobs, erosion, target, error)) << error;
     ASSERT_EQ(target.count(2), 1U);
     EXPECT_GT(*std::max_element(target[2].v.begin(), target[2].v.end()), 0.1f);
   }

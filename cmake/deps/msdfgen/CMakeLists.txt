@@ -35,7 +35,7 @@ target_include_directories(faf_msdfgen SYSTEM PUBLIC "${FAF_MSDFGEN_DIR}")
 # MSDFGEN_PUBLIC set: no generated msdfgen-config.h, these definitions stand in for it.
 target_compile_definitions(faf_msdfgen
   PUBLIC MSDFGEN_PUBLIC= MSDFGEN_USE_CPP11 MSDFGEN_DISABLE_SVG MSDFGEN_DISABLE_PNG MSDFGEN_DISABLE_VARIABLE_FONTS)
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_msdfgen PRIVATE -w)
 else()
   target_compile_options(faf_msdfgen PRIVATE /W0)

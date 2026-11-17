@@ -336,6 +336,6 @@ namespace fa
 } // namespace fa
 
 // Size check for 32-bit builds (x86). Will intentionally fail on x64.
-#if defined(_M_IX86) || defined(__i386__)
+#if FAFRE_ARCH_X86
 typedef char msvc8_auto_ptr_size_check[(sizeof(fa::auto_ptr<int>) == 4) ? 1 : -1];
 #endif

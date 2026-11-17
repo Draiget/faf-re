@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -70,5 +71,5 @@ namespace faf::editor
    * twice its dome's centre), the dome's heights kept. Returns the ratio (1: nothing to do).
    */
   float RescaleSkybox(SkyboxState& sky, float mapWidth, float mapDepth);
-  bool SkyboxFromScmskybox(const std::string& text, SkyboxState& sky, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> SkyboxFromScmskybox(const std::string& text, SkyboxState& sky);
 } // namespace faf::editor

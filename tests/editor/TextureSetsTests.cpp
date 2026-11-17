@@ -68,7 +68,7 @@ namespace
     ASSERT_STREQ(valley.id, "valley");
     // The game has every Evergreen (1) texture but none of Evergreen 2's; every texture is 1024 px.
     const auto exists = [](const std::string& path) {
-      return path.rfind("/env/Evergreen/", 0) == 0;
+      return path.starts_with("/env/Evergreen/");
     };
     const auto pixels = [](const std::string&) {
       return 1024;

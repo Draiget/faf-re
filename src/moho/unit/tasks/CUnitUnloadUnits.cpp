@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitUnloadUnits.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstdint>
 #include <limits>
@@ -257,7 +258,7 @@ namespace moho
 
     case TASKSTATE_Starting: {
       if (!mIsStagingPlatform && mUnit->IsMobile()) {
-        mUnloadGoal.aux4 = static_cast<std::int32_t>(LAYER_Land);
+        mUnloadGoal.aux4 = std::to_underlying(LAYER_Land);
         NewMoveTask(mUnloadGoal, this, 0, mOwnerCommandLinkLane.GetObjectPtr(), 0);
       }
 

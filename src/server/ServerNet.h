@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <expected>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -91,14 +92,14 @@ namespace faf::server
 
     /** Before `Start`: an address the match knows a player by (`CServerLinks::AllowAddress`). */
     void AllowAddress(
-      std::uint32_t ip
+      const remote::net::IpAddress& address
     )
     {
-      mLinks.AllowAddress(ip);
+      mLinks.AllowAddress(address);
     }
 
     /** Binds the socket and starts the thread. */
-    [[nodiscard]] bool Start(std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Start();
     /** Stops the thread; no seat is touched after this returns. */
     void Stop();
 
@@ -244,7 +245,7 @@ namespace faf::server
     bool RequestEject(std::int32_t uid, std::string reason);
     /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network
      * thread. */
-    void RequestAddress(std::uint32_t ip, bool allow);
+    void RequestAddress(const remote::net::IpAddress& address, bool allow);
     /**
      * Plan WP15.4 (#200): another person takes a seat during the game. The seat keeps its uid; its admission token and
      * name become `token` and `name`, the old player's channel goes, and the substitute joins as a player coming back
@@ -435,7 +436,7 @@ namespace faf::server
     std::vector<std::string> mNews;
     std::vector<SSeatState> mSeatStates;                         // under mNewsLock
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
-    std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
+    std::vector<std::pair<remote::net::IpAddress, bool>> mAddressChanges; // likewise: address, allow
     std::optional<SPinnedOptions> mPinsIn;                       // likewise
     struct SSubstitute
     {

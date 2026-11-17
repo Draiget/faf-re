@@ -156,7 +156,7 @@ namespace
     int loads = 0;
     eval.SetTextureLoader([&](const std::string& path, TexImage& out) {
       ++loads;
-      if (path.find("missing") != std::string::npos) {
+      if (path.contains("missing")) {
         return false;
       }
       out.Reset(2, 4, 0.25f);

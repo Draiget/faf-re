@@ -490,8 +490,8 @@ namespace moho
     {
       static constexpr std::size_t bucket_size = 4;
       static constexpr std::size_t min_buckets = 8;
-      std::size_t operator()(const DrawNodePair& key) const noexcept;
-      bool operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept;
+      static std::size_t operator()(const DrawNodePair& key) noexcept;
+      static bool operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) noexcept;
     };
 
     using EdgeMap = fa::hash_map<DrawNodePair, CommandGraphEdge, EdgeKeyHashCompare>;

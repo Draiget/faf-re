@@ -6,6 +6,7 @@
 // and `}` (WriteArchive::Write 0x00953CA0, WriteRefCounts 0x00953200); a pointer as `0`, `* index` or
 // `N handle payload }` (WriteRawPointer 0x00953320).
 
+#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -892,13 +893,13 @@ namespace
     const std::string text = WriteText([](gpg::WriteArchive& archive) {
       archive.WriteInt(-7);
       archive.WriteBool(true);
-      archive.WriteMarker(static_cast<int>(gpg::ArchiveToken::ObjectStart));
+      archive.WriteMarker(std::to_underlying(gpg::ArchiveToken::ObjectStart));
       archive.WriteUByte(200);
       archive.WriteByte(-5);
       archive.WriteFloat(1.5f);
       archive.WriteUInt64((std::numeric_limits<std::uint64_t>::max)());
       archive.WriteShort(-300);
-      archive.WriteMarker(static_cast<int>(gpg::ArchiveToken::ObjectTerminator));
+      archive.WriteMarker(std::to_underlying(gpg::ArchiveToken::ObjectTerminator));
     });
     EXPECT_EQ(text, "-7 1 { 200 -5 1.5 18446744073709551615 -300 } ");
 
@@ -912,13 +913,13 @@ namespace
       short s = 0;
       archive.ReadInt(&i);
       archive.ReadBool(&b);
-      EXPECT_EQ(archive.NextMarker(), static_cast<int>(gpg::ArchiveToken::ObjectStart));
+      EXPECT_EQ(archive.NextMarker(), std::to_underlying(gpg::ArchiveToken::ObjectStart));
       archive.ReadUByte(&ub);
       archive.ReadByte(&sb);
       archive.ReadFloat(&f);
       archive.ReadUInt64(&u64);
       archive.ReadShort(&s);
-      EXPECT_EQ(archive.NextMarker(), static_cast<int>(gpg::ArchiveToken::ObjectTerminator));
+      EXPECT_EQ(archive.NextMarker(), std::to_underlying(gpg::ArchiveToken::ObjectTerminator));
       EXPECT_EQ(i, -7);
       EXPECT_TRUE(b);
       EXPECT_EQ(ub, 200);

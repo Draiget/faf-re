@@ -156,7 +156,7 @@ namespace faf::editor
     struct Cache
     {
       std::size_t hash = 0;
-      std::size_t size = ~std::size_t{0};
+      std::size_t size = ~0uz;
       std::vector<LuaSpan> spans;
       std::vector<std::size_t> lineStarts;
     };
@@ -406,7 +406,7 @@ namespace faf::editor
       const EdLuaWord word = LuaWordBefore(text, caret);
       const bool typedEnough = word.prefix.size() >= 2 || (word.separator != 0 && !word.qualifier.empty());
       if ((assist.changed && typedEnough) || assist.asked || (assist.open && (typedEnough || word.separator != 0))) {
-        const bool same = word.prefix.rfind(assist.word.prefix, 0) == 0 && word.start == assist.word.start;
+        const bool same = word.prefix.starts_with(assist.word.prefix) && word.start == assist.word.start;
         assist.word = word;
         assist.items = LuaCompletions(word, 12);
         assist.open = !assist.items.empty() && (assist.open || assist.changed || assist.asked);

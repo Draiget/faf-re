@@ -36,6 +36,15 @@ namespace moho
    * alignment comes from mCamera: GeomCamera3's CGeomSolid3 planes are an
    * 8-aligned fastvector_n.
    */
+  /**
+   * Engine addition (the map editor's mesh terrain): a height range the shadow map must also hold, besides the
+   * height field's. Ground drawn as models (a mesh map's patches) can lie below or above the height field, and the
+   * light camera fitted to the height field alone leaves it past its far plane, all in shadow. Empty (min > max) when
+   * nothing asks for it.
+   */
+  extern float ren_ShadowExtraMinY;
+  extern float ren_ShadowExtraMaxY;
+
   class Shadow
   {
   public:

@@ -1,32 +1,27 @@
 #include "gpg/core/utils/LocalCache.h"
 
-#include <Windows.h>
-#include <ShlObj.h>
-
 #include <cstdlib>
 #include <filesystem>
 #include <system_error>
 
 #include "gpg/core/utils/Logging.h"
+#include "platform/CacheFolder.h"
 
 namespace gpg
 {
   const std::string& LocalCacheDirectory()
   {
     static const std::string directory = [] {
-      // As StartupHelpers' paths: the shell folder (the XDG one on Linux, platform/posix), then
-      // std::filesystem, so the headless Linux build keeps the same caches.
+      // The system's cache root (platform/CacheFolder.h: the local application data folder, macOS's
+      // ~/Library/Caches), then std::filesystem, so the headless POSIX builds keep the same caches.
       std::filesystem::path folder;
       if (
         const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR");
         configured != nullptr && configured[0] != '\0'
       ) {
         folder = configured;
-      } else {
-        wchar_t localAppData[MAX_PATH]{};
-        if (SUCCEEDED(::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppData))) {
-          folder = std::filesystem::path(localAppData) / "FAForever" / "ShaderCache";
-        }
+      } else if (const std::filesystem::path root = platform::CacheFolder(); !root.empty()) {
+        folder = root / "FAForever" / "ShaderCache";
       }
       if (folder.empty()) {
         return std::string();

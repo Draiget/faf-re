@@ -1303,7 +1303,6 @@ int lua_error(
 )
 {
   luaG_errormsg(state);
-  return 0; // unreachable
 }
 
 /**

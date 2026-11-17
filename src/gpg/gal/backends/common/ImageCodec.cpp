@@ -4,6 +4,7 @@
 #include "ImageCodecDirectXTex.h"
 #include "TextureQuality.h"
 
+#include <utility>
 #include <atomic>
 #include <algorithm>
 #include <cstdio>
@@ -473,7 +474,7 @@ namespace gpg::gal::imaging
           mListed = true;
           List();
         }
-        return mKeys.count(key) != 0U;
+        return mKeys.contains(key);
       }
 
       void Add(
@@ -1291,7 +1292,7 @@ namespace gpg::gal::imaging
           static_cast<int>(image.format),
           image.width,
           image.height,
-          static_cast<int>(format),
+          std::to_underlying(format),
           static_cast<unsigned long>(result)
         );
       }
@@ -1313,7 +1314,7 @@ namespace gpg::gal::imaging
           static_cast<int>(image.format),
           image.width,
           image.height,
-          static_cast<int>(format),
+          std::to_underlying(format),
           static_cast<unsigned long>(result)
         );
       }

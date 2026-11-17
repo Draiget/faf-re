@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,11 +20,27 @@ namespace faf::editor
     void Set(const std::string& key, const std::string& value);
   };
 
-  /** The builders of a `PlatoonBuilders` text; false with `error` when its Builders table can't be followed. */
-  bool ParseBuilders(const std::string& text, std::vector<MissionBuilder>& builders, std::string& error);
+  /** The builders of a `PlatoonBuilders` text; the error when its Builders table can't be followed. */
+  [[nodiscard]] std::expected<std::vector<MissionBuilder>, std::string> ParseBuilders(const std::string& text);
 
   /** The `PlatoonBuilders` text for these builders (as the saves lay the table out). */
   [[nodiscard]] std::string FormatBuilders(const std::vector<MissionBuilder>& builders);
+
+  /** The top-level items of a Lua table's text (`{ a, 'b', { c } }`), each as written; empty for no table. */
+  [[nodiscard]] std::vector<std::string> LuaTableItems(const std::string& table);
+
+  /**
+   * A builder's call (FAF Studio's builders editor): `{ '<file>', '<function>', <rest>... }` as PlatoonAIFunction and
+   * each of BuildConditions hold it; `rest` the items after the two names, as written, joined by ", ".
+   */
+  struct BuilderCall
+  {
+    std::string file;
+    std::string function;
+    std::string rest;
+  };
+  bool ParseBuilderCall(const std::string& text, BuilderCall& out);
+  [[nodiscard]] std::string FormatBuilderCall(const BuilderCall& call);
 
   /** A new builder with the fields the game's PBM reads, for a platoon template, at a base's location. */
   [[nodiscard]] MissionBuilder

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <string>
 #include <vector>
@@ -76,11 +77,10 @@ namespace faf::editor::gpu::gen
   }
 
   template <class T>
-  [[nodiscard]] bool UploadVec(
+  [[nodiscard]] std::expected<void, std::string> UploadVec(
     Executor& ex,
     const std::vector<T>& v,
-    std::unique_ptr<Resource>& out,
-    std::string& err
+    std::unique_ptr<Resource>& out
   )
   {
     static_assert(sizeof(T) == 4, "tables hold 4 byte elements");
@@ -90,8 +90,8 @@ namespace faf::editor::gpu::gen
       one.assign(1, T());
       src = &one;
     }
-    return MakeBuffer(ex, static_cast<u32>(src->size()), out, err) &&
-      UploadBuffer(ex, *out, src->data(), src->size() * sizeof(T), err);
+    FAF_GPU_TRY(MakeBuffer(ex, static_cast<u32>(src->size()), out));
+    return UploadBuffer(ex, *out, src->data(), src->size() * sizeof(T));
   }
 
   /** The optional `mask` input as a field (or a one element dummy: every slot a kernel declares must be bound). */
@@ -106,19 +106,19 @@ namespace faf::editor::gpu::gen
     }
   };
 
-  [[nodiscard]] inline bool BindMask(
+  [[nodiscard]] inline std::expected<void, std::string> BindMask(
     Executor& ex,
     const OpArgs& a,
-    MaskBind& m,
-    std::string& err
+    MaskBind& m
   )
   {
     if (const Grid* g = In(a, "mask"); g != nullptr) {
       m.has = true;
-      return UploadGrid(ex, *g, m.field, err);
+      return UploadGrid(ex, *g, m.field);
     }
     const float zero = 0.0f;
-    return MakeBuffer(ex, 1, m.dummy, err) && UploadBuffer(ex, *m.dummy, &zero, 4, err);
+    FAF_GPU_TRY(MakeBuffer(ex, 1, m.dummy));
+    return UploadBuffer(ex, *m.dummy, &zero, 4);
   }
 
   /** One dispatch of `unitsPerCell` * cells "octave evaluations" at most this big (a few ms on a discrete card, well
@@ -131,15 +131,14 @@ namespace faf::editor::gpu::gen
    * evaluations. A big field becomes several bands in time limited submissions (RunIterations).
    */
   template <class P>
-  [[nodiscard]] bool DispatchBands(
+  [[nodiscard]] std::expected<void, std::string> DispatchBands(
     Executor& ex,
     const KernelInfo& k,
     const u32 w,
     const u32 h,
     const double unitsPerCell,
     P params,
-    const Bindings& b,
-    std::string& err
+    const Bindings& b
   )
   {
     const double perRow = std::max(1.0, static_cast<double>(w) * std::max(1.0, unitsPerCell));
@@ -149,14 +148,14 @@ namespace faf::editor::gpu::gen
     if (bands <= 1) {
       params.z0 = 0;
       params.rows = h;
-      return DispatchGrid(ex, k, w, h, params, b, err);
+      return DispatchGrid(ex, k, w, h, params, b);
     }
-    return RunIterations(ex, bands, 60.0, [&](const u32 i, std::string& e) {
+    return RunIterations(ex, bands, 60.0, [&](const u32 i) {
       P p = params;
       p.z0 = i * rowsPer;
       p.rows = std::min(rowsPer, h - p.z0);
-      return DispatchGrid(ex, k, w, p.rows, p, b, e);
-    }, err);
+      return DispatchGrid(ex, k, w, p.rows, p, b);
+    });
   }
 
   /** Writes the affine map (see gen_noise.hlsli) of one octave into float table `tab` at record `o` (16 floats). false
@@ -258,31 +257,26 @@ namespace faf::editor::gpu::gen
   /** The common tail of a generator op: output field as UAV 0, banded dispatch of kernel `kernel`, download into a
    * local grid (`out` is only written on success). */
   template <class P>
-  [[nodiscard]] OpResult RunGenerator(
+  [[nodiscard]] std::expected<OpResult, std::string> RunGenerator(
     Executor& ex,
     const char* const kernel,
     const Shape& s,
     const double unitsPerCell,
     const P& params,
     Bindings b,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     const KernelInfo* k = FindKernel(kernel);
     if (k == nullptr) {
-      err = std::string("kernel ") + kernel + " is missing";
-      return OpResult::Failed;
+      return std::unexpected(std::string("kernel ") + kernel + " is missing");
     }
     Field res;
-    if (!MakeField(ex, s.w, s.h, res, err))
-      return OpResult::Failed;
+    FAF_GPU_TRY(MakeField(ex, s.w, s.h, res));
     b.Uav(0, res.R());
-    if (!DispatchBands(ex, *k, static_cast<u32>(s.w), static_cast<u32>(s.h), unitsPerCell, params, b, err))
-      return OpResult::Failed;
+    FAF_GPU_TRY(DispatchBands(ex, *k, static_cast<u32>(s.w), static_cast<u32>(s.h), unitsPerCell, params, b));
     Grid result = NewGrid(s);
-    if (!DownloadGrid(ex, res, result, err))
-      return OpResult::Failed;
+    FAF_GPU_TRY(DownloadGrid(ex, res, result));
     out = std::move(result);
     return OpResult::Done;
   }

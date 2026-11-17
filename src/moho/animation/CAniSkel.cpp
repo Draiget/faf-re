@@ -105,9 +105,9 @@ namespace
 
   struct NoDeleteAniSkel
   {
-    void operator()(
+    static void operator()(
       const moho::CAniSkel* const skeleton
-    ) const noexcept
+    ) noexcept
     {
       DefaultAniSkelNoDelete(const_cast<moho::CAniSkel*>(skeleton));
     }

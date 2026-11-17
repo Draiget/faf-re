@@ -1,5 +1,6 @@
 #include "moho/render/CWldTerrainDecal.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -364,7 +365,7 @@ namespace moho
   {
     writer.Write(mIndex);
 
-    const std::int32_t decalType = static_cast<std::int32_t>(mType);
+    const std::int32_t decalType = std::to_underlying(mType);
     writer.Write(decalType);
 
     constexpr std::int32_t kNameSlotCount = 2;

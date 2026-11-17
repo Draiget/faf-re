@@ -55,7 +55,7 @@ namespace faf::editor
         if (!MarkerPosition(marker, x, y, z)) {
           continue;
         }
-        if (type == "Blank Marker" && marker.name.rfind("ARMY_", 0) == 0) {
+        if (type == "Blank Marker" && marker.name.starts_with("ARMY_")) {
           StatStart start;
           start.name = marker.name;
           start.x = x;
@@ -94,9 +94,8 @@ namespace faf::editor
       decals = mDocument.Decals() != nullptr ? mDocument.Decals()->GetDecalCount() : 0;
       for (const SaveEntry& army : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
         std::vector<const SaveUnit*> units;
-        if (ParseUnitGroup(army.Get("Units"), group, error)) {
+        if (ParseUnitGroup(army.Get("Units"), group)) {
           CollectUnits(group, units);
         }
         armies.emplace_back(army.name, static_cast<int>(units.size()));

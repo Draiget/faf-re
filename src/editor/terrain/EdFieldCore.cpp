@@ -324,10 +324,9 @@ namespace faf::editor::field
     }
 
     /** The output takes its shape from `like`, else `a`, else width / height / cell / ox / oz. */
-    bool MakeOut(
+    std::expected<void, std::string> MakeOut(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* ref = Get(a, "like");
@@ -339,18 +338,16 @@ namespace faf::editor::field
       if (
         const Grid* const inA = Get(a, "a"); inA != nullptr && ref != nullptr && (inA->w != ref->w || inA->h != ref->h)
       ) {
-        err = "'like' and 'a' differ in size";
-        return false;
+        return std::unexpected("'like' and 'a' differ in size");
       }
       if (ref != nullptr) {
         out = Grid(ref->w, ref->h, ref->cell, ref->ox, ref->oz);
-        return true;
+        return {};
       }
       const int w = static_cast<int>(a.p.N("width", 0));
       const int h = static_cast<int>(a.p.N("height", 0));
       if (w < 1 || h < 1 || static_cast<long long>(w) * h > (1LL << 27)) {
-        err = "give 'like' or 'a', or width and height (at most 128M samples)";
-        return false;
+        return std::unexpected("give 'like' or 'a', or width and height (at most 128M samples)");
       }
       out = Grid(
         w,
@@ -359,7 +356,7 @@ namespace faf::editor::field
         static_cast<float>(a.p.N("ox", 0.0)),
         static_cast<float>(a.p.N("oz", 0.0))
       );
-      return true;
+      return {};
     }
 
     inline double WorldX(
@@ -699,79 +696,72 @@ namespace faf::editor::field
       return Clamp01(sum / norm);
     }
 
-    bool OpNoise(
+    std::expected<void, std::string> OpNoise(
       const OpArgs& a,
       Grid& out,
-      std::string& err,
       const int kind,
       const char* const defaultBasis
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const NoiseParams n = ReadNoise(a, defaultBasis);
       const Grid& g = out;
       Cells(out, [&](const int x, const int z) {
         return Fbm(kind, n, WorldX(g, x), WorldZ(g, z));
       });
-      return true;
+      return {};
     }
 
-    bool OpPerlin(
+    std::expected<void, std::string> OpPerlin(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoise(a, o, e, 0, "perlin");
+      return OpNoise(a, o, 0, "perlin");
     }
-    bool OpSimplex(
+    std::expected<void, std::string> OpSimplex(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoise(a, o, e, 0, "simplex");
+      return OpNoise(a, o, 0, "simplex");
     }
-    bool OpRidged(
+    std::expected<void, std::string> OpRidged(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoise(a, o, e, 1, "perlin");
+      return OpNoise(a, o, 1, "perlin");
     }
-    bool OpBillow(
+    std::expected<void, std::string> OpBillow(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoise(a, o, e, 2, "perlin");
+      return OpNoise(a, o, 2, "perlin");
     }
 
-    bool OpConst(
+    std::expected<void, std::string> OpConst(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       std::fill(out.v.begin(), out.v.end(), static_cast<float>(a.p.N("value", 0.0)));
-      return true;
+      return {};
     }
 
-    bool OpWhite(
+    std::expected<void, std::string> OpWhite(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const std::uint32_t seed = static_cast<std::uint32_t>(static_cast<std::int64_t>(a.p.N("seed", 1)));
       const Grid& g = out;
@@ -780,18 +770,17 @@ namespace faf::editor::field
           Hash2(static_cast<int>(std::floor(WorldX(g, x))), static_cast<int>(std::floor(WorldZ(g, z))), seed)
         );
       });
-      return true;
+      return {};
     }
 
     /** Voronoi / cellular: mode f1, f2, edge, id, crack. */
-    bool OpVoronoi(
+    std::expected<void, std::string> OpVoronoi(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double scale = std::max(1e-3, a.p.N("scale", 100.0));
       const float jitter = Clamp01(static_cast<float>(a.p.N("jitter", 1.0)));
@@ -840,18 +829,17 @@ namespace faf::editor::field
           return 1.0f - SmoothStep(0.0f, width, f2 - f1);
         return Clamp01(f1);
       });
-      return true;
+      return {};
     }
 
     /** Linear gradient: angle in degrees (0 = towards +x), lo at the start, hi at the end, spanning the field. */
-    bool OpGradient(
+    std::expected<void, std::string> OpGradient(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double ang = a.p.N("angle", 0.0) * 3.14159265358979 / 180.0;
       const double dx = std::cos(ang);
@@ -866,19 +854,18 @@ namespace faf::editor::field
         const double t = ((WorldX(g, x) - cxw) * dx + (WorldZ(g, z) - czw) * dz) / extent + 0.5;
         return Lerp(lo, hi, Clamp01(static_cast<float>(t)));
       });
-      return true;
+      return {};
     }
 
     /** Radial distance from a centre (default the middle) in units of `radius` (default half the smaller extent), 0 at
      * the centre, clamped to 0..1 unless clamp = 0. */
-    bool OpRadial(
+    std::expected<void, std::string> OpRadial(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err)) {
-        return false;
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const Grid& g = out;
       const double cxw = a.p.Has("cx") ? a.p.N("cx", 0) : WorldX(g, 0) + 0.5 * (g.w - 1) * g.cell;
@@ -892,146 +879,141 @@ namespace faf::editor::field
         const float d = static_cast<float>(std::sqrt(ex * ex + ez * ez) / radius);
         return clamp ? Clamp01(d) : d;
       });
-      return true;
+      return {};
     }
 
     // ---- point filters
     // ---------------------------------------------------------------------------------------------------------------------------
 
     template <class F>
-    bool Point(
+    std::expected<void, std::string> Point(
       const OpArgs& a,
       Grid& out,
-      std::string& err,
       F&& f
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       Cells(out, [&](const int x, const int z) {
         return f(src->At(x, z));
       });
-      return true;
+      return {};
     }
 
-    bool OpClamp(
+    std::expected<void, std::string> OpClamp(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float lo = static_cast<float>(a.p.N("lo", 0.0));
       const float hi = static_cast<float>(a.p.N("hi", 1.0));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return v < lo ? lo : (v > hi ? hi : v);
       });
     }
 
-    bool OpInvert(
+    std::expected<void, std::string> OpInvert(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float lo = static_cast<float>(a.p.N("lo", 0.0));
       const float hi = static_cast<float>(a.p.N("hi", 1.0));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return lo + hi - v;
       });
     }
 
-    bool OpAbs(
+    std::expected<void, std::string> OpAbs(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return std::fabs(v);
       });
     }
 
-    bool OpGamma(
+    std::expected<void, std::string> OpGamma(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float g = std::max(1e-3f, static_cast<float>(a.p.N("gamma", 1.0)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return v <= 0.0f ? 0.0f : std::pow(v, g);
       });
     }
 
     /** v * mul + add */
-    bool OpAffine(
+    std::expected<void, std::string> OpAffine(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float m = static_cast<float>(a.p.N("mul", 1.0));
       const float b = static_cast<float>(a.p.N("add", 0.0));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return v * m + b;
       });
     }
 
-    bool OpSmoothstep(
+    std::expected<void, std::string> OpSmoothstep(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float e0 = static_cast<float>(a.p.N("edge0", 0.0));
       const float e1 = static_cast<float>(a.p.N("edge1", 1.0));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return SmoothStep(e0, e1, v);
       });
     }
 
-    bool OpThreshold(
+    std::expected<void, std::string> OpThreshold(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float t = static_cast<float>(a.p.N("value", 0.5));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return v > t ? 1.0f : 0.0f;
       });
     }
 
-    bool OpNormalize(
+    std::expected<void, std::string> OpNormalize(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
+      std::string e;
       const Grid* src = Need(a, "a", e);
       if (src == nullptr) {
-        return false;
+        return std::unexpected(e);
       }
       const Stats s = Measure(*src);
       const float lo = static_cast<float>(a.p.N("lo", 0.0));
       const float hi = static_cast<float>(a.p.N("hi", 1.0));
       const float span = s.max - s.min;
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return span > 0.0f ? lo + (hi - lo) * ((v - s.min) / span) : lo;
       });
     }
 
     /** Rounds to a multiple of `step` (default 1/128: the height word grid). */
-    bool OpQuantize(
+    std::expected<void, std::string> OpQuantize(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float step = std::max(1e-6f, static_cast<float>(a.p.N("step", 1.0 / 128.0)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return std::floor(v / step + 0.5f) * step;
       });
     }
@@ -1044,16 +1026,14 @@ namespace faf::editor::field
       std::vector<float> x, y, m; // points sorted by x, tangents for the smooth mode
       bool smooth = false;
 
-      bool Build(
+      std::expected<void, std::string> Build(
         const std::vector<double>& flat,
-        const bool smoothMode,
-        std::string& err
+        const bool smoothMode
       )
       {
         const std::size_t n = flat.size() / 2;
         if (n < 2) {
-          err = "a curve needs at least two points";
-          return false;
+          return std::unexpected("a curve needs at least two points");
         }
         std::vector<std::pair<float, float>> pts;
         for (std::size_t i = 0; i < n; ++i) {
@@ -1096,7 +1076,7 @@ namespace faf::editor::field
             }
           }
         }
-        return true;
+        return {};
       }
 
       float Eval(
@@ -1127,30 +1107,27 @@ namespace faf::editor::field
     };
 
     /** points = {x1, y1, x2, y2, ...}; smooth = 1 for a monotone cubic through them, else straight segments. */
-    bool OpRemap(
+    std::expected<void, std::string> OpRemap(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const std::vector<double>* pts = a.p.A("points");
       if (pts == nullptr) {
-        e = "remap needs points";
-        return false;
+        return std::unexpected("remap needs points");
       }
       Curve c;
-      if (!c.Build(*pts, a.p.N("smooth", 1) != 0, e)) {
-        return false;
+      if (auto built = c.Build(*pts, a.p.N("smooth", 1) != 0); !built) {
+        return built;
       }
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return c.Eval(v);
       });
     }
 
-    bool OpLevels(
+    std::expected<void, std::string> OpLevels(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float inLo = static_cast<float>(a.p.N("in_lo", 0.0));
@@ -1159,7 +1136,7 @@ namespace faf::editor::field
       const float outLo = static_cast<float>(a.p.N("out_lo", 0.0));
       const float outHi = static_cast<float>(a.p.N("out_hi", 1.0));
       const float span = inHi - inLo;
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         float t = span != 0.0f ? Clamp01((v - inLo) / span) : (v >= inLo ? 1.0f : 0.0f);
         if (gamma != 1.0f && t > 0.0f) {
           t = std::pow(t, 1.0f / gamma);
@@ -1169,10 +1146,9 @@ namespace faf::editor::field
     }
 
     /** `steps` plateaus over 0..1 (or over lo..hi); sharpness 0 = smooth ramps, 1 = hard steps. */
-    bool OpTerrace(
+    std::expected<void, std::string> OpTerrace(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float n = std::max(1.0f, static_cast<float>(a.p.N("steps", 6)));
@@ -1181,7 +1157,7 @@ namespace faf::editor::field
       const float sharp = Clamp01(static_cast<float>(a.p.N("sharpness", 0.7)));
       const float width = 1.0f - sharp;
       const float span = hi - lo;
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         if (span == 0.0f)
           return v;
         const float t = (v - lo) / span * n;
@@ -1285,21 +1261,24 @@ namespace faf::editor::field
       return k;
     }
 
-    bool OpBlurImpl(
+    std::expected<void, std::string> OpBlurImpl(
       const OpArgs& a,
       Grid& out,
-      std::string& err,
       const bool gauss
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double radius = a.p.N("radius", 4.0) / static_cast<double>(src->cell); // world units -> samples
       if (radius <= 1e-6) {
         out.v = src->v;
-        return true;
+        return {};
       }
       int r = 0;
       const std::vector<float> k = MakeKernel(gauss, radius, r);
@@ -1311,47 +1290,47 @@ namespace faf::editor::field
           return Lerp(src->At(x, z), out.At(x, z), Clamp01(mask->At(x, z)));
         });
       }
-      return true;
+      return {};
     }
 
     /** radius = sigma in world units. */
-    bool OpBlur(
+    std::expected<void, std::string> OpBlur(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpBlurImpl(a, o, e, true);
+      return OpBlurImpl(a, o, true);
     }
     /** radius = half width in world units. */
-    bool OpBox(
+    std::expected<void, std::string> OpBox(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpBlurImpl(a, o, e, false);
+      return OpBlurImpl(a, o, false);
     }
 
     // ---- geometry
     // --------------------------------------------------------------------------------------------------------------------------------
 
     /** Displaces lookups of `a` by the fields dx / dz (0..1, 0.5 = no move) times `strength` world units. */
-    bool OpWarp(
+    std::expected<void, std::string> OpWarp(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* dx = Need(a, "dx", err);
       const Grid* dz = Need(a, "dz", err);
-      if (src == nullptr || dx == nullptr || dz == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr || dx == nullptr || dz == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       if (!dx->SameShape(*src) || !dz->SameShape(*src)) {
-        err = "warp: dx and dz must have the shape of a";
-        return false;
+        return std::unexpected("warp: dx and dz must have the shape of a");
       }
       const double strength = a.p.N("strength", 20.0) / static_cast<double>(src->cell); // samples
       const bool centred = a.p.N("centred", 1) != 0;
@@ -1363,19 +1342,22 @@ namespace faf::editor::field
         const double sz = (centred ? 2.0 * static_cast<double>(uz) - 1.0 : static_cast<double>(uz)) * strength;
         return Bilinear(*src, static_cast<double>(x) + sx, static_cast<double>(z) + sz, e, 0.0f);
       });
-      return true;
+      return {};
     }
 
     /** Moves the content by (move_x, move_z) world units; default wraps around. */
-    bool OpOffset(
+    std::expected<void, std::string> OpOffset(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double sx = a.p.N("move_x", 0.0) / static_cast<double>(src->cell);
       const double sz = a.p.N("move_z", 0.0) / static_cast<double>(src->cell);
@@ -1388,19 +1370,22 @@ namespace faf::editor::field
         }
         return Bilinear(*src, static_cast<double>(x) - sx, static_cast<double>(z) - sz, e, fill);
       });
-      return true;
+      return {};
     }
 
     /** Rotates by `angle` degrees (counter-clockwise seen with +z down) about (cx, cz) (default the middle). */
-    bool OpRotate(
+    std::expected<void, std::string> OpRotate(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double ang = a.p.N("angle", 0.0) * 3.14159265358979 / 180.0;
       const double c = std::cos(ang);
@@ -1414,19 +1399,22 @@ namespace faf::editor::field
         const double ez = static_cast<double>(z) - czs;
         return Bilinear(*src, cxs + c * ex + s * ez, czs - s * ex + c * ez, e, fill);
       });
-      return true;
+      return {};
     }
 
     /** Zooms by `factor` (2 = twice as big) about (cx, cz) (default the middle). */
-    bool OpScale(
+    std::expected<void, std::string> OpScale(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const double f = std::max(1e-4, a.p.N("factor", 1.0));
       const double cxs = a.p.Has("cx") ? (a.p.N("cx", 0) - src->ox) / src->cell : 0.5 * (src->w - 1);
@@ -1438,7 +1426,7 @@ namespace faf::editor::field
           *src, cxs + (static_cast<double>(x) - cxs) / f, czs + (static_cast<double>(z) - czs) / f, e, fill
         );
       });
-      return true;
+      return {};
     }
 
     /**
@@ -1446,30 +1434,31 @@ namespace faf::editor::field
      * (90 degrees, square), diag, adiag (square). side 0 keeps the first half / quadrant as the master, side 1 the
      * other.
      */
-    bool OpMirror(
+    std::expected<void, std::string> OpMirror(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const std::string mode = a.p.S("mode", "x");
       const int side = a.p.N("side", 0) != 0 ? 1 : 0;
       const int w = src->w;
       const int h = src->h;
       if ((mode == "rot4" || mode == "diag" || mode == "adiag") && w != h) {
-        err = "mirror " + mode + " needs a square field";
-        return false;
+        return std::unexpected("mirror " + mode + " needs a square field");
       }
       if (
         mode != "x" && mode != "z" && mode != "xz" && mode != "rot2" && mode != "rot4" && mode != "diag" &&
         mode != "adiag"
       ) {
-        err = "mirror: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("mirror: unknown mode '" + mode + "'");
       }
       Cells(out, [&](const int x, const int z) {
         int sx = x;
@@ -1537,19 +1526,19 @@ namespace faf::editor::field
         }
         return src->At(sx, sz);
       });
-      return true;
+      return {};
     }
 
     /** Sub rectangle x0..x1 / z0..z1 (sample indices, inclusive). */
-    bool OpCrop(
+    std::expected<void, std::string> OpCrop(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       int x0 = static_cast<int>(a.p.N("x0", 0));
       int z0 = static_cast<int>(a.p.N("z0", 0));
@@ -1560,8 +1549,7 @@ namespace faf::editor::field
       x1 = std::min(src->w - 1, x1);
       z1 = std::min(src->h - 1, z1);
       if (x0 > x1 || z0 > z1) {
-        err = "crop: empty rectangle";
-        return false;
+        return std::unexpected("crop: empty rectangle");
       }
       out = Grid(
         x1 - x0 + 1, z1 - z0 + 1, src->cell, static_cast<float>(WorldX(*src, x0)), static_cast<float>(WorldZ(*src, z0))
@@ -1569,25 +1557,24 @@ namespace faf::editor::field
       Cells(out, [&](const int x, const int z) {
         return src->At(x + x0, z + z0);
       });
-      return true;
+      return {};
     }
 
     /** New sample count over the same world extent (first and last samples map onto first and last), bilinear. */
-    bool OpResize(
+    std::expected<void, std::string> OpResize(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       const int w = static_cast<int>(a.p.N("width", src->w));
       const int h = static_cast<int>(a.p.N("height", src->h));
       if (w < 2 || h < 2 || static_cast<long long>(w) * h > (1LL << 27)) {
-        err = "resize: bad size";
-        return false;
+        return std::unexpected("resize: bad size");
       }
       const float cell =
         src->w > 1 ? src->cell * static_cast<float>(src->w - 1) / static_cast<float>(w - 1) : src->cell;
@@ -1601,107 +1588,105 @@ namespace faf::editor::field
           0.0f
         );
       });
-      return true;
+      return {};
     }
 
     // ---- combiners
     // -------------------------------------------------------------------------------------------------------------------------------
 
     template <class F>
-    bool Binary(
+    std::expected<void, std::string> Binary(
       const OpArgs& a,
       Grid& out,
-      std::string& err,
       F&& f
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const Grid* b = Get(a, "b");
       if (b != nullptr && !b->SameShape(*src)) {
-        err = "the two inputs differ in size";
-        return false;
+        return std::unexpected("the two inputs differ in size");
       }
       const float value = static_cast<float>(a.p.N("value", 0.0));
       Cells(out, [&](const int x, const int z) {
         return f(src->At(x, z), b != nullptr ? b->At(x, z) : value);
       });
-      return true;
+      return {};
     }
 
-    bool OpMin(
+    std::expected<void, std::string> OpMin(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Binary(a, o, e, [](const float p, const float q) {
+      return Binary(a, o, [](const float p, const float q) {
         return p < q ? p : q;
       });
     }
-    bool OpMax(
+    std::expected<void, std::string> OpMax(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Binary(a, o, e, [](const float p, const float q) {
+      return Binary(a, o, [](const float p, const float q) {
         return p > q ? p : q;
       });
     }
-    bool OpAdd(
+    std::expected<void, std::string> OpAdd(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Binary(a, o, e, [](const float p, const float q) {
+      return Binary(a, o, [](const float p, const float q) {
         return p + q;
       });
     }
-    bool OpSub(
+    std::expected<void, std::string> OpSub(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Binary(a, o, e, [](const float p, const float q) {
+      return Binary(a, o, [](const float p, const float q) {
         return p - q;
       });
     }
-    bool OpMul(
+    std::expected<void, std::string> OpMul(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return Binary(a, o, e, [](const float p, const float q) {
+      return Binary(a, o, [](const float p, const float q) {
         return p * q;
       });
     }
 
     /** lerp(a, f(a, b), opacity * mask): mode normal, add, sub, mul, screen, overlay, min, max, diff. */
-    bool OpBlend(
+    std::expected<void, std::string> OpBlend(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* b = Need(a, "b", err);
-      if (src == nullptr || b == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr || b == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       if (!b->SameShape(*src)) {
-        err = "the two inputs differ in size";
-        return false;
+        return std::unexpected("the two inputs differ in size");
       }
       const Grid* mask = Get(a, "mask");
       if (mask != nullptr && !mask->SameShape(*src)) {
-        err = "the mask differs in size";
-        return false;
+        return std::unexpected("the mask differs in size");
       }
       const std::string mode = a.p.S("mode", "normal");
       const float opacity = static_cast<float>(a.p.N("opacity", 1.0));
@@ -1730,7 +1715,7 @@ namespace faf::editor::field
         const float t = opacity * (mask != nullptr ? mask->At(x, z) : 1.0f);
         return Lerp(p, r, t);
       });
-      return true;
+      return {};
     }
 
     // ---- analysis
@@ -1742,15 +1727,18 @@ namespace faf::editor::field
      * unit; 0.75 blocks every land unit) and variation (highest minus lowest sample over the window + 1 skirt: the rule
      * for structures, MaxGroundVariation). `radius` widens the stencil of degrees / gradient (samples).
      */
-    bool OpSlope(
+    std::expected<void, std::string> OpSlope(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const std::string mode = a.p.S("mode", "degrees");
       const int w = src->w;
@@ -1785,11 +1773,10 @@ namespace faf::editor::field
           }
           return hi - lo;
         });
-        return true;
+        return {};
       }
       if (mode != "degrees" && mode != "gradient") {
-        err = "slope: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("slope: unknown mode '" + mode + "'");
       }
       const int n = std::max(1, std::min(16, static_cast<int>(a.p.N("radius", 1))));
       const bool degrees = mode == "degrees";
@@ -1803,20 +1790,19 @@ namespace faf::editor::field
         const float g = std::sqrt(gx * gx + gz * gz);
         return degrees ? std::atan(g) * (180.0f / kPi) : g;
       });
-      return true;
+      return {};
     }
 
     /** 1 inside lo..hi, falling to 0 over `soft` height units outside. */
-    bool OpHeightBand(
+    std::expected<void, std::string> OpHeightBand(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float lo = static_cast<float>(a.p.N("lo", 0.0));
       const float hi = static_cast<float>(a.p.N("hi", 1.0));
       const float soft = std::max(0.0f, static_cast<float>(a.p.N("soft", 0.0)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         if (v >= lo && v <= hi)
           return 1.0f;
         if (soft <= 0.0f)
@@ -1830,15 +1816,18 @@ namespace faf::editor::field
      * (gullies, basins) below, flat 0.5. `gain` scales it; raw = 1 returns the signed value (negative laplacian per
      * unit squared) instead.
      */
-    bool OpCurvature(
+    std::expected<void, std::string> OpCurvature(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const int n = std::max(1, std::min(32, static_cast<int>(a.p.N("radius", 1))));
       const float gain = static_cast<float>(a.p.N("gain", 10.0));
@@ -1853,59 +1842,55 @@ namespace faf::editor::field
           d2;
         return raw ? -lap : Clamp01(0.5f - gain * lap);
       });
-      return true;
+      return {};
     }
 
-    bool OpWaterBelow(
+    std::expected<void, std::string> OpWaterBelow(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float level = static_cast<float>(a.p.N("level", 0.0));
       const float soft = std::max(0.0f, static_cast<float>(a.p.N("soft", 0.0)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return soft > 0.0f ? SmoothStep(level + soft, level, v) : (v <= level ? 1.0f : 0.0f);
       });
     }
 
-    bool OpWaterAbove(
+    std::expected<void, std::string> OpWaterAbove(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float level = static_cast<float>(a.p.N("level", 0.0));
       const float soft = std::max(0.0f, static_cast<float>(a.p.N("soft", 0.0)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return soft > 0.0f ? SmoothStep(level - soft, level, v) : (v > level ? 1.0f : 0.0f);
       });
     }
 
     /** Depth of water over the ground (level minus height, 0 on land). */
-    bool OpWaterDepth(
+    std::expected<void, std::string> OpWaterDepth(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float level = static_cast<float>(a.p.N("level", 0.0));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         return v < level ? level - v : 0.0f;
       });
     }
 
     /** 1 within `width` height units of the water level (a beach band), soft edges over `soft`. */
-    bool OpShore(
+    std::expected<void, std::string> OpShore(
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
       const float level = static_cast<float>(a.p.N("level", 0.0));
       const float width = std::max(0.0f, static_cast<float>(a.p.N("width", 1.0)));
       const float soft = std::max(0.0f, static_cast<float>(a.p.N("soft", 0.5)));
-      return Point(a, o, e, [&](const float v) {
+      return Point(a, o, [&](const float v) {
         const float d = std::fabs(v - level);
         if (d <= width)
           return 1.0f;
@@ -2003,15 +1988,18 @@ namespace faf::editor::field
      * the nearest below it (inside), or both (signed: positive outside). range > 0 divides and clamps to 0..1; `max`
      * caps the distance.
      */
-    bool OpDistance(
+    std::expected<void, std::string> OpDistance(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const float threshold = static_cast<float>(a.p.N("threshold", 0.5));
       const std::string mode = a.p.S("mode", "outside");
@@ -2051,7 +2039,7 @@ namespace faf::editor::field
           r = std::min(1.0, std::fabs(r) / range) * (r < 0.0 ? -1.0 : 1.0);
         return static_cast<float>(r);
       });
-      return true;
+      return {};
     }
 
     // ---- thermal erosion
@@ -2063,20 +2051,22 @@ namespace faf::editor::field
      * its lower neighbours in proportion to their excess; everything is computed from the state at the start of the
      * iteration, so it is order independent and conserves the total height. `mask` scales the rate per cell.
      */
-    bool OpThermal(
+    std::expected<void, std::string> OpThermal(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const Grid* mask = Get(a, "mask");
       if (mask != nullptr && !mask->SameShape(*src)) {
-        err = "the mask differs in size";
-        return false;
+        return std::unexpected("the mask differs in size");
       }
       const int iterations = std::max(0, std::min(100000, static_cast<int>(a.p.N("iterations", 20))));
       const float talus = std::max(0.0f, static_cast<float>(a.p.N("talus", 0.6)));
@@ -2149,7 +2139,7 @@ namespace faf::editor::field
         std::swap(cur.v, next.v);
       }
       out.v = std::move(cur.v);
-      return true;
+      return {};
     }
 
     // ---- aspect and flow (stage T2)
@@ -2161,20 +2151,22 @@ namespace faf::editor::field
      * over a rise per run of `flat`, default 0.05); degrees: the downhill direction as an angle 0..360 in the same
      * convention (0 where level). `radius` widens the stencil like slope.
      */
-    bool OpAspect(
+    std::expected<void, std::string> OpAspect(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const std::string mode = a.p.S("mode", "facing");
       if (mode != "facing" && mode != "degrees") {
-        err = "aspect: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("aspect: unknown mode '" + mode + "'");
       }
       const bool degrees = mode == "degrees";
       const double ang = a.p.N("azimuth", 0.0) * 3.14159265358979 / 180.0;
@@ -2206,7 +2198,7 @@ namespace faf::editor::field
         const float c = (-gx * dx - gz * dz) / g;
         return 0.5f + 0.5f * c * std::min(1.0f, g / flat);
       });
-      return true;
+      return {};
     }
 
     /**
@@ -2216,20 +2208,22 @@ namespace faf::editor::field
      * does not depend on the thread count. mode cells (the count of cells draining through), area (world units squared)
      * or log (default: clamp01(ln area / ln range), `range` = the catchment area that reads as 1, default 1e6).
      */
-    bool OpFlow(
+    std::expected<void, std::string> OpFlow(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err)) {
-        return false;
+      if (src == nullptr) {
+        return std::unexpected(err);
+      }
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       const std::string mode = a.p.S("mode", "log");
       if (mode != "cells" && mode != "area" && mode != "log") {
-        err = "flow: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("flow: unknown mode '" + mode + "'");
       }
       const int w = src->w;
       const int h = src->h;
@@ -2275,21 +2269,21 @@ namespace faf::editor::field
           return area;
         return Clamp01(static_cast<float>(std::log(static_cast<double>(area)) * invLog));
       });
-      return true;
+      return {};
     }
 
     /** Reads `a` at the world positions of the samples of `like` (bilinear, clamped at the borders): puts a field of
      * another resolution onto this grid (a paint mask onto the height grid). */
-    bool OpResample(
+    std::expected<void, std::string> OpResample(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* like = Need(a, "like", err);
       if (src == nullptr || like == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       out =
         Grid(like->w, like->h, like->cell, like->ox, like->oz); // not MakeOut: `a` and `like` differ in size by design
@@ -2297,7 +2291,7 @@ namespace faf::editor::field
       Cells(out, [&](const int x, const int z) {
         return SampleWorld(*src, WorldX(g, x), WorldZ(g, z));
       });
-      return true;
+      return {};
     }
 
     /** Catmull-Rom (C1) value at fractional sample coordinates: a height put on a finer grid keeps smooth slopes
@@ -2339,16 +2333,16 @@ namespace faf::editor::field
 
     /** Reads `a` at the world positions of the samples of `like`, smoothly (Catmull-Rom; `linear` = 1 for masks that
      * must not overshoot): puts a field on a finer grid. */
-    bool OpUpsample(
+    std::expected<void, std::string> OpUpsample(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* like = Get(a, "like");
       if (src == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       if (like != nullptr) {
         out = Grid(like->w, like->h, like->cell, like->ox, like->oz);
@@ -2359,8 +2353,7 @@ namespace faf::editor::field
           static_cast<long long>(src->h - 1) * k + 1 > 32768 ||
           (static_cast<long long>(src->w - 1) * k + 1) * ((static_cast<long long>(src->h - 1)) * k + 1) > (1LL << 27)
         ) {
-          err = "upsample: bad factor or too large (at most 128M samples)";
-          return false;
+          return std::unexpected("upsample: bad factor or too large (at most 128M samples)");
         }
         out = Grid(
           (src->w - 1) * k + 1, (src->h - 1) * k + 1, src->cell / static_cast<float>(k), src->ox, src->oz
@@ -2374,21 +2367,21 @@ namespace faf::editor::field
         const double gz = (WorldZ(g, z) - static_cast<double>(src->oz)) * inv;
         return linear ? Bilinear(*src, gx, gz, kClamp, 0.0f) : Bicubic(*src, gx, gz);
       });
-      return true;
+      return {};
     }
 
     /** Brings a finer field onto the grid of `like` with a tent (triangle) filter as wide as the sample ratio: every
      * coarse sample is the weighted mean of the fine samples around it (no aliasing, unlike resample). */
-    bool OpDownsample(
+    std::expected<void, std::string> OpDownsample(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* like = Need(a, "like", err);
       if (src == nullptr || like == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       out = Grid(like->w, like->h, like->cell, like->ox, like->oz);
       const double ratio = static_cast<double>(like->cell) / static_cast<double>(src->cell);
@@ -2397,7 +2390,7 @@ namespace faf::editor::field
         Cells(out, [&](const int x, const int z) {
           return SampleWorld(*src, WorldX(g, x), WorldZ(g, z));
         });
-        return true;
+        return {};
       }
       const int radius = std::max(1, static_cast<int>(std::ceil(ratio - 0.0001)));
       // horizontal pass into a strip grid (like's columns, a's rows), then the vertical pass
@@ -2440,7 +2433,7 @@ namespace faf::editor::field
           }
         }
       });
-      return true;
+      return {};
     }
 
     // ---- height from gradients (Poisson solve by FFT)
@@ -2621,20 +2614,19 @@ namespace faf::editor::field
      * across the border, as a map's edge). The mean is 0. Costs a transform of (2 w) x (2 h) when mirrored: at most
      * 2^25 samples there.
      */
-    bool OpHeightFromGradient(
+    std::expected<void, std::string> OpHeightFromGradient(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* gx = Need(a, "dx", err);
       const Grid* gz = Need(a, "dz", err);
       if (gx == nullptr || gz == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       if (!gx->SameShape(*gz)) {
-        err = "height_from_gradient: dx and dz differ in size";
-        return false;
+        return std::unexpected("height_from_gradient: dx and dz differ in size");
       }
       const int w = gx->w;
       const int h = gx->h;
@@ -2642,8 +2634,9 @@ namespace faf::editor::field
       const int ew = periodic ? w : 2 * w;
       const int eh = periodic ? h : 2 * h;
       if (w < 2 || h < 2 || static_cast<long long>(ew) * eh > (1LL << 25)) {
-        err = "height_from_gradient: field too small or too large (at most 32M samples after mirroring)";
-        return false;
+        return std::unexpected(
+          "height_from_gradient: field too small or too large (at most 32M samples after mirroring)"
+        );
       }
       const double cell = static_cast<double>(gx->cell);
       const auto idx = [&](const int x, const int z) {
@@ -2734,13 +2727,13 @@ namespace faf::editor::field
       for (float& v : out.v) {
         v = static_cast<float>(static_cast<double>(v) - mean);
       }
-      return true;
+      return {};
     }
 
     // ---- registry
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    using OpFn = bool (*)(const OpArgs&, Grid&, std::string&);
+    using OpFn = std::expected<void, std::string> (*)(const OpArgs&, Grid&);
 
     const std::map<std::string, OpFn>& Registry()
     {
@@ -2867,49 +2860,45 @@ namespace faf::editor::field
     return copy;
   }
 
-  bool RunOp(
+  std::expected<void, std::string> RunOp(
     const std::string& name,
     const OpArgs& args,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     if (
-      const OpInterceptor intercept = gInterceptor.load(); intercept != nullptr &&
-      (Registry().count(name) != 0 || ExternalOps().count(name) != 0) && intercept(name, args, out)
+      const OpInterceptor intercept = gInterceptor.load();
+      intercept != nullptr && (Registry().contains(name) || ExternalOps().contains(name)) && intercept(name, args, out)
     ) {
-      return true;
+      return {};
     }
     const auto t0 = std::chrono::steady_clock::now();
-    const bool ok = RunOpCpu(name, args, out, err);
-    if (Registry().count(name) != 0 || ExternalOps().count(name) != 0) {
+    std::expected<void, std::string> ran = RunOpCpu(name, args, out);
+    if (Registry().contains(name) || ExternalOps().contains(name)) {
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       const std::lock_guard<std::mutex> lock(gStatsMutex);
       OpStat& s = StatTable()[name];
       ++s.cpuCalls;
       s.cpuMs += ms;
     }
-    return ok;
+    return ran;
   }
 
-  bool RunOpCpu(
+  std::expected<void, std::string> RunOpCpu(
     const std::string& name,
     const OpArgs& args,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     const auto it = Registry().find(name);
     const auto ext = ExternalOps().find(name);
     if (it == Registry().end() && ext == ExternalOps().end()) {
-      err = "unknown op '" + name + "'";
-      return false;
+      return std::unexpected("unknown op '" + name + "'");
     }
     try {
-      return it != Registry().end() ? it->second(args, out, err) : ext->second(args, out, err);
+      return it != Registry().end() ? it->second(args, out) : ext->second(args, out);
     } catch (const std::bad_alloc&) {
-      err = "out of memory";
-      return false;
+      return std::unexpected("out of memory");
     }
   }
 

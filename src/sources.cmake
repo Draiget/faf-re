@@ -48,6 +48,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/d3d9/StateManagerD3D9.cpp
   legacy/containers/Map.cpp
   legacy/containers/Set.cpp
+  legacy/containers/SlabAllocator.cpp
   legacy/containers/String.cpp
   legacy/exceptions/StdExcept.cpp
   legacy/math/Libm.cpp
@@ -341,6 +342,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/WaterBodySurfaces.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
+  moho/ui/UiDisplayScale.cpp
   moho/lua/SCR_Math.cpp
   moho/lua/SCR_String.cpp
   moho/audio/AudioEngine.cpp

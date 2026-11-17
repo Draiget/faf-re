@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <expected>
 #include <functional>
 #include <initializer_list>
 #include <stdexcept>
@@ -139,7 +140,7 @@ namespace faf::editor::terrain
      * on `fine` from its own inputs (brought onto the fine grid) with its own settings; false with `why` when the input
      * isn't an erosion node's height. Set by the runner.
      */
-    std::function<bool(const std::string& pin, int factor, const field::GridPtr& fine, Outputs& out, std::string& why)>
+    std::function<std::expected<Outputs, std::string>(const std::string& pin, int factor, const field::GridPtr& fine)>
       rerunUpstream;
 
     [[nodiscard]] int Seed(

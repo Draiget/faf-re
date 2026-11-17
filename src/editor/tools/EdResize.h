@@ -3,6 +3,7 @@
 #include "editor/tools/EdHeightFile.h"
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -83,10 +84,10 @@ namespace faf::editor
   /**
    * A `_save.lua`'s text for the new map: markers moved (dropped outside, and out of their chains; a chain left with
    * none goes), areas moved and clipped (one left with no size goes), every army's units moved (dropped outside).
-   * Empty with `error` when the text can't be read.
+   * The error when the text can't be read.
    */
-  [[nodiscard]] std::string
-  ResizeSaveText(const std::string& saveText, const ResizeGeometry& g, ResizeReport& report, std::string& error);
+  [[nodiscard]] std::expected<std::string, std::string>
+  ResizeSaveText(const std::string& saveText, const ResizeGeometry& g, ResizeReport& report);
   /** The scenario's `size = {w, d}` set. */
   [[nodiscard]] std::string WithScenarioSize(const std::string& scenario, int width, int depth);
 } // namespace faf::editor

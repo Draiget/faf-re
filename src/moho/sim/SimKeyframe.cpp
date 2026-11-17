@@ -34,7 +34,7 @@ namespace moho
     constexpr std::uint32_t kMaxListLength = 64u * 1024u * 1024u;
 
     std::vector<SSimFlatten> sFlattenLog;
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     std::vector<SimBlockLane::HeldBlock> sRestoredHeld;
 #endif
     std::unique_ptr<SSimKeyframeHeader> sRestore;
@@ -149,7 +149,7 @@ namespace moho
 
     constexpr std::size_t kUnheldBlockBytes = 2048u;
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     static_assert(kUnheldBlockBytes == SimBlockLane::kBlockBytes);
 
     // A block's first word is a vtable when it held an object. The save and the restore run the same
@@ -267,7 +267,7 @@ namespace moho
     header.heldBlocks.clear();
     header.heldSizes.clear();
     header.heldBytes.clear();
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     const auto packBlock = [](void* const block, std::uint8_t* const out) {
       std::memcpy(out, block, SimBlockLane::kBlockBytes);
       std::uint64_t firstWord = 0;
@@ -347,7 +347,7 @@ namespace moho
 
     sRestoredBlocks.clear();
     sRestoredFormationPointers.clear();
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     const auto unpackBlock = [](const std::uint64_t saved, const std::uint8_t* const in) {
       void* const block = ::operator new(SimBlockLane::kBlockBytes);
       std::memcpy(block, in, SimBlockLane::kBlockBytes);
@@ -429,7 +429,7 @@ namespace moho
     }
     sRestoredFormationPointers.clear();
     sRestoredBlocks.clear();
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     SimBlockLane::AdoptHeldBlocks(std::move(sRestoredHeld));
     sRestoredHeld.clear();
 #endif

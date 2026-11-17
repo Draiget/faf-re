@@ -383,21 +383,24 @@ int auxgetinfo(
 const char* LuaDebugBuildOpcodeText(
   const Proto* const proto,
   const int instructionIndex,
-  char* const outputBuffer
+  const std::span<char> outputBuffer
 )
 {
   const Instruction instruction = proto->code[instructionIndex];
   const auto opcode = static_cast<unsigned int>(instruction) & kLuaOpcodeMask;
   const int sourceLine = proto->lineinfo != nullptr ? proto->lineinfo[instructionIndex] : 0;
-  std::sprintf(outputBuffer, "(%4d) %4d - ", sourceLine, instructionIndex);
+  std::snprintf(outputBuffer.data(), outputBuffer.size(), "(%4d) %4d - ", sourceLine, instructionIndex);
 
-  char* const writeCursor = outputBuffer + std::strlen(outputBuffer);
+  const std::size_t written = std::strlen(outputBuffer.data());
+  char* const writeCursor = outputBuffer.data() + written;
+  const std::size_t room = outputBuffer.size() - written;
   const auto mode = kLuaOpcodeModes[opcode] & kLuaOpcodeModeMask;
   const auto registerA = static_cast<unsigned int>(instruction) >> kLuaInstructionAFieldShift;
 
   if (mode == 0) {
-    std::sprintf(
+    std::snprintf(
       writeCursor,
+      room,
       "%-12s%4u %4u %4u",
       kLuaOpcodeNames[opcode],
       registerA,
@@ -405,16 +408,18 @@ const char* LuaDebugBuildOpcodeText(
       (static_cast<unsigned int>(instruction) >> kLuaInstructionCFieldShift) & kLuaInstructionBOrCMask
     );
   } else if (mode == 1) {
-    std::sprintf(
+    std::snprintf(
       writeCursor,
+      room,
       "%-12s%4u %4u",
       kLuaOpcodeNames[opcode],
       registerA,
       (static_cast<unsigned int>(instruction) >> kLuaInstructionCFieldShift) & kLuaInstructionABxMask
     );
   } else if (mode == 2) {
-    std::sprintf(
+    std::snprintf(
       writeCursor,
+      room,
       "%-12s%4u %4d",
       kLuaOpcodeNames[opcode],
       registerA,
@@ -425,7 +430,7 @@ const char* LuaDebugBuildOpcodeText(
     );
   }
 
-  return outputBuffer;
+  return outputBuffer.data();
 }
 
 /**
@@ -459,7 +464,7 @@ int LuaDebugListCode(
   char opcodeText[100]{};
   for (int instructionIndex = 0; instructionIndex < proto->sizecode; ++instructionIndex) {
     lua_pushnumber(state, static_cast<lua_Number>(instructionIndex + 1));
-    lua_pushstring(state, LuaDebugBuildOpcodeText(proto, instructionIndex, opcodeText));
+    lua_pushstring(state, LuaDebugBuildOpcodeText(proto, instructionIndex, std::span<char>(opcodeText)));
     lua_settable(state, -3);
   }
 
@@ -527,7 +532,7 @@ int LuaDebugListLocals(
   const std::size_t value
 )
 {
-  return (value + 7u) & ~static_cast<std::size_t>(7u);
+  return (value + 7u) & ~7uz;
 }
 
 void LuaDebugAppendGcObject(

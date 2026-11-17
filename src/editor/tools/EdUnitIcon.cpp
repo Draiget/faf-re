@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 
 namespace faf::editor
@@ -332,5 +333,87 @@ namespace faf::editor
       return "Seraphim";
     }
     return {};
+  }
+
+  void IconLightEdge(
+    std::vector<float>& rgba,
+    const int side,
+    const float solid,
+    const float soft,
+    const float peak
+  )
+  {
+    if ((solid <= 0.0f && soft <= 0.0f) || side <= 0 || rgba.size() < static_cast<std::size_t>(side) * side * 4) {
+      return;
+    }
+    const int reach = static_cast<int>(std::ceil(solid + soft));
+    std::vector<float> coverage(static_cast<std::size_t>(side) * side);
+    for (std::size_t i = 0; i < coverage.size(); ++i) {
+      coverage[i] = rgba[i * 4 + 3];
+    }
+    for (int y = 0; y < side; ++y) {
+      for (int x = 0; x < side; ++x) {
+        const std::size_t i = static_cast<std::size_t>(y) * side + x;
+        const float u = coverage[i];
+        float d = 99.0f;
+        if (u >= 0.5f) {
+          d = 0.0f;
+        } else {
+          for (int dy = -reach; dy <= reach; ++dy) {
+            const int yy = y + dy;
+            if (yy < 0 || yy >= side) {
+              continue;
+            }
+            for (int dx = -reach; dx <= reach; ++dx) {
+              const int xx = x + dx;
+              if (xx >= 0 && xx < side && coverage[static_cast<std::size_t>(yy) * side + xx] >= 0.5f) {
+                d = std::min(d, std::sqrt(static_cast<float>(dx * dx + dy * dy)));
+              }
+            }
+          }
+        }
+        float halo = 0.0f;
+        if (d <= solid) {
+          halo = peak;
+        } else if (soft > 0.0f && d < solid + soft) {
+          halo = peak * (1.0f - (d - solid) / soft);
+        }
+        const float alpha = u + halo * (1.0f - u);
+        float* const p = &rgba[i * 4];
+        if (alpha > 0.0f) {
+          const float white = halo * (1.0f - u);
+          for (int c = 0; c < 3; ++c) {
+            p[c] = (p[c] * u + white) / alpha;
+          }
+          p[3] = alpha;
+        } else {
+          p[0] = p[1] = p[2] = 1.0f;
+          p[3] = 0.0f;
+        }
+      }
+    }
+  }
+
+  std::vector<std::uint32_t> IconDifference(
+    const std::uint8_t* made,
+    const std::uint8_t* shipped,
+    const int side
+  )
+  {
+    std::vector<std::uint32_t> out(static_cast<std::size_t>(side) * side);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+      const bool inMade = made[i * 4 + 3] >= 128;
+      const bool inShipped = shipped[i * 4 + 3] >= 128;
+      std::uint32_t r = 40, g = 40, b = 40;
+      if (inMade && inShipped) {
+        r = 60, g = 190, b = 90;
+      } else if (inMade) {
+        r = 220, g = 70, b = 60;
+      } else if (inShipped) {
+        r = 70, g = 110, b = 230;
+      }
+      out[i] = 0xFF000000u | (r << 16) | (g << 8) | b;
+    }
+    return out;
   }
 } // namespace faf::editor

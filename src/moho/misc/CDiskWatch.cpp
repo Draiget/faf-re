@@ -290,7 +290,7 @@ bool moho::FILE_Wild(
   }
 
   std::string normalizedPath(path);
-  if (normalizedPath.find('.') == std::string::npos) {
+  if (!normalizedPath.contains('.')) {
     normalizedPath.push_back('.');
   }
 

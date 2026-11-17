@@ -62,16 +62,13 @@ namespace faf::editor
     }
   } // namespace
 
-  bool EncodeDds(
+  std::expected<std::vector<std::uint8_t>, std::string> EncodeDds(
     const TexImage& image,
-    const DdsKind kind,
-    std::vector<std::uint8_t>& out,
-    std::string& error
+    const DdsKind kind
   )
   {
     if (image.size <= 0 || (image.channels != 1 && image.channels != 4)) {
-      error = "empty image";
-      return false;
+      return std::unexpected("empty image");
     }
     const std::vector<TexImage> levels = MipChain(image);
     const DXGI_FORMAT format = kind == DdsKind::Bgra ? DXGI_FORMAT_B8G8R8A8_UNORM
@@ -86,8 +83,7 @@ namespace faf::editor
       1U
     );
     if (dds.subresources.size() != levels.size()) {
-      error = "the DDS layout has no room for the mip levels";
-      return false;
+      return std::unexpected("the DDS layout has no room for the mip levels");
     }
     for (std::size_t mip = 0; mip < levels.size(); ++mip) {
       const TexImage& level = levels[mip];
@@ -127,8 +123,7 @@ namespace faf::editor
         DirectX::Compress(source, format, DirectX::TEX_COMPRESS_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, compressed);
       const DirectX::Image* result = SUCCEEDED(hr) ? compressed.GetImage(0, 0, 0) : nullptr;
       if (result == nullptr) {
-        error = "compressing mip level " + std::to_string(mip) + " failed";
-        return false;
+        return std::unexpected("compressing mip level " + std::to_string(mip) + " failed");
       }
       // Row of 4 x 4 blocks by row.
       for (std::uint32_t row = 0; row < sub.rowCount; ++row) {
@@ -139,10 +134,10 @@ namespace faf::editor
         );
       }
     }
+    std::vector<std::uint8_t> out;
     if (FAILED(gpg::gal::imaging::ImageCodec::WriteDds(dds, out))) {
-      error = "writing the DDS failed";
-      return false;
+      return std::unexpected("writing the DDS failed");
     }
-    return true;
+    return out;
   }
 } // namespace faf::editor

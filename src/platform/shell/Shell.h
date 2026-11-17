@@ -10,7 +10,7 @@
  * other systems) next to the shell.
  */
 
-#include <windows.h>
+#include <Windows.h>
 
 #include "platform/shell/app.h"
 #include "platform/shell/bitmap.h"

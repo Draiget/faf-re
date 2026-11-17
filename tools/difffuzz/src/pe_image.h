@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <string>
 
 namespace difffuzz
@@ -16,7 +17,7 @@ namespace difffuzz
   class RetailImage
   {
   public:
-    bool Load(const std::string& path, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Load(const std::string& path);
 
     [[nodiscard]] std::uint32_t Base() const noexcept
     {

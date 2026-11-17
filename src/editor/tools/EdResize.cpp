@@ -161,16 +161,15 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string ResizeSaveText(
+  std::expected<std::string, std::string> ResizeSaveText(
     const std::string& saveText,
     const ResizeGeometry& g,
-    ResizeReport& report,
-    std::string& error
+    ResizeReport& report
   )
   {
     SaveFile save;
-    if (!save.Parse(saveText, error)) {
-      return {};
+    if (const auto parsed = save.Parse(saveText); !parsed) {
+      return std::unexpected(parsed.error());
     }
     // Markers.
     std::set<std::string> dropped;
@@ -199,7 +198,7 @@ namespace faf::editor
           it->markers.begin(),
           it->markers.end(),
           [&](const std::string& name) {
-        return dropped.count(name) != 0;
+        return dropped.contains(name);
       }
         ),
         it->markers.end()
@@ -241,8 +240,7 @@ namespace faf::editor
         continue;
       }
       UnitGroup root;
-      std::string why;
-      if (!ParseUnitGroup(units, root, why)) {
+      if (!ParseUnitGroup(units, root)) {
         continue; // (left as it was: the editor can't read it)
       }
       ResizeGroup(root, g, report);

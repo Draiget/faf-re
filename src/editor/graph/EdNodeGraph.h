@@ -2,7 +2,9 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -116,6 +118,10 @@ namespace faf::editor
     /** New whenever a parameter or an input link changes, unique in the graph's life: what an evaluator caches against.
      */
     std::uint64_t revision = 0;
+    /** Bypassed (FAF Studio's bypass): the first input linked in goes straight through to the outputs. */
+    bool bypass = false;
+    /** The node's own name on its title bar (empty: the type's title). */
+    std::string name;
   };
 
   struct GraphLink
@@ -171,6 +177,9 @@ namespace faf::editor
     /** Sets a parameter and bumps the node's revision (and so its downstream's). */
     void SetParam(int id, std::size_t param, const ParamValue& value);
     void MoveNode(int id, float x, float y);
+    /** Bypass on or off; bumps the node's revision like a parameter. */
+    void SetBypass(int id, bool on);
+    void SetName(int id, const std::string& name);
 
     /** Links an output to an input, replacing the input's link. A link that would close a loop is refused. */
     LinkResult Link(int fromNode, int fromPin, int toNode, int toPin);
@@ -195,11 +204,21 @@ namespace faf::editor
     [[nodiscard]] std::string Save() const;
     /** Reads a graph file; unknown node types and parameters are dropped, missing parameters take their initial value.
      */
-    bool Load(const std::string& text, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Load(const std::string& text);
     void Clear();
+    /** The nodes given and the links among them, as a graph file's text (copy). */
+    [[nodiscard]] std::string SaveSome(const std::set<int>& ids) const;
+    /**
+     * Adds a graph file's nodes (with new ids) and their links, the group's top left corner at (x, y) (paste); the new
+     * ids, never none (the error when nothing was pasted). An output node is left out when the graph has one.
+     */
+    [[nodiscard]] std::expected<std::vector<int>, std::string> Paste(const std::string& text, float x, float y);
+    /** Load for undo and redo: the change count goes on (so whatever saved or ran against it sees a change). */
+    [[nodiscard]] std::expected<void, std::string> Restore(const std::string& text);
 
   private:
     void Touch(int id);
+    [[nodiscard]] std::string SaveNodes(const std::set<int>* only) const;
 
     const NodeTypeRegistry* mRegistry;
     std::vector<GraphNode> mNodes;

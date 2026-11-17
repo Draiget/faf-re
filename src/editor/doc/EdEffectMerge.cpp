@@ -28,9 +28,9 @@ namespace faf::editor
         at = text.find('\n', start);
         const std::string line = text.substr(start, at == std::string::npos ? std::string::npos : at - start + 1);
         std::size_t indent = 0;
-        if (line.rfind("\t", 0) == 0) {
+        if (line.starts_with("\t")) {
           indent = 1;
-        } else if (line.rfind("    ", 0) == 0) {
+        } else if (line.starts_with("    ")) {
           indent = 4;
         }
         const bool top =
@@ -74,7 +74,7 @@ namespace faf::editor
       const auto edited = Entries(editedText);
       std::vector<std::string> changed;
       for (const auto& [name, text] : edited) {
-        if (ignore.count(name) != 0) {
+        if (ignore.contains(name)) {
           continue;
         }
         const auto it = std::find_if(game.begin(), game.end(), [&](const auto& g) {
@@ -86,7 +86,7 @@ namespace faf::editor
       }
       if (why.empty()) {
         for (const auto& [name, text] : game) {
-          if (ignore.count(name) == 0 && std::none_of(edited.begin(), edited.end(), [&](const auto& e) {
+          if (!ignore.contains(name) && std::none_of(edited.begin(), edited.end(), [&](const auto& e) {
             return e.first == name;
           })) {
             why = name + " was taken out (a merge can't take a key away)";
@@ -163,7 +163,7 @@ namespace faf::editor
       return static_cast<char>(std::tolower(c));
     });
     // Only below effects/, no way up.
-    if (lower.rfind("effects/", 0) != 0 || path.find("..") != std::string::npos) {
+    if (!lower.starts_with("effects/") || path.contains("..")) {
       const std::size_t slash = path.find_last_of('/');
       return "effects/emitters/" + (slash == std::string::npos ? path : path.substr(slash + 1));
     }

@@ -5,7 +5,7 @@
 # that can't write to its dependencies folder.
 #
 # Not optional: faf_sim_math_tests links gtest and is part of every build (tests/CMakeLists.txt,
-# cmake/FafLinux.cmake), so a missing tree stops the configure here instead of the link later.
+# cmake/FafPosix.cmake), so a missing tree stops the configure here instead of the link later.
 
 if(DEFINED ENV{FAF_GTEST_DIR})
   set(FAF_GTEST_DIR "$ENV{FAF_GTEST_DIR}" CACHE PATH "Where the GoogleTest release is unpacked")

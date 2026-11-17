@@ -2,6 +2,7 @@
 #include "gpg/core/profiling/Profiler.h"
 #include "moho/unit/tasks/CUnitPatrolTaskTypeInfo.h"
 
+#include <utility>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -682,7 +683,7 @@ namespace moho
     const Wm3::Vector3f startPos = COORDS_ToWorldPos(
       map,
       *startPosCell,
-      static_cast<ELayer>(static_cast<std::uint8_t>(startFootprint.mOccupancyCaps)),
+      static_cast<ELayer>(std::to_underlying(startFootprint.mOccupancyCaps)),
       startFootprint.mSizeX,
       startFootprint.mSizeZ
     );
@@ -703,7 +704,7 @@ namespace moho
       endPos = COORDS_ToWorldPos(
         map,
         *tailPosCell,
-        static_cast<ELayer>(static_cast<std::uint8_t>(tailFootprint.mOccupancyCaps)),
+        static_cast<ELayer>(std::to_underlying(tailFootprint.mOccupancyCaps)),
         tailFootprint.mSizeX,
         tailFootprint.mSizeZ
       );

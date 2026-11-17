@@ -108,41 +108,45 @@ namespace faf::remote
       error = "/connectserver needs /serveruid with the player's id, which the token was made for.";
       return EServerConnectArgs::Invalid;
     }
-    return MakeServerConnectRequest(endpoint, token, std::atoi(uid.c_str()), request, error)
-      ? EServerConnectArgs::Valid
-      : EServerConnectArgs::Invalid;
+    if (auto made = MakeServerConnectRequest(endpoint, token, std::atoi(uid.c_str()), request); !made) {
+      error = made.error();
+      return EServerConnectArgs::Invalid;
+    }
+    return EServerConnectArgs::Valid;
   }
 
-  bool MakeServerConnectRequest(
+  std::expected<void, std::string> MakeServerConnectRequest(
     const std::string_view endpoint,
     const std::string_view token,
     const std::int32_t uid,
-    SServerConnectRequest& request,
-    std::string& error
+    SServerConnectRequest& request
   )
   {
-    // The session's channel takes an IPv4 address and port (`StartServerSession`); a name isn't looked up.
+    // The session's channel takes an IPv4 or IPv6 address and port (`StartServerSession`); a name isn't looked up.
     const std::string endpointText(endpoint);
     net::SEndpoint parsed;
     if (!net::ParseEndpoint(endpointText, parsed)) {
-      error = "The game server's address must be an IPv4 address and port: \"" + endpointText + "\".";
-      return false;
+      return std::unexpected(
+        "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in "
+        "brackets and port ([address]:port): \"" +
+        endpointText + "\"."
+      );
     }
     if (!IsTokenText(token)) {
-      error = "The game server's token must be 1 to " + std::to_string(kMaxTokenLength) +
-        " printable characters without spaces.";
-      return false;
+      return std::unexpected(
+        "The game server's token must be 1 to " + std::to_string(kMaxTokenLength) +
+        " printable characters without spaces."
+      );
     }
     if (uid <= 0) {
-      error = "The player's id for the game server must be above 0, not " + std::to_string(uid) + ".";
-      return false;
+      return std::unexpected("The player's id for the game server must be above 0, not " + std::to_string(uid) + ".");
     }
     request.endpoint = endpointText;
-    request.address = parsed.ip;
+    request.address = parsed.address;
     request.port = parsed.port;
     request.token.assign(token);
     request.uid = uid;
-    return true;
+    return {};
   }
 
   bool IsPeerLinkCommand(
@@ -572,11 +576,15 @@ namespace faf::remote
     // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
     net::SEndpoint server;
     if (!net::ParseEndpoint(request.endpoint, server)) {
-      return fail("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".");
+      return fail(
+        "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in brackets and "
+        "port ([address]:port): \"" +
+        request.endpoint + "\"."
+      );
     }
     sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
-    if (std::string openError; !sSession->link.Open(openError)) {
-      return fail("Can't reach the game server: " + openError);
+    if (auto opened = sSession->link.Open(); !opened) {
+      return fail("Can't reach the game server: " + opened.error());
     }
     const auto start = std::chrono::steady_clock::now();
     while (sSession->link.State() == net::CClientLink::EState::Connecting) {

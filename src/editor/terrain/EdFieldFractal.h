@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <expected>
 #include <string>
 
 namespace faf::editor::field::fractal
@@ -58,17 +59,15 @@ namespace faf::editor::field::fractal
     std::uint32_t octSeed[16] = {};
   };
 
-  /** Reads the options of `op fractal`; `cell` = world units between two samples of the output (for antialias). false
-   * with `err` set on a bad option. */
-  inline bool Read(
+  /** Reads the options of `op fractal`; `cell` = world units between two samples of the output (for antialias). The
+   * error on a bad option. */
+  [[nodiscard]] inline std::expected<Setup, std::string> Read(
     const OpArgs& a,
-    const float cell,
-    Setup& s,
-    std::string& err
+    const float cell
   )
   {
     using namespace t7;
-    s = Setup();
+    Setup s;
     s.seed = SeedOf(a);
     s.scale = std::max(1e-3, a.p.N("scale", 120.0));
     const int wantOct = std::max(1, std::min(16, static_cast<int>(a.p.N("octaves", 6))));
@@ -82,8 +81,7 @@ namespace faf::editor::field::fractal
     else if (kind == "ridged")
       s.kind = kRidged;
     else {
-      err = "fractal: kind must be fbm, billow or ridged";
-      return false;
+      return std::unexpected("fractal: kind must be fbm, billow or ridged");
     }
     const std::string style = a.p.S("style", "classic");
     if (style == "classic")
@@ -91,8 +89,7 @@ namespace faf::editor::field::fractal
     else if (style == "erosive")
       s.style = kErosive;
     else {
-      err = "fractal: style must be classic or erosive";
-      return false;
+      return std::unexpected("fractal: style must be classic or erosive");
     }
     s.erosion =
       std::max(0.0f, std::min(16.0f, static_cast<float>(a.p.N("erosion", 1.0)))) * (s.kind == kRidged ? 0.5f : 1.0f);
@@ -148,6 +145,6 @@ namespace faf::editor::field::fractal
       break;
     }
     s.fit = static_cast<float>(a.p.N("fit", static_cast<double>(s.fit)));
-    return true;
+    return s;
   }
 } // namespace faf::editor::field::fractal

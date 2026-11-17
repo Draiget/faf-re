@@ -101,7 +101,7 @@ namespace faf::editor
       typed.push_back(static_cast<char>(key));
       return true;
     }
-    if (key == '.' && typed.find('.') == std::string::npos) {
+    if (key == '.' && !typed.contains('.')) {
       typed.push_back('.');
       return true;
     }

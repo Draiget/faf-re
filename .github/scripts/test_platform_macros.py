@@ -30,9 +30,15 @@ class CheckLine(unittest.TestCase):
     def test_an_empty_comment_is_no_reason(self):
         self.assertTrue(self.refused("#if FAFRE_PLATFORM_LINUX //"))
 
+    def test_compiler_processor_macros_are_refused(self):
+        for line in ("#elif FAFRE_PLATFORM_POSIX && defined(__x86_64__)", "#if defined(_M_X64) || defined(__x86_64__)",
+                     "#ifdef _M_IX86", "#if defined(__aarch64__)"):
+            with self.subTest(line=line):
+                self.assertTrue(self.refused(line))
+
     def test_our_macros_pass(self):
         for line in ("#if FAFRE_PLATFORM_WINDOWS", "#if !FAFRE_PLATFORM_WINDOWS", "#if FAFRE_PLATFORM_POSIX",
-                     "#elif FAFRE_PLATFORM_POSIX && defined(__x86_64__)"):
+                     "#elif FAFRE_PLATFORM_POSIX && FAFRE_ARCH_X64", "#if FAFRE_ARCH_64BIT", "#if FAFRE_ARCH_X86"):
             with self.subTest(line=line):
                 self.assertFalse(self.refused(line))
 

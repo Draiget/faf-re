@@ -314,9 +314,9 @@ namespace fa
    */
   struct DefaultNodeDeleter
   {
-    void operator()(
+    static void operator()(
       NodeBase* n
-    ) const noexcept
+    ) noexcept
     {
       operator delete(n);
     }

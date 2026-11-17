@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <print>
 #include <stdexcept>
 #include <string_view>
 
@@ -81,9 +82,9 @@ namespace
   /** Deletes a thread's error string, when the thread ends or the slot is released (0x0045C110). */
   struct DiskThreadStateStringDeleter
   {
-    void operator()(
+    static void operator()(
       fa::string* const value
-    ) const noexcept
+    ) noexcept
     {
       DestroyDiskThreadStateString(value);
     }
@@ -935,7 +936,7 @@ void moho::DISK_TraceAccess(
   }
   std::lock_guard<std::mutex> guard(sAccessTraceLock);
   if (std::FILE* const file = sAccessTrace.load(std::memory_order_relaxed)) {
-    std::fprintf(file, "%s %s\n", kind, path != nullptr ? path : "");
+    std::println(file, "{} {}", kind, path != nullptr ? path : "");
   }
 }
 

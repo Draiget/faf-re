@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -82,6 +83,9 @@ func siblingExe(name string) string {
 	self, err := os.Executable()
 	if err != nil {
 		return ""
+	}
+	if runtime.GOOS != "windows" {
+		name = strings.TrimSuffix(name, ".exe") // Linux and macOS programs have no extension
 	}
 	p := filepath.Join(filepath.Dir(self), name)
 	if _, err = os.Stat(p); err == nil {

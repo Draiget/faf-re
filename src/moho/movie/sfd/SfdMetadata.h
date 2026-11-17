@@ -1,5 +1,6 @@
 #pragma once
 #include "SfdHeaderParser.h"
+#include <expected>
 #include <string>
 #include <vector>
 namespace moho::sfd
@@ -9,6 +10,6 @@ namespace moho::sfd
     HeaderInfo header;
     std::vector<std::uint16_t> privatePacketLengths;
   };
-  bool ReadMetadata(const char* filename, Metadata& result, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> ReadMetadata(const char* filename, Metadata& result);
   // Unknown subtitle/user-data formats intentionally have no guessed decoder.
 } // namespace moho::sfd

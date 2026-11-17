@@ -42,6 +42,7 @@ namespace faf::editor
       bool grid = true;
       float height = 0.0f; // the emitter above the ground
       bool turn = false;   // the camera turns slowly round the effect
+      float scale = 1.0f;  // the effect's scale (FAF Studio's Effect scale: ScaleEmitter)
     };
     [[nodiscard]] Options& Opts() noexcept
     {

@@ -16,7 +16,7 @@ The engine plays Forged Alliance's SFD movies with its own independent player bu
 ## Implementation
 
 - **Decoding**: FFmpeg libavformat demuxes MPEG-PS; libavcodec decodes MPEG-1/2 and ADX/MP1/MP2/MP3; libswscale produces BGRA (opaque alpha); libswresample converts audio to interleaved S16 stereo at 48 kHz. FFmpeg objects and ownership never cross the decoder implementation boundary.
-- **Threading and clock**: a player worker fills bounded queues independently of rendering. The audio device's playback position is the master clock while embedded audio plays; otherwise a steady clock is used. Pausing freezes both; reopening rebuilds decoder, queues, sink and PTS origin.
+- **Threading and clock**: a player worker fills bounded queues independently of rendering, about half a second ahead. Pictures stop sooner once they hold half of the 128 MiB at which the player fails a movie ("Excessive SFD stream interleave"), about 9 of the main menu's 1824x1024 pictures, which leaves the other half for what one decode adds, and due pictures go before each decode, so that the limit no longer counts those queued and due when the worker's pass began. Sound keeps its half second, which the device plays on while the worker stalls. Decoding for it queues the pictures in between too, so a movie with sound holds about half a second of pictures at any size, which stays under the limit up to about 1824x1024 at 30 frames a second; the game's one movie with sound, e3_demo_cut.sfd, is 1280x720. The audio device's playback position is the master clock while embedded audio plays; otherwise a steady clock is used. Pausing freezes both; reopening rebuilds decoder, queues, sink and PTS origin.
 - **End of file**: EOF drains both codecs and the resampler, then waits for the final displayed frame's duration and the submitted audio before reporting ended.
 - **Audio output**: `CMovieManager` owns the DirectSound device. Each audio movie has its own secondary buffer with wrap tracking and volume control. Manager volume updates reach active sinks. `/nosound` skips audio decode and uses the steady clock.
 - **Unchanged**: XACT movie sound/voice cues and Lua movie semantics are independent of the player and unchanged.
@@ -60,7 +60,7 @@ The parser scans at most the first 64 KiB (including, but not limited to, bases 
 | mwPlyStartFname | Player::Open, including complete restart |
 | mwPlyGetStat | Player status: 1 preparing, 2 ready/playing, 3 ended, 4 failed |
 | mwPlyPause / mwPlyIsPause | freeze/resume/query player and audio clocks |
-| mwPlyGetCurFrm / mwPlyRelCurFrm | borrow/release retained independent BGRA frame |
+| mwPlyGetCurFrm / mwPlyRelCurFrm | borrow/release retained independent BGRA frame, none while the texture has it (mwPlyFxCnvFrmARGB8888 copied it, and no `ForgetUploadedMovieFrame` since) |
 | mwPlyFxGetCompoMode | parsed composition mode |
 | mwPlyFxSetOutBufSize / mwPlyFxCnvFrmARGB8888 | checked pitch/height and row copy |
 | mwPlyGetSubtitle | empty output until a timed format is verified |
@@ -125,13 +125,15 @@ The CMake/CTest suites passed 7/7 in Debug/Win32 and Release/x64, covering:
 
 - Exact signature, relocated headers, truncated descriptors, invalid counts, malformed fields, effect mapping and 20,000 deterministic fuzz cases.
 - Complete MPEG video decoding and opaque BGRA validation; complete embedded ADX decode and resampler drain.
-- Texture copying with padded destination pitch and canaries.
+- Texture copying with padded destination pitch and canaries; an unchanged frame is not handed out for copying again, until `ForgetUploadedMovieFrame` says the texture was made again.
 - First frame while paused, timed playback, pause freeze, resume and volume.
 - Ring-buffer wrap, restart, EOF (including embedded audio drain), repeated reopen/dispose, missing-file rejection and idempotent shutdown.
 - Embedded-audio file with no sound device (steady-clock playback).
 - Graceful rejection of the observed special-composition file.
 
 Timed playback checks bound clock drift to 250 ms at the sampled point and freeze video PTS during pause. Consumed DirectSound ring slots are cleared to silence, so an underrun cannot replay PCM from an earlier wrap. Standalone Win32 and x64 diagnostics both passed normal embedded DirectSound playback.
+
+Timed playback also keeps the process under 96 MiB above the open while it plays, three quarters of the player's 128 MiB queue limit, sampled, as an earlier file of the same run may have set the process's own peak; `large-playback` checks this on main_menu.sfd, whose 1824x1024 pictures are the game's largest. With these two checks the suite passed 7/7 in Debug/Win32, Release/Win32 and Release/x64 on 15/11/2026, and an x64 Release ASan build (MSVC 14.44) passed 6/6 with the DirectSound test excluded, which crashes as below. ASan builds skip the bound: ASan keeps freed memory committed for a while (its quarantine), so that the process grows with every picture decoded, 353 MiB above the open on main_menu.sfd, not with the queue.
 
 **ASan**: parser ASan tests passed. The x64 Debug ASan suite passed parser, full video/audio decode and no-sound playback, and the final rerun passed 6/6 with the physical DirectSound test excluded. That test crashes inside Windows `DSOUND.dll` under ASan: a minimal program using only DirectSound creation, a silent secondary buffer and Play hits the same null read at `DSOUND.dll+0x69362` without FAF or FFmpeg, and disabling the optional RTL heap hook did not help. This is an environment/sanitizer limitation, not a passing sanitized audio test; ordinary x64 DirectSound tests pass. FFmpeg DLLs were not sanitizer-instrumented.
 

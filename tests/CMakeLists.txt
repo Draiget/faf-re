@@ -22,12 +22,20 @@ add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
 set_tests_properties(net_peer_transport PROPERTIES LABELS "Existing")
 
 # platform::net (issue #259): loopback sockets and the socket events the lockstep transport
-# waits on; Linux runs the same file on NetPosix.cpp (cmake/FafLinux.cmake).
+# waits on; Linux runs the same file on NetPosix.cpp (cmake/FafPosix.cmake).
 add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL net/PlatformNetTests.cpp)
 target_link_libraries(faf_platform_net_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_platform_net_tests PROPERTIES FOLDER "Tests/Net")
 add_test(NAME platform_net COMMAND faf_platform_net_tests)
 set_tests_properties(platform_net PROPERTIES LABELS "Net")
+
+# What the lobby puts on the wire for another player (LOBMSG_NewPeer): the Windows game's
+# bytes; Linux runs the same file (cmake/FafPosix.cmake).
+add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL net/LobbyWireTests.cpp)
+target_link_libraries(faf_lobby_wire_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_lobby_wire_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
+set_tests_properties(lobby_wire PROPERTIES LABELS "Net")
 
 # net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
 # switch off and on, at a fast rate and at the game's rate.
@@ -36,6 +44,14 @@ target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_fast_retransmit_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
 set_tests_properties(net_fast_retransmit PROPERTIES LABELS "Existing")
+
+# The end of a UDP connector: Destroy, its thread's goodbyes, then the connector deleted with its
+# socket and event; Linux runs the same file (cmake/FafPosix.cmake).
+add_executable(faf_udp_connector_lifetime_tests EXCLUDE_FROM_ALL net/UdpConnectorLifetimeTests.cpp)
+target_link_libraries(faf_udp_connector_lifetime_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_udp_connector_lifetime_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
+set_tests_properties(net_udp_connector_lifetime PROPERTIES LABELS "Net")
 
 # libjuice gathering against a STUN/TURN server (issue #228), run by hand:
 #   faf_juice_gather <host> <port> [<turn user> <turn password>]
@@ -247,6 +263,7 @@ add_subdirectory(remote)
 add_subdirectory(memory)
 add_subdirectory(tread_rotation)
 add_subdirectory(core)
+add_subdirectory(diagnostics)
 add_subdirectory(containers)
 add_subdirectory(lua)
 add_subdirectory(gal)
@@ -386,6 +403,10 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/GroundKindTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdGroundKind.cpp
   editor/MaskGenTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskGen.cpp
   editor/RecipeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdRecipes.cpp
+  editor/RoundSixFieldTests.cpp
+  editor/RoundSevenFieldTests.cpp
+  editor/RoundEightFieldTests.cpp
+  editor/RoundNineFieldTests.cpp
   editor/TextureSetsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTexScale.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureSets.cpp
   editor/SlopeRulesTests.cpp
   editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
@@ -478,6 +499,10 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/FafApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdFafApi.cpp
   editor/CommandsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCommands.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWindowChrome.cpp
   editor/KeymapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdKeymap.cpp
+  editor/RoundSixTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdStrataThemes.cpp
+  editor/RoundSevenTests.cpp
+  editor/RoundEightTests.cpp
+  editor/RoundNineTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdPerf.cpp
   editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
   editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
@@ -508,7 +533,8 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua")
+target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua"
+  FAF_THEMES_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/envlib_themes.lua")
 # The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
 target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).

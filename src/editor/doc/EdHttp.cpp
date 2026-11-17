@@ -25,11 +25,10 @@ namespace faf::editor
     }
   } // namespace
 
-  bool HttpRequest(
+  std::expected<void, std::string> HttpRequest(
     const HttpCall& call,
     long& status,
     std::string& body,
-    std::string& error,
     std::atomic<std::uint64_t>* const received,
     std::atomic<std::uint64_t>* const total
   )
@@ -49,8 +48,7 @@ namespace faf::editor
     parts.lpszExtraInfo = extra;
     parts.dwExtraInfoLength = static_cast<DWORD>(std::size(extra));
     if (!::WinHttpCrackUrl(wide.c_str(), 0, 0, &parts)) {
-      error = "not a link: " + call.url;
-      return false;
+      return std::unexpected("not a link: " + call.url);
     }
     const std::wstring object = std::wstring(parts.lpszUrlPath, parts.dwUrlPathLength) +
       std::wstring(parts.lpszExtraInfo, parts.dwExtraInfoLength);
@@ -80,6 +78,7 @@ namespace faf::editor
                 0
       ) &&
       ::WinHttpReceiveResponse(request, nullptr);
+    std::string error;
     if (ok) {
       DWORD code = 0;
       DWORD size = sizeof(code);
@@ -148,7 +147,10 @@ namespace faf::editor
     if (session != nullptr) {
       ::WinHttpCloseHandle(session);
     }
-    return ok;
+    if (!ok) {
+      return std::unexpected(std::move(error));
+    }
+    return {};
   }
 
   std::string UrlEncode(

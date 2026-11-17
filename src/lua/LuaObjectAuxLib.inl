@@ -200,30 +200,32 @@ int luaB_tostring(
     lua_pushlstring(state, "upval", 5u);
     return 1;
   case LUA_TLIGHTUSERDATA:
-    std::sprintf(rendered, "pointer: %p", lua_tolightuserdata(state, 1));
+    std::snprintf(rendered, sizeof(rendered), "pointer: %p", lua_tolightuserdata(state, 1));
     break;
   case LUA_TTABLE:
-    std::sprintf(rendered, "table: %p", lua_topointer(state, 1));
+    std::snprintf(rendered, sizeof(rendered), "table: %p", lua_topointer(state, 1));
     break;
   case LUA_CFUNCTION:
-    std::sprintf(rendered, "cfunction: %p", lua_topointer(state, 1));
+    std::snprintf(rendered, sizeof(rendered), "cfunction: %p", lua_topointer(state, 1));
     break;
   case LUA_TFUNCTION:
-    std::sprintf(rendered, "function: %p", lua_topointer(state, 1));
+    std::snprintf(rendered, sizeof(rendered), "function: %p", lua_topointer(state, 1));
     break;
   case LUA_TTHREAD:
-    std::sprintf(rendered, "thread: %p", static_cast<void*>(lua_tothread(state, 1)));
+    std::snprintf(rendered, sizeof(rendered), "thread: %p", static_cast<void*>(lua_tothread(state, 1)));
     break;
   case LUA_TUSERDATA: {
     gpg::RRef reference{};
     GetRRefFromUserdata(&reference, state, 1);
     const fa::string lexical = reference.GetLexical();
-    std::sprintf(rendered, "userdata: %.80s at %p = %.80s", reference.GetName(), reference.mObj, lexical.c_str());
+    std::snprintf(
+      rendered, sizeof(rendered), "userdata: %.80s at %p = %.80s", reference.GetName(), reference.mObj, lexical.c_str()
+    );
     break;
   }
   case LUA_TPROTO: {
     const Proto* const proto = static_cast<const Proto*>(state->base->value.p);
-    std::sprintf(rendered, "code: %.200s(%d)", proto->source->str, proto->lineDefined);
+    std::snprintf(rendered, sizeof(rendered), "code: %.200s(%d)", proto->source->str, proto->lineDefined);
     break;
   }
   default:
@@ -700,7 +702,7 @@ int luaL_argerror(
     ar.name = "?";
   }
 
-  return luaL_error(state, "bad argument #%d to `%s' (%s)", narg, ar.name, extramsg);
+  luaL_error(state, "bad argument #%d to `%s' (%s)", narg, ar.name, extramsg);
 }
 
 /**
@@ -1245,7 +1247,7 @@ int luaL_loadfile(
   LuaLoadFileState lf;
   if (filename != nullptr) {
     lua_pushfstring(state, "@%s", filename);
-    lf.f = std::fopen(filename, "r");
+    lf.f = std::fopen(LuaIoPath(filename).c_str(), "r"); // LuaObjectIoLib.inl: POSIX paths as Windows finds them
   } else {
     lua_pushlstring(state, "=stdin", 6u);
     lf.f = stdin;
@@ -1275,7 +1277,7 @@ int luaL_loadfile(
   std::ungetc(first, lf.f);
   if (std::isspace(first) == 0 && std::isprint(first) == 0 && lf.f != stdin) {
     std::fclose(lf.f);
-    lf.f = std::fopen(filename, "rb");
+    lf.f = std::fopen(LuaIoPath(filename).c_str(), "rb");
     if (lf.f == nullptr) {
       return errfile(state, fnameindex);
     }

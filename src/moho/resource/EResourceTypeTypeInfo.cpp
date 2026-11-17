@@ -1,5 +1,6 @@
 ﻿#include "moho/resource/EResourceTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -120,10 +121,10 @@ namespace moho
   {
     mPrefix = "RESTYPE_";
 
-    AddEnum(StripPrefix("RESTYPE_None"), static_cast<std::int32_t>(RESTYPE_None));
-    AddEnum(StripPrefix("RESTYPE_Mass"), static_cast<std::int32_t>(RESTYPE_Mass));
-    AddEnum(StripPrefix("RESTYPE_Hydrocarbon"), static_cast<std::int32_t>(RESTYPE_Hydrocarbon));
-    AddEnum(StripPrefix("RESTYPE_Max"), static_cast<std::int32_t>(RESTYPE_Max));
+    AddEnum(StripPrefix("RESTYPE_None"), std::to_underlying(RESTYPE_None));
+    AddEnum(StripPrefix("RESTYPE_Mass"), std::to_underlying(RESTYPE_Mass));
+    AddEnum(StripPrefix("RESTYPE_Hydrocarbon"), std::to_underlying(RESTYPE_Hydrocarbon));
+    AddEnum(StripPrefix("RESTYPE_Max"), std::to_underlying(RESTYPE_Max));
   }
 
   /**

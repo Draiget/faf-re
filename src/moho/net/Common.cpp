@@ -1,5 +1,6 @@
 #include "Common.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -177,7 +178,7 @@ void moho::ENetworkPlayerStateToStr(
 )
 {
   if (state >= ENetworkPlayerState::_Last) {
-    out = gpg::STR_Printf("%d", static_cast<int32_t>(state));
+    out = gpg::STR_Printf("%d", std::to_underlying(state));
     return;
   }
 
@@ -240,7 +241,7 @@ void moho::NetPacketTypeToStr(
     out = "NATTRAVERSAL";
     return;
   default:
-    out = gpg::STR_Printf("%02x", static_cast<uint8_t>(state));
+    out = gpg::STR_Printf("%02x", std::to_underlying(state));
   }
 }
 
@@ -794,8 +795,8 @@ INetConnector* moho::NET_MakeUDPConnector(
   }
   sockaddr_in name;
   name.sin_family = AF_INET;
-  name.sin_port = ::htons(port);
-  name.sin_addr.s_addr = ::htonl(0);
+  name.sin_port = htons(port);
+  name.sin_addr.s_addr = htonl(0);
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
@@ -847,8 +848,8 @@ INetConnector* moho::NET_MakeTCPConnector(
 
   sockaddr_in name{};
   name.sin_family = AF_INET;
-  name.sin_port = ::htons(port);
-  name.sin_addr.s_addr = ::htonl(0);
+  name.sin_port = htons(port);
+  name.sin_addr.s_addr = htonl(0);
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
@@ -1089,7 +1090,7 @@ fa::string moho::NET_GetProtocolName(
     break;
   }
 
-  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
+  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", std::to_underlying(protocol));
   throw std::domain_error(msg.c_str());
 }
 

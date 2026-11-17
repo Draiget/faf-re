@@ -887,13 +887,11 @@ namespace faf::remote
     return false;
   }
 
-  bool ParseSyncPolicy(
-    std::string_view text,
-    SSyncPolicy& policy,
-    std::string& error
+  std::expected<SSyncPolicy, std::string> ParseSyncPolicy(
+    std::string_view text
   )
   {
-    policy = SSyncPolicy{};
+    SSyncPolicy policy;
     constexpr std::string_view kVersionTag = "# game-version:";
     int lineNumber = 0;
     while (!text.empty()) {
@@ -909,8 +907,7 @@ namespace faf::remote
             number.data() + number.size() ||
           policy.gameVersion <= 0
         ) {
-          error = "line " + std::to_string(lineNumber) + ": bad game version";
-          return false;
+          return std::unexpected("line " + std::to_string(lineNumber) + ": bad game version");
         }
         continue;
       }
@@ -919,33 +916,31 @@ namespace faf::remote
       }
       const std::size_t tab = line.find('\t');
       if (tab == std::string_view::npos) {
-        error = "line " + std::to_string(lineNumber) + ": no route after the key";
-        return false;
+        return std::unexpected("line " + std::to_string(lineNumber) + ": no route after the key");
       }
       const std::string_view key = TrimSpace(line.substr(0, tab));
       std::string_view routeText = line.substr(tab + 1);
       routeText = TrimSpace(routeText.substr(0, routeText.find('\t')));
       ESyncRoute route = ESyncRoute::Observers;
       if (key.empty() || !ParseSyncRouteName(routeText, route)) {
-        error = "line " + std::to_string(lineNumber) + ": bad key or route '" + std::string(routeText) + "'";
-        return false;
+        return std::unexpected(
+          "line " + std::to_string(lineNumber) + ": bad key or route '" + std::string(routeText) + "'"
+        );
       }
       policy.routes.emplace_back(std::string(key), route);
     }
     if (policy.gameVersion == 0) {
-      error = "no '# game-version: <n>' line";
-      return false;
+      return std::unexpected("no '# game-version: <n>' line");
     }
     std::sort(policy.routes.begin(), policy.routes.end(), [](const auto& a, const auto& b) {
       return a.first < b.first;
     });
     for (std::size_t index = 1; index < policy.routes.size(); ++index) {
       if (policy.routes[index].first == policy.routes[index - 1].first) {
-        error = "key '" + policy.routes[index].first + "' is listed twice";
-        return false;
+        return std::unexpected("key '" + policy.routes[index].first + "' is listed twice");
       }
     }
-    return true;
+    return policy;
   }
 
   void UseSyncPolicy(
@@ -966,15 +961,13 @@ namespace faf::remote
     sLoadedRoutes.clear();
   }
 
-  bool UseSyncPolicyFile(
-    const std::string& path,
-    std::string& error
+  std::expected<void, std::string> UseSyncPolicyFile(
+    const std::string& path
   )
   {
     std::FILE* const file = std::fopen(path.c_str(), "rb");
     if (file == nullptr) {
-      error = "can't open " + path;
-      return false;
+      return std::unexpected("can't open " + path);
     }
     std::string text;
     char buffer[4096];
@@ -983,13 +976,12 @@ namespace faf::remote
       text.append(buffer, read);
     }
     std::fclose(file);
-    SSyncPolicy policy;
-    if (!ParseSyncPolicy(text, policy, error)) {
-      error = path + ": " + error;
-      return false;
+    std::expected<SSyncPolicy, std::string> policy = ParseSyncPolicy(text);
+    if (!policy) {
+      return std::unexpected(path + ": " + policy.error());
     }
-    UseSyncPolicy(std::move(policy));
-    return true;
+    UseSyncPolicy(std::move(*policy));
+    return {};
   }
 
   CSyncRouter::CSyncRouter(

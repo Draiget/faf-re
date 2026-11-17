@@ -1,5 +1,6 @@
 #include "moho/ai/EAiTargetTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -85,9 +86,9 @@ const char* EAiTargetTypeTypeInfo::GetName() const
 void EAiTargetTypeTypeInfo::AddEnums()
 {
   mPrefix = "AITARGET_";
-  AddEnum(StripPrefix("AITARGET_None"), static_cast<std::int32_t>(EAiTargetType::AITARGET_None));
-  AddEnum(StripPrefix("AITARGET_Entity"), static_cast<std::int32_t>(EAiTargetType::AITARGET_Entity));
-  AddEnum(StripPrefix("AITARGET_Ground"), static_cast<std::int32_t>(EAiTargetType::AITARGET_Ground));
+  AddEnum(StripPrefix("AITARGET_None"), std::to_underlying(EAiTargetType::AITARGET_None));
+  AddEnum(StripPrefix("AITARGET_Entity"), std::to_underlying(EAiTargetType::AITARGET_Entity));
+  AddEnum(StripPrefix("AITARGET_Ground"), std::to_underlying(EAiTargetType::AITARGET_Ground));
 }
 
 /**

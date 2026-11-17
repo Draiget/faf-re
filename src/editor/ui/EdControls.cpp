@@ -42,11 +42,17 @@ namespace faf::editor
         }
         ++p;
       }
+      const auto unescape = [](std::string text) {
+        for (std::size_t at = text.find("%%"); at != std::string::npos; at = text.find("%%", at + 1)) {
+          text.erase(at, 1);
+        }
+        return text;
+      };
       if (*p == 0) {
-        name = format; // no number: the text whole ("Hard seam")
+        name = unescape(format); // no number: the text whole ("Hard seam")
         return;
       }
-      name.assign(format, static_cast<std::size_t>(p - format));
+      name = unescape(std::string(format, static_cast<std::size_t>(p - format)));
       while (!name.empty() && name.back() == ' ') {
         name.pop_back();
       }

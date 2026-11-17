@@ -500,7 +500,7 @@ namespace fa
       const char ch
     ) noexcept
     {
-      return append(std::size_t{1}, ch);
+      return append(1uz, ch);
     }
 
     /**
@@ -533,6 +533,45 @@ namespace fa
      */
     [[nodiscard]]
     std::size_t find(const char* s, std::size_t pos, std::size_t n) const noexcept;
+
+    /// `std::string`'s C++20/23 membership tests, so engine code reads the same for both strings.
+    [[nodiscard]] bool starts_with(
+      const std::string_view prefix
+    ) const noexcept
+    {
+      return view().starts_with(prefix);
+    }
+    [[nodiscard]] bool starts_with(
+      const char ch
+    ) const noexcept
+    {
+      return view().starts_with(ch);
+    }
+    [[nodiscard]] bool ends_with(
+      const std::string_view suffix
+    ) const noexcept
+    {
+      return view().ends_with(suffix);
+    }
+    [[nodiscard]] bool ends_with(
+      const char ch
+    ) const noexcept
+    {
+      return view().ends_with(ch);
+    }
+    /// Exactly `find(...) != npos`, the spelling it replaces (a string failing `basic_sanity` holds nothing).
+    [[nodiscard]] bool contains(
+      const std::string_view needle
+    ) const noexcept
+    {
+      return find(needle) != npos; // NOLINT(readability-container-contains): this is contains
+    }
+    [[nodiscard]] bool contains(
+      const char ch
+    ) const noexcept
+    {
+      return find(ch) != npos; // NOLINT(readability-container-contains): this is contains
+    }
 
     /**
      * replace(pos, count, repl) - in-place only.

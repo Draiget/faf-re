@@ -3,6 +3,7 @@
 // A small JSON tree: parsed whole (nesting respected, unlike the key search of EdJson.h) and written back. For the
 // editor's own `.editor` files (paths, detail classes, unit wizard templates).
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -58,8 +59,8 @@ namespace faf::editor
     JsonTree& Push(JsonTree value);
   };
 
-  /** Parses `text`; false with `error` (and the offset) on bad JSON. */
-  bool ParseJsonTree(const std::string& text, JsonTree& out, std::string& error);
+  /** Parses `text`; the error (and the offset) on bad JSON. */
+  [[nodiscard]] std::expected<JsonTree, std::string> ParseJsonTree(const std::string& text);
   /** The node as JSON text: objects and arrays of objects one member a line, `indent` spaces deep. */
   [[nodiscard]] std::string WriteJsonTree(const JsonTree& node, int indent = 0);
 } // namespace faf::editor

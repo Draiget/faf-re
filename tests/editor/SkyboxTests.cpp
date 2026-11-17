@@ -105,8 +105,8 @@ namespace
   )
   {
     SkyboxState sky;
-    std::string error;
-    ASSERT_TRUE(faf::editor::SkyboxFromScmskybox(kFafme, sky, error)) << error;
+    auto read = faf::editor::SkyboxFromScmskybox(kFafme, sky);
+    ASSERT_TRUE(read) << read.error();
     // The sky's own Position and Scale, not the planet's.
     EXPECT_FLOAT_EQ(sky.position[0], 512.0f);
     EXPECT_FLOAT_EQ(sky.scale, 4686.0f);
@@ -132,17 +132,19 @@ namespace
   )
   {
     SkyboxState sky;
-    std::string error;
-    ASSERT_TRUE(faf::editor::SkyboxFromScmskybox(kFafme, sky, error)) << error;
+    auto read = faf::editor::SkyboxFromScmskybox(kFafme, sky);
+    ASSERT_TRUE(read) << read.error();
     sky.planets.push_back({});
     SkyboxState again;
-    ASSERT_TRUE(faf::editor::SkyboxFromScmskybox(faf::editor::SkyboxToScmskybox(sky), again, error)) << error;
+    read = faf::editor::SkyboxFromScmskybox(faf::editor::SkyboxToScmskybox(sky), again);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(again == sky);
     // No planets is a sky too.
     sky.planets.clear();
-    ASSERT_TRUE(faf::editor::SkyboxFromScmskybox(faf::editor::SkyboxToScmskybox(sky), again, error)) << error;
+    read = faf::editor::SkyboxFromScmskybox(faf::editor::SkyboxToScmskybox(sky), again);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(again == sky);
-    EXPECT_FALSE(faf::editor::SkyboxFromScmskybox("{ \"LightingMultiplier\": 1 }", again, error));
+    EXPECT_FALSE(faf::editor::SkyboxFromScmskybox("{ \"LightingMultiplier\": 1 }", again));
   }
 
   TEST(

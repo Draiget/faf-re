@@ -36,7 +36,7 @@ namespace
     const std::string& needle
   )
   {
-    return text.find(needle) != std::string::npos;
+    return text.contains(needle);
   }
 
   bool HasNote(

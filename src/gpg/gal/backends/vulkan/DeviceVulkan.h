@@ -352,6 +352,8 @@ namespace gpg::gal
     void TransitionForTransferWrite(vulkan::TrackedImage& image);
     void TransitionSampled(const std::vector<effects::TextureBinding>& bindings);
     void TransferBarrier();
+    /** Makes the transfer writes recorded so far visible to the host, for a readback the next submission waits for. */
+    void HostReadBarrier();
 
     [[nodiscard]] ProgramState& StateFor(effects::EffectProgram& program);
     [[nodiscard]] VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout);

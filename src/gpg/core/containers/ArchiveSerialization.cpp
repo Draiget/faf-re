@@ -896,7 +896,7 @@ void gpg::WriteRawPointer(
   }
 
   if (!objectRef.mObj) {
-    archive->WriteMarker(static_cast<int>(ArchiveToken::NullPointer));
+    archive->WriteMarker(std::to_underlying(ArchiveToken::NullPointer));
     return;
   }
 
@@ -926,7 +926,7 @@ void gpg::WriteRawPointer(
       record = &inserted.first->second;
     }
 
-    archive->WriteMarker(static_cast<int>(ArchiveToken::NewObject));
+    archive->WriteMarker(std::to_underlying(ArchiveToken::NewObject));
 
     RType* const objectType = objectRef.mType;
     if (!objectType || (!objectType->serConstructFunc_ && !objectType->newRefFunc_)) {
@@ -974,7 +974,7 @@ void gpg::WriteRawPointer(
       objectType->serSaveFunc_(archive, objectRef.mObj, objectType->version_, const_cast<RRef*>(&ownerRef));
     }
 
-    archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
+    archive->WriteMarker(std::to_underlying(ArchiveToken::ObjectTerminator));
   } else {
     if (record->ownership == TrackedPointerState::Reserved) {
       ThrowSerializationError(
@@ -983,7 +983,7 @@ void gpg::WriteRawPointer(
       );
     }
 
-    archive->WriteMarker(static_cast<int>(ArchiveToken::ExistingPointer));
+    archive->WriteMarker(std::to_underlying(ArchiveToken::ExistingPointer));
     archive->WriteInt(record->index);
   }
 
@@ -1046,7 +1046,7 @@ TrackedPointerInfo& gpg::ReadRawPointer(
 
   if (token != ArchiveToken::NewObject) {
     ThrowSerializationError(
-      STR_Printf("Error detected in archive: found an invalid token value of %d", static_cast<int>(token))
+      STR_Printf("Error detected in archive: found an invalid token value of %d", std::to_underlying(token))
     );
   }
 
@@ -1103,7 +1103,7 @@ TrackedPointerInfo& gpg::ReadRawPointer(
     handle.type->serLoadFunc_(archive, constructResult.mInfo.object, handle.version, const_cast<RRef*>(&ownerRef));
   }
 
-  if (archive->NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
+  if (archive->NextMarker() != std::to_underlying(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: data for object of type \"%s\" did not terminate properly.", SafeTypeName(handle.type)
     ));

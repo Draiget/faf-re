@@ -7,7 +7,7 @@
 #   faf_imgui_sdl   + the SDL3 platform backend and SDL's renderer: the developer windows
 #                   (src/platform/sdl/ToolWindow.cpp, issue #412), on every platform.
 #
-# The SDL3 targets (cmake/deps/sdl3, cmake/FafLinuxClient.cmake) are named, not required here.
+# The SDL3 targets (cmake/deps/sdl3, cmake/FafPosixClient.cmake) are named, not required here.
 
 set(_imgui "${FAF_DEPENDENCIES_DIR}/imgui")
 if(NOT EXISTS "${_imgui}/imgui.cpp")
@@ -29,7 +29,7 @@ target_compile_definitions(faf_imgui_core PRIVATE IMGUI_ENABLE_TEST_ENGINE)
 # 32-bit indices: the editor's renderer reads them from a structured buffer of uint; SDL's renderer
 # takes either size.
 target_compile_definitions(faf_imgui_core PUBLIC "ImDrawIdx=unsigned int" IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_imgui_core PRIVATE -w)
   set_target_properties(faf_imgui_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 else()
@@ -38,7 +38,7 @@ else()
 endif()
 set_target_properties(faf_imgui_core PROPERTIES FOLDER "dependencies")
 
-if(NOT FAF_LINUX)
+if(NOT FAFRE_PLATFORM_POSIX)
   # The editor's panels draw their text through FreeType with hinting (misc/freetype; the editor sets the loader).
   add_library(faf_imgui STATIC "${_imgui}/backends/imgui_impl_win32.cpp" "${_imgui}/misc/freetype/imgui_freetype.cpp")
   target_compile_options(faf_imgui PRIVATE /W0)
@@ -51,7 +51,7 @@ add_library(faf_imgui_sdl STATIC
   "${_imgui}/backends/imgui_impl_sdl3.cpp"
   "${_imgui}/backends/imgui_impl_sdlrenderer3.cpp")
 target_link_libraries(faf_imgui_sdl PUBLIC faf_imgui_core SDL3::SDL3-static)
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_imgui_sdl PRIVATE -w)
   set_target_properties(faf_imgui_sdl PROPERTIES POSITION_INDEPENDENT_CODE ON)
 else()

@@ -533,7 +533,7 @@ namespace gpg::gal::d3d11
       )
       {
         for (const std::string_view base : {"float", "half", "int", "uint", "bool", "double"}) {
-          if (word.substr(0U, base.size()) != base) {
+          if (!word.starts_with(base)) {
             continue;
           }
           const std::string_view rest = word.substr(base.size());
@@ -730,7 +730,7 @@ namespace gpg::gal::d3d11
         const std::string& returnSemantic
       )
       {
-        if (mFunctions.count(name) != 0U || name == "if" || name == "while" || name == "for" || name == "switch") {
+        if (mFunctions.contains(name) || name == "if" || name == "while" || name == "for" || name == "switch") {
           return;
         }
         Function function{};
@@ -1057,7 +1057,7 @@ namespace gpg::gal::d3d11
           if (close == std::string::npos) {
             break;
           }
-          if (mSeparateAlphaBlendStates.count(name) != 0U) {
+          if (mSeparateAlphaBlendStates.contains(name)) {
             searchFrom = close + 1U;
             continue;
           }
@@ -1123,7 +1123,7 @@ namespace gpg::gal::d3d11
       void DropUndefinedFixedFunctionTechniques()
       {
         for (const char* const function : {"FixedFuncVS", "FixedFuncBloomVS", "FixedFuncPS"}) {
-          if (mText.find(function) == std::string::npos) {
+          if (!mText.contains(function)) {
             continue;
           }
           if (gEffectFastScan) {
@@ -1191,7 +1191,7 @@ namespace gpg::gal::d3d11
               break;
             }
             const std::string_view body = std::string_view(mText).substr(open, close - open);
-            if (body.find(function) != std::string_view::npos) {
+            if (body.contains(function)) {
               mNotes.push_back(
                 "technique " + droppedName + " dropped: it uses the undefined D3D9 fixed-function " + function
               );

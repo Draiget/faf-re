@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <string>
 #include <utility>
@@ -158,8 +159,8 @@ namespace faf::editor
   /** The emitter's whole life is over at `tickCount` (a negative Lifetime: it never ends). */
   bool EmitterFinished(const EmitterBlueprint& emitter, float tickCount);
 
-  /** Reads the file's text; false with `error` (and the line) when it isn't an emitter blueprint. */
-  bool ParseEmitter(const std::string& text, EmitterBlueprint& out, std::string& error);
+  /** Reads the file's text; the error (and the line) when it isn't an emitter blueprint. */
+  [[nodiscard]] std::expected<EmitterBlueprint, std::string> ParseEmitter(const std::string& text);
   /** The file's text, as retail's editor writes it. */
   std::string WriteEmitter(const EmitterBlueprint& emitter);
 
@@ -234,8 +235,8 @@ namespace faf::editor
   /** What the effect is for, by the words in its name (first match in kEffectKinds' order): its index there. */
   int EffectKind(const std::string& path);
 
-  /** Reads a beam or trail file; false with `error` for anything else. */
-  bool ParseFlatBlueprint(const std::string& text, FlatBlueprint& out, std::string& error);
+  /** Reads a beam or trail file; the error for anything else. */
+  [[nodiscard]] std::expected<FlatBlueprint, std::string> ParseFlatBlueprint(const std::string& text);
   /** The file's text: `Kind {`, a key a line (four spaces, as the game's own), `}`. */
   std::string WriteFlatBlueprint(const FlatBlueprint& blueprint);
 } // namespace faf::editor
