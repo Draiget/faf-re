@@ -300,6 +300,14 @@ target_include_directories(faf_client_objs PRIVATE
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"
   "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")
 
+# What the Vulkan backend checks against a device's limits (VulkanLimits.h), as Windows runs it
+# (tests/vulkan): header-only, on the Vulkan headers alone.
+add_executable(faf_vulkan_limits_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/vulkan/LimitsTests.cpp")
+target_include_directories(faf_vulkan_limits_tests PRIVATE
+  "${PROJECT_SOURCE_DIR}/src" "${FAF_DEPENDENCIES_DIR}/vulkan/include")
+target_link_libraries(faf_vulkan_limits_tests PRIVATE gtest_main)
+add_test(NAME vulkan_limits COMMAND faf_vulkan_limits_tests)
+
 # The Linux client executable (issue #256): its entry point (src/platform/posix/ClientMainPosix.cpp,
 # WinMain's place), the client objects and the simulation. Not built by default until it links;
 # `--target faf_client` lists what is still unresolved.

@@ -430,6 +430,7 @@ namespace gpg::gal
     bool mBlockCompression = false; // BC textures; without, BC1 to BC3 decode on the CPU (CreateTexture)
     bool mWireframeSupported = false;
     bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
+    bool mDepthBiasClamp = false;        // the depthBiasClamp feature: pipelines keep the rasterizer state's clamp
     bool mMemoryBudget = false;          // VK_EXT_memory_budget enabled
     std::string mDriverName;             // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
@@ -585,6 +586,9 @@ namespace gpg::gal
 
     bool mRayQuery = false;
     VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;
+    // mRayLayout's bindings (CreateLayouts), which the pipeline layouts that hold it count against the limits;
+    // none without ray queries.
+    std::vector<VkDescriptorSetLayoutBinding> mRaySceneBindings;
     VkDescriptorPool mRayPool = VK_NULL_HANDLE;
     VkDescriptorSet mRaySet = VK_NULL_HANDLE;
     // Engine addition (ren_RayAlphaShadows): set 2's bindings 1-4 (RayTracingVulkan.cpp WriteRaySet): the alpha-tested
@@ -613,6 +617,7 @@ namespace gpg::gal
     RayGeometryId mNextRayGeometry = 1U;
     std::vector<VkAccelerationStructureInstanceKHR> mRayInstances;
     VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout mGpuEmptySetLayout = VK_NULL_HANDLE; // set 1 of mGpuPipelineLayout, which no program uses
     VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
     VkSampler mGpuSamplers[3]{};          // by GpuSampler
     vulkan::TrackedBuffer mGpuNullBuffer; // unbound t0..t3 and u0..u1
