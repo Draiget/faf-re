@@ -7,8 +7,12 @@
 #include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
 #include "lua/LuaObject.h"
+#include "editor/ui/EdUiScale.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
+
+#include <set>
 
 #include <algorithm>
 #include <cctype>
@@ -107,27 +111,25 @@ namespace faf::editor
     return rules->GetUnitBlueprint(resId) != nullptr;
   }
 
-  bool EdUnitLabPanel::Derive(
+  std::expected<void, std::string> EdUnitLabPanel::Derive(
     const std::string& id,
     const std::string& name,
-    const std::string& description,
-    std::string& error
+    const std::string& description
   )
   {
     ModProject* const p = mProject.Project();
     if (p == nullptr || mUnit.empty()) {
-      error = "no project or unit";
-      return false;
+      return std::unexpected("no project or unit");
     }
     const std::string base = ModSourceUnit(*p, mUnit);
     const ModChanges before = ModChangesOf(*p);
-    if (!AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit, error)) {
-      return false;
+    if (const auto added = AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit); !added) {
+      return std::unexpected(added.error());
     }
     (void)mProject.History().Record("derive " + id + " from " + base, before, ModChangesOf(*p), "", ImGui::GetTime());
     mProject.Touch();
     mUnit = id;
-    return true;
+    return {};
   }
 
   bool EdUnitLabPanel::SetField(
@@ -210,14 +212,14 @@ namespace faf::editor
         std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
           return static_cast<char>(std::tolower(c));
         });
-        if (!filter.empty() && lower.find(filter) == std::string::npos) {
+        if (!filter.empty() && !lower.contains(filter)) {
           continue;
         }
         if (++shown > 300) {
           ImGui::TextDisabled("... more: type to narrow");
           break;
         }
-        if (p->edits.count(u.id) != 0) {
+        if (p->edits.contains(u.id)) {
           text += "  (changed)";
         }
         if (ImGui::Selectable(text.c_str(), u.id == mUnit)) {
@@ -267,13 +269,15 @@ namespace faf::editor
       ImGui::Checkbox("With a script of its own", &mDeriveScript);
       EdSetItemTooltip("units/<id>/<id>_script.lua: a class built on the base unit's, written once for you to change");
       if (ImGui::Button("Derive")) {
-        if (Derive(mDeriveId, mDeriveName, mDeriveDescription, mDeriveError)) {
+        if (const auto derived = Derive(mDeriveId, mDeriveName, mDeriveDescription); derived) {
           if (mDeriveScript) {
             if (const auto made = p->derived.find(mDeriveId); made != p->derived.end()) {
               made->second.script = true;
             }
           }
           ImGui::CloseCurrentPopup();
+        } else {
+          mDeriveError = derived.error();
         }
       }
       if (!mDeriveError.empty()) {
@@ -282,8 +286,8 @@ namespace faf::editor
       ImGui::EndPopup();
     }
     ImGui::SameLine();
-    ImGui::BeginDisabled(mUnit.empty() || (p->edits.count(mUnit) == 0 && p->derived.count(mUnit) == 0));
-    if (ImGui::Button(p->derived.count(mUnit) != 0 ? "Remove unit" : "Revert unit")) {
+    ImGui::BeginDisabled(mUnit.empty() || (!p->edits.contains(mUnit) && !p->derived.contains(mUnit)));
+    if (ImGui::Button(p->derived.contains(mUnit) ? "Remove unit" : "Revert unit")) {
       const ModChanges before = ModChangesOf(*p);
       p->edits.erase(mUnit);
       const bool removed = p->derived.erase(mUnit) != 0;
@@ -296,7 +300,7 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(!canPlay || p->Empty());
-    if (p->derived.count(mUnit) != 0) {
+    if (p->derived.contains(mUnit)) {
       if (ImGui::Button("Model from an OBJ...")) {
         mModelAsk = mUnit;
       }
@@ -309,12 +313,84 @@ namespace faf::editor
     if (ImGui::Button(ICON_PLAY " Test")) {
       mTestAsked = true;
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mUnit.empty());
+    if (ImGui::Button("Test in game")) {
+      mTestInGameAsked = true;
+    }
+    ImGui::EndDisabled();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
       EdSetTooltip(
-        canPlay ? "Writes the project and plays the open map with its mod on"
+        canPlay ? "Plays the open map with the project's mod on; Test in game also puts the selected unit and dummy "
+                  "targets near the first start, with quick orders here"
                 : "Open a map to play it with the project's mod on"
       );
+    }
+    // The test running: the sim's state and the quick orders.
+    if (!testUnit.empty()) {
+      ImGui::SeparatorText(("Testing " + testUnit).c_str());
+      ImGui::TextWrapped("%s", testStatus.empty() ? "Waiting for the play..." : testStatus.c_str());
+      if (!testNote.empty()) {
+        ImGui::TextDisabled("%s", testNote.c_str());
+      }
+      for (const char* order :
+           {"Attack", "Move", "Patrol", "Stop", "Heal", "Kill", "Build", "Respawn", "Restart", "End test"}) {
+        // One row that wraps (SameLineIfFits) instead of running off the panel.
+        if (std::string(order) != "Attack") {
+          SameLineIfFits(ImGui::CalcTextSize(order).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        }
+        if (ImGui::SmallButton(order)) {
+          std::string key = order;
+          key = key == "End test" ? "end" : key;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          mTestOrder = key;
+        }
+      }
+      // Fire any projectile of the game from the unit (the sim's own, with its effects), and play an effect template at
+      // it (Studio's Effects panel).
+      if (!testProjectiles.empty()) {
+        testProjectile = std::clamp(testProjectile, 0, static_cast<int>(testProjectiles.size()) - 1);
+        ImGui::SetNextItemWidth(Em(260.0f));
+        if (EdBeginCombo("##testprojectile", testProjectiles[static_cast<std::size_t>(testProjectile)].c_str())) {
+          for (int i = 0; i < static_cast<int>(testProjectiles.size()); ++i) {
+            if (ImGui::Selectable(testProjectiles[static_cast<std::size_t>(i)].c_str(), i == testProjectile)) {
+              testProjectile = i;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        SameLineIfFits(Em(120.0f));
+        ImGui::SetNextItemWidth(Em(120.0f));
+        (void)FillSliderFloat("##testspeed", &testProjectileSpeed, 1.0f, 100.0f, "Speed %.0f");
+        SameLineIfFits(ImGui::CalcTextSize("Fire").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        if (ImGui::SmallButton("Fire")) {
+          char order[320];
+          (void)std::snprintf(
+            order,
+            sizeof(order),
+            "fire:%s:%.1f",
+            testProjectiles[static_cast<std::size_t>(testProjectile)].c_str(),
+            static_cast<double>(testProjectileSpeed)
+          );
+          mTestOrder = order;
+        }
+        EdSetItemTooltip("The sim fires this projectile from the unit, with its trail and impact effects");
+      }
+      ImGui::SetNextItemWidth(Em(200.0f));
+      ImGui::InputTextWithHint("##testeffect", "EffectTemplates name", testEffect, sizeof(testEffect));
+      SameLineIfFits(Em(120.0f));
+      ImGui::SetNextItemWidth(Em(120.0f));
+      (void)FillSliderFloat("##testeffecth", &testEffectHeight, 0.0f, 20.0f, "Height %.1f");
+      SameLineIfFits(ImGui::CalcTextSize("Play effect").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+      if (ImGui::SmallButton("Play effect")) {
+        char order[200];
+        (void)std::snprintf(order, sizeof(order), "effect:%s:%.1f", testEffect, static_cast<double>(testEffectHeight));
+        mTestOrder = order;
+      }
+      EdSetItemTooltip("Plays an effect template of EffectTemplates.lua at the unit, this high above it");
     }
     if (mUnit.empty()) {
       ImGui::End();
@@ -382,7 +458,96 @@ namespace faf::editor
       }
       ImGui::PopID();
     }
+    DrawProjectiles();
     ImGui::EndChild();
     ImGui::End();
+  }
+
+  void EdUnitLabPanel::DrawProjectiles()
+  {
+    // Studio's fxedit.lua: the numbers of the projectiles the unit's weapons fire, as merge blueprints of the project
+    // (projectiles/<name>/<name>_proj.bp; each change an undo step of the project).
+    ModProject* const p = mProject.Project();
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    if (p == nullptr || rules == nullptr || mUnit.empty()) {
+      return;
+    }
+    moho::RResId unitId{};
+    unitId.name.assign(mUnit.c_str());
+    const moho::RUnitBlueprint* const unit = rules->GetUnitBlueprint(unitId);
+    if (unit == nullptr || unit->Weapons.WeaponBlueprints.empty() || !Section("Projectiles", false)) {
+      return;
+    }
+    std::set<std::string> shown;
+    for (const moho::RUnitBlueprintWeapon& weapon : unit->Weapons.WeaponBlueprints) {
+      std::string id = weapon.ProjectileId.name.c_str();
+      for (char& c : id) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      if (id.empty() || !ModProjectileId(id) || !shown.insert(id).second) {
+        continue;
+      }
+      const moho::RProjectileBlueprint* const bp = rules->GetProjectileBlueprint(weapon.ProjectileId);
+      if (bp == nullptr) {
+        continue;
+      }
+      ImGui::SeparatorText((std::string(weapon.Label.c_str()) + ": " + id).c_str());
+      struct Row
+      {
+        const char* key;
+        const char* label;
+        double base;
+        float step;
+      };
+      const Row rows[] = {
+        {"Physics.InitialSpeed", "Initial speed", bp->Physics.InitialSpeed, 0.5f},
+        {"Physics.MaxSpeed", "Max speed", bp->Physics.MaxSpeed, 0.5f},
+        {"Physics.Acceleration", "Acceleration", bp->Physics.Acceleration, 0.5f},
+        {"Physics.TurnRate", "Turn rate", bp->Physics.TurnRate, 1.0f},
+        {"Physics.Lifetime", "Lifetime", bp->Physics.Lifetime, 0.1f},
+        {"Physics.MaxZigZag", "Zig-zag", bp->Physics.MaxZigZag, 0.1f},
+        {"Display.UniformScale", "Model scale", bp->Display.UniformScale, 0.01f},
+        {"Economy.BuildCostMass", "Mass cost", bp->Economy.BuildCostMass, 10.0f},
+        {"Economy.BuildCostEnergy", "Energy cost", bp->Economy.BuildCostEnergy, 100.0f},
+        {"Economy.BuildTime", "Build time", bp->Economy.BuildTime, 10.0f},
+      };
+      ImGui::PushID(id.c_str());
+      for (const Row& row : rows) {
+        double current = row.base;
+        bool changed = false;
+        if (const auto edits = p->edits.find(id); edits != p->edits.end()) {
+          if (const auto edit = edits->second.find(row.key); edit != edits->second.end()) {
+            current = edit->second;
+            changed = true;
+          }
+        }
+        float value = static_cast<float>(current);
+        ImGui::SetNextItemWidth(-Em(40.0f));
+        const std::string label = std::string(row.label) + (changed ? " ~" : "");
+        if (FillDragFloat((label + "##" + row.key).c_str(), &value, row.step, 0.0f, 0.0f, "%.2f")) {
+          const ModChanges before = ModChangesOf(*p);
+          if (SetModEdit(*p, id, row.key, value, row.base)) {
+            (void)mProject.History().Record(
+              "change " + id + " " + row.label, before, ModChangesOf(*p), "lab " + id + " " + row.key, ImGui::GetTime()
+            );
+            mProject.Touch();
+          }
+        }
+        EdSetItemTooltip("%s: the game has %.2f", row.key, row.base);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!changed);
+        if (ImGui::SmallButton((std::string(ICON_UNDO) + "##back" + row.key).c_str())) {
+          const ModChanges before = ModChangesOf(*p);
+          if (SetModEdit(*p, id, row.key, row.base, row.base)) {
+            (void)mProject.History().Record(
+              "change " + id + " " + row.label, before, ModChangesOf(*p), "", ImGui::GetTime()
+            );
+            mProject.Touch();
+          }
+        }
+        ImGui::EndDisabled();
+      }
+      ImGui::PopID();
+    }
   }
 } // namespace faf::editor

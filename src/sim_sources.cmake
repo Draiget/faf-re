@@ -27,7 +27,7 @@ set(_faf_client_only_patterns
   # Particle and beam drawing (the particle buffers the sim fills stay).
   "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles)\\.cpp$"
   # Audio output (the sim's sound manager and parameters stay).
-  "^moho/audio/(AudioEngine|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
+  "^moho/audio/(AudioEngine|AudioOutputWatch|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
   # The script debugger's windows (Dear ImGui, issue #413).
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl)\\.cpp$"
   # D3D device resources.

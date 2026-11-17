@@ -648,7 +648,7 @@ void luaD_callhook(
  * how a stack trace gets attached. Either way the result is thrown as a
  * lua_RuntimeError carrying the top-of-stack string.
  */
-void luaG_errormsg(
+[[noreturn]] void luaG_errormsg(
   lua_State* const state
 )
 {
@@ -741,7 +741,7 @@ int luaV_tostring(
 
   char rendered[32];
   // Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
-  (void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", static_cast<double>(object->value.n));
+  (void)lua::FormatNumberLikeWindowsCrt(rendered, sizeof(rendered), "%.14g", static_cast<double>(object->value.n));
 
   TString* const interned = luaS_newlstr(state, rendered, std::strlen(rendered));
   object->value.p = interned;
@@ -1985,7 +1985,7 @@ TObject* luaV_execute(
  * than something the caller has to free. Only %%, %c, %d, %f and %s are
  * understood - anything else is dropped, as in the binary.
  */
-void luaG_errormsg(lua_State* L);
+[[noreturn]] void luaG_errormsg(lua_State* L);
 
 const char* luaO_pushvfstring(
   lua_State* const state,
@@ -2055,7 +2055,7 @@ const char* luaO_pushvfstring(
  * the chunk and line it came from, and hands it to the error machinery.
  * Never returns.
  */
-void luaG_runerror(
+[[noreturn]] void luaG_runerror(
   lua_State* const state,
   const char* const format,
   ...
@@ -3748,7 +3748,9 @@ void lua_close(
   close_state(mainThread);
 }
 }
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 void moho::LUA_SetCallGate(
   const LuaCallGate gate
@@ -4210,7 +4212,7 @@ LuaObject::~LuaObject()
 LuaState::LuaState(
   const StandardLibraries initStandardLibrary
 )
-  : LuaState(initStandardLibrary, static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline))
+  : LuaState(initStandardLibrary, std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline))
 {}
 
 LuaState::LuaState(
@@ -4231,7 +4233,7 @@ LuaState::LuaState(
   lua_setusergcfunction(m_state, &LuaPlusGCFunction);
   lua_setstateuserdata(m_state, this);
 
-  if (collectorRole != static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline)) {
+  if (collectorRole != std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline)) {
     faf_lua51_gc_register_vm(m_state, collectorRole);
   }
 

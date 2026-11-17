@@ -201,7 +201,7 @@ u_short CNetTCPConnector::GetLocalPort()
 {
   sockaddr_in name{};
   platform::net::GetLocalAddress(mSocket, &name);
-  return ::ntohs(name.sin_port);
+  return ntohs(name.sin_port);
 }
 
 /**
@@ -240,8 +240,8 @@ INetConnection* CNetTCPConnector::Connect(
 
   sockaddr_in name{};
   name.sin_family = AF_INET;
-  name.sin_port = ::htons(port);
-  name.sin_addr.s_addr = ::htonl(address);
+  name.sin_port = htons(port);
+  name.sin_addr.s_addr = htonl(address);
   if (
     platform::net::Connect(socket, name) == platform::net::kSocketError &&
     platform::net::LastError() != platform::net::error::kWouldBlock
@@ -352,8 +352,8 @@ void CNetTCPConnector::Pull()
       gpg::Logf("CNetTCPConnector::Pull: accept() failed: %s", NET_GetWinsockErrorString());
     }
   } else {
-    const u_long hostAddress = ::ntohl(address.sin_addr.s_addr);
-    const u_short hostPort = ::ntohs(address.sin_port);
+    const u_long hostAddress = ntohl(address.sin_addr.s_addr);
+    const u_short hostPort = ntohs(address.sin_port);
     gpg::Logf(
       "CNetTCPConnector::Pull(): accepted connection from %s:%d", NET_GetHostName(hostAddress).c_str(), hostPort
     );

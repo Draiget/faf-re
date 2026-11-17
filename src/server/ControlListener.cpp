@@ -323,35 +323,35 @@ namespace faf::server
     crypto_wipe(mKey.data(), mKey.size());
   }
 
-  bool CControlListener::Open(
+  std::expected<void, std::string> CControlListener::Open(
     const remote::net::SEndpoint& at,
-    const ControlKey& key,
-    std::string& error
+    const ControlKey& key
   )
   {
     mKey = key;
+    if (!at.IsIpv4()) {
+      return std::unexpected("control: an IPv4 address only, not " + at.Text());
+    }
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (mListenSocket < 0) {
-      error = "control: no TCP socket";
-      return false;
+      return std::unexpected("control: no TCP socket");
     }
     const int yes = 1;
     (void)::setsockopt(mListenSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
-    address.sin_addr.s_addr = htonl(at.ip);
+    address.sin_addr.s_addr = htonl(at.Ipv4());
     if (
       ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
       ::listen(mListenSocket, 4) != 0
     ) {
-      error = "control: can't listen on " + at.Text();
       ::close(mListenSocket);
       mListenSocket = -1;
-      return false;
+      return std::unexpected("control: can't listen on " + at.Text());
     }
     SetNonBlocking(mListenSocket);
-    return true;
+    return {};
   }
 
   bool CControlListener::Connected() const noexcept
@@ -450,19 +450,18 @@ namespace faf::server
     }
   }
 
-  bool CControlListener::OpenRest(
+  std::expected<void, std::string> CControlListener::OpenRest(
     const remote::net::SEndpoint& at,
     std::string token,
-    std::string corsOrigin,
-    std::string& error
+    std::string corsOrigin
   )
   {
     auto rest = std::make_unique<CRestListener>();
-    if (!rest->Open(at, std::move(token), std::move(corsOrigin), error)) {
-      return false;
+    if (auto opened = rest->Open(at, std::move(token), std::move(corsOrigin)); !opened) {
+      return opened;
     }
     mRest = std::move(rest);
-    return true;
+    return {};
   }
 
   void CControlListener::Reply(
@@ -536,8 +535,7 @@ namespace faf::server
         break;
       }
       remote::net::SEndpoint peer;
-      peer.ip = ntohl(from.sin_addr.s_addr);
-      peer.port = ntohs(from.sin_port);
+      peer = remote::net::SEndpoint(ntohl(from.sin_addr.s_addr), ntohs(from.sin_port));
       for (const std::unique_ptr<SConnection>& connection : mConnections) {
         if (PeerClosed(*connection)) {
           Close(*connection, connection->channel->Ready() ? "disconnected" : "disconnected during the handshake");

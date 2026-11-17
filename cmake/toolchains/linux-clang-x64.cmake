@@ -5,7 +5,7 @@
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 #
 # The top-level CMakeLists.txt sees FAF_LINUX and builds the Linux project
-# (cmake/FafLinux.cmake) instead of the Windows one.
+# (cmake/FafPosix.cmake) instead of the Windows one.
 #
 #   FAF_LINUX_LLVM_ROOT               LLVM install with clang, clang++ and
 #                                     ld.lld. Default: the pinned one

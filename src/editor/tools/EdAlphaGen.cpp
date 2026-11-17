@@ -108,18 +108,15 @@ namespace faf::editor
     }
   }
 
-  bool MakeAtlasTile(
+  std::expected<AtlasTile, std::string> MakeAtlasTile(
     const std::vector<std::uint8_t>& albedo,
     const std::vector<std::uint8_t>& normal,
     const GroundKind kind,
-    const AtlasSettings& o,
-    AtlasTile& out,
-    std::string& error
+    const AtlasSettings& o
   )
   {
     if (albedo.size() != kCount * 4) {
-      error = "the albedo isn't " + std::to_string(kAtlasTile) + " pixels square";
-      return false;
+      return std::unexpected("the albedo isn't " + std::to_string(kAtlasTile) + " pixels square");
     }
     const int n = kAtlasTile;
     std::vector<float> lum(kCount);
@@ -146,10 +143,9 @@ namespace faf::editor
       args.in["dz"] = dz;
       args.p.num["periodic"] = 1.0;
       field::Grid h;
-      std::string why;
-      if (!field::RunOpCpu("height_from_gradient", args, h, why) || h.v.size() != kCount) {
-        error = "the normal map's relief: " + why;
-        return false;
+      const auto ran = field::RunOpCpu("height_from_gradient", args, h);
+      if (!ran || h.v.size() != kCount) {
+        return std::unexpected("the normal map's relief: " + (ran ? std::string() : ran.error()));
       }
       relief = std::move(h.v);
     }
@@ -164,6 +160,7 @@ namespace faf::editor
     const float gh = hs > 1.0e-6f ? spread / hs : 0.0f;
     const float bias = KindHeightStep(kind) * o.biasScale;
     const float baseRough = KindRoughness(kind);
+    AtlasTile out;
     out.height.assign(kCount, 0.5f);
     out.rough.assign(kCount, baseRough);
     for (std::size_t i = 0; i < kCount; ++i) {
@@ -172,7 +169,7 @@ namespace faf::editor
       out.height[i] = std::clamp(0.5f + bias + (1.0f - wc) * l + wc * c, 0.05f, 0.95f);
       out.rough[i] = std::clamp(baseRough - kRoughDetail * o.roughDetail * l * 2.0f, kRoughMin, kRoughMax);
     }
-    return true;
+    return out;
   }
 
   void PackAtlas(
@@ -231,7 +228,7 @@ namespace faf::editor
       use.layers = LayerAlphaUse::Unused;
       use.baseOpacity = true;
     } else if (
-      low.size() >= 10 && low.rfind("terrain", 0) == 0 && (low[7] == '1' || low[7] == '2') &&
+      low.size() >= 10 && low.starts_with("terrain") && (low[7] == '1' || low[7] == '2') &&
       std::isdigit(static_cast<unsigned char>(low[8])) != 0 && std::isdigit(static_cast<unsigned char>(low[9])) != 0
     ) {
       // Terrain1xx / 2xx (a B at the end: biplanar): roughness and height from the atlas; the last digit 1 or 2 lays

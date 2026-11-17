@@ -12,7 +12,7 @@ namespace faf::editor
       std::string& digits
     )
     {
-      if (shader.rfind("Terrain", 0) != 0 || shader.size() < 10) {
+      if (!shader.starts_with("Terrain") || shader.size() < 10) {
         return false;
       }
       digits = shader.substr(7, 3);

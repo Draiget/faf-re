@@ -56,10 +56,10 @@ namespace moho
    */
   struct ZipEntryNameLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const fa::string& lhs,
       const fa::string& rhs
-    ) const
+    )
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }

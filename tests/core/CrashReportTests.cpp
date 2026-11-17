@@ -1,7 +1,7 @@
 // The crash report writer (src/gpg/core/diagnostics/CrashReport.cpp) without a crash: one report from a made-up access
 // violation, written beside this test program (<exe dir>\faf_crash_<time>.txt, mirrored to faf_crash_latest.txt),
 // with one registered section before the thread stacks and one after, then the minidump. Windows only: the Linux
-// build leaves CrashReport.cpp out (cmake/FafLinux.cmake). The writer runs once per process (a second report while
+// build leaves CrashReport.cpp out (cmake/FafPosix.cmake). The writer runs once per process (a second report while
 // one is written is refused, and the flag stays set), so everything is one test.
 
 #include "platform/PlatformDefines.h"
@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 #include <sstream>
 #include <string>
 #include <gtest/gtest.h>
@@ -25,7 +26,7 @@ namespace
     const gpg::diag::CrashSectionInfo& info
   )
   {
-    std::fprintf(sink, "early section, access target %p\n", info.accessTarget);
+    std::println(sink, "early section, access target {}", info.accessTarget);
   }
 
   void LateSection(
@@ -33,7 +34,7 @@ namespace
     const gpg::diag::CrashSectionInfo&
   )
   {
-    std::fprintf(sink, "late section text\n");
+    std::println(sink, "late section text");
   }
 
   std::string ReadAll(

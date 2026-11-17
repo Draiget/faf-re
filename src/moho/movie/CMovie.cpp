@@ -6,6 +6,7 @@
 
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -20,8 +21,17 @@ namespace moho
   extern bool debug_movie;
   extern int snd_index;
 
+  bool ren_MovieUploadOnce = true;
+
   namespace
   {
+    TConVar<bool> gTConVar_ren_MovieUploadOnce(
+      "ren_MovieUploadOnce",
+      "A movie's picture is copied into its texture once, when it changes or the texture is made again (1, the "
+      "default), or on every frame drawn, as before (0). Read each frame.",
+      &ren_MovieUploadOnce
+    );
+
     constexpr std::int32_t kSofdecInterlacedCompoMode = 33;
 
     struct MoviePlaybackInfoDebug
@@ -195,6 +205,9 @@ namespace moho
     }
 
     if (textureReady) {
+      // Engine addition: a new texture holds no frame, after a device reset or a resize too, and
+      // mwPlyGetCurFrm hands out only a frame the texture lacks.
+      ForgetUploadedMovieFrame(mPly);
       return true;
     }
 
@@ -560,6 +573,12 @@ namespace moho
    */
   void CMovie::UploadCurrentFrameToTexture()
   {
+    // Engine addition (ren_MovieUploadOnce): with the switch off, the layer forgets the copied frame
+    // and hands out the current one on every frame drawn, the path before the switch.
+    if (!ren_MovieUploadOnce) {
+      ForgetUploadedMovieFrame(mPly);
+    }
+
     MwsfdFrameInfo frameInfo{};
     ::mwPlyGetCurFrm(mPly, &frameInfo);
     if (frameInfo.bufferAddress == 0) {

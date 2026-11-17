@@ -56,14 +56,14 @@ namespace faf::netlink
     )
     {
       std::string_view rest(ufrag);
-      if (rest.rfind(prefix, 0) != 0) {
+      if (!rest.starts_with(prefix)) {
         return false;
       }
       rest.remove_prefix(prefix.size());
-      if (rest.rfind("w+", 0) == 0) {
+      if (rest.starts_with("w+")) {
         rest.remove_prefix(2);
       }
-      return rest.rfind(tag, 0) == 0;
+      return rest.starts_with(tag);
     }
 
     std::int64_t SteadyMicros()
@@ -97,7 +97,7 @@ namespace faf::netlink
         if (!line.empty() && line.back() == '\r') {
           line.pop_back();
         }
-        if (line.rfind(prefix, 0) == 0) {
+        if (line.starts_with(prefix)) {
           return line.substr(prefix.size());
         }
       }
@@ -716,8 +716,8 @@ namespace faf::netlink
   )
   {
     mRemoteUfrag = ufrag;
-    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
-    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
+    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.starts_with(mOptions.ufragPrefix);
+    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.starts_with(mOptions.ufragPrefix + "w+");
     mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
     // Issue #289: both sides decide the same way, each from the other's ufrag
     // and its own, so the lane is sealed on both or on neither.
@@ -1616,11 +1616,11 @@ namespace faf::netlink
     } else if (data[0] == 'f' && self->mRemoteMarked) {
       // Issue #234: only peers with our ufrag prefix send or get these.
       const std::string_view body(data + 1, size - 1);
-      if (body.rfind("netlink-probe", 0) == 0) {
+      if (body.starts_with("netlink-probe")) {
         static constexpr char kAck[] = "fnetlink-ack 1";
         juice_send(agent, kAck, sizeof(kAck) - 1);
         self->mOurPeer = true;
-      } else if (body.rfind("netlink-ack", 0) == 0) {
+      } else if (body.starts_with("netlink-ack")) {
         self->mOurPeer = true;
       }
     } else {

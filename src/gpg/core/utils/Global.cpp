@@ -19,6 +19,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/SlabAllocator.h"
 #include "legacy/containers/String.h"
 
 /// Engine addition: the x86 allocator finds a size class by table (true) or by the binary's
@@ -29,7 +30,7 @@ namespace
 {
   constexpr std::uint32_t kPageShift = 12u;
   constexpr std::uint32_t kPageSizeBytes = (1u << kPageShift);
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   constexpr std::uint32_t kMaxPageIndex = 0xC0000u;
   constexpr std::uint32_t kPageOwnerMapBytes = 0x3FF000u;
 #else
@@ -282,7 +283,7 @@ namespace
     return node;
   }
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // x64 always allocates from a system heap. The engine allocator is the x86
   // binary's: its smallest size classes (4..28 bytes, step 4) cannot hold the
   // 8-byte free-list link a freed block carries, nor give the 16-byte
@@ -445,7 +446,7 @@ namespace
     constexpr std::size_t kMaxPooledBytes = 4096u;
     constexpr std::size_t kSpanBytes = 64u * 1024u;
     constexpr std::size_t kCommitChunkBytes = 1024u * 1024u;
-    constexpr std::size_t kReserveBytes = std::size_t{64} << 30;
+    constexpr std::size_t kReserveBytes = 64uz << 30;
     constexpr std::size_t kSpanCount = kReserveBytes / kSpanBytes;
     constexpr std::uint32_t kClassCount = 48u;
 
@@ -535,7 +536,7 @@ namespace
     {
 #if defined(__SANITIZE_ADDRESS__)
       return true;
-#elif defined(__has_feature)
+#elifdef __has_feature
 #if __has_feature(address_sanitizer)
       return true;
 #endif
@@ -1367,7 +1368,7 @@ namespace
     (void)moduleHandle;
     (void)reserved;
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     // Not in the binary: the x64 FAF_HIGHMEM test mode has to run before
     // the CRT allocates anything, and this callback is the first code the
     // loader runs in the image.
@@ -1807,7 +1808,7 @@ namespace
  * passes, and every thread exit runs it.
  */
 #if FAFRE_PLATFORM_WINDOWS
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
 #else // x64 C names carry no leading underscore
@@ -1819,7 +1820,7 @@ extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1
 #pragma const_seg()
 #endif // _WIN32 (POSIX: RegisterThreadHeapCacheExit)
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
 void gpg::LogHighMemoryReservation()
 {
   // Plan 7.1: Stage A keeps the image below 4 GB (static addresses still
@@ -1834,6 +1835,10 @@ void gpg::LogHighMemoryReservation()
     "mem: small-block pool %s (blocks up to %u bytes; /smallpool 0 or FAF_SMALLPOOL=0 turns it off)",
     small_pool::Enabled() ? "on" : "off",
     static_cast<unsigned int>(small_pool::kMaxPooledBytes)
+  );
+  gpg::Logf(
+    "mem: tree node slabs %s (32 nodes per tree; /treeslabs 0 or FAF_TREESLABS=0 turns them off)",
+    fa::TreeSlabsEnabled() ? "on" : "off"
   );
 
   if (!gHighMemoryReservation.requested) {
@@ -1959,7 +1964,7 @@ extern "C" void* __cdecl malloc_0(
   const std::uint32_t size
 )
 {
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   void* block = (size <= small_pool::kMaxPooledBytes && small_pool::Enabled()) ? small_pool::Allocate(size) : nullptr;
   if (block == nullptr) {
     block = SystemHeapAlloc(size); // larger blocks, no pool, or the pool's range is used up
@@ -2072,7 +2077,7 @@ extern "C" void __cdecl free_0(
   }
 #endif
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // This has to come before `GetPageOwner`, which is only meaningful for
   // pages the engine allocator owns.
   if (gMemHook != nullptr) {
@@ -2145,7 +2150,7 @@ extern "C" size_t __cdecl msize(
     return 0;
   }
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // `realloc_0` sizes its copy from this, so it has to answer for system-heap
   // blocks; `HeapSize` reports `(SIZE_T)-1` for a pointer it does not own.
   if (small_pool::Owns(memblock)) {
@@ -2470,7 +2475,7 @@ void gpg::GetHeapInfo(
     return;
   }
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // On the x64 system heap the engine allocator never starts, and must not
   // be started here just to read its (empty) counters.
   FillSystemHeapStats(*outStats);
@@ -2563,6 +2568,6 @@ void gpg::SetThreadName(
   FAF_PROFILE_SET_THREAD_NAME(name);
 }
 
-#if FAFRE_PLATFORM_WINDOWS && !defined(_M_X64) && !defined(__x86_64__)
+#if FAFRE_PLATFORM_WINDOWS && !FAFRE_ARCH_64BIT
 #include "../../../../tests/memory/AllocatorBoundsNative.inl"
 #endif

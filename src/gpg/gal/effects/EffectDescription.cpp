@@ -77,7 +77,7 @@ namespace gpg::gal::effects
             "d3d11_blend_",
             "d3d11_comparison_",
             "d3d11_stencil_op_"}) {
-        if (key.rfind(prefix, 0U) == 0U) {
+        if (key.starts_with(prefix)) {
           key.erase(0U, std::char_traits<char>::length(prefix));
         }
       }
@@ -526,7 +526,7 @@ namespace gpg::gal::effects
       };
       for (const auto& [name, scalar] : scalars) {
         const std::size_t length = std::char_traits<char>::length(name);
-        if (base.rfind(name, 0U) != 0U) {
+        if (!base.starts_with(name)) {
           continue;
         }
         const std::string dims = base.substr(length);
@@ -876,15 +876,14 @@ namespace gpg::gal::effects
       }
       if (
         item.braced &&
-        (head.find("sampler_state") != std::string::npos || StartsWithWord(head, "SamplerState") ||
-         StartsWithWord(head, "sampler2D") || StartsWithWord(head, "sampler") || StartsWithWord(head, "samplerCUBE") ||
-         StartsWithWord(head, "sampler3D") || StartsWithWord(head, "sampler1D"))
+        (head.contains("sampler_state") || StartsWithWord(head, "SamplerState") || StartsWithWord(head, "sampler2D") ||
+         StartsWithWord(head, "sampler") || StartsWithWord(head, "samplerCUBE") || StartsWithWord(head, "sampler3D") ||
+         StartsWithWord(head, "sampler1D"))
       ) {
         effect.samplers.push_back(ParseSampler(item));
         continue;
       }
-      const bool initializerList =
-        item.braced && HasTopLevelAssignment(head) && head.find("sampler_state") == std::string::npos;
+      const bool initializerList = item.braced && HasTopLevelAssignment(head) && !head.contains("sampler_state");
       if (item.braced && !initializerList) {
         continue; // a function, cbuffer or anything else with a body
       }
@@ -908,7 +907,7 @@ namespace gpg::gal::effects
         }
       }
       auto [declarator, annotations] = NameAndAnnotations(declaration);
-      if (declarator.find('(') != std::string::npos) {
+      if (declarator.contains('(')) {
         continue; // a function declaration
       }
       const std::size_t colon = declarator.find(':');
@@ -929,7 +928,7 @@ namespace gpg::gal::effects
       const std::string typeName = Trim(declarator.substr(0U, space));
       // `const` globals stay parameters (in $Globals, with their initializer
       // as the default), as in the Direct3D 9 effect framework.
-      if (StartsWithWord(typeName, "static") || typeName.find(" static ") != std::string::npos) {
+      if (StartsWithWord(typeName, "static") || typeName.contains(" static ")) {
         continue;
       }
       Parameter parameter;
@@ -960,7 +959,7 @@ namespace gpg::gal::effects
     for (const Item* const item : techniques) {
       Technique technique;
       std::string head = item->head;
-      head = Trim(head.substr(head.find(' ') == std::string::npos ? head.size() : head.find(' ')));
+      head = Trim(head.substr(!head.contains(' ') ? head.size() : head.find(' ')));
       auto [name, annotations] = NameAndAnnotations(head);
       technique.name = name;
       technique.annotations = std::move(annotations);

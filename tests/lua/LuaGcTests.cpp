@@ -5,6 +5,7 @@
 // UI VM, and drive it as UI_ProcessIdleGC (CUIManager.cpp) does - faf_lua51_gc_slice with a work
 // budget - and as allocation does through luaC_checkGC.
 
+#include <utility>
 #include <memory>
 #include <string>
 #include <gtest/gtest.h>
@@ -120,8 +121,9 @@ namespace
     {
       mPrevious = moho::lua_IncrementalGC;
       moho::lua_IncrementalGC = true;
-      mState =
-        std::make_unique<LuaState>(LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi));
+      mState = std::make_unique<LuaState>(
+        LuaState::LIB_BASE, std::to_underlying(moho::lua_incremental::ELuaVmRole::FrontendUi)
+      );
     }
 
     void TearDown() override

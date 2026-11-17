@@ -25,7 +25,7 @@ namespace moho
 
   struct IntelHandleDeleter
   {
-    void operator()(CIntelPosHandle* handle) const noexcept;
+    static void operator()(CIntelPosHandle* handle) noexcept;
   };
 
   using IntelHandle = std::unique_ptr<CIntelPosHandle, IntelHandleDeleter>;

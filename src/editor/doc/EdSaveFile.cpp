@@ -141,12 +141,11 @@ namespace faf::editor
     }
 
     /** The entries `['name'] = { ['key'] = value, ... },` between `open` ('{') and `close`. */
-    bool ParseEntries(
+    std::expected<void, std::string> ParseEntries(
       const std::string& text,
       const std::size_t open,
       const std::size_t close,
       std::vector<SaveEntry>& out,
-      std::string& error,
       std::vector<SaveEntrySpan>* spans = nullptr
     )
     {
@@ -159,30 +158,26 @@ namespace faf::editor
         const std::size_t lead = at;
         at = SkipSpace(text, at);
         if (at >= close) {
-          return true;
+          return {};
         }
         SaveEntrySpan span;
         span.lead = lead;
         span.start = at;
         SaveEntry entry;
         if (!ReadKey(text, at, entry.name)) {
-          error = "an entry without a name at offset " + std::to_string(at);
-          return false;
+          return std::unexpected("an entry without a name at offset " + std::to_string(at));
         }
         at = SkipSpace(text, at);
         if (at >= text.size() || text[at] != '=') {
-          error = "'" + entry.name + "' has no '='";
-          return false;
+          return std::unexpected("'" + entry.name + "' has no '='");
         }
         at = SkipSpace(text, at + 1);
         if (at >= text.size() || text[at] != '{') {
-          error = "'" + entry.name + "' is not a table";
-          return false;
+          return std::unexpected("'" + entry.name + "' is not a table");
         }
         const std::size_t entryClose = MatchBracket(text, at);
         if (entryClose == std::string::npos || entryClose > close) {
-          error = "'" + entry.name + "' is not closed";
-          return false;
+          return std::unexpected("'" + entry.name + "' is not closed");
         }
         std::size_t inner = at + 1;
         for (;;) {
@@ -192,13 +187,11 @@ namespace faf::editor
           }
           std::string key;
           if (!ReadKey(text, inner, key)) {
-            error = "a property of '" + entry.name + "' without a key";
-            return false;
+            return std::unexpected("a property of '" + entry.name + "' without a key");
           }
           inner = SkipSpace(text, inner);
           if (inner >= text.size() || text[inner] != '=') {
-            error = "property '" + key + "' of '" + entry.name + "' has no '='";
-            return false;
+            return std::unexpected("property '" + key + "' of '" + entry.name + "' has no '='");
           }
           ++inner;
           const std::size_t valueStart = SkipSpace(text, inner);
@@ -384,9 +377,8 @@ namespace faf::editor
     return value ? "BOOLEAN( true )" : "BOOLEAN( false )";
   }
 
-  bool SaveFile::Parse(
-    std::string text,
-    std::string& error
+  std::expected<void, std::string> SaveFile::Parse(
+    std::string text
   )
   {
     mText = std::move(text);
@@ -407,23 +399,23 @@ namespace faf::editor
       )
     ) {
       mMarkerBlock.found = true;
-      if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error, &mMarkerBlock.spans)) {
-        error = "markers: " + error;
-        return false;
+      if (
+        const auto read = ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, &mMarkerBlock.spans);
+        !read
+      ) {
+        return std::unexpected("markers: " + read.error());
       }
     }
     if (FindBlock(mText, std::regex(R"(Areas\s*=\s*\{)"), 0, mAreaBlock.open, mAreaBlock.close, mAreaBlock.indent)) {
       mAreaBlock.found = true;
-      if (!ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, error, &mAreaBlock.spans)) {
-        error = "areas: " + error;
-        return false;
+      if (const auto read = ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, &mAreaBlock.spans); !read) {
+        return std::unexpected("areas: " + read.error());
       }
     }
     if (FindBlock(mText, std::regex(R"(\bArmies\s*=\s*\{)"), 0, mArmyBlock.open, mArmyBlock.close, mArmyBlock.indent)) {
       mArmyBlock.found = true;
-      if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error, &mArmyBlock.spans)) {
-        error = "armies: " + error;
-        return false;
+      if (const auto read = ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, &mArmyBlock.spans); !read) {
+        return std::unexpected("armies: " + read.error());
       }
     }
     // The chains: `['name'] = { Markers = { "a", "b", }, },` each.
@@ -448,7 +440,7 @@ namespace faf::editor
     mAreasRead = mAreas;
     mArmiesRead = mArmies;
     mChainsRead = mChains;
-    return true;
+    return {};
   }
 
   std::string SaveFile::ChainsText(
@@ -481,8 +473,7 @@ namespace faf::editor
 
   void SaveFile::MarkSaved()
   {
-    std::string error;
-    (void)Parse(Text(), error);
+    (void)Parse(Text());
   }
 
   bool SaveFile::Changed() const
@@ -510,7 +501,7 @@ namespace faf::editor
     }
     if (mChainBlock.found && mChains != mChainsRead) {
       replaces.push_back(
-        {&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.find("\r\n") != std::string::npos ? "\r\n" : "\n")}
+        {&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.contains("\r\n") ? "\r\n" : "\n")}
       );
     }
     std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) {
@@ -529,7 +520,7 @@ namespace faf::editor
     const std::vector<SaveEntry>& read
   ) const
   {
-    const std::string nl = mText.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    const std::string nl = mText.contains("\r\n") ? "\r\n" : "\n";
     // A value written by the editor in the file's line ends.
     const auto lineEnds = [&nl](const std::string& value) {
       if (nl == "\n") {
@@ -790,7 +781,7 @@ namespace faf::editor
     }
     std::string out = script;
     // The import the call needs, at the top, if the script has none.
-    if (out.find("ScenarioFramework = import") == std::string::npos) {
+    if (!out.contains("ScenarioFramework = import")) {
       out = "local ScenarioFramework = import('/lua/ScenarioFramework.lua')\n" + out;
     }
     // After InitializeArmies in OnPopulate, or as OnPopulate's first line.

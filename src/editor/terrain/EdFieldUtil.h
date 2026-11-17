@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -114,10 +115,9 @@ namespace faf::editor::field::t7
   }
 
   /** The output takes its shape from `like`, else `a`, else width / height / cell / ox / oz. */
-  inline bool MakeOut(
+  [[nodiscard]] inline std::expected<void, std::string> MakeOut(
     const OpArgs& a,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     const Grid* ref = Get(a, "like");
@@ -126,18 +126,16 @@ namespace faf::editor::field::t7
     if (
       const Grid* const inA = Get(a, "a"); inA != nullptr && ref != nullptr && (inA->w != ref->w || inA->h != ref->h)
     ) {
-      err = "'like' and 'a' differ in size";
-      return false;
+      return std::unexpected("'like' and 'a' differ in size");
     }
     if (ref != nullptr) {
       out = Grid(ref->w, ref->h, ref->cell, ref->ox, ref->oz);
-      return true;
+      return {};
     }
     const int w = static_cast<int>(a.p.N("width", 0));
     const int h = static_cast<int>(a.p.N("height", 0));
     if (w < 1 || h < 1 || static_cast<long long>(w) * h > (1LL << 27)) {
-      err = "give 'like' or 'a', or width and height (at most 128M samples)";
-      return false;
+      return std::unexpected("give 'like' or 'a', or width and height (at most 128M samples)");
     }
     out = Grid(
       w,
@@ -146,22 +144,20 @@ namespace faf::editor::field::t7
       static_cast<float>(a.p.N("ox", 0.0)),
       static_cast<float>(a.p.N("oz", 0.0))
     );
-    return true;
+    return {};
   }
 
-  /** Checks that an optional input has the shape of `ref`; sets err and returns false when it does not. */
-  inline bool SameOrNone(
+  /** Checks that an optional input has the shape of `ref`; the error when it does not. */
+  [[nodiscard]] inline std::expected<void, std::string> SameOrNone(
     const Grid* g,
     const Grid& ref,
-    const char* const name,
-    std::string& err
+    const char* const name
   )
   {
     if (g != nullptr && !g->SameShape(ref)) {
-      err = std::string("input '") + name + "' differs in size";
-      return false;
+      return std::unexpected(std::string("input '") + name + "' differs in size");
     }
-    return true;
+    return {};
   }
 
   inline double WorldX(

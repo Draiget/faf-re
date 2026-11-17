@@ -2,6 +2,7 @@
 
 #include "editor/doc/EdEditorMods.h"
 
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -30,8 +31,12 @@ namespace faf::editor
    * command turns on: a left click on the view calls `click(x, z, shift, ctrl)`), `SetHeights(x0, z0, w, h, list)`
    * (one undo step), `LayerAt(layer, x, z)`, `MissionNode(id, title, params, code)` (a node type for the mission
    * graph), `On(event, fn)` (fn(arg) on "map", "save" or "edit"), `Has(point [, version])`, `Capabilities` and
-   * `ApiVersion` (FAF Studio's extension points, on this editor). A command that raises an error is reported with its
-   * mod's name and turns that mod off until the editor starts again; a panel that raises stops drawing and says why.
+   * `ApiVersion` (FAF Studio's extension points, on this editor). The map's paint, props, decals and units:
+   * `SetLayer(layer, x0, z0, w, h, list)`, `PaintSize()`, `Props()`, `AddProp(bp, x, z [, scale])`,
+   * `RemoveProp(index)`, `Decals()`, `AddDecal(texture, x, z, size [, heading])`, `Units()`, `AddUnit(type, army, x,
+   * z)` (each change one undo step); a store kept with the map, `MapData(key)` / `SetMapData(key, value)`. A command
+   * that raises an error is reported with its mod's name and turns that mod off until the editor starts again; a panel
+   * that raises stops drawing and says why.
    */
   class EdModHost
   {
@@ -124,9 +129,37 @@ namespace faf::editor
       mActiveTool.clear();
     }
     /** What the mods' map writes and reads go through (the view's; set by the app). */
-    std::function<bool(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message)>
+    std::function<std::expected<void, std::string>(int x0, int z0, int w, int h, const std::vector<float>& heights)>
       writeHeights;
     std::function<float(int layer, float x, float z)> layerAt;
+    std::function<
+      std::expected<void, std::string>(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights)>
+      writeLayer;
+    std::function<bool(int& width, int& height)> paintSize;
+    /** A prop, decal or unit as the mods see it. */
+    struct MapObject
+    {
+      std::string what; // blueprint path / texture / unit blueprint id
+      std::string name; // a unit's name
+      std::string army; // a unit's army
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      float size = 0.0f; // a decal's size
+    };
+    /** "props", "decals" or "units". */
+    std::function<std::vector<MapObject>(const std::string& kind)> listObjects;
+    /** Each returns an error text, empty when done (one undo step). */
+    std::function<std::string(const std::string& blueprint, float x, float z, float scale)> addProp;
+    std::function<std::string(int index)> removeProp;
+    std::function<std::string(const std::string& texture, float x, float z, float size, float heading)> addDecal;
+    std::function<std::string(const std::string& type, const std::string& army, float x, float z, std::string& name)>
+      addUnit;
+    /**
+     * A mod's own data kept with the open map (FAF Studio's sidecar): `<map>_moddata.editor` beside the map's file, a
+     * `uid<TAB>key<TAB>value` line each; written at once (not part of the map's undo). Empty: none.
+     */
+    [[nodiscard]] std::string MapData(const std::string& uid, const std::string& key) const;
+    [[nodiscard]] std::expected<void, std::string>
+    SetMapData(const std::string& uid, const std::string& key, const std::string& value, bool remove);
     /** Each frame: the shown panels of the running mods. */
     void DrawPanels();
     /** The menu entries the running mods asked for, and their panels' show commands. */

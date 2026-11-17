@@ -147,6 +147,14 @@ IMessageReceiver::IMessageReceiver() = default;
  */
 IMessageReceiver::~IMessageReceiver()
 {
+  RemoveAllLinkages();
+}
+
+/**
+ * Engine addition: `~IMessageReceiver`'s loop (0x0047C4F0), under a name.
+ */
+void IMessageReceiver::RemoveAllLinkages()
+{
   while (!mLinkages.empty()) {
     SMsgReceiverLinkage* const linkage = mLinkages.mNext->Get();
     linkage->mDispatcher->RemoveLinkage(linkage);

@@ -1,5 +1,6 @@
 #include "editor/tools/EdFindReplace.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -12,7 +13,7 @@ namespace faf::editor
   {
     std::map<std::pair<int, std::string>, std::pair<int, int>> counts; // count, group
     for (const FindObject& object : objects) {
-      auto& [count, group] = counts[{static_cast<int>(object.kind), object.type}];
+      auto& [count, group] = counts[{std::to_underlying(object.kind), object.type}];
       ++count;
       group = object.group;
     }
@@ -103,7 +104,7 @@ namespace faf::editor
     if (const std::size_t dot = name.find_last_of('.'); dot != std::string::npos && dot > 0) {
       name.resize(dot);
     }
-    if (kind == FindKind::Prop && name.size() > 5 && name.compare(name.size() - 5, 5, "_prop") == 0) {
+    if (kind == FindKind::Prop && name.size() > 5 && name.ends_with("_prop")) {
       name.resize(name.size() - 5);
     }
     return name;

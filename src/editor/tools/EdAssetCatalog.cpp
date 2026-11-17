@@ -58,7 +58,7 @@ namespace faf::editor
     )
     {
       const std::string lower = Lower(path);
-      if (lower.rfind("/env/", 0) != 0) {
+      if (!lower.starts_with("/env/")) {
         return {};
       }
       const std::size_t end = path.find('/', 5);
@@ -134,7 +134,7 @@ namespace faf::editor
     const AssetEntry& entry
   ) const
   {
-    return mFavourites.count(Id(entry)) != 0;
+    return mFavourites.contains(Id(entry));
   }
 
   void AssetMarks::ToggleFavourite(
@@ -191,13 +191,13 @@ namespace faf::editor
       if (!line.empty() && line.back() == '\r') {
         line.pop_back();
       }
-      if (line.size() < 3 || line.find(':') == std::string::npos) {
+      if (line.size() < 3 || !line.contains(':')) {
         continue;
       }
-      if (line.rfind(kMarkFavourite, 0) == 0) {
+      if (line.starts_with(kMarkFavourite)) {
         mFavourites.insert(line.substr(2));
       } else if (
-        line.rfind(kMarkRecent, 0) == 0 && mRecent.size() < kRecent &&
+        line.starts_with(kMarkRecent) && mRecent.size() < kRecent &&
         std::find(mRecent.begin(), mRecent.end(), line.substr(2)) == mRecent.end()
       ) {
         mRecent.push_back(line.substr(2));
@@ -229,7 +229,7 @@ namespace faf::editor
         continue;
       }
       bool pass = std::all_of(words.begin(), words.end(), [&](const std::string& w) {
-        return e.search.find(w) != std::string::npos;
+        return e.search.contains(w);
       });
       for (const auto& [facet, value] : query.filters) {
         if (!value.empty()) {
@@ -303,7 +303,7 @@ namespace faf::editor
     const std::string lower = Lower(blueprint);
     e.tags["type"] = "Other";
     for (const auto& [word, type] : kTypes) {
-      if (lower.find(word) != std::string::npos) {
+      if (lower.contains(word)) {
         e.tags["type"] = type;
         break;
       }
@@ -373,9 +373,7 @@ namespace faf::editor
     e.tags["faction"] = faction > 0 ? kEffectFactions[faction] : "Other";
     e.tags["type"] = kind > 0 ? kEffectKinds[kind] : "Other";
     const std::string lower = Lower(name);
-    e.tags["file"] = lower.find("_beam") != std::string::npos ? "Beam"
-      : lower.find("_trail") != std::string::npos             ? "Trail"
-                                                              : "Emitter";
+    e.tags["file"] = lower.contains("_beam") ? "Beam" : lower.contains("_trail") ? "Trail" : "Emitter";
     e.sub = e.tags["faction"] + " " + Lower(e.tags["type"]);
     Finish(e);
     return e;
@@ -471,10 +469,8 @@ namespace faf::editor
     const std::string& text
   )
   {
-    EmitterBlueprint emitter;
-    std::string error;
-    if (ParseEmitter(text, emitter, error) && !emitter.texture.empty()) {
-      return emitter.texture;
+    if (const auto emitter = ParseEmitter(text); emitter && !emitter->texture.empty()) {
+      return emitter->texture;
     }
     // A beam's or a trail's: the first texture it names.
     static const std::regex kTexture(R"((\w*Texture\w*)\s*=\s*['"]([^'"]+\.dds)['"])", std::regex::icase);

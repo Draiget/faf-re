@@ -1,5 +1,6 @@
 #include "moho/render/EBeamParamTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -67,32 +68,32 @@ const char* EBeamParamTypeInfo::GetName() const
 void EBeamParamTypeInfo::AddEnums()
 {
   mPrefix = "BEAM_";
-  AddEnum(StripPrefix("BEAM_POSITION"), static_cast<std::int32_t>(BEAM_POSITION));
-  AddEnum(StripPrefix("BEAM_POSITION_X"), static_cast<std::int32_t>(BEAM_POSITION_X));
-  AddEnum(StripPrefix("BEAM_POSITION_Y"), static_cast<std::int32_t>(BEAM_POSITION_Y));
-  AddEnum(StripPrefix("BEAM_POSITION_Z"), static_cast<std::int32_t>(BEAM_POSITION_Z));
-  AddEnum(StripPrefix("BEAM_ENDPOSITION"), static_cast<std::int32_t>(BEAM_ENDPOSITION));
-  AddEnum(StripPrefix("BEAM_ENDPOSITION_X"), static_cast<std::int32_t>(BEAM_ENDPOSITION_X));
-  AddEnum(StripPrefix("BEAM_ENDPOSITION_Y"), static_cast<std::int32_t>(BEAM_ENDPOSITION_Y));
-  AddEnum(StripPrefix("BEAM_ENDPOSITION_Z"), static_cast<std::int32_t>(BEAM_ENDPOSITION_Z));
-  AddEnum(StripPrefix("BEAM_LENGTH"), static_cast<std::int32_t>(BEAM_LENGTH));
-  AddEnum(StripPrefix("BEAM_LIFETIME"), static_cast<std::int32_t>(BEAM_LIFETIME));
-  AddEnum(StripPrefix("BEAM_STARTCOLOR"), static_cast<std::int32_t>(BEAM_STARTCOLOR));
-  AddEnum(StripPrefix("BEAM_STARTCOLOR_R"), static_cast<std::int32_t>(BEAM_STARTCOLOR_R));
-  AddEnum(StripPrefix("BEAM_STARTCOLOR_G"), static_cast<std::int32_t>(BEAM_STARTCOLOR_G));
-  AddEnum(StripPrefix("BEAM_STARTCOLOR_B"), static_cast<std::int32_t>(BEAM_STARTCOLOR_B));
-  AddEnum(StripPrefix("BEAM_STARTCOLOR_A"), static_cast<std::int32_t>(BEAM_STARTCOLOR_A));
-  AddEnum(StripPrefix("BEAM_ENDCOLOR"), static_cast<std::int32_t>(BEAM_ENDCOLOR));
-  AddEnum(StripPrefix("BEAM_ENDCOLOR_R"), static_cast<std::int32_t>(BEAM_ENDCOLOR_R));
-  AddEnum(StripPrefix("BEAM_ENDCOLOR_G"), static_cast<std::int32_t>(BEAM_ENDCOLOR_G));
-  AddEnum(StripPrefix("BEAM_ENDCOLOR_B"), static_cast<std::int32_t>(BEAM_ENDCOLOR_B));
-  AddEnum(StripPrefix("BEAM_ENDCOLOR_A"), static_cast<std::int32_t>(BEAM_ENDCOLOR_A));
-  AddEnum(StripPrefix("BEAM_THICKNESS"), static_cast<std::int32_t>(BEAM_THICKNESS));
-  AddEnum(StripPrefix("BEAM_USHIFT"), static_cast<std::int32_t>(BEAM_USHIFT));
-  AddEnum(StripPrefix("BEAM_VSHIFT"), static_cast<std::int32_t>(BEAM_VSHIFT));
-  AddEnum(StripPrefix("BEAM_REPEATRATE"), static_cast<std::int32_t>(BEAM_REPEATRATE));
-  AddEnum(StripPrefix("BEAM_LODCUTOFF"), static_cast<std::int32_t>(BEAM_LODCUTOFF));
-  AddEnum(StripPrefix("BEAM_LASTPARAM"), static_cast<std::int32_t>(BEAM_LASTPARAM));
+  AddEnum(StripPrefix("BEAM_POSITION"), std::to_underlying(BEAM_POSITION));
+  AddEnum(StripPrefix("BEAM_POSITION_X"), std::to_underlying(BEAM_POSITION_X));
+  AddEnum(StripPrefix("BEAM_POSITION_Y"), std::to_underlying(BEAM_POSITION_Y));
+  AddEnum(StripPrefix("BEAM_POSITION_Z"), std::to_underlying(BEAM_POSITION_Z));
+  AddEnum(StripPrefix("BEAM_ENDPOSITION"), std::to_underlying(BEAM_ENDPOSITION));
+  AddEnum(StripPrefix("BEAM_ENDPOSITION_X"), std::to_underlying(BEAM_ENDPOSITION_X));
+  AddEnum(StripPrefix("BEAM_ENDPOSITION_Y"), std::to_underlying(BEAM_ENDPOSITION_Y));
+  AddEnum(StripPrefix("BEAM_ENDPOSITION_Z"), std::to_underlying(BEAM_ENDPOSITION_Z));
+  AddEnum(StripPrefix("BEAM_LENGTH"), std::to_underlying(BEAM_LENGTH));
+  AddEnum(StripPrefix("BEAM_LIFETIME"), std::to_underlying(BEAM_LIFETIME));
+  AddEnum(StripPrefix("BEAM_STARTCOLOR"), std::to_underlying(BEAM_STARTCOLOR));
+  AddEnum(StripPrefix("BEAM_STARTCOLOR_R"), std::to_underlying(BEAM_STARTCOLOR_R));
+  AddEnum(StripPrefix("BEAM_STARTCOLOR_G"), std::to_underlying(BEAM_STARTCOLOR_G));
+  AddEnum(StripPrefix("BEAM_STARTCOLOR_B"), std::to_underlying(BEAM_STARTCOLOR_B));
+  AddEnum(StripPrefix("BEAM_STARTCOLOR_A"), std::to_underlying(BEAM_STARTCOLOR_A));
+  AddEnum(StripPrefix("BEAM_ENDCOLOR"), std::to_underlying(BEAM_ENDCOLOR));
+  AddEnum(StripPrefix("BEAM_ENDCOLOR_R"), std::to_underlying(BEAM_ENDCOLOR_R));
+  AddEnum(StripPrefix("BEAM_ENDCOLOR_G"), std::to_underlying(BEAM_ENDCOLOR_G));
+  AddEnum(StripPrefix("BEAM_ENDCOLOR_B"), std::to_underlying(BEAM_ENDCOLOR_B));
+  AddEnum(StripPrefix("BEAM_ENDCOLOR_A"), std::to_underlying(BEAM_ENDCOLOR_A));
+  AddEnum(StripPrefix("BEAM_THICKNESS"), std::to_underlying(BEAM_THICKNESS));
+  AddEnum(StripPrefix("BEAM_USHIFT"), std::to_underlying(BEAM_USHIFT));
+  AddEnum(StripPrefix("BEAM_VSHIFT"), std::to_underlying(BEAM_VSHIFT));
+  AddEnum(StripPrefix("BEAM_REPEATRATE"), std::to_underlying(BEAM_REPEATRATE));
+  AddEnum(StripPrefix("BEAM_LODCUTOFF"), std::to_underlying(BEAM_LODCUTOFF));
+  AddEnum(StripPrefix("BEAM_LASTPARAM"), std::to_underlying(BEAM_LASTPARAM));
 }
 
 /**

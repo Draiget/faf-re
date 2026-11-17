@@ -167,24 +167,22 @@ namespace faf::editor::field
       return 1.0 - SmoothStep(d / p.skirt);
     }
 
-    bool OpPadFlatten(
+    std::expected<void, std::string> OpPadFlatten(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr)
-        return false;
+        return std::unexpected(err);
       const std::vector<double>* v = a.p.A("pads");
       if (v == nullptr || v->size() % 6 != 0) {
-        err = "'pads' needs 6 numbers per pad (x, z, half, skirt, y, group)";
-        return false;
+        return std::unexpected("'pads' needs 6 numbers per pad (x, z, half, skirt, y, group)");
       }
       const std::string output = a.p.S("output", "height");
       if (output != "height" && output != "weight" && output != "core") {
-        err = "output must be height, weight or core";
-        return false;
+        return std::unexpected("output must be height, weight or core");
       }
       const double grid = std::max(1e-6, a.p.N("grid", 1.0));
       const bool snap = a.p.N("snap", 1.0) != 0.0;
@@ -299,7 +297,7 @@ namespace faf::editor::field
           }
         }
       });
-      return true;
+      return {};
     }
 
     // ---- symmetrize
@@ -353,11 +351,9 @@ namespace faf::editor::field
      * the mirror modes it is ignored. Wedge k runs from a0 + k * width to a0 + (k + 1) * width (increasing angle =
      * clockwise on a map that has z pointing down), the same numbering the Symmetry panel's "Symmetrise from" parts
      * use. */
-    bool BuildGroup(
+    std::expected<Group, std::string> BuildGroup(
       const std::string& mode,
-      const OpArgs& a,
-      Group& g,
-      std::string& err
+      const OpArgs& a
     )
     {
       int n = 1;
@@ -398,14 +394,13 @@ namespace faf::editor::field
       } else if (mode == "rotn") {
         n = static_cast<int>(std::lround(a.p.N("n", 3.0)));
         if (n < 2 || n > 16) {
-          err = "symmetrize: rotn needs 2 <= n <= 16";
-          return false;
+          return std::unexpected("symmetrize: rotn needs 2 <= n <= 16");
         }
         a0 = turn;
       } else {
-        err = "symmetrize: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("symmetrize: unknown mode '" + mode + "'");
       }
+      Group g;
       for (int k = 0; k < n; ++k) {
         g.m.push_back(Rot(2.0 * kPi * k / n));
       }
@@ -421,7 +416,7 @@ namespace faf::editor::field
         g.a0 = a0;
         g.width = 2.0 * kPi / n;
       }
-      return true;
+      return g;
     }
 
     float Bilinear(
@@ -514,23 +509,23 @@ namespace faf::editor::field
     //             the border both sides compute the same blend, so the result is continuous across it (a turn has no
     //             other way to join two arbitrary wedge contents).
     //   avg, max, min   over all images inside the field (exactly symmetric, no master wedge).
-    bool OpSymmetrize(
+    std::expected<void, std::string> OpSymmetrize(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr)
-        return false;
-      Group grp;
+        return std::unexpected(err);
       const std::string mode = a.p.S("mode", "mirror_x");
-      if (!BuildGroup(mode, a, grp, err))
-        return false;
+      const auto built = BuildGroup(mode, a);
+      if (!built)
+        return std::unexpected(built.error());
+      const Group& grp = *built;
       const std::string combine = a.p.S("combine", "copy");
       if (combine != "copy" && combine != "avg" && combine != "max" && combine != "min") {
-        err = "symmetrize: combine must be copy, avg, max or min";
-        return false;
+        return std::unexpected("symmetrize: combine must be copy, avg, max or min");
       }
       const int combineMode = combine == "copy" ? 0 : (combine == "avg" ? 1 : (combine == "max" ? 2 : 3));
       const int count = static_cast<int>(grp.m.size());
@@ -631,25 +626,24 @@ namespace faf::editor::field
           }
         }
       });
-      return true;
+      return {};
     }
 
     // ---- slope_limit
     // ----------------------------------------------------------------------------------------------------------------------------
 
-    bool OpSlopeLimit(
+    std::expected<void, std::string> OpSlopeLimit(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr)
-        return false;
+        return std::unexpected(err);
       const std::string mode = a.p.S("mode", "both");
       if (mode != "lower" && mode != "raise" && mode != "both") {
-        err = "slope_limit: mode must be lower, raise or both";
-        return false;
+        return std::unexpected("slope_limit: mode must be lower, raise or both");
       }
       const double limit = a.p.N("limit", 0.75);
       const double margin = std::max(0.0, a.p.N("margin", 0.03));
@@ -657,8 +651,7 @@ namespace faf::editor::field
       const double strength = Clamp01(a.p.N("strength", 1.0));
       const Grid* mask = Get(a, "mask");
       if (mask != nullptr && !mask->SameShape(*src)) {
-        err = "'mask' must have the shape of 'a'";
-        return false;
+        return std::unexpected("'mask' must have the shape of 'a'");
       }
       const double L = std::max(0.0, (limit - margin)) * static_cast<double>(src->cell);
       const int w = src->w;
@@ -715,7 +708,7 @@ namespace faf::editor::field
           s *= Clamp01(mask->v[i]);
         out.v[i] = static_cast<float>(static_cast<double>(src->v[i]) + (r - static_cast<double>(src->v[i])) * s);
       }
-      return true;
+      return {};
     }
 
     // ---- reach and regions
@@ -730,24 +723,22 @@ namespace faf::editor::field
       return m.At(x, z) >= 0.5f;
     }
 
-    bool OpReach(
+    std::expected<void, std::string> OpReach(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* pass = Need(a, "a", err);
       if (pass == nullptr)
-        return false;
+        return std::unexpected(err);
       const Grid* cost = Get(a, "b");
       if (cost != nullptr && !cost->SameShape(*pass)) {
-        err = "reach: 'b' must have the shape of 'a'";
-        return false;
+        return std::unexpected("reach: 'b' must have the shape of 'a'");
       }
       const std::vector<double>* src = a.p.A("src");
       if (src == nullptr || src->empty() || src->size() % 2 != 0) {
-        err = "reach: 'src' needs x, z pairs";
-        return false;
+        return std::unexpected("reach: 'src' needs x, z pairs");
       }
       const int w = pass->w;
       const int h = pass->h;
@@ -818,22 +809,21 @@ namespace faf::editor::field
         if (dist[i] != std::numeric_limits<double>::infinity())
           out.v[i] = static_cast<float>(dist[i]);
       }
-      return true;
+      return {};
     }
 
-    bool OpRegions(
+    std::expected<void, std::string> OpRegions(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* pass = Need(a, "a", err);
       if (pass == nullptr)
-        return false;
+        return std::unexpected(err);
       const std::string mode = a.p.S("mode", "label");
       if (mode != "label" && mode != "size") {
-        err = "regions: mode must be label or size";
-        return false;
+        return std::unexpected("regions: mode must be label or size");
       }
       const int conn = a.p.N("connectivity", 8.0) == 4.0 ? 4 : 8;
       const int w = pass->w;
@@ -883,7 +873,7 @@ namespace faf::editor::field
           ? static_cast<float>(label[i])
           : static_cast<float>(static_cast<double>(sizes[static_cast<std::size_t>(label[i])]) * area);
       }
-      return true;
+      return {};
     }
 
     /** Registers the ops with the field engine at start-up (EdFieldCore.cpp: RegisterOp). */

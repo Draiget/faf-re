@@ -41,7 +41,7 @@ namespace faf::editor
   {
     int failed = 0;
     for (const Test& t : mTests) {
-      failed += t.ran && !t.result.empty() && t.result.compare(0, 5, "skip:") != 0 ? 1 : 0;
+      failed += t.ran && !t.result.empty() && !t.result.starts_with("skip:") ? 1 : 0;
     }
     return failed;
   }
@@ -113,7 +113,7 @@ namespace faf::editor
     int skipped = 0;
     for (const Test& t : mTests) {
       passed += t.ran && t.result.empty() ? 1 : 0;
-      skipped += t.ran && t.result.compare(0, 5, "skip:") == 0 ? 1 : 0;
+      skipped += t.ran && t.result.starts_with("skip:") ? 1 : 0;
     }
     gpg::Logf(
       "editor: self tests: %d passed, %d failed, %d skipped; %s", passed, Failed(), skipped, mBudgetResult.c_str()
@@ -143,17 +143,17 @@ namespace faf::editor
       ImGui::TextDisabled("running...");
     }
     for (const Test& t : mTests) {
-      const ImU32 colour = !t.ran              ? IM_COL32(160, 160, 160, 255)
-        : t.result.empty()                     ? IM_COL32(110, 220, 120, 255)
-        : t.result.compare(0, 5, "skip:") == 0 ? IM_COL32(200, 200, 120, 255)
-                                               : IM_COL32(255, 110, 100, 255);
+      const ImU32 colour = !t.ran       ? IM_COL32(160, 160, 160, 255)
+        : t.result.empty()              ? IM_COL32(110, 220, 120, 255)
+        : t.result.starts_with("skip:") ? IM_COL32(200, 200, 120, 255)
+                                        : IM_COL32(255, 110, 100, 255);
       ImGui::PushStyleColor(ImGuiCol_Text, colour);
       ImGui::TextWrapped(
         "%s  %s%s",
-        !t.ran                                   ? "-"
-          : t.result.empty()                     ? "ok"
-          : t.result.compare(0, 5, "skip:") == 0 ? "skip"
-                                                 : "FAIL",
+        !t.ran                            ? "-"
+          : t.result.empty()              ? "ok"
+          : t.result.starts_with("skip:") ? "skip"
+                                          : "FAIL",
         t.name.c_str(),
         t.result.empty() ? "" : (": " + t.result).c_str()
       );

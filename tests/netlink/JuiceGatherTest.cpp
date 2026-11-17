@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <print>
 #include <string>
 #include <thread>
 
@@ -33,7 +34,7 @@ namespace
   )
   {
     auto* g = static_cast<Gathered*>(user);
-    std::printf("candidate: %s\n", sdp);
+    std::println("candidate: {}", sdp);
     if (std::strstr(sdp, " typ host") != nullptr) {
       ++g->host;
     } else if (std::strstr(sdp, " typ srflx") != nullptr) {
@@ -58,7 +59,7 @@ int main(
 )
 {
   if (argc != 3 && argc != 5) {
-    std::fprintf(stderr, "usage: %s <host> <port> [<turn user> <turn password>]\n", argv[0]);
+    std::println(stderr, "usage: {} <host> <port> [<turn user> <turn password>]", argv[0]);
     return 2;
   }
   const std::string host = argv[1];
@@ -88,12 +89,12 @@ int main(
 
   juice_agent_t* agent = juice_create(&config);
   if (agent == nullptr) {
-    std::fprintf(stderr, "juice_create failed\n");
+    std::println(stderr, "juice_create failed");
     return 1;
   }
   char sdp[JUICE_MAX_SDP_STRING_LEN];
   juice_get_local_description(agent, sdp, sizeof(sdp));
-  std::printf("local description:\n%s", sdp);
+  std::print("local description:\n{}", sdp);
   juice_gather_candidates(agent);
 
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
@@ -102,14 +103,14 @@ int main(
   }
   juice_destroy(agent);
 
-  std::printf(
-    "gathering %s: host=%d srflx=%d relay=%d\n",
+  std::println(
+    "gathering {}: host={} srflx={} relay={}",
     gathered.done ? "done" : "timed out",
     gathered.host.load(),
     gathered.srflx.load(),
     gathered.relay.load()
   );
   const bool ok = gathered.done && gathered.host > 0 && gathered.srflx > 0 && (!withTurn || gathered.relay > 0);
-  std::printf("%s\n", ok ? "PASS" : "FAIL");
+  std::println("{}", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

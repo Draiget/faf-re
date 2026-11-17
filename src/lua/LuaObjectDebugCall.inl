@@ -654,7 +654,7 @@ const char* addinfo(
  * Resolves Lua operand provenance/name when possible and raises a typed
  * operation error matching Lua's runtime wording.
  */
-void luaG_typeerror(
+[[noreturn]] void luaG_typeerror(
   lua_State* const state,
   const TObject* const object,
   const char* const operation

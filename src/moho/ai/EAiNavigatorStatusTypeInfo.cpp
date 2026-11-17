@@ -1,5 +1,6 @@
 #include "moho/ai/EAiNavigatorStatusTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -102,9 +103,9 @@ const char* EAiNavigatorStatusTypeInfo::GetName() const
 void EAiNavigatorStatusTypeInfo::AddEnums()
 {
   mPrefix = "AINAVSTATUS_";
-  AddEnum(StripPrefix("AINAVSTATUS_Idle"), static_cast<std::int32_t>(AINAVSTATUS_Idle));
-  AddEnum(StripPrefix("AINAVSTATUS_Thinking"), static_cast<std::int32_t>(AINAVSTATUS_Thinking));
-  AddEnum(StripPrefix("AINAVSTATUS_Steering"), static_cast<std::int32_t>(AINAVSTATUS_Steering));
+  AddEnum(StripPrefix("AINAVSTATUS_Idle"), std::to_underlying(AINAVSTATUS_Idle));
+  AddEnum(StripPrefix("AINAVSTATUS_Thinking"), std::to_underlying(AINAVSTATUS_Thinking));
+  AddEnum(StripPrefix("AINAVSTATUS_Steering"), std::to_underlying(AINAVSTATUS_Steering));
 }
 
 /**

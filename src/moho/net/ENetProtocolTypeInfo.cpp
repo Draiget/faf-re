@@ -1,5 +1,6 @@
 #include "moho/net/ENetProtocolTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -62,9 +63,9 @@ namespace moho
   void ENetProtocolTypeInfo::AddEnums()
   {
     mPrefix = "NETPROTO_";
-    AddEnum(StripPrefix("NETPROTO_None"), static_cast<std::int32_t>(ENetProtocolType::kNone));
-    AddEnum(StripPrefix("NETPROTO_TCP"), static_cast<std::int32_t>(ENetProtocolType::kTcp));
-    AddEnum(StripPrefix("NETPROTO_UDP"), static_cast<std::int32_t>(ENetProtocolType::kUdp));
+    AddEnum(StripPrefix("NETPROTO_None"), std::to_underlying(ENetProtocolType::kNone));
+    AddEnum(StripPrefix("NETPROTO_TCP"), std::to_underlying(ENetProtocolType::kTcp));
+    AddEnum(StripPrefix("NETPROTO_UDP"), std::to_underlying(ENetProtocolType::kUdp));
   }
 
   /**

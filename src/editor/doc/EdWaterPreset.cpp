@@ -46,16 +46,14 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool WaterFromScmwtr(
+  std::expected<void, std::string> WaterFromScmwtr(
     const std::string& text,
-    WaterState& water,
-    std::string& error
+    WaterState& water
   )
   {
     std::string probe;
     if (!JsonValue(text, "SurfaceColor", probe) || !JsonValue(text, "WaveTextures", probe)) {
-      error = "not a water settings file (no SurfaceColor or WaveTextures)";
-      return false;
+      return std::unexpected("not a water settings file (no SurfaceColor or WaveTextures)");
     }
     WaterNumbers& s = water.shader;
     std::string has;
@@ -104,7 +102,7 @@ namespace faf::editor
       (void)JsonFloat(layer, "NormalRepeat", s.mNormalRepeatRate[i]);
       at = close + 1;
     }
-    return true;
+    return {};
   }
 
   const char* WaterMotionPresetName(

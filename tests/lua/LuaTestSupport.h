@@ -64,6 +64,6 @@ namespace faf_lua_tests
     const std::string& part
   )
   {
-    return text.find(part) != std::string::npos;
+    return text.contains(part);
   }
 } // namespace faf_lua_tests

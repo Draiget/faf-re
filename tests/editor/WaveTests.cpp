@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <print>
 
 namespace
 {
@@ -56,13 +57,14 @@ namespace
     ASSERT_TRUE(faf::editor::WaveRecordsFromBytes(bytes, again));
     ASSERT_EQ(again.size(), 2u);
     EXPECT_TRUE(again[0] == waves[0]);
-    std::string error;
-    ASSERT_TRUE(faf::editor::WavesFromScmwaves(faf::editor::WavesToScmwaves(waves), again, error)) << error;
+    auto read = faf::editor::WavesFromScmwaves(faf::editor::WavesToScmwaves(waves));
+    ASSERT_TRUE(read) << read.error();
+    again = std::move(*read);
     ASSERT_EQ(again.size(), 2u);
     EXPECT_TRUE(again[0] == waves[0]);
     EXPECT_TRUE(again[1] == waves[1]);
     EXPECT_FALSE(faf::editor::WaveRecordsFromBytes(bytes.substr(0, bytes.size() - 1), again));
-    EXPECT_FALSE(faf::editor::WavesFromScmwaves("{ \"Units\": [] }", again, error));
+    EXPECT_FALSE(faf::editor::WavesFromScmwaves("{ \"Units\": [] }"));
   }
 
   TEST(
@@ -101,7 +103,7 @@ namespace
       generators += waves.size();
     }
     EXPECT_GT(maps, 0);
-    std::printf("[ waves    ] %d retail maps, %zu wave generators round-tripped\n", maps, generators);
+    std::println("[ waves    ] {} retail maps, {} wave generators round-tripped", maps, generators);
   }
 
   TEST(
@@ -142,9 +144,9 @@ patterns = {
     { name = 'no parameters' },
 }
 )";
-    std::vector<faf::editor::WavePattern> patterns;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseWavePatterns(lua, patterns, error)) << error;
+    const auto parsed = faf::editor::ParseWavePatterns(lua);
+    ASSERT_TRUE(parsed) << parsed.error();
+    const std::vector<faf::editor::WavePattern>& patterns = *parsed;
     ASSERT_EQ(patterns.size(), 1u);
     EXPECT_EQ(patterns[0].name, "test break");
     EXPECT_EQ(patterns[0].ramp, "/env/common/decals/shoreline/ramp_waves_01.dds");
@@ -154,7 +156,7 @@ patterns = {
     EXPECT_FLOAT_EQ(patterns[0].scale[1], 2.4f);
     EXPECT_FLOAT_EQ(patterns[0].frameCount, 16.0f);
     EXPECT_NEAR(patterns[0].frameRate[0], 0.423f, 1e-5f);
-    EXPECT_FALSE(faf::editor::ParseWavePatterns("x = 1", patterns, error));
+    EXPECT_FALSE(faf::editor::ParseWavePatterns("x = 1"));
   }
 
   TEST(

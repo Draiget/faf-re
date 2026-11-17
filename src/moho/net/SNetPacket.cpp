@@ -3,6 +3,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "platform/Platform.h"
+#include <utility>
 using namespace moho;
 
 /**
@@ -88,7 +89,7 @@ void SNetPacket::LogPacket(
 
   fa::string buf;
   if (header.mType >= PT_NumTypes) {
-    buf = gpg::STR_Printf("?[%d)", static_cast<uint8_t>(header.mType));
+    buf = gpg::STR_Printf("?[%d)", std::to_underlying(header.mType));
   } else {
     NetPacketTypeToStr(header.mType, buf);
   }

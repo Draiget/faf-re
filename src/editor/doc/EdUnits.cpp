@@ -343,7 +343,7 @@ namespace faf::editor
     {
       int highest = 0;
       for (const SaveUnit& unit : group.units) {
-        if (unit.name.rfind("UNIT_", 0) == 0) {
+        if (unit.name.starts_with("UNIT_")) {
           highest = std::max(highest, std::atoi(unit.name.c_str() + 5));
         }
       }
@@ -354,20 +354,18 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ParseUnitGroup(
+  std::expected<void, std::string> ParseUnitGroup(
     const std::string& text,
-    UnitGroup& group,
-    std::string& error
+    UnitGroup& group
   )
   {
     Reader reader{text, 0, {}};
     group = UnitGroup{};
     if (!ReadGroup(reader, group)) {
-      error = reader.error;
-      return false;
+      return std::unexpected(reader.error);
     }
-    group.newline = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
-    return true;
+    group.newline = text.contains("\r\n") ? "\r\n" : "\n";
+    return {};
   }
 
   std::string FormatUnitGroup(

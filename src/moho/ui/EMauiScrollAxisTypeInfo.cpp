@@ -1,5 +1,6 @@
 #include "moho/ui/EMauiScrollAxisTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -48,8 +49,8 @@ namespace moho
   {
     mPrefix = "MSA_";
 
-    AddEnum(StripPrefix("MSA_Vert"), static_cast<std::int32_t>(MSA_Vert));
-    AddEnum(StripPrefix("MSA_Horz"), static_cast<std::int32_t>(MSA_Horz));
+    AddEnum(StripPrefix("MSA_Vert"), std::to_underlying(MSA_Vert));
+    AddEnum(StripPrefix("MSA_Horz"), std::to_underlying(MSA_Horz));
   }
 } // namespace moho
 

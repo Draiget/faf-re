@@ -127,8 +127,8 @@ namespace faf::editor
     bool shortFound = false;
     bool twiceFound = false;
     for (const CheckIssue& issue : issues) {
-      shortFound = shortFound || (issue.marker == "Short" && issue.text.find("needs two") != std::string::npos);
-      twiceFound = twiceFound || (issue.marker == "Twice" && issue.text.find("more than once") != std::string::npos);
+      shortFound = shortFound || (issue.marker == "Short" && issue.text.contains("needs two"));
+      twiceFound = twiceFound || (issue.marker == "Twice" && issue.text.contains("more than once"));
     }
     EXPECT_TRUE(shortFound);
     EXPECT_TRUE(twiceFound);

@@ -58,6 +58,22 @@ git clang-format origin/master
 
 `git clang-format` comes with LLVM (Windows: `C:\Program Files\LLVM\bin`), or with `pip install clang-format==22.1.8`, which is the version the check uses.
 
+### Language level
+
+The code is C++23. Windows builds use clang-cl 22 with Microsoft's standard library, and Linux builds use clang 18 with libc++ 18, which has less of the C++23 library. Use only what both have; the Linux jobs fail otherwise.
+
+Prefer the C++23 spelling where it fits:
+
+- `s.contains(x)`, `s.starts_with(x)`, `s.ends_with(x)` on strings (`fa::string` has them too) and `map.contains(key)`, not `find` compared with `npos` or `end()`.
+- `std::to_underlying(e)` for an enum's integer value, `std::byteswap` for a byte swap, `0uz` for a `std::size_t` literal, `#elifdef` / `#elifndef`.
+- `static` call operators on function objects without state (hashers, comparators, deleters).
+- An explicit object parameter (`template <class Self> auto& Get(this Self& self)`) instead of a const and a mutable copy of the same method, or a CRTP base.
+- A function that can fail returns `std::expected<T, std::string>` (`std::expected<void, std::string>` when there is no value), not a `bool` and an error out-parameter: the engine's own code does this throughout. Success text that the old message parameter also carried goes in the value (`std::expected<std::string, std::string>`). `std::optional`'s `and_then`, `transform` and `or_else`. `std::ranges::to`. `if consteval`.
+
+libc++ 18 lacks `std::flat_map`, `std::move_only_function`, `std::generator`, `std::stacktrace`, `std::out_ptr`, `std::bind_back`, `std::spanstream`, `std::ranges::contains`, `std::ranges::fold_left`, and `views::zip`, `views::enumerate`, `views::chunk` and `views::stride`. clang 18 lacks `[[assume]]`. clang 18 does support explicit object parameters but leaves `__cpp_explicit_this_parameter` undefined, so don't test that macro.
+
+Recovered functions keep one function per binary address: don't turn one into a template, which an explicit object parameter does. Keep `GPG_UNREACHABLE`, which reports an error and carries on as the binary does. For a point no input can reach, such as the end of a switch that returns for every value of an enum the engine itself produces, use `FAF_UNREACHABLE()` (`gpg/core/utils/Unreachable.h`): `std::unreachable()` in release builds, a report and an abort otherwise. Never use it where the value can come from a replay, the network, Lua or a file.
+
 ### Platform guards
 
 Platform code tests the macros in [src/platform/PlatformDefines.h](src/platform/PlatformDefines.h), never the compilers' own (`_WIN32`, `__linux__`, `__APPLE__`): `#if FAFRE_PLATFORM_WINDOWS` and `#if FAFRE_PLATFORM_POSIX`. Code that every POSIX system shares (the SDL window layer, `src/platform/posix/`, sockets, threads) tests `FAFRE_PLATFORM_POSIX`, so the macOS port gets it too. `FAFRE_PLATFORM_LINUX` and `FAFRE_PLATFORM_MACOS` are only for something one system has, named in a comment on the same line: `#if FAFRE_PLATFORM_LINUX // MSG_NOSIGNAL; macOS sets SO_NOSIGPIPE`. The `platform-macros` check fails a pull request that adds a line breaking this; run it before pushing with `python .github/scripts/platform_macros.py --diff origin/master HEAD`.

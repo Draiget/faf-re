@@ -247,7 +247,7 @@ extern "C" int luaL_error(
   va_end(arguments);
 
   lua_concat(state, 2);
-  return lua_error(state);
+  lua_error(state);
 }
 
 /**
@@ -473,7 +473,7 @@ int setarrayvector(
   lua_State* const state
 )
 {
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // The binary's array is `size * 8` bytes (0x00927248), and realloc_0 moves it to a new block when it grows
   // past the old one or shrinks to half of it. Landing in the 896-byte class it takes the block the next
   // formation would have reused; ours is twice as big and doesn't come from that list (26910291 at tick 68348,
@@ -962,7 +962,7 @@ namespace
   int luaO_str2d(const char* s, float* result);
   int luaV_tostring(lua_State* L, TObject* obj);
   const char* getobjname(int stackPos, CallInfo* callInfo, const char** nameOut);
-  void luaG_runerror(lua_State* L, const char* format, ...);
+  [[noreturn]] void luaG_runerror(lua_State* L, const char* format, ...);
   int luaZ_fill(ZIO* stream);
   size_t luaZ_read(ZIO* stream, void* buffer, size_t size);
   char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <expected>
 #include <memory>
 #include <string>
 #include <utility>
@@ -35,8 +36,8 @@ namespace faf::headless
     CReplayEffectOps();
     ~CReplayEffectOps();
 
-    /** Installs the hook; either path may be empty. False (and `error` set) when a file can't be written. */
-    [[nodiscard]] bool Open(const std::string& countsPath, const std::string& recordPath, std::string& error);
+    /** Installs the hook; either path may be empty. The error when a file can't be written. */
+    [[nodiscard]] std::expected<void, std::string> Open(const std::string& countsPath, const std::string& recordPath);
     void OnBeat(int beat);
     /** Removes the hook, closes the files and prints the summaries with `label`. */
     void Finish(const char* label);

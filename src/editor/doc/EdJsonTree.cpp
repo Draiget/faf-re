@@ -466,24 +466,20 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ParseJsonTree(
-    const std::string& text,
-    JsonTree& out,
-    std::string& error
+  std::expected<JsonTree, std::string> ParseJsonTree(
+    const std::string& text
   )
   {
     Parser p{text, 0, {}};
-    out = JsonTree{};
+    JsonTree out;
     if (!p.Value(out, 0)) {
-      error = p.error;
-      return false;
+      return std::unexpected(p.error);
     }
     p.Space();
     if (p.at != text.size()) {
-      error = "text after the value at offset " + std::to_string(p.at);
-      return false;
+      return std::unexpected("text after the value at offset " + std::to_string(p.at));
     }
-    return true;
+    return out;
   }
 
   std::string WriteJsonTree(

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -42,8 +43,8 @@ namespace faf::editor
   };
   const std::vector<OptionTable>& KnownOptionTables();
 
-  /** Reads the tables the script uses from a `_tables.lua`'s text; others are left to the text. False with `error`. */
-  bool ParseAdaptiveTables(const std::string& text, AdaptiveTables& tables, std::string& error);
+  /** Reads the tables the script uses from a `_tables.lua`'s text; others are left to the text. The error otherwise. */
+  [[nodiscard]] std::expected<void, std::string> ParseAdaptiveTables(const std::string& text, AdaptiveTables& tables);
 
   /**
    * The text with the tables written in: each one the script uses replaced where it is (the rest of the file, its

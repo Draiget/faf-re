@@ -88,7 +88,11 @@ namespace
       (void)SDL_SetWindowPosition(AsWindow(window), x, y);
     }
     if ((flags & SWP_NOSIZE) == 0u) {
-      (void)SDL_SetWindowSize(AsWindow(window), width, height);
+      (void)SDL_SetWindowSize(
+        AsWindow(window),
+        platform::window::sdl::PixelsToWindowUnits(AsWindow(window), width),
+        platform::window::sdl::PixelsToWindowUnits(AsWindow(window), height)
+      );
     }
   }
 
@@ -344,6 +348,22 @@ namespace platform::window::sdl
     platform::posix::SetKeyDown(virtualKey, down);
   }
 
+  bool IsSystemShortcut(
+    const int virtualKey,
+    const unsigned int sdlModifiers
+  )
+  {
+#if FAFRE_PLATFORM_MACOS // Command-key shortcuts belong to macOS and the app menu
+    // Command itself still reaches the game (its key state, a binding of its own); what is pressed
+    // while it is held doesn't, so Cmd+S never fires the game's S binding.
+    return (sdlModifiers & SDL_KMOD_GUI) != 0u && virtualKey != VK_LWIN && virtualKey != VK_RWIN;
+#else
+    (void)virtualKey;
+    (void)sdlModifiers;
+    return false;
+#endif
+  }
+
   void OnCursorMoved(
     const int screenX,
     const int screenY
@@ -382,6 +402,15 @@ namespace platform::window::sdl
   {
     (void)window;
     return false;
+  }
+
+  void SetClipChildren(
+    SDL_Window* const window,
+    const bool clip
+  )
+  {
+    (void)window;
+    (void)clip;
   }
 
   bool SetChildBounds(

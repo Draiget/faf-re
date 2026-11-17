@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 
 #include <gtest/gtest.h>
 
@@ -101,8 +102,8 @@ namespace
     if (workers > 0 && enabled && finish) {
       const auto actualWorkers = CSimWorkerPool::Get().WorkerCount();
       Check(actualWorkers > 0, "worker pool available after Finish");
-      std::printf(
-        "packet count=%zu configured workers=%d pool workers=%u; dispatch completed\n", count, workers, actualWorkers
+      std::println(
+        "packet count={} configured workers={} pool workers={}; dispatch completed", count, workers, actualWorkers
       );
       // The caller helps with chunks: this does not assert a worker took a chunk.
     }

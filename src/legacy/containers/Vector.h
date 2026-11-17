@@ -6792,7 +6792,7 @@ namespace fa
     )
     {
       const std::size_t offset = (size() == 0u) ? 0u : static_cast<std::size_t>(pos - first_);
-      (void)insert(pos, static_cast<std::size_t>(1), value);
+      (void)insert(pos, 1uz, value);
       return first_ + offset;
     }
 

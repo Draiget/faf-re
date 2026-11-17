@@ -13,16 +13,12 @@ namespace
     JsonReadsWhatTheApiWrites
   )
   {
-    JsonNode root;
-    std::string error;
-    ASSERT_TRUE(
-      faf::editor::ParseJson(
-        R"({"a": [1, 2.5, -3e2], "b": {"c": "x \"y\" {z}", "d": true, "e": null},
-      "u": "Café 😀", "n": "line\nnext"})",
-        root,
-        error
-      )
-    ) << error;
+    const auto parsed = faf::editor::ParseJson(
+      R"({"a": [1, 2.5, -3e2], "b": {"c": "x \"y\" {z}", "d": true, "e": null},
+      "u": "Café 😀", "n": "line\nnext"})"
+    );
+    ASSERT_TRUE(parsed) << parsed.error();
+    const JsonNode& root = *parsed;
     ASSERT_NE(root.Get("a"), nullptr);
     ASSERT_EQ(root.Get("a")->items.size(), 3u);
     EXPECT_EQ(root.Get("a")->items[1].number, 2.5);
@@ -32,8 +28,8 @@ namespace
     EXPECT_EQ(root.Get("b")->Get("e")->kind, JsonNode::Kind::Null);
     EXPECT_EQ(root.String("u"), "Caf\xC3\xA9 \xF0\x9F\x98\x80");
     EXPECT_EQ(root.String("n"), "line\nnext");
-    EXPECT_FALSE(faf::editor::ParseJson(R"({"a": [1, 2)", root, error));
-    EXPECT_FALSE(faf::editor::ParseJson(R"({"a": 1} x)", root, error));
+    EXPECT_FALSE(faf::editor::ParseJson(R"({"a": [1, 2)"));
+    EXPECT_FALSE(faf::editor::ParseJson(R"({"a": 1} x)"));
   }
 
   TEST(
@@ -112,8 +108,8 @@ namespace
     })";
     std::vector<faf::editor::VaultMap> maps;
     int pages = 0;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseVaultSearch(answer, maps, pages, error)) << error;
+    const auto read = faf::editor::ParseVaultSearch(answer, maps, pages);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(maps.size(), 1u) << "the map without a version can't be downloaded";
     EXPECT_EQ(maps[0].name, "Dual Gap Adaptive");
     EXPECT_EQ(maps[0].folder, "dualgap_adaptive.v0012");
@@ -126,7 +122,8 @@ namespace
     EXPECT_EQ(maps[0].description, "Two {gaps}");
     EXPECT_EQ(pages, 4);
 
-    EXPECT_FALSE(faf::editor::ParseVaultSearch(R"({"errors": [{"detail": "Invalid filter"}]})", maps, pages, error));
-    EXPECT_EQ(error, "Invalid filter");
+    const auto refused = faf::editor::ParseVaultSearch(R"({"errors": [{"detail": "Invalid filter"}]})", maps, pages);
+    ASSERT_FALSE(refused);
+    EXPECT_EQ(refused.error(), "Invalid filter");
   }
 } // namespace

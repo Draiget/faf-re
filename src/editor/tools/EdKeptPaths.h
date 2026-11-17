@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <string>
@@ -215,6 +216,8 @@ namespace faf::editor
     float over = 0.0f;                        // share of the length above the limit
     std::vector<std::pair<int, int>> flagged; // sample ranges above the limit
     std::vector<float> ys;
+    float worstX = 0.0f; // where the steepest grade starts
+    float worstZ = 0.0f;
   };
   [[nodiscard]] KeptPathReport
   ReportKeptPath(const KeptPath& path, const std::function<float(float, float)>& ground, float water);
@@ -286,16 +289,10 @@ namespace faf::editor
   /**
    * Builds a path's result on `ground` with its earlier result `old` (null: none) taken off first: the shape ops of the
    * path and its images, the blend, the bank erosion, quantised to words. `wantMasks` also makes the strata masks.
-   * False with `error` when the path lies off the map or an op fails.
+   * The error when the path lies off the map or an op fails.
    */
-  bool BuildKeptPath(
-    const KeptPath& path,
-    const KeptPathGround& ground,
-    const KeptPathResult* old,
-    bool wantMasks,
-    KeptPathPlan& plan,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<KeptPathPlan, std::string>
+  BuildKeptPath(const KeptPath& path, const KeptPathGround& ground, const KeptPathResult* old, bool wantMasks);
 
   /**
    * Strata into the mask texels (`width` x `height` over a map `mapSize` units): the earlier result's weights taken
@@ -323,5 +320,5 @@ namespace faf::editor
 
   /** The file text (`<map>_paths.editor`, JSON) and back. */
   [[nodiscard]] std::string KeptPathsText(const KeptPathSet& set);
-  bool ReadKeptPaths(const std::string& text, KeptPathSet& set, std::string& error);
+  [[nodiscard]] std::expected<KeptPathSet, std::string> ReadKeptPaths(const std::string& text);
 } // namespace faf::editor

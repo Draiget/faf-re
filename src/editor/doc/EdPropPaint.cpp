@@ -28,16 +28,13 @@ namespace faf::editor
     return out + (entries.empty() ? "]\n}" : "\n    ]\n}");
   }
 
-  bool PaintSetFromProppaintset(
-    const std::string& text,
-    std::vector<PropPaintEntry>& entries,
-    std::string& error
+  std::expected<std::vector<PropPaintEntry>, std::string> PaintSetFromProppaintset(
+    const std::string& text
   )
   {
     std::string array;
     if (!JsonValue(text, "PaintProps", array) || array.empty() || array.front() != '[') {
-      error = "not a prop paint set (no PaintProps list)";
-      return false;
+      return std::unexpected("not a prop paint set (no PaintProps list)");
     }
     std::vector<PropPaintEntry> read;
     for (const std::string& object : JsonObjects(array)) {
@@ -59,8 +56,7 @@ namespace faf::editor
       }
       read.push_back(std::move(entry));
     }
-    entries = std::move(read);
-    return true;
+    return read;
   }
 
   int PickPaintEntry(

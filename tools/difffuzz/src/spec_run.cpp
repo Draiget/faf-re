@@ -262,12 +262,12 @@ namespace difffuzz
       RetailImage& image
     )
     {
-      spec::File file;
-      std::string error;
-      if (!spec::ReadSpec(opt.specPath, file, error)) {
-        std::fprintf(stderr, "difffuzz --spec: %s: %s\n", opt.specPath, error.c_str());
+      std::expected<spec::File, std::string> read = spec::ReadSpec(opt.specPath);
+      if (!read) {
+        std::fprintf(stderr, "difffuzz --spec: %s: %s\n", opt.specPath, read.error().c_str());
         return 3;
       }
+      spec::File file = std::move(*read);
       std::vector<spec::Row> rows;
       std::vector<std::pair<std::string, int>> skipped;
       spec::SelectValueRows(file, rows, skipped);

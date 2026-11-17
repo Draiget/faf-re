@@ -2,10 +2,17 @@
 // LuaObjectAuxLib.inl): type, tonumber, tostring, assert, error, pcall, unpack, the raw
 // functions, next/pairs/ipairs, environments, loadstring, gcinfo, _G and _VERSION.
 
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <gtest/gtest.h>
 
 #include "LuaTestSupport.h"
+#include "platform/PlatformDefines.h"
+
+#if FAFRE_PLATFORM_POSIX
+#include <stdlib.h>
+#endif
 
 namespace
 {
@@ -285,4 +292,83 @@ namespace
       return a == 'line1' and n == 42 and rest == 'line3' and size == 14 and two == 'ne1' and lines == 3
          and atEnd == nil and not closedOk)"));
   }
+
+#if FAFRE_PLATFORM_POSIX
+  // Engine addition (issue #255): scripts join the engine's folders, which SHGetFolderPath ends with
+  // '\', with their own names, and Windows finds a file whatever the case of its name. FAF's start-up
+  // script deletes old compiled shaders as `SHGetFolderPath('LOCAL_APPDATA') .. 'Gas Powered
+  // Games/.../cache' .. '/' .. file`. On POSIX the io and os calls take such a path as Windows would.
+  TEST_F(
+    LuaBaseLibOsio,
+    FilePathsWithBackslashesAndAnotherCase
+  )
+  {
+    char pattern[] = "/tmp/faf-lua-io-XXXXXX";
+    ASSERT_NE(::mkdtemp(pattern), nullptr);
+    const std::string root = pattern;
+    const std::filesystem::path cache = std::filesystem::path(root) / "Gas Powered Games" / "cache";
+    std::filesystem::create_directories(cache);
+    std::ofstream(cache / "shader.0042") << "old";
+
+    // The script's paths: '\' after the engine's folder, folders in another case.
+    const std::string base = "local base = '" + root + "\\\\' .. 'gas powered games/CACHE'\n";
+    EXPECT_TRUE(Check((base + R"(
+      local f = io.open(base .. '\\new.txt', 'w')
+      if f == nil then return false end
+      f:write('one\ntwo\n')
+      f:close()
+      local lines = {}
+      for l in io.lines(base .. '\\NEW.txt') do table.insert(lines, l) end
+      io.input(base .. '/New.txt')
+      local first = io.read('*l')
+      io.input():close()
+      io.input(io.stdin)
+      return table.getn(lines) == 2 and lines[1] == 'one' and lines[2] == 'two' and first == 'one')")
+                        .c_str()));
+    EXPECT_TRUE(std::filesystem::exists(cache / "new.txt"));
+
+    EXPECT_TRUE(Check((base + R"(
+      local f = io.output(base .. '\\out.txt')
+      io.write('written')
+      io.output():close()
+      io.output(io.stdout)
+      return true)")
+                        .c_str()));
+    EXPECT_TRUE(std::filesystem::exists(cache / "out.txt"));
+
+    EXPECT_TRUE(Check((base + "return os.rename(base .. '\\\\new.txt', base .. '\\\\Renamed.txt') == true").c_str()));
+    EXPECT_FALSE(std::filesystem::exists(cache / "new.txt"));
+    EXPECT_TRUE(std::filesystem::exists(cache / "Renamed.txt"));
+
+    EXPECT_TRUE(Check((base + "return os.remove(base .. '/' .. 'SHADER.0042') == true").c_str()));
+    EXPECT_FALSE(std::filesystem::exists(cache / "shader.0042"));
+
+    // As the MSVC CRT: rename refuses a destination that exists, but a change of case of the same
+    // file goes through; remove deletes files, not folders.
+    std::ofstream(cache / "taken.txt") << "taken";
+    EXPECT_TRUE(Check((base +
+                       "local r, e = os.rename(base .. '\\\\renamed.txt', base .. '\\\\TAKEN.txt') return r == "
+                       "nil and type(e) == 'string'")
+                        .c_str()));
+    EXPECT_TRUE(std::filesystem::exists(cache / "Renamed.txt"));
+    EXPECT_TRUE(
+      Check((base + "return os.rename(base .. '\\\\renamed.txt', base .. '\\\\RENAMED.txt') == true").c_str())
+    );
+    EXPECT_TRUE(std::filesystem::exists(cache / "RENAMED.txt"));
+    std::filesystem::create_directories(cache / "folder");
+    EXPECT_TRUE(
+      Check((base + "local r, e = os.remove(base .. '\\\\Folder') return r == nil and type(e) == 'string'").c_str())
+    );
+    EXPECT_TRUE(std::filesystem::is_directory(cache / "folder"));
+
+    // loadfile, dofile and require read their file the same way.
+    std::ofstream(cache / "script.lua") << "return 40 + 2";
+    EXPECT_TRUE(Check(
+      (base + "return dofile(base .. '\\\\SCRIPT.lua') == 42 and loadfile(base .. '\\\\Script.lua')() == 42").c_str()
+    ));
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+  }
+#endif
 } // namespace

@@ -29,7 +29,7 @@ namespace faf::editor
       const std::string& part
     )
     {
-      return text.find(part) != std::string::npos;
+      return text.contains(part);
     }
 
     std::size_t CountOf(
@@ -38,7 +38,7 @@ namespace faf::editor
     )
     {
       return static_cast<std::size_t>(std::count_if(problems.begin(), problems.end(), [&](const MissionProblem& p) {
-        return p.text.find(words) != std::string::npos;
+        return p.text.contains(words);
       }));
     }
 
@@ -208,9 +208,9 @@ namespace faf::editor
     );
     m.dialogues.push_back({"Intro", {{"Commander, \"welcome\" {", "HQ", 4}}});
     const std::string text = SaveMission(m);
-    Mission back;
-    std::string error;
-    ASSERT_TRUE(LoadMission(text, back, error)) << error;
+    const auto loaded = LoadMission(text);
+    ASSERT_TRUE(loaded) << loaded.error();
+    const Mission& back = *loaded;
     EXPECT_EQ(back.mode, "both");
     ASSERT_EQ(back.stages.size(), 2U);
     EXPECT_EQ(back.stages[0].name, "Attack");
@@ -225,7 +225,7 @@ namespace faf::editor
     EXPECT_EQ(CompileMission(back, MissionCompileOptions{}), CompileMission(m, MissionCompileOptions{}))
       << "the same script from the saved mission";
     EXPECT_EQ(SaveMission(Mission{}), "");
-    EXPECT_FALSE(LoadMission("{}", back, error));
+    EXPECT_FALSE(LoadMission("{}"));
   }
 
   TEST(
@@ -372,9 +372,9 @@ namespace faf::editor
     m.bases[0].supportAcus = 2;
     m.bases[0].opai[0].master = "random patrol";
     m.bases[0].opai[0].condCount[1] = {12, 8, 3};
-    Mission back;
-    std::string error;
-    ASSERT_TRUE(LoadMission(SaveMission(m), back, error)) << error;
+    const auto loaded = LoadMission(SaveMission(m));
+    ASSERT_TRUE(loaded) << loaded.error();
+    const Mission& back = *loaded;
     ASSERT_EQ(back.bases.size(), 1U);
     const MissionBase& b = back.bases[0];
     EXPECT_EQ(b.name, "North");
@@ -499,9 +499,9 @@ namespace faf::editor
   )
   {
     const Mission m = WithPlatoons();
-    Mission back;
-    std::string error;
-    ASSERT_TRUE(LoadMission(SaveMission(m), back, error)) << error;
+    const auto loaded = LoadMission(SaveMission(m));
+    ASSERT_TRUE(loaded) << loaded.error();
+    const Mission& back = *loaded;
     ASSERT_EQ(back.platoons.size(), 1U);
     ASSERT_EQ(back.platoons[0].rows.size(), 2U);
     EXPECT_EQ(back.platoons[0].rows[1].bp, "uel0103");

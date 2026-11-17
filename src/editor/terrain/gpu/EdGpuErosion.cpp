@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <memory>
 #include <string>
 #include <vector>
@@ -105,41 +106,42 @@ namespace faf::editor::gpu
     struct Dev
     {
       Executor& ex;
-      std::string& err;
       std::unique_ptr<Resource>
         dummy[7]; // [0] read only; [1..6] one per unused written slot (one resource is never bound to two UAV slots of
                   // a dispatch: the runtime drops the dispatch's writes)
-      Dev(
-        Executor& e,
-        std::string& er
+      explicit Dev(
+        Executor& e
       )
         : ex(e)
-        , err(er)
       {}
-      bool Zero(
+      std::expected<void, std::string> Zero(
         Field& f,
         const int w,
         const int h
       )
       {
-        return MakeField(ex, w, h, f, err) && FillBuffer(ex, f.R(), 0u, err);
+        FAF_GPU_TRY(MakeField(ex, w, h, f));
+        FAF_GPU_TRY(FillBuffer(ex, f.R(), 0u));
+        return {};
       }
-      bool Zero(
+      std::expected<void, std::string> Zero(
         std::unique_ptr<Resource>& r,
         const u32 count
       )
       {
-        return MakeBuffer(ex, count, r, err) && FillBuffer(ex, *r, 0u, err);
+        FAF_GPU_TRY(MakeBuffer(ex, count, r));
+        FAF_GPU_TRY(FillBuffer(ex, *r, 0u));
+        return {};
       }
-      bool Dummies()
+      std::expected<void, std::string> Dummies()
       {
         for (auto& d : dummy) {
-          if (!MakeBuffer(ex, 1, d, err) || !FillBuffer(ex, *d, 0u, err))
-            return false;
+          FAF_GPU_TRY(MakeBuffer(ex, 1, d));
+          FAF_GPU_TRY(FillBuffer(ex, *d, 0u));
         }
-        return true;
+        return {};
       }
-      bool Optional(
+      std::expected<void, std::string> Optional(
         const std::vector<float>& v,
         const int w,
         const int h,
@@ -147,12 +149,12 @@ namespace faf::editor::gpu
       )
       {
         if (v.empty())
-          return true;
+          return {};
         if (v.size() != static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
-          err = "per cell factor of the wrong size";
-          return false;
+          return std::unexpected("per cell factor of the wrong size");
         }
-        return MakeField(ex, w, h, f, err) && UploadField(ex, f, v.data(), err);
+        FAF_GPU_TRY(MakeField(ex, w, h, f));
+        return UploadField(ex, f, v.data());
       }
     };
 
@@ -172,7 +174,7 @@ namespace faf::editor::gpu
       const KernelInfo* a = nullptr;
       const KernelInfo* b = nullptr;
       Field share, moved;
-      bool Make(
+      std::expected<void, std::string> Make(
         Dev& d,
         const int w,
         const int h
@@ -181,36 +183,33 @@ namespace faf::editor::gpu
         a = FindKernel("erosion_thermal_a");
         b = FindKernel("erosion_thermal_b");
         if (a == nullptr || b == nullptr) {
-          d.err = "kernel erosion_thermal_a / erosion_thermal_b is missing";
-          return false;
+          return std::unexpected("kernel erosion_thermal_a / erosion_thermal_b is missing");
         }
-        return MakeField(d.ex, w, h, share, d.err) && MakeField(d.ex, w, h, moved, d.err);
+        FAF_GPU_TRY(MakeField(d.ex, w, h, share));
+        return MakeField(d.ex, w, h, moved);
       }
       /** One slide step from pp.Src() into pp.Dst(), then flips. */
-      bool Step(
+      std::expected<void, std::string> Step(
         Executor& ex,
         PingPong& pp,
         const Resource& mask,
         const bool hasMask,
-        const hk::ErodeThermalParams& tp,
-        std::string& err
+        const hk::ErodeThermalParams& tp
       )
       {
         {
           Bindings bi;
           bi.Srv(0, pp.Src().R()).Srv(1, mask).Uav(0, share.R()).Uav(1, moved.R());
-          if (!DispatchGrid(ex, *a, tp.w, tp.h, tp, bi, err))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *a, tp.w, tp.h, tp, bi));
         }
         {
           Bindings bi;
           bi.Srv(0, pp.Src().R()).Srv(1, share.R()).Srv(2, moved.R()).Uav(0, pp.Dst().R());
-          if (!DispatchGrid(ex, *b, tp.w, tp.h, tp, bi, err))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *b, tp.w, tp.h, tp, bi));
         }
         (void)hasMask;
         pp.Flip();
-        return true;
+        return {};
       }
     };
 
@@ -238,11 +237,10 @@ namespace faf::editor::gpu
     // ---- erode_hydraulic
     // -------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpHydraulicGpu(
+    std::expected<OpResult, std::string> OpHydraulicGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = nullptr;
@@ -261,8 +259,7 @@ namespace faf::editor::gpu
       const KernelInfo* kSettle = FindKernel("erosion_hydro_settle");
       const KernelInfo* kApply = FindKernel("erosion_hydro_apply");
       if (kFlux == nullptr || kWater == nullptr || kTrans == nullptr || kSettle == nullptr || kApply == nullptr) {
-        err = "an erosion_hydro kernel is missing";
-        return OpResult::Failed;
+        return std::unexpected("an erosion_hydro kernel is missing");
       }
 
       ero::OpFactors fac;
@@ -270,29 +267,32 @@ namespace faf::editor::gpu
       const bool masks = WantsMasks(a);
       const bool thermalOn = p.thermal > 0.0f && p.thermal_every > 0;
 
-      Dev dev(ex, err);
+      Dev dev(ex);
       PingPong T;
       Field D, S, SN, DO, dT, rain, rock, thermalRate, wear, dep, flow;
       std::unique_ptr<Resource> Fa, Fb;
       ThermalKit tk;
-      if (!dev.Dummies() || !MakeField(ex, w, h, T.f[1], err) || !UploadGrid(ex, *src, T.f[0], err))
-        return OpResult::Failed;
-      if (
-        !dev.Zero(D, w, h) || !dev.Zero(S, w, h) || !MakeField(ex, w, h, SN, err) || !MakeField(ex, w, h, DO, err) ||
-        !MakeField(ex, w, h, dT, err)
-      )
-        return OpResult::Failed;
-      if (!dev.Zero(Fa, static_cast<u32>(4 * n)) || !dev.Zero(Fb, static_cast<u32>(4 * n)))
-        return OpResult::Failed;
-      if (
-        !dev.Optional(fac.rain, w, h, rain) || !dev.Optional(fac.rock, w, h, rock) ||
-        !dev.Optional(fac.thermal, w, h, thermalRate)
-      )
-        return OpResult::Failed;
-      if (masks && (!dev.Zero(wear, w, h) || !dev.Zero(dep, w, h) || !dev.Zero(flow, w, h)))
-        return OpResult::Failed;
-      if (thermalOn && !tk.Make(dev, w, h))
-        return OpResult::Failed;
+      FAF_GPU_TRY(dev.Dummies());
+      FAF_GPU_TRY(MakeField(ex, w, h, T.f[1]));
+      FAF_GPU_TRY(UploadGrid(ex, *src, T.f[0]));
+      FAF_GPU_TRY(dev.Zero(D, w, h));
+      FAF_GPU_TRY(dev.Zero(S, w, h));
+      FAF_GPU_TRY(MakeField(ex, w, h, SN));
+      FAF_GPU_TRY(MakeField(ex, w, h, DO));
+      FAF_GPU_TRY(MakeField(ex, w, h, dT));
+      FAF_GPU_TRY(dev.Zero(Fa, static_cast<u32>(4 * n)));
+      FAF_GPU_TRY(dev.Zero(Fb, static_cast<u32>(4 * n)));
+      FAF_GPU_TRY(dev.Optional(fac.rain, w, h, rain));
+      FAF_GPU_TRY(dev.Optional(fac.rock, w, h, rock));
+      FAF_GPU_TRY(dev.Optional(fac.thermal, w, h, thermalRate));
+      if (masks) {
+        FAF_GPU_TRY(dev.Zero(wear, w, h));
+        FAF_GPU_TRY(dev.Zero(dep, w, h));
+        FAF_GPU_TRY(dev.Zero(flow, w, h));
+      }
+      if (thermalOn) {
+        FAF_GPU_TRY(tk.Make(dev, w, h));
+      }
 
       const int sides = p.pin_border ? (p.pin_sides & 15) : 0;
       hk::ErodeHydroParams hp{};
@@ -330,47 +330,42 @@ namespace faf::editor::gpu
       const Resource& depR = masks ? dep.R() : *dev.dummy[2];
       const Resource& flowR = masks ? flow.R() : *dev.dummy[3];
       IterStats st;
-      const bool ok = RunIterations(ex, static_cast<u32>(p.iterations), 60.0, [&](const u32 it, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(p.iterations), 60.0, [&](const u32 it) -> std::expected<void, std::string> {
         hp.iter = it;
         {
           Bindings b;
           b.Srv(0, T.Src().R()).Srv(1, D.R()).Srv(2, Or(rain, d0)).Uav(0, *Fa).Uav(1, *Fb);
-          if (!DispatchGrid(ex, *kFlux, hp.w, hp.h, hp, b, e))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kFlux, hp.w, hp.h, hp, b));
         }
         {
           Bindings b;
           b.Srv(0, T.Src().R()).Srv(1, *Fa).Srv(2, *Fb).Srv(3, Or(rain, d0)).Srv(4, Or(rock, d0)).Srv(5, S.R());
           b.Uav(0, dT.R()).Uav(1, D.R()).Uav(2, SN.R()).Uav(3, DO.R()).Uav(4, wearR).Uav(5, depR).Uav(6, flowR);
-          if (!DispatchGrid(ex, *kWater, hp.w, hp.h, hp, b, e))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kWater, hp.w, hp.h, hp, b));
         }
         {
           Bindings b;
           b.Srv(0, T.Src().R()).Srv(1, dT.R()).Uav(0, T.Dst().R());
-          if (!DispatchGrid(ex, *kApply, hp.w, hp.h, hp, b, e))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kApply, hp.w, hp.h, hp, b));
         }
         T.Flip();
         {
           Bindings b;
           b.Srv(0, *Fa).Srv(1, *Fb).Srv(2, SN.R()).Srv(3, DO.R()).Uav(0, S.R()).Uav(1, D.R());
-          if (!DispatchGrid(ex, *kTrans, hp.w, hp.h, hp, b, e))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kTrans, hp.w, hp.h, hp, b));
         }
         if (thermalOn && ((it + 1) % static_cast<u32>(p.thermal_every)) == 0) {
-          if (!tk.Step(ex, T, Or(thermalRate, d0), !fac.thermal.empty(), tp, e))
-            return false;
+          FAF_GPU_TRY(tk.Step(ex, T, Or(thermalRate, d0), !fac.thermal.empty(), tp));
         }
-        return true;
-      }, err, &st);
+        return {};
+      }, &st);
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       if (p.settle) {
         Bindings b;
         b.Uav(0, T.Src().R()).Uav(1, S.R()).Uav(2, depR);
-        if (!DispatchGrid(ex, *kSettle, hp.w, hp.h, hp, b, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(DispatchGrid(ex, *kSettle, hp.w, hp.h, hp, b));
       }
 
       ero::HydroState hs;
@@ -378,25 +373,23 @@ namespace faf::editor::gpu
       hs.h = h;
       hs.cell = src->cell;
       hs.t.resize(static_cast<std::size_t>(n));
-      if (!DownloadField(ex, T.Src(), hs.t.data(), err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadField(ex, T.Src(), hs.t.data()));
       if (masks) {
         hs.d.resize(static_cast<std::size_t>(n));
         hs.s.resize(static_cast<std::size_t>(n));
         hs.wear.resize(static_cast<std::size_t>(n));
         hs.dep.resize(static_cast<std::size_t>(n));
         hs.flow.resize(static_cast<std::size_t>(n));
-        if (
-          !DownloadField(ex, D, hs.d.data(), err) || !DownloadField(ex, S, hs.s.data(), err) ||
-          !DownloadField(ex, wear, hs.wear.data(), err) || !DownloadField(ex, dep, hs.dep.data(), err) ||
-          !DownloadField(ex, flow, hs.flow.data(), err)
-        ) {
-          return OpResult::Failed;
-        }
+        FAF_GPU_TRY(DownloadField(ex, D, hs.d.data()));
+        FAF_GPU_TRY(DownloadField(ex, S, hs.s.data()));
+        FAF_GPU_TRY(DownloadField(ex, wear, hs.wear.data()));
+        FAF_GPU_TRY(DownloadField(ex, dep, hs.dep.data()));
+        FAF_GPU_TRY(DownloadField(ex, flow, hs.flow.data()));
       }
       Grid result;
-      if (!ero::FinishHydroOp(a, *src, p, hs, result, err))
-        return OpResult::Failed;
+      if (auto finished = ero::FinishHydroOp(a, *src, p, hs, result); !finished) {
+        return std::unexpected(finished.error());
+      }
       out = std::move(result);
       return OpResult::Done;
     }
@@ -428,7 +421,7 @@ namespace faf::editor::gpu
       std::unique_ptr<Resource> weights;
       Field d, f[3];
 
-      bool Make(
+      std::expected<void, std::string> Make(
         Dev& dev,
         const int w,
         const int h
@@ -438,21 +431,22 @@ namespace faf::editor::gpu
         kBlend = FindKernel("erosion_blend");
         kBlur = FindKernel("blur_pass");
         if (kDelta == nullptr || kBlend == nullptr || kBlur == nullptr) {
-          dev.err = "kernel erosion_delta / erosion_blend / blur_pass is missing";
-          return false;
+          return std::unexpected("kernel erosion_delta / erosion_blend / blur_pass is missing");
         }
         const float kern[2] = {0.5f, 0.25f}; // centre 1/2, sides 1/4: with the clamped edges the CPU BlurPass
-        return MakeField(dev.ex, w, h, d, dev.err) && MakeField(dev.ex, w, h, f[0], dev.err) &&
-          MakeField(dev.ex, w, h, f[1], dev.err) && MakeField(dev.ex, w, h, f[2], dev.err) &&
-          MakeBuffer(dev.ex, 2, weights, dev.err) && UploadBuffer(dev.ex, *weights, kern, sizeof(kern), dev.err);
+        FAF_GPU_TRY(MakeField(dev.ex, w, h, d));
+        FAF_GPU_TRY(MakeField(dev.ex, w, h, f[0]));
+        FAF_GPU_TRY(MakeField(dev.ex, w, h, f[1]));
+        FAF_GPU_TRY(MakeField(dev.ex, w, h, f[2]));
+        FAF_GPU_TRY(MakeBuffer(dev.ex, 2, weights));
+        return UploadBuffer(dev.ex, *weights, kern, sizeof(kern));
       }
 
       /** One smoothing pass of `from` into a scratch field other than `from` (never `d`, which the blend needs);
-       * returns it (null on error). */
-      Field* Pass(
+       * returns it (or the error). */
+      std::expected<Field*, std::string> Pass(
         Executor& ex,
-        Field* from,
-        std::string& err
+        Field* from
       )
       {
         Field* out = nullptr;
@@ -466,8 +460,7 @@ namespace faf::editor::gpu
             tmp = &c;
         }
         if (out == nullptr || tmp == nullptr) {
-          err = "no scratch field left";
-          return nullptr;
+          return std::unexpected("no scratch field left");
         }
         hk::BlurParams bp{};
         bp.w = static_cast<std::uint32_t>(d.w);
@@ -477,20 +470,18 @@ namespace faf::editor::gpu
           bp.vertical = 0;
           Bindings bi;
           bi.Srv(0, from->R()).Srv(1, *weights).Uav(0, tmp->R());
-          if (!DispatchGrid(ex, *kBlur, bp.w, bp.h, bp, bi, err))
-            return nullptr;
+          FAF_GPU_TRY(DispatchGrid(ex, *kBlur, bp.w, bp.h, bp, bi));
         }
         {
           bp.vertical = 1;
           Bindings bi;
           bi.Srv(0, tmp->R()).Srv(1, *weights).Uav(0, out->R());
-          if (!DispatchGrid(ex, *kBlur, bp.w, bp.h, bp, bi, err))
-            return nullptr;
+          FAF_GPU_TRY(DispatchGrid(ex, *kBlur, bp.w, bp.h, bp, bi));
         }
         return out;
       }
 
-      bool Run(
+      std::expected<void, std::string> Run(
         Executor& ex,
         PingPong& t,
         const Field& base,
@@ -498,8 +489,7 @@ namespace faf::editor::gpu
         const float amount,
         const Resource* mask,
         const bool edgeKeep,
-        const Resource& dummy,
-        std::string& err
+        const Resource& dummy
       )
       {
         hk::ErodeThermalParams tp{};
@@ -508,23 +498,23 @@ namespace faf::editor::gpu
         {
           Bindings bi;
           bi.Srv(0, t.Src().R()).Srv(1, base.R()).Uav(0, d.R());
-          if (!DispatchGrid(ex, *kDelta, tp.w, tp.h, tp, bi, err))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kDelta, tp.w, tp.h, tp, bi));
         }
         const int whole = static_cast<int>(passes);
         const float frac = passes - static_cast<float>(whole);
         Field* sm = &d;
         for (int k = 0; k < whole; ++k) {
-          Field* next = Pass(ex, sm, err);
-          if (next == nullptr)
-            return false;
-          sm = next;
+          const auto next = Pass(ex, sm);
+          if (!next)
+            return std::unexpected(next.error());
+          sm = *next;
         }
         Field* sm2 = sm;
         if (frac > 0.0f) {
-          sm2 = Pass(ex, sm, err);
-          if (sm2 == nullptr)
-            return false;
+          const auto next = Pass(ex, sm);
+          if (!next)
+            return std::unexpected(next.error());
+          sm2 = *next;
         }
         tp.amount = amount;
         tp.blendNext = frac;
@@ -537,18 +527,16 @@ namespace faf::editor::gpu
           .Srv(3, sm2->R())
           .Srv(4, mask != nullptr ? *mask : dummy)
           .Uav(0, t.Dst().R());
-        if (!DispatchGrid(ex, *kBlend, tp.w, tp.h, tp, bi, err))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *kBlend, tp.w, tp.h, tp, bi));
         t.Flip();
-        return true;
+        return {};
       }
     };
 
-    OpResult OpDropletGpu(
+    std::expected<OpResult, std::string> OpDropletGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = nullptr;
@@ -566,8 +554,7 @@ namespace faf::editor::gpu
       const KernelInfo* kSteer = FindKernel("erosion_steer");
       const KernelInfo* kCopy = FindKernel("erosion_copy");
       if (kDrop == nullptr || kResolve == nullptr || kSteer == nullptr || kCopy == nullptr) {
-        err = "an erosion_drop kernel is missing";
-        return OpResult::Failed;
+        return std::unexpected("an erosion_drop kernel is missing");
       }
 
       ero::OpFactors fac;
@@ -603,37 +590,39 @@ namespace faf::editor::gpu
       const double fraction = want - static_cast<double>(whole);
       const std::uint32_t batches = (whole + 1u + kBatch - 1u) / kBatch;
 
-      Dev dev(ex, err);
+      Dev dev(ex);
       PingPong T;
       Field t0, tprev, hs, rock, soft, accept, thermalRate, wearF, depF, flowF;
       std::unique_ptr<Resource> dq, wq, pq, fq;
       DeltaFilter filter;
       ThermalKit tk;
-      if (
-        !dev.Dummies() || !UploadGrid(ex, *src, T.f[0], err) || !UploadGrid(ex, *src, t0, err) ||
-        !MakeField(ex, w, h, T.f[1], err)
-      )
-        return OpResult::Failed;
-      if (!dev.Zero(dq, static_cast<u32>(n)))
-        return OpResult::Failed;
-      if (
-        masks &&
-        (!dev.Zero(wq, static_cast<u32>(n)) || !dev.Zero(pq, static_cast<u32>(n)) ||
-         !dev.Zero(fq, static_cast<u32>(n)) || !dev.Zero(wearF, w, h) || !dev.Zero(depF, w, h) ||
-         !dev.Zero(flowF, w, h))
-      )
-        return OpResult::Failed;
-      if (
-        !dev.Optional(fac.rock, w, h, rock) || !dev.Optional(fac.soft, w, h, soft) ||
-        !dev.Optional(fac.accept, w, h, accept) || !dev.Optional(fac.thermal, w, h, thermalRate)
-      )
-        return OpResult::Failed;
-      if (pits && (!UploadGrid(ex, *src, hs, err) || !MakeField(ex, w, h, tprev, err)))
-        return OpResult::Failed;
-      if ((creepPasses > 0.0f || smoothOn) && !filter.Make(dev, w, h))
-        return OpResult::Failed;
-      if (thermalOn && !tk.Make(dev, w, h))
-        return OpResult::Failed;
+      FAF_GPU_TRY(dev.Dummies());
+      FAF_GPU_TRY(UploadGrid(ex, *src, T.f[0]));
+      FAF_GPU_TRY(UploadGrid(ex, *src, t0));
+      FAF_GPU_TRY(MakeField(ex, w, h, T.f[1]));
+      FAF_GPU_TRY(dev.Zero(dq, static_cast<u32>(n)));
+      if (masks) {
+        FAF_GPU_TRY(dev.Zero(wq, static_cast<u32>(n)));
+        FAF_GPU_TRY(dev.Zero(pq, static_cast<u32>(n)));
+        FAF_GPU_TRY(dev.Zero(fq, static_cast<u32>(n)));
+        FAF_GPU_TRY(dev.Zero(wearF, w, h));
+        FAF_GPU_TRY(dev.Zero(depF, w, h));
+        FAF_GPU_TRY(dev.Zero(flowF, w, h));
+      }
+      FAF_GPU_TRY(dev.Optional(fac.rock, w, h, rock));
+      FAF_GPU_TRY(dev.Optional(fac.soft, w, h, soft));
+      FAF_GPU_TRY(dev.Optional(fac.accept, w, h, accept));
+      FAF_GPU_TRY(dev.Optional(fac.thermal, w, h, thermalRate));
+      if (pits) {
+        FAF_GPU_TRY(UploadGrid(ex, *src, hs));
+        FAF_GPU_TRY(MakeField(ex, w, h, tprev));
+      }
+      if (creepPasses > 0.0f || smoothOn) {
+        FAF_GPU_TRY(filter.Make(dev, w, h));
+      }
+      if (thermalOn) {
+        FAF_GPU_TRY(tk.Make(dev, w, h));
+      }
 
       hk::ErodeDropParams dp{};
       dp.w = static_cast<std::uint32_t>(w);
@@ -670,7 +659,7 @@ namespace faf::editor::gpu
       std::vector<float> host;
       const u32 total = static_cast<u32>(rounds) * batches;
       IterStats st;
-      const bool ok = RunIterations(ex, total, 60.0, [&](const u32 it, std::string& e) {
+      const auto ok = RunIterations(ex, total, 60.0, [&](const u32 it) -> std::expected<void, std::string> {
         const u32 round = it / batches;
         const u32 batch = it % batches;
         if (batch == 0) {
@@ -679,17 +668,14 @@ namespace faf::editor::gpu
             // does not parallelise)
             host.resize(static_cast<std::size_t>(n));
             std::vector<float> fill;
-            if (!DownloadField(ex, T.Src(), host.data(), e))
-              return false;
+            FAF_GPU_TRY(DownloadField(ex, T.Src(), host.data()));
             ero::FillSteeringSurface(host, w, h, 0.004f * src->cell, fill);
-            if (!UploadField(ex, hs, fill.data(), e))
-              return false;
+            FAF_GPU_TRY(UploadField(ex, hs, fill.data()));
           }
           if (pits) {
             Bindings bi;
             bi.Srv(0, T.Src().R()).Uav(0, tprev.R());
-            if (!DispatchGrid(ex, *kCopy, gp.w, gp.h, gp, bi, e))
-              return false;
+            FAF_GPU_TRY(DispatchGrid(ex, *kCopy, gp.w, gp.h, gp, bi));
           }
         }
         // this batch of droplets
@@ -709,8 +695,7 @@ namespace faf::editor::gpu
             .Srv(4, Or(soft, d0));
           bi.Uav(0, *dq).Uav(1, wqR).Uav(2, pqR).Uav(3, fqR);
           const std::uint32_t rowsNeeded = (count + dp.gw - 1) / dp.gw;
-          if (!DispatchGrid(ex, *kDrop, dp.gw, rowsNeeded, dp, bi, e))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *kDrop, dp.gw, rowsNeeded, dp, bi));
         }
         if (batch + 1 == batches) {
           // the end of the round: the integers into the floats, the steering surface follows, creep
@@ -724,62 +709,57 @@ namespace faf::editor::gpu
               .Uav(5, pqR)
               .Uav(6, masks ? flowF.R() : *dev.dummy[6])
               .Uav(7, fqR);
-            if (!DispatchGrid(ex, *kResolve, gp.w, gp.h, gp, bi, e))
-              return false;
+            FAF_GPU_TRY(DispatchGrid(ex, *kResolve, gp.w, gp.h, gp, bi));
           }
-          if (
-            creepPasses > 0.0f &&
-            !filter.Run(ex, T, t0, creepPasses, 1.0f, fac.rock.empty() ? nullptr : &rockR, false, d0, e)
-          )
-            return false;
+          if (creepPasses > 0.0f) {
+            FAF_GPU_TRY(filter.Run(ex, T, t0, creepPasses, 1.0f, fac.rock.empty() ? nullptr : &rockR, false, d0));
+          }
           if (pits) {
             Bindings bi;
             bi.Srv(0, tprev.R()).Srv(1, T.Src().R()).Uav(0, hs.R());
-            if (!DispatchGrid(ex, *kSteer, gp.w, gp.h, gp, bi, e))
-              return false;
+            FAF_GPU_TRY(DispatchGrid(ex, *kSteer, gp.w, gp.h, gp, bi));
           }
         }
-        return true;
-      }, err, &st);
+        return {};
+      }, &st);
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
 
       // the cell noise filter (the CPU SmoothDelta: the change since the input, smoothed), then the thermal slides
       if (smoothOn) {
-        const bool okFilter = RunIterations(ex, 1, 60.0, [&](u32, std::string& e) {
+        const auto okFilter = RunIterations(ex, 1, 60.0, [&](u32) -> std::expected<void, std::string> {
           return filter.Run(
-            ex, T, t0, static_cast<float>(smoothPasses), std::min(1.0f, smoothAmount), nullptr, false, d0, e
+            ex, T, t0, static_cast<float>(smoothPasses), std::min(1.0f, smoothAmount), nullptr, false, d0
           );
-        }, err);
+        });
         if (!okFilter)
-          return OpResult::Failed;
+          return std::unexpected(okFilter.error());
       }
       if (thermalOn) {
         const hk::ErodeThermalParams tp =
           ThermalParams(w, h, src->cell, static_cast<float>(a.p.N("talus", 0.8)), thermal, !fac.thermal.empty(), 0);
-        const bool okThermal = RunIterations(ex, static_cast<u32>(thermalSteps), 60.0, [&](u32, std::string& e) {
-          return tk.Step(ex, T, Or(thermalRate, d0), !fac.thermal.empty(), tp, e);
-        }, err);
+        const auto okThermal =
+          RunIterations(ex, static_cast<u32>(thermalSteps), 60.0, [&](u32) -> std::expected<void, std::string> {
+          return tk.Step(ex, T, Or(thermalRate, d0), !fac.thermal.empty(), tp);
+        });
         if (!okThermal)
-          return OpResult::Failed;
+          return std::unexpected(okThermal.error());
       }
 
       std::vector<float> height(static_cast<std::size_t>(n)), wear, deposit, flow;
-      if (!DownloadField(ex, T.Src(), height.data(), err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadField(ex, T.Src(), height.data()));
       if (masks) {
         wear.resize(static_cast<std::size_t>(n));
         deposit.resize(static_cast<std::size_t>(n));
         flow.resize(static_cast<std::size_t>(n));
-        if (
-          !DownloadField(ex, wearF, wear.data(), err) || !DownloadField(ex, depF, deposit.data(), err) ||
-          !DownloadField(ex, flowF, flow.data(), err)
-        )
-          return OpResult::Failed;
+        FAF_GPU_TRY(DownloadField(ex, wearF, wear.data()));
+        FAF_GPU_TRY(DownloadField(ex, depF, deposit.data()));
+        FAF_GPU_TRY(DownloadField(ex, flowF, flow.data()));
       }
       Grid result;
-      if (!ero::FinishDropletOp(a, *src, height, wear, deposit, flow, result, err))
-        return OpResult::Failed;
+      if (auto finished = ero::FinishDropletOp(a, *src, height, wear, deposit, flow, result); !finished) {
+        return std::unexpected(finished.error());
+      }
       out = std::move(result);
       return OpResult::Done;
     }

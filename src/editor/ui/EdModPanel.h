@@ -3,6 +3,7 @@
 #include "editor/doc/EdModProject.h"
 #include "editor/tools/EdUnitLab.h"
 
+#include <expected>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -27,18 +28,18 @@ namespace faf::editor
 
     /** The folder the projects are in: the vault's `mods`. */
     [[nodiscard]] std::filesystem::path Root() const;
-    /** Makes a project and opens it; false with `error` (a bad or taken name). */
-    bool Create(const std::string& name, std::string& error);
-    bool Open(const std::string& name, std::string& error);
+    /** Makes a project and opens it; the error for a bad or taken name. */
+    [[nodiscard]] std::expected<void, std::string> Create(const std::string& name);
+    [[nodiscard]] std::expected<void, std::string> Open(const std::string& name);
     /** Writes the open project; its report. */
     ModWriteReport Write();
     /** The open project's checks now. */
     [[nodiscard]] std::vector<ModIssue> Check();
     /**
      * Zip for the vault: the project written, then its files but the editor's own zipped under one folder into the
-     * vault's `editor_releases` folder; the zip's path, or empty with `error`.
+     * vault's `editor_releases` folder; the zip's path, or the error.
      */
-    std::filesystem::path Release(std::string& error);
+    [[nodiscard]] std::expected<std::filesystem::path, std::string> Release();
     [[nodiscard]] ModProject* Project() noexcept
     {
       return mProject ? &*mProject : nullptr;

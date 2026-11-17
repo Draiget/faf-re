@@ -73,14 +73,15 @@ namespace faf::editor
 
   PreviewFrame PreviewFrameOf(
     const float mapWidth,
-    const float mapDepth
+    const float mapDepth,
+    const int side
   )
   {
     PreviewFrame f;
     const float longer = std::max({mapWidth, mapDepth, 1.0f});
-    f.scale = longer / static_cast<float>(kPreviewSide);
-    f.offsetX = (static_cast<float>(kPreviewSide) - mapWidth / f.scale) * 0.5f;
-    f.offsetZ = (static_cast<float>(kPreviewSide) - mapDepth / f.scale) * 0.5f;
+    f.scale = longer / static_cast<float>(side);
+    f.offsetX = (static_cast<float>(side) - mapWidth / f.scale) * 0.5f;
+    f.offsetZ = (static_cast<float>(side) - mapDepth / f.scale) * 0.5f;
     return f;
   }
 
@@ -91,7 +92,7 @@ namespace faf::editor
     const PreviewOptions& options
   )
   {
-    constexpr int kSide = kPreviewSide;
+    const int kSide = std::clamp(options.side, 16, 2048);
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide, 0xFF000000u);
     if (heights.width < 2 || heights.height < 2 || mapWidth <= 0.0f || mapDepth <= 0.0f) {
       return pixels;
@@ -120,11 +121,11 @@ namespace faf::editor
     }
     const float low = options.water ? std::max(options.waterLevel, lowWord / 128.0f) : lowWord / 128.0f;
     const float range = std::max(1.0f, highWord / 128.0f - low);
-    const PreviewFrame f = PreviewFrameOf(mapWidth, mapDepth);
-    // Lit from the north-west, above.
-    const float lx = -0.5f;
-    const float ly = 0.75f;
-    const float lz = -0.5f;
+    const PreviewFrame f = PreviewFrameOf(mapWidth, mapDepth, kSide);
+    // Lit from the north-west, above; or by the map's sun.
+    const float lx = options.sun ? options.sunDirection[0] : -0.5f;
+    const float ly = options.sun ? options.sunDirection[1] : 0.75f;
+    const float lz = options.sun ? options.sunDirection[2] : -0.5f;
     const float ll = std::sqrt(lx * lx + ly * ly + lz * lz);
     for (int py = 0; py < kSide; ++py) {
       for (int px = 0; px < kSide; ++px) {
@@ -148,9 +149,22 @@ namespace faf::editor
           const float nz = -dz;
           const float nl = std::sqrt(nx * nx + ny * ny + nz * nz);
           const float light = std::clamp((nx * lx + ny * ly + nz * lz) / (nl * ll), 0.0f, 1.0f);
-          const float shade = 0.45f + 0.75f * light;
-          const Rgb land = LandColour((h - low) / range);
-          colour = {land.r * shade, land.g * shade, land.b * shade};
+          float painted[3] = {0.0f, 0.0f, 0.0f};
+          const bool fromLayers = options.groundColour && options.groundColour(x, z, painted);
+          const Rgb land = fromLayers ? Rgb{painted[0], painted[1], painted[2]} : LandColour((h - low) / range);
+          if (options.sun) {
+            // The map's light: its ambience plus the sun's colour by the slope's light, times its multiplier.
+            float lit[3];
+            for (int i = 0; i < 3; ++i) {
+              lit[i] = std::clamp(
+                (options.ambient[i] + options.sunColour[i] * light) * options.multiplier * 0.75f, 0.0f, 1.6f
+              );
+            }
+            colour = {land.r * lit[0], land.g * lit[1], land.b * lit[2]};
+          } else {
+            const float shade = 0.45f + 0.75f * light;
+            colour = {land.r * shade, land.g * shade, land.b * shade};
+          }
         }
         pixels[static_cast<std::size_t>(py) * kSide + px] = Pack(colour);
       }

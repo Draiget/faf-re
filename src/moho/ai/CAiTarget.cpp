@@ -1,6 +1,7 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/lua/LuaVector3.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstddef>
 #include <cstdint>
@@ -506,7 +507,7 @@ bool CAiTarget::ImpactDidHitEntity(
     return true;
   }
 
-  const std::int32_t impactOrdinal = static_cast<std::int32_t>(impactType);
+  const std::int32_t impactOrdinal = std::to_underlying(impactType);
   return entity == nullptr && static_cast<std::uint32_t>(impactOrdinal - 1) <= 3u;
 }
 

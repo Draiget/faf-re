@@ -1,5 +1,6 @@
 #include "moho/sim/EGenericIconTypeTypeInfo.h"
 
+#include <utility>
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -68,14 +69,14 @@ namespace moho
   void EGenericIconTypeTypeInfo::AddEnums()
   {
     mPrefix = "GIT_";
-    AddEnum(StripPrefix("GIT_Land"), static_cast<std::int32_t>(GIT_Land));
-    AddEnum(StripPrefix("GIT_LandHL"), static_cast<std::int32_t>(GIT_LandHL));
-    AddEnum(StripPrefix("GIT_Naval"), static_cast<std::int32_t>(GIT_Naval));
-    AddEnum(StripPrefix("GIT_NavalHL"), static_cast<std::int32_t>(GIT_NavalHL));
-    AddEnum(StripPrefix("GIT_Air"), static_cast<std::int32_t>(GIT_Air));
-    AddEnum(StripPrefix("GIT_AirHL"), static_cast<std::int32_t>(GIT_AirHL));
-    AddEnum(StripPrefix("GIT_Structure"), static_cast<std::int32_t>(GIT_Structure));
-    AddEnum(StripPrefix("GIT_StructureHL"), static_cast<std::int32_t>(GIT_StructureHL));
+    AddEnum(StripPrefix("GIT_Land"), std::to_underlying(GIT_Land));
+    AddEnum(StripPrefix("GIT_LandHL"), std::to_underlying(GIT_LandHL));
+    AddEnum(StripPrefix("GIT_Naval"), std::to_underlying(GIT_Naval));
+    AddEnum(StripPrefix("GIT_NavalHL"), std::to_underlying(GIT_NavalHL));
+    AddEnum(StripPrefix("GIT_Air"), std::to_underlying(GIT_Air));
+    AddEnum(StripPrefix("GIT_AirHL"), std::to_underlying(GIT_AirHL));
+    AddEnum(StripPrefix("GIT_Structure"), std::to_underlying(GIT_Structure));
+    AddEnum(StripPrefix("GIT_StructureHL"), std::to_underlying(GIT_StructureHL));
   }
 } // namespace moho
 

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <span>
 #include <string>
@@ -114,14 +115,14 @@ namespace faf::remote
     int gameVersion = 0;
     std::vector<std::pair<std::string, ESyncRoute>> routes; // sorted by key
   };
-  /** Reads a policy file's text; false with `error` set if a line is bad, a key repeats or the version is missing. */
-  [[nodiscard]] bool ParseSyncPolicy(std::string_view text, SSyncPolicy& policy, std::string& error);
+  /** Reads a policy file's text; the error if a line is bad, a key repeats or the version is missing. */
+  [[nodiscard]] std::expected<SSyncPolicy, std::string> ParseSyncPolicy(std::string_view text);
   /** From now on `SyncKeyRoutes` and `RouteOfSyncKey` answer from `policy` (`--sync-policy`); call before routing. */
   void UseSyncPolicy(SSyncPolicy policy);
   /** Back to the compiled table (tests). */
   void UseCompiledSyncPolicy();
-  /** `--sync-policy <file>`, if given: read and put in use. False with `error` set if the file can't be used. */
-  [[nodiscard]] bool UseSyncPolicyFile(const std::string& path, std::string& error);
+  /** `--sync-policy <file>`, if given: read and put in use. The error if the file can't be used. */
+  [[nodiscard]] std::expected<void, std::string> UseSyncPolicyFile(const std::string& path);
 
   /** A chat message's `to`: `'all'`, `'allies'`, an army number, or anything else (`'notify'`, nil). */
   enum class EChatTo : std::uint8_t

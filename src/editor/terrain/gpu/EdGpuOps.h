@@ -6,10 +6,11 @@
 // condition holds, and on ANY other outcome returns false so the CPU op runs as before:
 //   policy.enabled (ed_gpu_compute)   the backend may work (Backend::MayWork)   the op has a registered GpuOpFn   the
 //   field has at least policy.minCells samples (ed_gpu_min_cells) the backend is not busy with another thread's op
-//   (never waits)   the GpuOpFn returns Done (Unsupported = parameters it does not handle, Failed = an error: both fall
-//   back).
+//   (never waits)   the GpuOpFn returns Done (Unsupported = parameters it does not handle, an error = something failed:
+//   both fall back).
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -18,18 +19,18 @@
 
 namespace faf::editor::gpu
 {
+  /** What a GPU op did when nothing failed. A failure is the op's error instead (something went wrong on the device,
+   * the text says what): the CPU op runs, the fall-back is counted and the reason kept (LastOpError). */
   enum class OpResult
   {
     Done,        // `out` is complete
     Unsupported, // these inputs / parameters are not handled on the GPU: the CPU op runs (nothing is counted as a
                  // failure)
-    Failed, // something went wrong on the device (`err` says what): the CPU op runs, the fall-back is counted and the
-            // reason kept (LastOpError)
   };
 
   /** A GPU version of CPU op `name`: same parameters, same result (within float tolerance). Must leave `out` untouched
    * unless it returns Done. May throw nothing the caller cannot take (TryRun catches). */
-  using GpuOpFn = OpResult (*)(Executor& ex, const field::OpArgs& args, field::Grid& out, std::string& err);
+  using GpuOpFn = std::expected<OpResult, std::string> (*)(Executor& ex, const field::OpArgs& args, field::Grid& out);
 
   /** Console variables ed_gpu_compute / ed_gpu_min_cells (EdGpuLua.cpp binds them to these). */
   struct Policy
@@ -72,7 +73,7 @@ namespace faf::editor::gpu
   /** Forget it (after a device reset). */
   void ResetSelfTestState();
 
-  /** The reason of the last Failed op or refused lease ("blur: ..."), empty if none. */
+  /** The reason of the last failed op or refused lease ("blur: ..."), empty if none. */
   [[nodiscard]] std::string LastOpError();
   void SetLastOpError(const std::string& text);
 
@@ -87,16 +88,8 @@ namespace faf::editor::gpu
    * samples (> 1e-6), clamped edges. `src` -> `tmp` (rows) -> `dst` (columns): `dst` may be `src`, `tmp` must be
    * another field of the same size. Same arithmetic as the CPU, in the same order.
    */
-  [[nodiscard]] bool BlurDevice(
-    Executor& ex,
-    const Resource& src,
-    Resource& tmp,
-    Resource& dst,
-    int w,
-    int h,
-    double sigma,
-    std::string& err
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  BlurDevice(Executor& ex, const Resource& src, Resource& tmp, Resource& dst, int w, int h, double sigma);
 
   // ---- self test
   // -----------------------------------------------------------------------------------------------------------------------------

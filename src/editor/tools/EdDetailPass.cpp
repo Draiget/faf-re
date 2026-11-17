@@ -310,7 +310,7 @@ namespace faf::editor
       const std::size_t end = t.find('/', at + 5);
       const std::string folder = t.substr(at + 5, end == std::string::npos ? std::string::npos : end - at - 5);
       for (const auto& [name, id] : kFolders) {
-        if (folder.find(name) != std::string::npos) {
+        if (folder.contains(name)) {
           ++votes[id];
           break;
         }
@@ -337,10 +337,7 @@ namespace faf::editor
     const std::string file = "/" + Lower(name) + "_prop.bp";
     for (const std::string& bp : blueprints) {
       const std::string l = Lower(bp);
-      if (
-        l.find(g) != std::string::npos && l.size() >= file.size() &&
-        l.compare(l.size() - file.size(), file.size(), file) == 0
-      ) {
+      if (l.contains(g) && l.size() >= file.size() && l.ends_with(file)) {
         return bp;
       }
     }
@@ -391,12 +388,11 @@ namespace faf::editor
     return std::max(1, static_cast<int>(std::floor(c.per1000 * area / 1000.0 * density + 0.5)));
   }
 
-  bool DetailDensity(
+  std::expected<void, std::string> DetailDensity(
     MaskGenContext& context,
     const DetailClass& c,
     const int seed,
-    field::Grid& out,
-    std::string& error
+    field::Grid& out
   )
   {
     // The raw clustering noise first (0..1, monotone in the noise), then its top share kept: the value a share of the
@@ -411,8 +407,8 @@ namespace faf::editor
        {"to", 1.0f}}
     )};
     field::Grid noise;
-    if (!EvaluateMaskRules(context, raw, noise, error)) {
-      return false;
+    if (auto made = EvaluateMaskRules(context, raw, noise); !made) {
+      return made;
     }
     std::vector<float> sorted = noise.v;
     std::sort(sorted.begin(), sorted.end());
@@ -442,8 +438,8 @@ namespace faf::editor
         Rule("grow", {{"distance", 2.0f}, {"soft", 2.0f}}),
       };
       field::Grid channels;
-      if (!EvaluateMaskRules(context, flow, channels, error)) {
-        return false;
+      if (auto made = EvaluateMaskRules(context, flow, channels); !made) {
+        return made;
       }
       if (channels.v.size() == out.v.size()) {
         for (std::size_t k = 0; k < out.v.size(); ++k) {
@@ -451,7 +447,7 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return {};
   }
 
   std::vector<DetailMeasure> MeasureDetail(

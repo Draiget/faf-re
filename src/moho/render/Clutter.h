@@ -168,10 +168,10 @@ namespace moho
    */
   struct ClutterRegionKeyLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const ClutterRegionKey& lhs,
       const ClutterRegionKey& rhs
-    ) const noexcept
+    ) noexcept
     {
       return (lhs.mX < rhs.mX) || (lhs.mX == rhs.mX && lhs.mZ < rhs.mZ);
     }

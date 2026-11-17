@@ -2,6 +2,7 @@
 #include "moho/terrain/SplatChunkRenderer.h"
 #include "moho/terrain/SplatBudget.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -996,7 +997,7 @@ namespace moho
 
     for (const TerrainDecalDrawCommand& command : mDecalDrawCommands) {
       CWldTerrainDecal& decal = *command.decal;
-      if (static_cast<std::int32_t>(decal.mType) != decalType) {
+      if (std::to_underlying(decal.mType) != decalType) {
         continue;
       }
 

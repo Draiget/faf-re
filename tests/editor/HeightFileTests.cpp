@@ -56,10 +56,11 @@ namespace
   {
     const HeightImage written = Random(65, 65, 3u);
     const std::filesystem::path file = TempFile(GetParam());
-    std::string error;
-    ASSERT_TRUE(WriteHeightImage(file, written, error)) << error;
-    HeightImage read;
-    ASSERT_TRUE(ReadHeightImage(file, 0, 0, read, error)) << error;
+    const auto wrote = WriteHeightImage(file, written);
+    ASSERT_TRUE(wrote) << wrote.error();
+    const auto back = ReadHeightImage(file, 0, 0);
+    ASSERT_TRUE(back) << back.error();
+    const HeightImage& read = *back;
     EXPECT_EQ(read.width, 65);
     EXPECT_EQ(read.height, 65);
     EXPECT_EQ(read.words, written.words);
@@ -74,12 +75,12 @@ namespace
   {
     const HeightImage written = Random(129, 65, 4u);
     const std::filesystem::path file = TempFile("wide.raw");
-    std::string error;
-    ASSERT_TRUE(WriteHeightImage(file, written, error)) << error;
-    HeightImage read;
-    EXPECT_FALSE(ReadHeightImage(file, 0, 0, read, error));
-    ASSERT_TRUE(ReadHeightImage(file, 129, 65, read, error)) << error;
-    EXPECT_EQ(read.words, written.words);
+    const auto wrote = WriteHeightImage(file, written);
+    ASSERT_TRUE(wrote) << wrote.error();
+    EXPECT_FALSE(ReadHeightImage(file, 0, 0));
+    const auto read = ReadHeightImage(file, 129, 65);
+    ASSERT_TRUE(read) << read.error();
+    EXPECT_EQ(read->words, written.words);
   }
 
   TEST(

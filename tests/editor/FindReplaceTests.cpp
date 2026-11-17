@@ -3,6 +3,7 @@
 
 #include "editor/tools/EdFindReplace.h"
 
+#include <utility>
 #include <gtest/gtest.h>
 
 #include <vector>
@@ -80,7 +81,7 @@ namespace
         for (int c = 0; c < copies; ++c) {
           inside += InFirstPart(kSide, kSide, symmetry, turns, cx[c], cz[c]) ? 1 : 0;
         }
-        EXPECT_EQ(inside, 1) << "symmetry " << static_cast<int>(symmetry) << " at " << x << ", " << z;
+        EXPECT_EQ(inside, 1) << "symmetry " << std::to_underlying(symmetry) << " at " << x << ", " << z;
       }
     }
     EXPECT_TRUE(InFirstPart(kSide, kSide, Symmetry::LeftRight, 2, 40.0f, 60.0f)) << "left-right: the left half";

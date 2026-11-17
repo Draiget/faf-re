@@ -36,9 +36,9 @@ namespace
     ReadsFafmesSet
   )
   {
-    std::vector<PropPaintEntry> entries;
-    std::string error;
-    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(kFafme, entries, error)) << error;
+    const auto read = faf::editor::PaintSetFromProppaintset(kFafme);
+    ASSERT_TRUE(read) << read.error();
+    const std::vector<PropPaintEntry>& entries = *read;
     ASSERT_EQ(entries.size(), 2u);
     EXPECT_EQ(entries[0].blueprint, "/env/evergreen/props/trees/pine06_s1_prop.bp");
     EXPECT_FLOAT_EQ(entries[0].scaleMin, 0.8f);
@@ -53,20 +53,22 @@ namespace
     WritesEachEntrysOwnValues
   )
   {
-    std::vector<PropPaintEntry> entries;
-    std::string error;
-    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(kFafme, entries, error)) << error;
-    std::vector<PropPaintEntry> again;
-    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset(entries), again, error))
-      << error;
+    auto read = faf::editor::PaintSetFromProppaintset(kFafme);
+    ASSERT_TRUE(read) << read.error();
+    const std::vector<PropPaintEntry> entries = std::move(*read);
+    read = faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset(entries));
+    ASSERT_TRUE(read) << read.error();
+    std::vector<PropPaintEntry> again = std::move(*read);
     ASSERT_EQ(again.size(), entries.size());
     for (std::size_t i = 0; i < entries.size(); ++i) {
       EXPECT_TRUE(again[i] == entries[i]) << "entry " << i;
     }
     // An empty list is a set too.
-    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset({}), again, error)) << error;
+    read = faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset({}));
+    ASSERT_TRUE(read) << read.error();
+    again = std::move(*read);
     EXPECT_TRUE(again.empty());
-    EXPECT_FALSE(faf::editor::PaintSetFromProppaintset("{ \"Units\": [] }", again, error));
+    EXPECT_FALSE(faf::editor::PaintSetFromProppaintset("{ \"Units\": [] }"));
   }
 
   TEST(

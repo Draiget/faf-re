@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <print>
 #include <random>
 #include <string>
 #include <vector>
@@ -132,8 +133,7 @@ namespace
   )
   {
     ++counts.mInputs;
-    std::string reason;
-    if (!moho::MSDF_CheckFontStructure(input.data(), input.size(), reason)) {
+    if (!moho::MSDF_CheckFontStructure(input.data(), input.size())) {
       ++counts.mStructureRefused;
       return;
     }
@@ -142,7 +142,7 @@ namespace
 
     moho::SMsdfFontAtlas atlas;
     const auto start = std::chrono::steady_clock::now();
-    const bool cooked = moho::MSDF_CookFont(input.data(), input.size(), options, atlas, reason);
+    const bool cooked = moho::MSDF_CookFont(input.data(), input.size(), options, atlas).has_value();
     counts.mSlowestMs =
       (std::max)(counts.mSlowestMs,
                  static_cast<int>(
@@ -165,10 +165,7 @@ namespace
       packed[random() % packed.size()] = InterestingByte(random);
     }
     moho::SMsdfFontAtlas loaded;
-    if (
-      !moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) ||
-      !moho::MSDF_CheckCookedAtlas(loaded, options, reason)
-    ) {
+    if (!moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) || !moho::MSDF_CheckCookedAtlas(loaded, options)) {
       ++counts.mAtlasRefused;
     }
   }
@@ -180,7 +177,7 @@ int main(
 )
 {
   if (argc < 2) {
-    std::printf("usage: faf_fontfuzz <folder of fonts> [--seed N] [--seconds N] [--iterations N] [--save <folder>]\n");
+    std::println("usage: faf_fontfuzz <folder of fonts> [--seed N] [--seconds N] [--iterations N] [--save <folder>]");
     return 2;
   }
   std::uint64_t seed = 1u;
@@ -204,15 +201,14 @@ int main(
   for (const auto& entry : std::filesystem::directory_iterator(argv[1])) {
     std::ifstream in(entry.path(), std::ios::binary);
     Bytes bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-    std::string reason;
-    if (moho::MSDF_CheckFontStructure(bytes.data(), bytes.size(), reason)) {
+    if (auto checked = moho::MSDF_CheckFontStructure(bytes.data(), bytes.size())) {
       fonts.push_back(std::move(bytes));
     } else {
-      std::printf("skipped %s: %s\n", entry.path().string().c_str(), reason.c_str());
+      std::println("skipped {}: {}", entry.path().string(), checked.error());
     }
   }
   if (fonts.empty()) {
-    std::printf("no usable fonts in %s\n", argv[1]);
+    std::println("no usable fonts in {}", argv[1]);
     return 2;
   }
 
@@ -249,9 +245,9 @@ int main(
     RunOne(input, options, counts, random);
   }
 
-  std::printf(
-    "seed %llu: %llu inputs, %llu refused by structure, %llu refused by the cook, %llu cooked, %llu atlases refused, "
-    "slowest cook %d ms\n",
+  std::println(
+    "seed {}: {} inputs, {} refused by structure, {} refused by the cook, {} cooked, {} atlases refused, slowest cook "
+    "{} ms",
     static_cast<unsigned long long>(seed),
     static_cast<unsigned long long>(counts.mInputs),
     static_cast<unsigned long long>(counts.mStructureRefused),

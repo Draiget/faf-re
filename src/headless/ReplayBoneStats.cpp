@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <mutex>
+#include <print>
 #include <unordered_map>
 
 #if FAFRE_PLATFORM_WINDOWS
@@ -140,7 +141,7 @@ namespace faf::headless
           return name;
         }
       }
-      return name.find("Manipulator") != std::string::npos ? name : std::string();
+      return name.contains("Manipulator") ? name : std::string();
     }
 
     void RecordLuaCall(
@@ -168,7 +169,7 @@ namespace faf::headless
       mFile = nullptr;
       return;
     }
-    std::fprintf(mFile, "beat,units_with_pose,bones,changed_exact,changed_over_tolerance\n");
+    std::println(mFile, "beat,units_with_pose,bones,changed_exact,changed_over_tolerance");
   }
 
   CReplayBoneStats::~CReplayBoneStats()
@@ -264,9 +265,9 @@ namespace faf::headless
     ++mBeats;
     mChangedPerBeat.push_back(changedTolerance);
     if (mFile != nullptr) {
-      std::fprintf(
+      std::println(
         mFile,
-        "%d,%u,%llu,%u,%u\n",
+        "{},{},{},{},{}",
         packet.mCurBeat,
         unitsWithPose,
         static_cast<unsigned long long>(bones),
@@ -280,17 +281,17 @@ namespace faf::headless
   {
     std::FILE* blueprintFile = nullptr;
     if (fopen_s(&blueprintFile, (mPath + ".blueprints.csv").c_str(), "w") == 0 && blueprintFile != nullptr) {
-      std::fprintf(
+      std::println(
         blueprintFile,
-        "blueprint,unit_beats,bones_per_unit,changed_exact_per_unit_beat,changed_over_tolerance_per_unit_beat,"
-        "max_changed_over_tolerance\n"
+        "blueprint,unit_beats,bones_per_unit,changed_exact_per_unit_beat,changed_over_tolerance_per_unit_beat,max_"
+        "changed_over_tolerance"
       );
       for (const auto& [name, totals] : mBlueprints) {
         const double n = static_cast<double>(totals.unitBeats);
-        std::fprintf(
+        std::println(
           blueprintFile,
-          "%s,%llu,%.1f,%.2f,%.2f,%u\n",
-          name.c_str(),
+          "{},{},{:.1f},{:.2f},{:.2f},{}",
+          name,
           static_cast<unsigned long long>(totals.unitBeats),
           totals.bones / n,
           totals.changedExact / n,
@@ -308,15 +309,11 @@ namespace faf::headless
     std::string writerSummary;
     std::FILE* writerFile = nullptr;
     if (fopen_s(&writerFile, (mPath + ".writers.csv").c_str(), "w") == 0 && writerFile != nullptr) {
-      std::fprintf(writerFile, "manipulator,blueprint,changed_over_tolerance\n");
+      std::println(writerFile, "manipulator,blueprint,changed_over_tolerance");
       for (const auto& [name, totals] : mWriters) {
-        std::fprintf(
-          writerFile, "%s,*,%llu\n", name.c_str(), static_cast<unsigned long long>(totals.changedOverTolerance)
-        );
+        std::println(writerFile, "{},*,{}", name, static_cast<unsigned long long>(totals.changedOverTolerance));
         for (const auto& [blueprint, changed] : totals.byBlueprint) {
-          std::fprintf(
-            writerFile, "%s,%s,%llu\n", name.c_str(), blueprint.c_str(), static_cast<unsigned long long>(changed)
-          );
+          std::println(writerFile, "{},{},{}", name, blueprint, static_cast<unsigned long long>(changed));
         }
       }
       std::fclose(writerFile);
@@ -337,7 +334,7 @@ namespace faf::headless
     std::uint64_t manipulatorCalls = 0;
     std::FILE* callFile = nullptr;
     if (fopen_s(&callFile, (mPath + ".lua_calls.csv").c_str(), "w") == 0 && callFile != nullptr) {
-      std::fprintf(callFile, "function,calls,calls_per_beat\n");
+      std::println(callFile, "function,calls,calls_per_beat");
       const std::lock_guard<std::mutex> lock(sCallMutex);
       std::map<std::string, std::uint64_t> byName;
       for (const auto& [function, calls] : sLuaCalls) {
@@ -347,10 +344,10 @@ namespace faf::headless
       }
       for (const auto& [name, calls] : byName) {
         manipulatorCalls += calls;
-        std::fprintf(
+        std::println(
           callFile,
-          "%s,%llu,%.3f\n",
-          name.c_str(),
+          "{},{},{:.3f}",
+          name,
           static_cast<unsigned long long>(calls),
           mBeats == 0 ? 0.0 : static_cast<double>(calls) / static_cast<double>(mBeats)
         );

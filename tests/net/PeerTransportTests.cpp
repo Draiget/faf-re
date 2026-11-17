@@ -7,6 +7,8 @@
 // NET_DeliverFromPeerTransport and none could have used the network. Both
 // pairs exchange the same messages in both directions, in order.
 
+#include "NetTestSupport.h"
+
 #include "moho/net/CMessage.h"
 #include "moho/net/CNetUDPConnector.h"
 #include "moho/net/Common.h"
@@ -21,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <print>
 #include <string>
 #include <thread>
 #include <vector>
@@ -39,7 +42,7 @@ namespace
   )
   {
     EXPECT_TRUE(ok) << what;
-    std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
+    std::println("{} {}", ok ? "ok  " : "FAIL", what);
   }
 
   // Any type outside 200..209: those are connection events the receiving
@@ -91,8 +94,8 @@ namespace
     return std::string(side) + " message " + std::to_string(i) + std::string(static_cast<std::size_t>(i % 200), 'x');
   }
 
-  // Connects a (Connect) and b (Accept) at the given addresses and sends
-  // kMessages each way.
+  // Connects a (Connect) and b (Accept) at the given addresses, sends
+  // kMessages each way, and ends both connectors.
   bool Exchange(
     CNetUDPConnector* a,
     CNetUDPConnector* b,
@@ -107,6 +110,8 @@ namespace
     INetConnection* ba = b->Accept(aAddr, aPort);
     if (ab == nullptr || ba == nullptr) {
       Check(false, label);
+      a->Destroy();
+      b->Destroy();
       return false;
     }
     Collector atA;
@@ -140,12 +145,11 @@ namespace
       inOrder = atA.got[static_cast<std::size_t>(i)] == Payload("b", i) &&
         atB.got[static_cast<std::size_t>(i)] == Payload("a", i);
     }
-    std::printf("  %s: a got %zu, b got %zu\n", label, atA.got.size(), atB.got.size());
+    std::println("  {}: a got {}, b got {}", label, atA.got.size(), atB.got.size());
     Check(inOrder, label);
     ab->RemoveReceiver(kMessageType, kMessageType + 1, &atA);
     ba->RemoveReceiver(kMessageType, kMessageType + 1, &atB);
-    ab->Close();
-    ba->Close();
+    Check(net_test::EndConnected(a, ab, b, ba), "both connectors gone");
     return inOrder;
   }
 } // namespace
@@ -163,8 +167,6 @@ TEST(
   Exchange(
     a, b, gSocketHost, b->GetLocalPort(), gSocketHost, a->GetLocalPort(), "socket path, both directions in order"
   );
-  a->Destroy();
-  b->Destroy();
 }
 
 TEST(
@@ -189,11 +191,8 @@ TEST(
   NET_SetPeerTransport(b, kAddrA, 1, toA);
   Check(NET_PeerTransportsActive(), "two transports registered");
   Exchange(a, b, kAddrB, 2, kAddrA, 1, "transport path, both directions in order");
-  std::printf("  datagrams through the transports: %d to b, %d to a\n", toB->datagrams, toA->datagrams);
+  std::println("  datagrams through the transports: {} to b, {} to a", toB->datagrams, toA->datagrams);
   Check(toB->datagrams > 0 && toA->datagrams > 0, "every datagram went through a transport");
-  a->Destroy();
-  b->Destroy();
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
 int main(
@@ -206,7 +205,7 @@ int main(
     if (std::strcmp(argv[i], "--host") == 0) {
       in_addr address{};
       if (::inet_pton(AF_INET, argv[i + 1], &address) != 1) {
-        std::fprintf(stderr, "--host %s is not an IPv4 address\n", argv[i + 1]);
+        std::println(stderr, "--host {} is not an IPv4 address", argv[i + 1]);
         return 2;
       }
       gSocketHost = ::ntohl(address.s_addr);

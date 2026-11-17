@@ -1,4 +1,5 @@
 #include "moho/render/BounceLight.h"
+#include "moho/render/camera/EyeRelative.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -147,7 +148,7 @@ namespace moho
     }
 
     BounceConstants constants{};
-    constants.inverseViewProjection = camera.inverseViewProjection;
+    constants.inverseViewProjection = EyeRelativeInverseViewProjection(camera);
     constants.viewProjection = camera.viewProjection;
     constants.viewRect[0] = static_cast<float>(x);
     constants.viewRect[1] = static_cast<float>(y);

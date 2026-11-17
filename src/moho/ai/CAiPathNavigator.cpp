@@ -1,6 +1,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiPathNavigator.h"
 
+#include <utility>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -483,12 +484,11 @@ namespace
 
       EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *grid.sim->mMapData, walkCell);
       if (unitLayer == LAYER_Water) {
-        const std::uint8_t masked =
-          static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+        const std::uint8_t masked = std::to_underlying(occupancyCaps) & ~std::to_underlying(EOccupancyCaps::OC_SUB);
         occupancyCaps = static_cast<EOccupancyCaps>(masked);
       }
 
-      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(grid, walkCell, footprint, occupancyCaps)) == 0u) {
+      if (std::to_underlying(OCCUPY_FootprintFits(grid, walkCell, footprint, occupancyCaps)) == 0u) {
         return false;
       }
 
@@ -582,12 +582,11 @@ namespace
     const SFootprint& footprint = pathFinder->mUnit->GetFootprint();
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *sim->mMapData, toCell);
     if (pathFinder->mUnit->mVarDat.mLayerMask == LAYER_Water) {
-      const std::uint8_t masked =
-        static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+      const std::uint8_t masked = std::to_underlying(occupancyCaps) & ~std::to_underlying(EOccupancyCaps::OC_SUB);
       occupancyCaps = static_cast<EOccupancyCaps>(masked);
     }
 
-    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*grid, toCell, footprint, occupancyCaps)) != 0u;
+    return std::to_underlying(OCCUPY_FootprintFits(*grid, toCell, footprint, occupancyCaps)) != 0u;
   }
 
   /**
@@ -1622,7 +1621,7 @@ void CAiPathNavigator::UpdateCurrentPosition(
                                                     : mTickBucket7 == static_cast<std::int32_t>(currentTick % 7u);
     if (
       onProbeTick && mSim != nullptr && mSim->mOGrid != nullptr &&
-      static_cast<std::uint8_t>(
+      std::to_underlying(
         OCCUPY_FootprintFits(*mSim->mOGrid, mCurrentPos, unit->GetFootprint(), static_cast<EOccupancyCaps>(0xFFu))
       ) != 0u
     ) {
@@ -1990,7 +1989,7 @@ void CAiPathNavigator::MemberDeserialize(
   mTargetWithinOneCell = boolValue ? 1u : 0u;
   ESearchType searchType{};
   archive->Read(gpg::RTypeOf<ESearchType>(), &searchType, owner);
-  mPathRequestMode = static_cast<std::int32_t>(searchType);
+  mPathRequestMode = std::to_underlying(searchType);
   archive->ReadInt(&mPathRequestCountdown);
   archive->ReadInt(&mTickBucket7);
   archive->ReadInt(&mTickBucket13);

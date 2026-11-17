@@ -8,7 +8,7 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
+#include <Windows.h>
 
 namespace moho
 {
@@ -32,8 +32,8 @@ namespace moho
 
   namespace slab_region
   {
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
-    constexpr std::size_t kReserveBytes = std::size_t{2} << 30; // 2 GB virtual address space
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_64BIT
+    constexpr std::size_t kReserveBytes = 2uz << 30; // 2 GB virtual address space
 #else
     constexpr std::size_t kReserveBytes = 128u * 1024u * 1024u; // 128 MB virtual address space
 #endif

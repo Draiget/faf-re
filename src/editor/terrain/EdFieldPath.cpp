@@ -102,18 +102,16 @@ namespace faf::editor::field
       }
     };
 
-    bool ReadPath(
-      const OpArgs& a,
-      Path& path,
-      std::string& err
+    std::expected<Path, std::string> ReadPath(
+      const OpArgs& a
     )
     {
       const std::vector<double>* v = a.p.A("pts");
       if (v == nullptr || v->size() < kStride || v->size() % kStride != 0) {
-        err = "'pts' needs 8 numbers per point (x, z, y, w, f, bank, off, s)";
-        return false;
+        return std::unexpected("'pts' needs 8 numbers per point (x, z, y, w, f, bank, off, s)");
       }
       const std::size_t n = v->size() / kStride;
+      Path path;
       path.p.resize(n);
       for (std::size_t i = 0; i < n; ++i) {
         const double* q = v->data() + i * kStride;
@@ -128,7 +126,7 @@ namespace faf::editor::field
         pt.s = F32(q[7]);
         path.maxReach = std::max(path.maxReach, pt.w + pt.f);
       }
-      return true;
+      return path;
     }
 
     const Grid* Get(
@@ -140,10 +138,9 @@ namespace faf::editor::field
       return it != a.in.end() ? it->second.get() : nullptr;
     }
 
-    bool MakeOut(
+    std::expected<void, std::string> MakeOut(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* ref = Get(a, "like");
@@ -151,19 +148,17 @@ namespace faf::editor::field
         ref = Get(a, "a");
       }
       if (ref == nullptr) {
-        err = "give 'like' or 'a'";
-        return false;
+        return std::unexpected("give 'like' or 'a'");
       }
       // the ops index their inputs with the output's size: two inputs of different shapes would read or write out of
       // range
       if (
         const Grid* const inA = Get(a, "a"); inA != nullptr && ref != nullptr && (inA->w != ref->w || inA->h != ref->h)
       ) {
-        err = "'like' and 'a' differ in size";
-        return false;
+        return std::unexpected("'like' and 'a' differ in size");
       }
       out = Grid(ref->w, ref->h, ref->cell, ref->ox, ref->oz);
-      return true;
+      return {};
     }
 
     template <class F>
@@ -448,49 +443,51 @@ namespace faf::editor::field
     // ---- ops
     // -------------------------------------------------------------------------------------------------------------------------------------
 
-    bool Prepare(
+    std::expected<void, std::string> Prepare(
       const OpArgs& a,
       Path& P,
       Grid& out,
-      Loc& L,
-      std::string& err
+      Loc& L
     )
     {
-      if (!ReadPath(a, P, err) || !MakeOut(a, out, err)) {
-        return false;
+      auto read = ReadPath(a);
+      if (!read) {
+        return std::unexpected(std::move(read.error()));
+      }
+      P = std::move(*read);
+      if (auto made = MakeOut(a, out); !made) {
+        return made;
       }
       Locate(P, out, L);
-      return true;
+      return {};
     }
 
-    bool OpDist(
+    std::expected<void, std::string> OpDist(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Path P;
       Loc L;
-      if (!Prepare(a, P, out, L, err))
-        return false;
+      if (auto ran = Prepare(a, P, out, L); !ran)
+        return ran;
       const bool sgn = a.p.N("signed", 0.0) != 0.0;
       const float far = static_cast<float>(a.p.N("far", P.maxReach));
       EachCell(out, [&](const std::size_t i) {
         return L.Hit(i) ? (sgn ? L.sd[i] : L.bd[i]) : far;
       });
-      return true;
+      return {};
     }
 
-    bool OpAlong(
+    std::expected<void, std::string> OpAlong(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Path P;
       Loc L;
-      if (!Prepare(a, P, out, L, err))
-        return false;
+      if (auto ran = Prepare(a, P, out, L); !ran)
+        return ran;
       const bool norm = a.p.N("normalize", 0.0) != 0.0;
       const double total = P.p.back().s;
       const float outside = static_cast<float>(a.p.N("outside", -1.0));
@@ -500,42 +497,39 @@ namespace faf::editor::field
         const double s = AttrAt(P, L.seg[i], L.tt[i]).s;
         return static_cast<float>(norm ? (total > 0.0 ? s / total : 0.0) : s);
       });
-      return true;
+      return {};
     }
 
-    bool OpU(
+    std::expected<void, std::string> OpU(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Path P;
       Loc L;
-      if (!Prepare(a, P, out, L, err))
-        return false;
+      if (auto ran = Prepare(a, P, out, L); !ran)
+        return ran;
       EachCell(out, [&](const std::size_t i) {
         if (!L.Hit(i))
           return 2.0f;
         const Attr at = AttrAt(P, L.seg[i], L.tt[i]);
         return static_cast<float>(L.sd[i] / (at.w + at.f));
       });
-      return true;
+      return {};
     }
 
-    bool OpMask(
+    std::expected<void, std::string> OpMask(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Path P;
       Loc L;
-      if (!Prepare(a, P, out, L, err))
-        return false;
+      if (auto ran = Prepare(a, P, out, L); !ran)
+        return ran;
       const std::string kind = a.p.S("kind", "weight");
       if (kind != "weight" && kind != "core" && kind != "reach" && kind != "bank") {
-        err = "kind must be weight, core, reach or bank";
-        return false;
+        return std::unexpected("kind must be weight, core, reach or bank");
       }
       Profile flat; // constant 1
       flat.lut.assign(kLut + 1, 1.0f);
@@ -559,41 +553,36 @@ namespace faf::editor::field
           return static_cast<float>(r);
         return static_cast<float>(std::max(0.0, r - core));
       });
-      return true;
+      return {};
     }
 
-    bool OpShape(
+    std::expected<void, std::string> OpShape(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Get(a, "a");
       if (src == nullptr) {
-        err = "missing input 'a'";
-        return false;
+        return std::unexpected("missing input 'a'");
       }
       Path P;
       Loc L;
-      if (!Prepare(a, P, out, L, err))
-        return false;
+      if (auto ran = Prepare(a, P, out, L); !ran)
+        return ran;
       const std::string mode = a.p.S("mode", "offset");
       const std::string clip = a.p.S("clip", "none");
       if (mode != "offset" && mode != "target") {
-        err = "mode must be offset or target";
-        return false;
+        return std::unexpected("mode must be offset or target");
       }
       if (clip != "none" && clip != "min" && clip != "max") {
-        err = "clip must be none, min or max";
-        return false;
+        return std::unexpected("clip must be none, min or max");
       }
       const bool target = mode == "target";
       const int clipMode = clip == "min" ? 1 : (clip == "max" ? 2 : 0);
       const double strength = Clamp01(a.p.N("strength", 1.0));
       const Grid* mask = Get(a, "mask");
       if (mask != nullptr && !mask->SameShape(*src)) {
-        err = "'mask' must have the shape of 'a'";
-        return false;
+        return std::unexpected("'mask' must have the shape of 'a'");
       }
       Profile prof;
       prof.Build(a);
@@ -618,35 +607,30 @@ namespace faf::editor::field
           h = std::max(h, static_cast<double>(base));
         return static_cast<float>(h);
       });
-      return true;
+      return {};
     }
 
-    bool OpPaste(
+    std::expected<void, std::string> OpPaste(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Get(a, "a");
       const Grid* b = Get(a, "b");
       if (src == nullptr || b == nullptr) {
-        err = "path_paste needs 'a' and 'b'";
-        return false;
+        return std::unexpected("path_paste needs 'a' and 'b'");
       }
       if (std::fabs(static_cast<double>(src->cell) - static_cast<double>(b->cell)) > 1e-6) {
-        err = "path_paste: both fields need the same cell size";
-        return false;
+        return std::unexpected("path_paste: both fields need the same cell size");
       }
       const double offx = (static_cast<double>(b->ox) - static_cast<double>(src->ox)) / static_cast<double>(src->cell);
       const double offz = (static_cast<double>(b->oz) - static_cast<double>(src->oz)) / static_cast<double>(src->cell);
       if (std::fabs(offx - std::round(offx)) > 1e-3 || std::fabs(offz - std::round(offz)) > 1e-3) {
-        err = "path_paste: 'b' must lie on whole samples of 'a'";
-        return false;
+        return std::unexpected("path_paste: 'b' must lie on whole samples of 'a'");
       }
       const std::string mode = a.p.S("mode", "add");
       if (mode != "add" && mode != "sub" && mode != "set" && mode != "max" && mode != "min") {
-        err = "mode must be add, sub, set, max or min";
-        return false;
+        return std::unexpected("mode must be add, sub, set, max or min");
       }
       const int ix = static_cast<int>(std::lround(offx));
       const int iz = static_cast<int>(std::lround(offz));
@@ -676,7 +660,7 @@ namespace faf::editor::field
           }
         }
       });
-      return true;
+      return {};
     }
     /** Registers the ops with the field engine at start-up (EdFieldCore.cpp: RegisterOp). */
     struct PathOpRegistrar

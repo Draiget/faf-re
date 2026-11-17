@@ -79,10 +79,10 @@ namespace moho
   template <class T>
   struct SpatialEntryLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const SpatialEntry<T>& lhs,
       const SpatialEntry<T>& rhs
-    ) const noexcept
+    ) noexcept
     {
       if (lhs.mFadeOut > 0.0f) {
         return rhs.mFadeOut > 0.0f && lhs.mFadeOut > rhs.mFadeOut;

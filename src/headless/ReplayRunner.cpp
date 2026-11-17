@@ -21,6 +21,7 @@
 #include <cstring>
 #include <iterator>
 #include <map>
+#include <print>
 #include <string_view>
 #include <type_traits>
 #include <memory>
@@ -153,7 +154,7 @@ namespace faf::headless
           std::strstr(message.c_str(), " mismatched: ") != nullptr
         ) {
           mMismatches.fetch_add(1, std::memory_order_relaxed);
-          std::printf("[%s] DESYNC-LINE %s\n", mLabel.c_str(), message.c_str());
+          std::println("[{}] DESYNC-LINE {}", mLabel, message.c_str());
           std::fflush(stdout);
         }
       }
@@ -258,9 +259,9 @@ namespace faf::headless
       const moho::SSyncData& packet
     )
     {
-      std::fprintf(
+      std::println(
         file,
-        "%d,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%llu\n",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         packet.mCurBeat,
         packet.mNewEntities.size(),
         packet.mNewUnits.size(),
@@ -342,9 +343,13 @@ namespace faf::headless
     if (liveRejoin) {
       // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
       fa::string reason;
-      bool failed = !moho::REJOIN_BeginSetup(
-        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
+      const auto begun = moho::REJOIN_BeginSetup(
+        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort)
       );
+      bool failed = !begun;
+      if (!begun) {
+        reason = begun.error();
+      }
       while (!failed && sessionInfo.get() == nullptr) {
         fa::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
         if (polled.get() != nullptr) {
@@ -428,15 +433,17 @@ namespace faf::headless
       netConfig.joinSeconds = 1.0e9;
       netConfig.reconnectSeconds = 1.0e9;
       netConfig.holdViewsForJoin = !options.targetAudit;
+      // Each player's stream compressed as the server compresses it (`srv_ViewCompression`), so a seat run measures
+      // the bytes a real server sends; a probe with --no-view-compression still gets it uncompressed.
+      netConfig.viewCompression = faf::server::ViewCompressionSwitch();
       seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
       for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
         seatNet->AddSeat(
           seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat
         );
       }
-      std::string netError;
-      if (!seatNet->Start(netError)) {
-        result.error = netError;
+      if (auto started = seatNet->Start(); !started) {
+        result.error = started.error();
         return result;
       }
     }
@@ -453,7 +460,8 @@ namespace faf::headless
     );
 
     moho::SWldGameData gameData{};
-    if (!LoadSessionScenario(*sessionInfo, gameData, result.error)) {
+    if (auto loaded = LoadSessionScenario(*sessionInfo, gameData); !loaded) {
+      result.error = loaded.error();
       moho::ReleaseWldGameDataHandles(&gameData);
       return result;
     }
@@ -477,12 +485,10 @@ namespace faf::headless
       }
       int ordinal = 0;
       for (; const moho::RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(ordinal); ++ordinal) {
-        std::fprintf(orderFile, "%d %s\n", ordinal, blueprint->mBlueprintId.c_str());
+        std::println(orderFile, "{} {}", ordinal, blueprint->mBlueprintId.c_str());
       }
       std::fclose(orderFile);
-      std::printf(
-        "[%s] blueprint order: %d blueprints written to %s\n", label, ordinal, options.blueprintOrderPath.c_str()
-      );
+      std::println("[{}] blueprint order: {} blueprints written to {}", label, ordinal, options.blueprintOrderPath);
     }
 
 #if FAF_SERVER_MODE
@@ -527,7 +533,7 @@ namespace faf::headless
       loadInfo->mLanguage = launchInfo->mLanguage;
       loadInfo->mCheatsEnabled = launchInfo->mCheatsEnabled;
       loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
-      std::printf("[%s] resuming from beat %u, tick %u\n", label, keyframeHeader.beat, keyframeHeader.tick);
+      std::println("[{}] resuming from beat {}, tick {}", label, keyframeHeader.beat, keyframeHeader.tick);
       std::fflush(stdout);
       moho::SIM_BeginKeyframeRestore(keyframeHeader);
       if (rejoinRehearsal) {
@@ -571,8 +577,8 @@ namespace faf::headless
         sources.push_back(source);
       }
       if (sources.empty()) {
-        std::printf(
-          "[%s] warning: --bot-obs army %d has no command source (an AI slot): the file will hold no commands\n",
+        std::println(
+          "[{}] warning: --bot-obs army {} has no command source (an AI slot): the file will hold no commands",
           label,
           options.focusArmy
         );
@@ -849,7 +855,7 @@ namespace faf::headless
     // resumes (28088230 at beat 4864, 27993035 at 14215) stalled headless for good. Issuing anyway plays the
     // recorded beats as the game ran them: paused beats advance without a tick. A live game's stream (gpgnet://)
     // and the rejoin modes keep the network rule.
-    if (!rejoinRehearsal && !liveRejoin && options.replayPath.rfind("gpgnet://", 0) != 0) {
+    if (!rejoinRehearsal && !liveRejoin && !options.replayPath.starts_with("gpgnet://")) {
       moho::SIM_SetIssueWhilePaused(true);
     }
     std::unique_ptr<moho::ISTIDriver> driver(
@@ -878,7 +884,9 @@ namespace faf::headless
     } const stopSeatNet{seatNet.get()};
 #endif
     result.loadSeconds = SecondsSince(loadStart);
-    std::printf("[%s] loaded in %.1fs: %d armies, focus %d\n", label, result.loadSeconds, armyCount, options.focusArmy);
+    std::println(
+      "[{}] loaded in {:.1f}s: {} armies, focus {}", label, result.loadSeconds, armyCount, options.focusArmy
+    );
     std::fflush(stdout);
 
     std::FILE* digestFile = nullptr;
@@ -899,7 +907,7 @@ namespace faf::headless
     }
     // A live game's replay (a server's observer stream, gpgnet://): its digests are read as they're written, so the
     // file is opened shared (`fopen_s` denies other readers on Windows until it is closed).
-    const bool liveReplay = options.replayPath.rfind("gpgnet://", 0) == 0;
+    const bool liveReplay = options.replayPath.starts_with("gpgnet://");
     if (!options.digestPath.empty() && (digestFile = std::fopen(options.digestPath.c_str(), "w")) == nullptr) {
       result.error = "cannot write " + options.digestPath;
       return result;
@@ -933,7 +941,8 @@ namespace faf::headless
       }
     }
     CReplayEffectOps effectOps; // plan WP9.1
-    if (!effectOps.Open(options.effectOpsPath, options.effectRecordPath, result.error)) {
+    if (auto opened = effectOps.Open(options.effectOpsPath, options.effectRecordPath); !opened) {
+      result.error = opened.error();
       return result;
     }
 #if FAF_SERVER_MODE
@@ -1043,7 +1052,7 @@ namespace faf::headless
           if (sim != nullptr && packet->mCurBeat >= 0) {
             const gpg::MD5Digest& digest = sim->mSimHashes[static_cast<std::uint32_t>(packet->mCurBeat) & 0x7Fu];
             if (!IsZero(digest)) {
-              std::fprintf(digestFile, "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
+              std::println(digestFile, "{} {}", packet->mCurBeat, digest.ToString().c_str());
               ++result.digestsWritten;
               if (liveReplay) {
                 std::fflush(digestFile); // plan WP13.3: a shadow verifier reads them while the game goes on
@@ -1056,9 +1065,9 @@ namespace faf::headless
           WriteLaneSizes(laneSizesFile, *packet);
         }
         if (stateDigestFile != nullptr) {
-          std::fprintf(
+          std::println(
             stateDigestFile,
-            "%d %016llx\n",
+            "{} {:016x}",
             packet->mCurBeat,
             static_cast<unsigned long long>(DigestPublishedState(*packet))
           );
@@ -1118,7 +1127,7 @@ namespace faf::headless
             sAlliesStarted = true;
             sLastAllies = allies;
             if (file != nullptr) {
-              std::fprintf(file, "%d %s\n", packet->mCurBeat, allies.c_str());
+              std::println(file, "{} {}", packet->mCurBeat, allies);
               std::fclose(file);
             }
           }
@@ -1126,7 +1135,7 @@ namespace faf::headless
         const bool syncSaysEnded = InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
           result.gameEnded = true;
-          std::printf("[%s] GAME-ENDED beat %d\n", label, packet->mCurBeat);
+          std::println("[{}] GAME-ENDED beat {}", label, packet->mCurBeat);
           std::fflush(stdout);
         }
 #if FAF_SERVER_MODE
@@ -1213,8 +1222,8 @@ namespace faf::headless
       if (elapsed - lastReport >= 30.0) {
         lastReport = elapsed;
         const int gameSeconds = result.lastBeat > 0 ? result.lastBeat / 10 : 0;
-        std::printf(
-          "[%s] beat %d game time %02d:%02d:%02d after %.0fs\n",
+        std::println(
+          "[{}] beat {} game time {:02}:{:02}:{:02} after {:.0f}s",
           label,
           result.lastBeat,
           gameSeconds / 3600,
@@ -1280,8 +1289,8 @@ namespace faf::headless
     }
 #endif
     if (pacePeriod > 0.0) {
-      std::printf(
-        "[%s] pace %d ms: %d of %d beats late, %.1f s lost\n",
+      std::println(
+        "[{}] pace {} ms: {} of {} beats late, {:.1f} s lost",
         label,
         options.paceMs,
         lateBeats,
@@ -1362,9 +1371,9 @@ namespace faf::headless
     if (!options.syncKeysPath.empty()) {
       std::FILE* keysFile = nullptr;
       if (fopen_s(&keysFile, options.syncKeysPath.c_str(), "w") == 0 && keysFile != nullptr) {
-        std::fprintf(keysFile, "# key beats-present first-beat last-beat (of %d beats)\n", result.beats);
+        std::println(keysFile, "# key beats-present first-beat last-beat (of {} beats)", result.beats);
         for (const auto& [key, seen] : syncKeys) {
-          std::fprintf(keysFile, "%s %d %d %d\n", key.c_str(), seen.beats, seen.firstBeat, seen.lastBeat);
+          std::println(keysFile, "{} {} {} {}", key, seen.beats, seen.firstBeat, seen.lastBeat);
         }
         std::fclose(keysFile);
       }
@@ -1419,8 +1428,8 @@ namespace faf::headless
       if (step >= plan.size() || beat < plan[step]) {
         return false;
       }
-      std::printf(
-        "[%s] seek %zu: at beat %d, %.2fs after it was asked for\n", label, step, beat, SecondsSince(seekStart)
+      std::println(
+        "[{}] seek {}: at beat {}, {:.2f}s after it was asked for", label, step, beat, SecondsSince(seekStart)
       );
       std::fflush(stdout);
       ++step;
@@ -1449,8 +1458,9 @@ namespace faf::headless
       }
 
       const SReplayResult result = RunReplay(run);
-      std::printf(
-        "[%s] seek session %d: up to beat %d, %d beats, load %.2fs, play %.1fs, teardown %.2fs, process %.0f MB\n",
+      std::println(
+        "[{}] seek session {}: up to beat {}, {} beats, load {:.2f}s, play {:.1f}s, teardown {:.2f}s, process {:.0f} "
+        "MB",
         label,
         session,
         result.lastBeat,
@@ -1461,7 +1471,7 @@ namespace faf::headless
         ProcessMegabytes()
       );
       if (!result.keyframeSummary.empty()) {
-        std::printf("[%s] %s\n", label, result.keyframeSummary.c_str());
+        std::println("[{}] {}", label, result.keyframeSummary);
       }
       std::fflush(stdout);
 
@@ -1487,8 +1497,8 @@ namespace faf::headless
       const auto after = keyframes.upper_bound(plan[step]);
       run.resumeFrom = after != keyframes.begin() ? std::prev(after)->second : std::string{};
       seekStart = Clock::now();
-      std::printf(
-        "[%s] seek %zu: from beat %d to beat %d, by %s\n",
+      std::println(
+        "[{}] seek {}: from beat {} to beat {}, by {}",
         label,
         step,
         result.lastBeat,
@@ -1498,7 +1508,7 @@ namespace faf::headless
       std::fflush(stdout);
     }
     if (step < plan.size()) {
-      std::printf("[%s] seek: the game ended with %zu of %zu moves left\n", label, plan.size() - step, plan.size());
+      std::println("[{}] seek: the game ended with {} of {} moves left", label, plan.size() - step, plan.size());
     }
     return total;
   }

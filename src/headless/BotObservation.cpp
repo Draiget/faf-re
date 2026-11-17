@@ -425,7 +425,7 @@ namespace faf::headless
       const moho::CmdId id
     ) const
     {
-      return mForeignCommands.count(static_cast<std::int32_t>(id)) != 0u;
+      return mForeignCommands.contains(static_cast<std::int32_t>(id));
     }
 
     [[nodiscard]] bool Own(
@@ -619,10 +619,10 @@ namespace faf::headless
     if (!entity.blip) {
       return true;
     }
-    if (entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect)) {
+    if (entity.visibilityMode == std::to_underlying(moho::EUserEntityVisibilityMode::MapPlayableRect)) {
       return true;
     }
-    if (entity.visibilityMode != static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid)) {
+    if (entity.visibilityMode != std::to_underlying(moho::EUserEntityVisibilityMode::ReconGrid)) {
       return false;
     }
     // As `UserUnit::UpdateVisibility` (0x008C09B0) shows the mesh.
@@ -653,8 +653,8 @@ namespace faf::headless
   ) const noexcept
   {
     const bool shownMode =
-      entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect) ||
-      entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid);
+      entity.visibilityMode == std::to_underlying(moho::EUserEntityVisibilityMode::MapPlayableRect) ||
+      entity.visibilityMode == std::to_underlying(moho::EUserEntityVisibilityMode::ReconGrid);
     if (entity.dead || !shownMode) {
       return false;
     }
@@ -733,8 +733,8 @@ namespace faf::headless
       entity.fraction = data.mFractionComplete;
       entity.beingBuilt = data.mIsBeingBuilt != 0u;
       entity.dead = data.mIsDead != 0u;
-      entity.visibilityMode = static_cast<std::int32_t>(data.mVisibilityMode);
-      entity.layer = static_cast<std::int32_t>(data.mLayerMask);
+      entity.visibilityMode = std::to_underlying(data.mVisibilityMode);
+      entity.layer = std::to_underlying(data.mLayerMask);
     }
 
     for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
@@ -891,7 +891,7 @@ namespace faf::headless
       // The recon flags, plus kShownMapWide when the entity's visibility mode is MapPlayableRect: the UI then draws
       // its mesh whatever the intel (`UserUnit::UpdateVisibility`), as for civilians revealed at the start.
       std::uint32_t flags = entity->recon;
-      if (entity->visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect)) {
+      if (entity->visibilityMode == std::to_underlying(moho::EUserEntityVisibilityMode::MapPlayableRect)) {
         flags |= kShownMapWide;
       }
       line += ',' + std::to_string(flags) + ',';

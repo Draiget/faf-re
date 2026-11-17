@@ -193,7 +193,7 @@ namespace faf::editor
       bool asWreck = false;
       bool asUnit = false;
       for (const ScriptGroupCreation& creation : made) {
-        if (creation.prefix ? group->rfind(creation.name, 0) == 0 : *group == creation.name) {
+        if (creation.prefix ? group->starts_with(creation.name) : *group == creation.name) {
           (creation.wreck ? asWreck : asUnit) = true;
         }
       }
@@ -247,7 +247,7 @@ namespace faf::editor
       const std::size_t categories = text.find("Categories");
       const std::size_t close = categories == std::string::npos ? categories : text.find('}', categories);
       const std::string list = close == std::string::npos ? std::string() : text.substr(categories, close - categories);
-      if (list.find("\"NAVAL\"") == std::string::npos && list.find("'NAVAL'") == std::string::npos) {
+      if (!list.contains("\"NAVAL\"") && !list.contains("'NAVAL'")) {
         return wreck;
       }
       const std::string naval = std::string("Categories = {") + list.substr(list.find('{') + 1) +
@@ -276,8 +276,8 @@ namespace faf::editor
       const std::size_t close = open == std::string::npos ? open : text.find('}', open);
       const std::string categories = close == std::string::npos ? std::string() : text.substr(open, close - open);
       const auto has = [&](const char* const category) {
-        return categories.find(std::string("\"") + category + "\"") != std::string::npos ||
-          categories.find(std::string("'") + category + "'") != std::string::npos;
+        return categories.contains(std::string("\"") + category + "\"") ||
+          categories.contains(std::string("'") + category + "'");
       };
       // Unit.lua's CreateWreckageProp: TECH1 0.9, TECH2 0.8, TECH3 0.7, EXPERIMENTAL 0.6, anything else 0.9.
       static constexpr std::pair<const char*, double> kOrder[] = {

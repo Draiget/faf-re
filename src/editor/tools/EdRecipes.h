@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <string>
 #include <vector>
@@ -122,14 +123,12 @@ namespace faf::editor
    * The rules of every kind for this map, style and knobs. `context` gives the noise its grid: a noise's thresholds
    * come from the noise itself (its percentiles), so "dirt covers 38 %" means that on any map.
    */
-  bool RecipeRoles(
+  [[nodiscard]] std::expected<std::vector<RecipeRole>, std::string> RecipeRoles(
     MaskGenContext& context,
     const RecipePlan& plan,
     const RecipeStats& stats,
     const RecipeKnobs& knobs,
-    int style,
-    std::vector<RecipeRole>& roles,
-    std::string& error
+    int style
   );
 
   /**
@@ -163,15 +162,14 @@ namespace faf::editor
    * layers (`variants[{kind, n}]`). The second: the priority cascade (each kind takes its selection of what the kinds
    * above it left, the base the rest), every layer of a kind, the layers of `cleared` kinds emptied, the soft blend.
    */
-  bool RecipeSelections(
+  [[nodiscard]] std::expected<void, std::string> RecipeSelections(
     MaskGenContext& context,
     const RecipePlan& plan,
     const std::vector<RecipeRole>& roles,
     const RecipeKnobs& knobs,
     int style,
     std::array<std::vector<float>, 9>& selection,
-    std::map<std::pair<int, int>, std::vector<float>>& variants,
-    std::string& error
+    std::map<std::pair<int, int>, std::vector<float>>& variants
   );
   bool ResolveSelections(
     MaskGenContext& context,
@@ -184,13 +182,12 @@ namespace faf::editor
     std::string& error
   );
 
-  bool RecipeErosionSelections(
+  [[nodiscard]] std::expected<void, std::string> RecipeErosionSelections(
     MaskGenContext& context,
     const RecipePlan& plan,
     const RecipeKnobs& knobs,
     std::array<std::vector<float>, 9>& selection,
-    std::map<std::pair<int, int>, std::vector<float>>& variants,
-    std::string& error
+    std::map<std::pair<int, int>, std::vector<float>>& variants
   );
 
   /** The value `share` (0..1) of the values lie above. */

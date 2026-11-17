@@ -86,13 +86,13 @@ func main() {
 	}
 	if *publicHost == "" {
 		*publicHost = *gameIP
-		if *publicHost == "0.0.0.0" {
-			*publicHost = "127.0.0.1"
-			if c, err := net.Dial("udp4", "8.8.8.8:53"); err == nil {
-				*publicHost = c.LocalAddr().(*net.UDPAddr).IP.String()
-				c.Close()
-			}
+		if *publicHost == "0.0.0.0" || *publicHost == "::" {
+			*publicHost = outboundIPv4()
 		}
+	}
+	observeHost := *publicHost
+	if ip := net.ParseIP(observeHost); ip != nil && ip.To4() == nil {
+		observeHost = outboundIPv4() // observers' live replay is IPv4 only
 	}
 	echoListen, err := rttEchoAddress(*rttEchoFlag, *listen, *gameIP)
 	if err != nil {
@@ -140,7 +140,7 @@ func main() {
 	log.Printf("maps: %d found in %v", len(listMaps()), maps)
 
 	m := newManager(config{serverBin: *serverBin, engineArgs: strings.Fields(*engineArgs), runsDir: *runs, publicHost: *publicHost,
-		listenIP: *gameIP, portFirst: pf, portLast: pl, maxLobbies: *maxLobbies}, listMaps, smp.cpus)
+		observeHost: observeHost, listenIP: *gameIP, portFirst: pf, portLast: pl, maxLobbies: *maxLobbies}, listMaps, smp.cpus)
 	m.links = links.get
 	m.nodes = func() []Node {
 		ids := []int{}
@@ -182,4 +182,22 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+}
+
+// outboundIPv4 is this machine's IPv4 address towards the internet, else the loopback address.
+func outboundIPv4() string {
+	if c, err := net.Dial("udp4", "8.8.8.8:53"); err == nil {
+		defer c.Close()
+		return c.LocalAddr().(*net.UDPAddr).IP.String()
+	}
+	return "127.0.0.1"
+}
+
+// observeListenIP is where a lobby's observers listen: the game's address when it is IPv4, else all IPv4 addresses, as
+// the server's observer listener and the engine's live replay are IPv4 only.
+func observeListenIP(gameIP string) string {
+	if ip := net.ParseIP(gameIP); ip != nil && ip.To4() == nil {
+		return "0.0.0.0"
+	}
+	return gameIP
 }

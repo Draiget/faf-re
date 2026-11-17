@@ -1,5 +1,6 @@
 #include "CDecoder.h"
 
+#include <utility>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -324,9 +325,7 @@ namespace moho
       break;
     }
 
-    ThrowDecoderError(
-      gpg::STR_Printf("Unexpected opcode in command stream: 0x%02x", static_cast<std::uint8_t>(opcode))
-    );
+    ThrowDecoderError(gpg::STR_Printf("Unexpected opcode in command stream: 0x%02x", std::to_underlying(opcode)));
   }
 
   /**

@@ -201,10 +201,10 @@ namespace moho
      */
     struct TechniqueNameLess
     {
-      [[nodiscard]] bool operator()(
+      [[nodiscard]] static bool operator()(
         const Technique& lhs,
         const Technique& rhs
-      ) const
+      )
       {
         return lhs.mName < rhs.mName;
       }

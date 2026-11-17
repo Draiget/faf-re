@@ -2,6 +2,7 @@
 
 #define GPG_ERROR(msg) gpg::HandleAssertFailure(msg, __LINE__, __FILE__);
 #define GPG_UNREACHABLE(...) GPG_ERROR("Reached the supposably unreachable.");
+#include "gpg/core/utils/Unreachable.h" // FAF_UNREACHABLE
 #define GPG_ASSERT(x)                                                                                                  \
   do {                                                                                                                 \
     if (!(x)) {                                                                                                        \
@@ -96,7 +97,7 @@ namespace gpg
   /// binary's binary search; console variable `mem_SmallBlockIndexTable`.
   extern bool mem_SmallBlockIndexTable;
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   /**
    * x64 port (not in the binary): logs the image base (and whether it is below
    * 4 GB), then what `FAF_HIGHMEM=1` reserved below 4 GB before the CRT

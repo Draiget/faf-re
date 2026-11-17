@@ -1,5 +1,6 @@
 #include "moho/sim/EAllianceTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -118,9 +119,9 @@ namespace moho
   void EAllianceTypeInfo::AddEnums()
   {
     mPrefix = "ALLIANCE_";
-    AddEnum(StripPrefix("ALLIANCE_Neutral"), static_cast<std::int32_t>(ALLIANCE_Neutral));
-    AddEnum(StripPrefix("ALLIANCE_Ally"), static_cast<std::int32_t>(ALLIANCE_Ally));
-    AddEnum(StripPrefix("ALLIANCE_Enemy"), static_cast<std::int32_t>(ALLIANCE_Enemy));
+    AddEnum(StripPrefix("ALLIANCE_Neutral"), std::to_underlying(ALLIANCE_Neutral));
+    AddEnum(StripPrefix("ALLIANCE_Ally"), std::to_underlying(ALLIANCE_Ally));
+    AddEnum(StripPrefix("ALLIANCE_Enemy"), std::to_underlying(ALLIANCE_Enemy));
   }
 
   /**

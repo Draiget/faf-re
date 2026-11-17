@@ -28,7 +28,7 @@ namespace faf::editor
     )
     {
       constexpr const char kPrefix[] = "water body ";
-      if (line.rfind(kPrefix, 0) != 0) {
+      if (!line.starts_with(kPrefix)) {
         return 0;
       }
       return static_cast<std::size_t>(std::strtoul(line.c_str() + sizeof(kPrefix) - 1, nullptr, 10));
@@ -76,7 +76,7 @@ namespace faf::editor
         if (desc >= 1 && desc <= descs.size()) {
           const std::size_t body = bodyOf[desc - 1] + 1;
           line = "water body " + std::to_string(body) + line.substr(line.find(' ', 11));
-          fillSkipped[desc - 1] = fillSkipped[desc - 1] || line.find("skipped") != std::string::npos;
+          fillSkipped[desc - 1] = fillSkipped[desc - 1] || line.contains("skipped");
         }
         log.push_back(line);
       }

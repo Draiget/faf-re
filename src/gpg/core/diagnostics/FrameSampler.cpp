@@ -26,6 +26,7 @@ void gpg::diag::FrameSamplerMark() {}
 #include <cstring>
 #include <deque>
 #include <mutex>
+#include <print>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -101,7 +102,7 @@ namespace gpg::diag
       std::uintptr_t* const frames
     )
     {
-#if defined(_M_X64)
+#if FAFRE_ARCH_X64
       std::uint32_t depth = 0;
       while (depth < kMaxDepth && context.Rip != 0) {
         frames[depth++] = static_cast<std::uintptr_t>(context.Rip);
@@ -322,7 +323,7 @@ namespace gpg::diag
       std::FILE* file = nullptr;
       if (::fopen_s(&file, path.c_str(), "ab") == 0 && file != nullptr) {
         for (const auto& [stack, count] : state.folded) {
-          std::fprintf(file, "%s %u\n", stack.c_str(), count);
+          std::println(file, "{} {}", stack, count);
         }
         std::fclose(file);
       }

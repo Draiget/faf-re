@@ -1,6 +1,7 @@
 #include "moho/unit/tasks/CUnitMeleeAttackTargetTask.h"
 #include "moho/unit/tasks/TaskThreadWake.h"
 
+#include <utility>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -802,7 +803,7 @@ namespace moho
         mTargetPosition = COORDS_ToWorldPos(
           unit->SimulationRef->mMapData,
           adjustedPosition,
-          static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
+          static_cast<ELayer>(std::to_underlying(footprint.mOccupancyCaps)),
           static_cast<int>(footprint.mSizeX),
           static_cast<int>(footprint.mSizeZ)
         );

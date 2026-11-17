@@ -439,10 +439,10 @@ namespace
   struct ConsoleCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(
+    static bool operator()(
       const std::string& lhs,
       const std::string& rhs
-    ) const noexcept
+    ) noexcept
     {
       return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -557,7 +557,9 @@ namespace
     std::string text(commandText);
     bool inQuotes = false;
     int tokenStart = -1;
-    std::size_t tokenEnd = text.size();
+    // Where a comment or `;` ends the line; otherwise the end of `text` after the loop, which removes the
+    // backslash of each escaped quote and so shortens it.
+    std::size_t tokenEnd = std::string::npos;
 
     for (std::size_t index = 0; index < text.size(); ++index) {
       const char ch = text[index];
@@ -621,7 +623,9 @@ namespace
     }
 
     if (tokenStart != -1) {
-      PushTokenFromRange(text, static_cast<std::size_t>(tokenStart), tokenEnd, tokens);
+      PushTokenFromRange(
+        text, static_cast<std::size_t>(tokenStart), tokenEnd == std::string::npos ? text.size() : tokenEnd, tokens
+      );
     }
   }
 
@@ -660,7 +664,7 @@ namespace
     if (text.empty()) {
       return true;
     }
-    if (text.find("//") != std::string_view::npos) {
+    if (text.contains("//")) {
       return true;
     }
     return text.find_first_of("#; \t\"") != std::string_view::npos;

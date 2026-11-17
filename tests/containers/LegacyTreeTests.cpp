@@ -6,13 +6,16 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -30,9 +33,9 @@ namespace
 
   struct SetKey
   {
-    [[nodiscard]] const int& operator()(
+    [[nodiscard]] static const int& operator()(
       const int& v
-    ) const noexcept
+    ) noexcept
     {
       return v;
     }
@@ -41,9 +44,9 @@ namespace
   struct MapKey
   {
     template <class Pair>
-    [[nodiscard]] const int& operator()(
+    [[nodiscard]] static const int& operator()(
       const Pair& v
-    ) const noexcept
+    ) noexcept
     {
       return v.first;
     }
@@ -243,7 +246,7 @@ namespace
         break;
       case 5: {
         const auto it = s.find(key);
-        ASSERT_EQ(it == s.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == s.end(), !ref.contains(key));
         if (it != s.end()) {
           const auto next = s.erase(it);
           const auto refNext = ref.erase(ref.find(key));
@@ -646,7 +649,7 @@ TEST(
         break;
       case 6: {
         const auto it = m.find(key);
-        ASSERT_EQ(it == m.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == m.end(), !ref.contains(key));
         if (it != m.end()) {
           const auto next = m.erase(it);
           const auto refNext = ref.erase(ref.find(key));
@@ -799,7 +802,7 @@ TEST(
         break;
       case 4: {
         const auto it = m.find(key);
-        ASSERT_EQ(it == m.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == m.end(), !ref.contains(key));
         if (it != m.end()) {
           ASSERT_EQ(it->first, key);
           ASSERT_EQ(Offset(m.begin(), it, m.end()), Offset(ref.begin(), ref.lower_bound(key), ref.end()));
@@ -980,9 +983,9 @@ namespace
   struct RecordingDeleter
   {
     static inline std::vector<fa::NodeBase*> handed;
-    void operator()(
+    static void operator()(
       fa::NodeBase* const n
-    ) const
+    )
     {
       handed.push_back(n);
     }
@@ -997,9 +1000,9 @@ namespace
 
   struct FreeingDeleter
   {
-    void operator()(
+    static void operator()(
       fa::NodeBase* const n
-    ) const noexcept
+    ) noexcept
     {
       delete static_cast<KeyNode*>(n);
     }
@@ -1166,4 +1169,198 @@ TEST(
     return n.value < key;
   };
   EXPECT_EQ((fa::find_equal_or_head_node<Node, &Node::isNil>(head, 3, nodeLess)), head);
+}
+
+// -----------------------------------------------------------------------------
+// Tree node allocation: per-tree slabs on 64-bit (SlabAllocator.h), std::allocator on 32-bit
+// -----------------------------------------------------------------------------
+
+TEST(
+  FaTree,
+  DefaultAllocatorMatchesArchitecture
+)
+{
+#if FAFRE_ARCH_64BIT
+  EXPECT_TRUE((std::is_same_v<fa::set<int>::allocator_type, fa::local_slab_allocator<int, 32>>));
+  EXPECT_TRUE((std::is_same_v<fa::multiset<int>::allocator_type, fa::local_slab_allocator<int, 32>>));
+  EXPECT_TRUE((
+    std::is_same_v<fa::map<int, int>::allocator_type, fa::local_slab_allocator<std::pair<const int, int>, 32>>
+  ));
+  EXPECT_TRUE((
+    std::is_same_v<fa::multimap<int, int>::allocator_type, fa::local_slab_allocator<std::pair<const int, int>, 32>>
+  ));
+#else
+  EXPECT_TRUE((std::is_same_v<fa::set<int>::allocator_type, std::allocator<int>>));
+  EXPECT_TRUE((std::is_same_v<fa::multiset<int>::allocator_type, std::allocator<int>>));
+  EXPECT_TRUE((std::is_same_v<fa::map<int, int>::allocator_type, std::allocator<std::pair<const int, int>>>));
+  EXPECT_TRUE((std::is_same_v<fa::multimap<int, int>::allocator_type, std::allocator<std::pair<const int, int>>>));
+#endif
+}
+
+TEST(
+  FaTree,
+  StdAllocatorTreeKeepsItsSize
+)
+{
+  // The comparator and std::allocator are both empty bases; neither may add storage (on 32-bit Windows that
+  // needs empty_bases on rb_tree). Retail layout keeps the 2007 proxy word: 12 bytes on 32-bit.
+  using StdSet = fa::set<int, std::less<int>, std::allocator<int>>;
+  using StdMap = fa::map<int, int, std::less<int>, std::allocator<std::pair<const int, int>>>;
+  constexpr std::size_t kFields = (FAF_RETAIL_LAYOUT ? 3u : 2u) * sizeof(void*);
+  EXPECT_LE(sizeof(StdSet), kFields + sizeof(void*));
+  EXPECT_EQ(sizeof(StdSet), sizeof(StdMap));
+#if FAFRE_ARCH_X86
+  EXPECT_EQ(sizeof(StdSet), FAF_RETAIL_LAYOUT ? 12u : 8u);
+#endif
+}
+
+#if FAFRE_ARCH_64BIT
+namespace
+{
+  using SlabAlloc = fa::local_slab_allocator<std::uint64_t, 32>;
+} // namespace
+
+TEST(
+  FaTree,
+  SlabAllocatorFirstObjectComesFromTheHeap
+)
+{
+  SlabAlloc alloc;
+  if (!alloc.slabs_on()) {
+    GTEST_SKIP() << "tree slabs are off (/treeslabs 0 or FAF_TREESLABS=0)";
+  }
+  std::uint64_t* const head = alloc.allocate(1);
+  EXPECT_EQ(alloc.total_slabs(), 0u) << "an empty tree's head must not take a slab";
+  EXPECT_EQ(alloc.active_allocations(), 1u);
+  std::uint64_t* const first = alloc.allocate(1);
+  EXPECT_EQ(alloc.total_slabs(), 1u);
+  alloc.deallocate(first, 1);
+  alloc.deallocate(head, 1);
+  EXPECT_EQ(alloc.active_allocations(), 0u);
+}
+
+TEST(
+  FaTree,
+  SlabAllocatorFillsSlabsAndReusesFreedNodes
+)
+{
+  SlabAlloc alloc;
+  if (!alloc.slabs_on()) {
+    GTEST_SKIP() << "tree slabs are off (/treeslabs 0 or FAF_TREESLABS=0)";
+  }
+  std::vector<std::uint64_t*> nodes;
+  nodes.push_back(alloc.allocate(1)); // head, from the heap
+  for (int i = 0; i < 32; ++i) {
+    nodes.push_back(alloc.allocate(1));
+  }
+  EXPECT_EQ(alloc.total_slabs(), 1u) << "32 nodes fit one slab";
+  nodes.push_back(alloc.allocate(1));
+  EXPECT_EQ(alloc.total_slabs(), 2u) << "the 33rd node opens a second slab";
+
+  std::uint64_t* const freed = nodes[5];
+  alloc.deallocate(freed, 1);
+  std::uint64_t* const again = alloc.allocate(1);
+  EXPECT_EQ(again, freed) << "a freed node is the next one handed out";
+  EXPECT_EQ(alloc.total_slabs(), 2u);
+  nodes[5] = again;
+  EXPECT_EQ(alloc.active_allocations(), nodes.size());
+
+  alloc.purge();
+  EXPECT_EQ(alloc.total_slabs(), 0u);
+  EXPECT_EQ(alloc.active_allocations(), 0u);
+}
+
+TEST(
+  FaTree,
+  SlabAllocatorArraysGoToTheHeap
+)
+{
+  SlabAlloc alloc;
+  std::uint64_t* const block = alloc.allocate(4);
+  EXPECT_EQ(alloc.total_slabs(), 0u);
+  EXPECT_EQ(alloc.active_allocations(), 0u);
+  alloc.deallocate(block, 4);
+}
+
+TEST(
+  FaTree,
+  SlabAllocatorCopiesAreFreshAndMovesCarryTheNodes
+)
+{
+  SlabAlloc alloc;
+  if (!alloc.slabs_on()) {
+    GTEST_SKIP() << "tree slabs are off (/treeslabs 0 or FAF_TREESLABS=0)";
+  }
+  std::uint64_t* const head = alloc.allocate(1);
+  std::uint64_t* const node = alloc.allocate(1);
+  EXPECT_TRUE(alloc == alloc);
+
+  const SlabAlloc copy(alloc);
+  EXPECT_FALSE(copy == alloc) << "a copy has its own pool and can't free the original's nodes";
+  EXPECT_EQ(copy.active_allocations(), 0u);
+
+  SlabAlloc moved(std::move(alloc));
+  EXPECT_EQ(moved.active_allocations(), 2u);
+  EXPECT_EQ(moved.total_slabs(), 1u);
+  EXPECT_EQ(alloc.active_allocations(), 0u);
+  EXPECT_EQ(alloc.total_slabs(), 0u);
+  moved.deallocate(node, 1);
+  moved.deallocate(head, 1);
+  EXPECT_EQ(moved.active_allocations(), 0u);
+}
+#endif
+
+TEST(
+  FaTree,
+  DefaultAllocatorTreeMatchesStdSetThroughCopyMoveAndSwap
+)
+{
+  std::mt19937 rng(469u);
+  std::uniform_int_distribution<int> key(0, 999);
+  fa::set<int> a;
+  fa::set<int> b;
+  std::set<int> refA;
+  std::set<int> refB;
+  for (int i = 0; i < 4000; ++i) {
+    const int k = key(rng);
+    if ((i % 3) == 0) {
+      EXPECT_EQ(a.erase(k), refA.erase(k));
+    } else {
+      a.insert(k);
+      refA.insert(k);
+    }
+    const int k2 = key(rng);
+    b.insert(k2);
+    refB.insert(k2);
+  }
+  EXPECT_TRUE(std::equal(a.begin(), a.end(), refA.begin(), refA.end()));
+
+  fa::set<int> copied(a);
+  EXPECT_TRUE(std::equal(copied.begin(), copied.end(), refA.begin(), refA.end()));
+  copied.insert(5000);
+  EXPECT_EQ(a.count(5000), 0u) << "the copy owns its own nodes";
+
+  a.swap(b);
+  EXPECT_TRUE(std::equal(a.begin(), a.end(), refB.begin(), refB.end()));
+  EXPECT_TRUE(std::equal(b.begin(), b.end(), refA.begin(), refA.end()));
+
+  fa::set<int> moved(std::move(a));
+  EXPECT_TRUE(std::equal(moved.begin(), moved.end(), refB.begin(), refB.end()));
+  moved.insert(-1);
+  b = std::move(moved);
+  EXPECT_EQ(b.count(-1), 1u);
+  EXPECT_EQ(b.size(), refB.size() + 1u);
+
+  fa::map<int, std::string> m;
+  for (int i = 0; i < 100; ++i) {
+    m[i] = std::to_string(i);
+  }
+  fa::map<int, std::string> m2;
+  m2 = m;
+  for (int i = 0; i < 100; i += 2) {
+    m.erase(i);
+  }
+  EXPECT_EQ(m.size(), 50u);
+  EXPECT_EQ(m2.size(), 100u);
+  EXPECT_EQ(m2[42], "42");
 }

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <string>
@@ -103,6 +104,7 @@ namespace faf::editor
     bool add = false;     // added to what is drawn (the larger value wins)
     bool flipX = false;
     bool flipZ = false;
+    int channel = 0; // what is read (Studio's "Reads"): 0 brightness, 1 red, 2 green, 3 blue, 4 alpha
   };
 
   /** A blob drawn on the Base layers: its centre in world units and its size in cells. */
@@ -243,7 +245,7 @@ namespace faf::editor
     /** The drawing as JSON (cells run-length coded in 1/255 steps); "" when nothing is drawn and no marker was
      * generated. */
     [[nodiscard]] std::string Save() const;
-    bool Load(const std::string& text, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Load(const std::string& text);
 
   private:
     LayoutLayer MakeLayer(LayoutKind kind, const std::string& name);
@@ -275,24 +277,17 @@ namespace faf::editor
    * The layout's heights on the grid of `like`, and (when `masks` is given) the softened mask of every layer. Layers
    * apply from the first to the last; clamped to 0..400.
    */
-  bool BuildLayout(
+  [[nodiscard]] std::expected<void, std::string> BuildLayout(
     const MapLayout& layout,
     const field::Grid& like,
     const LayoutBuildOptions& options,
     field::Grid& height,
-    std::vector<field::Grid>* masks,
-    std::string& error
+    std::vector<field::Grid>* masks
   );
 
   /** Layer i's mask on the grid of `like`: softened by its kind's soft edge, or plain. */
-  bool LayoutLayerMask(
-    const MapLayout& layout,
-    const field::Grid& like,
-    int i,
-    bool soft,
-    field::Grid& out,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  LayoutLayerMask(const MapLayout& layout, const field::Grid& like, int i, bool soft, field::Grid& out);
 
   /** Whether layer i has cells above `level` (a water layer above 0.3 sets the water level). */
   [[nodiscard]] bool LayoutLayerHas(const LayoutLayer& layer, float level);

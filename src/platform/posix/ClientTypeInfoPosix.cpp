@@ -12,7 +12,24 @@
 
 #if !FAFRE_PLATFORM_WINDOWS
 
-// FAF_CLIENT_TYPEINFO(mangled name): typeinfo `_ZTI<name>` and its name string `_ZTS<name>`.
+// FAF_CLIENT_TYPEINFO(mangled name): typeinfo `_ZTI<name>` and its name string `_ZTS<name>`, weak so
+// a client build that has the real ones keeps those.
+#if FAFRE_PLATFORM_MACOS // Mach-O: C symbols carry a leading '_', weak definitions instead of COMDAT groups
+#define FAF_CLIENT_TYPEINFO(NAME)                                                                                      \
+  asm(".section __TEXT,__const\n"                                                                                      \
+      ".globl __ZTS" NAME "\n"                                                                                         \
+      ".weak_definition __ZTS" NAME "\n"                                                                               \
+      "__ZTS" NAME ":\n"                                                                                               \
+      ".asciz \"" NAME "\"\n"                                                                                          \
+      ".section __DATA,__const\n"                                                                                      \
+      ".globl __ZTI" NAME "\n"                                                                                         \
+      ".weak_definition __ZTI" NAME "\n"                                                                               \
+      ".p2align 3\n"                                                                                                   \
+      "__ZTI" NAME ":\n"                                                                                               \
+      ".quad __ZTVN10__cxxabiv117__class_type_infoE+16\n"                                                              \
+      ".quad __ZTS" NAME "\n"                                                                                          \
+      ".text\n");
+#else
 #define FAF_CLIENT_TYPEINFO(NAME)                                                                                      \
   asm(".section .rodata._ZTS" NAME ",\"aG\",@progbits,_ZTS" NAME ",comdat\n"                                           \
       ".weak _ZTS" NAME "\n"                                                                                           \
@@ -25,6 +42,7 @@
       ".quad _ZTVN10__cxxabiv117__class_type_infoE+16\n"                                                               \
       ".quad _ZTS" NAME "\n"                                                                                           \
       ".text\n");
+#endif
 
 FAF_CLIENT_TYPEINFO(
   "N4moho8UserUnitE"

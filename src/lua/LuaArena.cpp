@@ -25,8 +25,8 @@ namespace
   constexpr std::size_t kCommitChunkBytes = 1024u * 1024u;
   // Far above any game seen: Lua holds 117 MB live on a 6v6 game on a server. The range only reserves.
   // Windows keeps a page just below 2 GB in every process, so nothing larger is free below 4 GB.
-  constexpr std::size_t kMaxReserveBytes = std::size_t{2} << 30;
-  constexpr std::size_t kMinReserveBytes = std::size_t{1} << 29;
+  constexpr std::size_t kMaxReserveBytes = 2uz << 30;
+  constexpr std::size_t kMinReserveBytes = 1uz << 29;
   constexpr std::uintptr_t kAddressStep = std::uintptr_t{1} << 24;
   constexpr std::uintptr_t kAddressLimit = std::uintptr_t{1} << 32;
   constexpr std::size_t kSpanCount = kMaxReserveBytes / kSpanBytes;
@@ -115,7 +115,10 @@ namespace
   std::uintptr_t gBase = 0;
   std::size_t gReserveBytes = 0;
   std::once_flag gReserveOnce;
-  std::mutex gSpanLock;
+  // The arena's locks are never destroyed: Lua states that other statics own (the preferences,
+  // CUserPrefs) are closed during static destruction, after this file's objects would be, and
+  // libc++ on macOS throws when a destroyed mutex is locked (std::terminate in a noexcept path).
+  [[clang::no_destroy]] std::mutex gSpanLock;
   std::size_t gNextSpan = 0;
   std::size_t gCommittedBytes = 0;
   std::uint8_t gSpanClass[kSpanCount];
@@ -127,7 +130,7 @@ namespace
   std::uint32_t gAdjacentSpans[kSpanCount]{};
   std::size_t gLargestAdjacentRun = 0;
   bool gFreeRunsChanged = true;
-  GlobalClassLists gGlobal[kClassCount];
+  [[clang::no_destroy]] GlobalClassLists gGlobal[kClassCount];
   constinit thread_local ThreadLists tLists{};
 
   [[nodiscard]] std::uintptr_t TryReserve(
@@ -156,6 +159,22 @@ namespace
 
   void Reserve() noexcept
   {
+#if FAFRE_PLATFORM_MACOS // __PAGEZERO covers the low 4 GB: the range lies anywhere, read back with a bias
+    // Every span's offset plus 16 MB reads back from 32 bits (lua::PointerBits).
+    for (std::size_t bytes = kMaxReserveBytes; bytes >= kMinReserveBytes && gBase == 0; bytes /= 2u) {
+      void* const mapped = ::mmap(nullptr, bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+      if (mapped != MAP_FAILED) {
+        gBase = reinterpret_cast<std::uintptr_t>(mapped);
+        gReserveBytes = bytes;
+        lua::gArenaBias = gBase - kAddressStep;
+      }
+    }
+    if (gBase == 0) {
+      std::fputs("Lua arena: no free address range\n", stderr);
+      std::abort();
+    }
+    return;
+#endif
     // Every span of the range has to read back from 32 bits, so it ends below 4 GB. A crowded process
     // (overlays, injected DLLs) gets a smaller range before it gets none.
     for (std::size_t bytes = kMaxReserveBytes; bytes >= kMinReserveBytes && gBase == 0; bytes /= 2u) {

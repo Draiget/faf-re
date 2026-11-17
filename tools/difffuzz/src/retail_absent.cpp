@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 
 namespace
 {
@@ -14,7 +15,7 @@ namespace
     const char* const name
   )
   {
-    std::fprintf(stderr, "faf_math_dump: retail::%s called, but this build has no retail image\n", name);
+    std::println(stderr, "faf_math_dump: retail::{} called, but this build has no retail image", name);
     std::abort();
   }
 } // namespace

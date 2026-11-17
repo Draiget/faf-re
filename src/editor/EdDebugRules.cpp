@@ -1,5 +1,7 @@
 // The debugger's rules (EdLuaDebugger.h) apart from the Lua hook, so tests reach them without the engine.
 
+#include "gpg/core/utils/Unreachable.h"
+
 #include <algorithm>
 #include <cctype>
 
@@ -44,8 +46,8 @@ namespace faf::editor
     case EdStepMode::Out:
       return depth < stepDepth || atBreakpoint;
     case EdStepMode::Run:
-    default:
       return atBreakpoint;
     }
+    FAF_UNREACHABLE();
   }
 } // namespace faf::editor

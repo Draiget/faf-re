@@ -381,7 +381,7 @@ namespace
   )
   {
     static const char* const kSeverity[] = {"debug", "info", "warning"};
-    const int index = static_cast<int>(level);
+    const int index = std::to_underlying(level);
     if (index < 0 || index >= static_cast<int>(std::size(kSeverity))) {
       return "info";
     }

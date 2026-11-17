@@ -126,7 +126,7 @@ namespace gpg::gal
       };
       lower(commandLine);
       lower(needle);
-      return commandLine.find(needle) != std::string::npos;
+      return commandLine.contains(needle);
     }
 
     [[nodiscard]] bool IsRgbaTexture(
@@ -506,6 +506,21 @@ namespace gpg::gal
     }
 
     std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME, vulkan::PlatformSurfaceExtension()};
+    // A Vulkan loader lists portability drivers (MoltenVK on macOS) only to an instance that asks for
+    // them. MoltenVK loaded directly doesn't offer the extension and lists itself anyway.
+    VkInstanceCreateFlags instanceFlags = 0;
+    {
+      std::uint32_t count = 0U;
+      Vk().vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
+      std::vector<VkExtensionProperties> available(count);
+      Vk().vkEnumerateInstanceExtensionProperties(nullptr, &count, available.data());
+      for (const VkExtensionProperties& extension : available) {
+        if (std::strcmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
+          extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+          instanceFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        }
+      }
+    }
     std::vector<const char*> layers;
     const bool debug = CommandLineHas("/vulkandebug");
     if (debug) {
@@ -531,6 +546,7 @@ namespace gpg::gal
     application.apiVersion = VK_API_VERSION_1_3;
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    info.flags = instanceFlags;
     info.pApplicationInfo = &application;
     info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
     info.ppEnabledExtensionNames = extensions.data();
@@ -713,6 +729,11 @@ namespace gpg::gal
       }
       );
     };
+    // A device that implements Vulkan only in part (MoltenVK) names its gaps through this extension,
+    // which the specification requires an application to enable when the device offers it.
+    if (hasExtension("VK_KHR_portability_subset")) {
+      extensions.push_back("VK_KHR_portability_subset");
+    }
     VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
     rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     rayQueryFeatures.rayQuery = VK_TRUE;
@@ -1750,6 +1771,24 @@ namespace gpg::gal
     Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
   }
 
+  void DeviceVulkan::HostReadBarrier()
+  {
+    // Waiting for the submission on the host does not make the device's writes visible to it: the wait's
+    // scope covers only device accesses (the specification's "host access types"). A GPU whose caches a
+    // submission's end does not flush, as a phone's can be, would hand the host stale bytes without this.
+    VkMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.memoryBarrierCount = 1U;
+    dependency.pMemoryBarriers = &barrier;
+    Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
+  }
+
   void DeviceVulkan::UploadBuffer(
     vulkan::TrackedBuffer& destination,
     const VkDeviceSize offset,
@@ -1966,6 +2005,7 @@ namespace gpg::gal
     Vk().vkCmdCopyImageToBuffer(
       mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1U, &region
     );
+    HostReadBarrier();
     Submit(true, false);
     bytes.assign(readback.memory.mapped, readback.memory.mapped + layout.ByteSize());
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);

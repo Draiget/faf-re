@@ -467,7 +467,7 @@ namespace
     const moho::EOccupancyCaps caps
   ) noexcept
   {
-    return static_cast<std::uint8_t>(caps);
+    return std::to_underlying(caps);
   }
 
   [[nodiscard]] constexpr moho::EOccupancyCaps ToOccupancyCaps(
@@ -477,10 +477,10 @@ namespace
     return static_cast<moho::EOccupancyCaps>(mask);
   }
 
-  constexpr std::uint8_t kOccLand = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_LAND);
-  constexpr std::uint8_t kOccSeabed = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED);
-  constexpr std::uint8_t kOccSub = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SUB);
-  constexpr std::uint8_t kOccWater = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_WATER);
+  constexpr std::uint8_t kOccLand = std::to_underlying(moho::EOccupancyCaps::OC_LAND);
+  constexpr std::uint8_t kOccSeabed = std::to_underlying(moho::EOccupancyCaps::OC_SEABED);
+  constexpr std::uint8_t kOccSub = std::to_underlying(moho::EOccupancyCaps::OC_SUB);
+  constexpr std::uint8_t kOccWater = std::to_underlying(moho::EOccupancyCaps::OC_WATER);
   constexpr std::uint8_t kOccLandSeabed = static_cast<std::uint8_t>(kOccLand | kOccSeabed);
   constexpr std::uint8_t kOccWaterSubSeabed = static_cast<std::uint8_t>(kOccWater | kOccSub | kOccSeabed);
 
@@ -3462,9 +3462,7 @@ namespace moho
   {
     EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *grid.sim->mMapData, pos);
     if (occupancyCaps == EOccupancyCaps::OC_WATER) {
-      caps = static_cast<EOccupancyCaps>(
-        static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-      );
+      caps = static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
     }
     return OCCUPY_FootprintFits(grid, pos, footprint, caps);
   }
@@ -3789,9 +3787,8 @@ namespace moho
         ),
       };
       const EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(blueprint.mFootprint, map, originCell);
-      dest.pos = COORDS_GridSnap(
-        &map, worldPos, blueprint.mFootprint, static_cast<ELayer>(static_cast<std::uint8_t>(mobileCaps))
-      );
+      dest.pos =
+        COORDS_GridSnap(&map, worldPos, blueprint.mFootprint, static_cast<ELayer>(std::to_underlying(mobileCaps)));
       dest.layers = static_cast<std::int32_t>(mobileCaps);
       return static_cast<std::int32_t>(mobileCaps) != LAYER_None;
     }
@@ -3810,7 +3807,7 @@ namespace moho
     dest.pos = COORDS_ToWorldPos(
       &map,
       originCell,
-      static_cast<ELayer>(static_cast<std::uint8_t>(blueprint.mFootprint.mOccupancyCaps)),
+      static_cast<ELayer>(std::to_underlying(blueprint.mFootprint.mOccupancyCaps)),
       static_cast<int>(blueprint.mFootprint.mSizeX),
       static_cast<int>(blueprint.mFootprint.mSizeZ)
     );
@@ -3837,18 +3834,17 @@ namespace moho
 
     std::int32_t layerCaps = blueprint.Physics.BuildOnLayerCapsMask;
     if (!flatnessOk) {
-      layerCaps &= ~(static_cast<std::int32_t>(LAYER_Land) | static_cast<std::int32_t>(LAYER_Seabed));
+      layerCaps &= ~(std::to_underlying(LAYER_Land) | std::to_underlying(LAYER_Seabed));
     }
 
     // Engine addition: the water level at the structure's position.
     const float effectiveWaterElevation = map.GetWaterElevationAt(worldPos.x, worldPos.z);
     if (effectiveWaterElevation > skirtMinHeight) {
-      layerCaps &= ~static_cast<std::int32_t>(LAYER_Land);
+      layerCaps &= ~std::to_underlying(LAYER_Land);
     }
     if (skirtMaxHeight > (effectiveWaterElevation - blueprint.mFootprint.mMinWaterDepth)) {
       layerCaps &=
-        ~(static_cast<std::int32_t>(LAYER_Seabed) | static_cast<std::int32_t>(LAYER_Sub) |
-          static_cast<std::int32_t>(LAYER_Water));
+        ~(std::to_underlying(LAYER_Seabed) | std::to_underlying(LAYER_Sub) | std::to_underlying(LAYER_Water));
     }
     if (layerCaps == 0) {
       return false;

@@ -59,7 +59,7 @@ namespace gpg
         Grow();
       }
       if ((mCount >> kChunkBits) == mChunks.size()) {
-        mChunks.push_back(std::make_unique<Entry[]>(std::size_t{1} << kChunkBits));
+        mChunks.push_back(std::make_unique<Entry[]>(1uz << kChunkBits));
       }
       Entry& entry = At(mCount);
       entry.key = key;
@@ -89,7 +89,7 @@ namespace gpg
     }
 
   private:
-    static constexpr std::size_t kInitialSlots = std::size_t{1} << 16;
+    static constexpr std::size_t kInitialSlots = 1uz << 16;
     static constexpr std::uint32_t kChunkBits = 14u;
 
     [[nodiscard]] static std::size_t Hash(

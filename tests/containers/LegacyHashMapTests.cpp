@@ -173,7 +173,7 @@ TEST(
 )
 {
   const fa::hash_compare<unsigned int> ints;
-  EXPECT_EQ(ints(5u), fa::hash_value(static_cast<long>(static_cast<std::size_t>(5u) ^ fa::hash_seed)));
+  EXPECT_EQ(ints(5u), fa::hash_value(static_cast<long>(5uz ^ fa::hash_seed)));
   int object = 0;
   const fa::hash_compare<int*> pointers;
   EXPECT_EQ(

@@ -671,10 +671,7 @@ namespace
   INSTANTIATE_TEST_SUITE_P(
     ShapesAndHeapFailures,
     VulkanAllocatorSplit,
-    testing::Combine(
-      testing::Values("exact", "suffix", "prefix", "both"),
-      testing::Values(std::size_t{0}, std::size_t{1}, std::size_t{2})
-    )
+    testing::Combine(testing::Values("exact", "suffix", "prefix", "both"), testing::Values(0uz, 1uz, 2uz))
   );
   class VulkanAllocatorFailure : public testing::TestWithParam<std::tuple<Case, bool>>
   {};

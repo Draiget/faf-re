@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,12 +34,12 @@ namespace faf::editor
     }
   };
 
-  /** The value that starts at `at` (after spaces and comments); false with `error`. */
-  bool ReadLuaValue(const std::string& text, std::size_t at, LuaText& value, std::string& error);
+  /** The value that starts at `at` (after spaces and comments); the error otherwise. */
+  [[nodiscard]] std::expected<LuaText, std::string> ReadLuaValue(const std::string& text, std::size_t at);
 
-  /** A top-level `name = value` of a file, its value read; false when the file has no such assignment or it doesn't
-   * read. */
-  bool ReadLuaAssignment(const std::string& text, const std::string& name, LuaText& value, std::string& error);
+  /** A top-level `name = value` of a file, its value read; the error when the file has no such assignment or it
+   * doesn't read. */
+  [[nodiscard]] std::expected<LuaText, std::string> ReadLuaAssignment(const std::string& text, const std::string& name);
 
   /** A number as a map file writes it: no trailing zeros, at most 3 decimals. */
   std::string LuaNumber(double value);

@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdArrange.h"
 
+#include <utility>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -146,7 +147,7 @@ namespace
     IdsRoundTrip
   )
   {
-    for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+    for (int i = 0; i < std::to_underlying(ArrangeOp::Count); ++i) {
       EXPECT_EQ(ArrangeFromId(ArrangeId(static_cast<ArrangeOp>(i))), static_cast<ArrangeOp>(i));
     }
     EXPECT_EQ(ArrangeFromId("nope"), ArrangeOp::Count);

@@ -85,91 +85,51 @@ namespace moho
   );
 
   /**
-   * CRTP mixin with typed packet-field helpers.
+   * Typed packet-field helpers mixed into SNetPacket.
    *
    * These helpers are intentionally synthetic for host-side readability and do not map
-   * to standalone engine symbols in FA/Moho binaries.
+   * to standalone engine symbols in FA/Moho binaries. Each one takes the packet as an explicit
+   * object parameter (`this Self& self`), so one definition serves a mutable and a const packet.
    */
-  template <class Derived>
   struct INetPacketOps
   {
     /**
-     * Get mutable pointer to the first wire byte (header start)
+     * T, const-qualified when the packet is.
      */
-    void* GetPayload() noexcept
-    {
-      auto& self = *static_cast<Derived*>(this);
-      return &self.header.mType;
-    }
+    template <class Self, class T>
+    using LikePacket = std::conditional_t<std::is_const_v<Self>, const T, T>;
 
     /**
-     * Get const pointer to the first wire byte (header start)
+     * Pointer to the first wire byte (header start)
      */
-    [[nodiscard]]
-    const void* GetPayload() const noexcept
-    {
-      auto& self = *static_cast<const Derived*>(this);
-      return &self.header.mType;
-    }
-
-    /**
-     * Get packet type as strongly-typed one-byte wrapper.
-     */
-    [[nodiscard]]
-    PacketTypeByte GetTypeByte() const noexcept
-    {
-      auto& self = *static_cast<const Derived*>(this);
-      return PacketTypeByte{self.header.mType};
-    }
-
-    /**
-     * Set packet type from one-byte wrapper.
-     */
-    void SetTypeByte(
-      const PacketTypeByte type
+    template <class Self>
+    [[nodiscard]] LikePacket<Self, void>* GetPayload(
+      this Self& self
     ) noexcept
     {
-      auto& self = *static_cast<Derived*>(this);
-      self.header.mType = static_cast<EPacketType>(type);
-    }
-
-    /**
-     * Get wire payload bytes span (just payload, not including header)
-     */
-    std::span<std::byte> GetPayloadSpan() noexcept
-    {
-      auto& self = *static_cast<Derived*>(this);
-      return {reinterpret_cast<std::byte*>(self.data), self.header.mPayloadLength};
-    }
-
-    /**
-     * Get wire payload bytes span (const)
-     */
-    [[nodiscard]]
-    std::span<const std::byte> GetPayloadSpan() const noexcept
-    {
-      auto& self = *static_cast<const Derived*>(this);
-      return {reinterpret_cast<const std::byte*>(self.data), self.header.mPayloadLength};
+      return &self.header.mType;
     }
 
     /**
      * Get total wire size including header and payload
      */
-    [[nodiscard]]
-    std::size_t GetPayloadSize() const noexcept
+    template <class Self>
+    [[nodiscard]] std::size_t GetPayloadSize(
+      this const Self& self
+    ) noexcept
     {
-      auto& self = *static_cast<const Derived*>(this);
       return static_cast<std::size_t>(self.mSize);
     }
 
     /**
      * Set total payload length and recompute wire size
      */
+    template <class Self>
     void SetPayloadSize(
+      this Self& self,
       std::uint16_t payloadBytes
     ) noexcept
     {
-      auto& self = *static_cast<Derived*>(this);
       self.header.mPayloadLength = payloadBytes;
       self.mSize = static_cast<std::int32_t>(kNetPacketHeaderSize + payloadBytes);
     }
@@ -177,82 +137,13 @@ namespace moho
     /**
      * Return typed body by reference
      */
-    template <PacketBody T>
-    T& As() noexcept
-    {
-      auto& self = *static_cast<Derived*>(this);
-      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return *reinterpret_cast<T*>(self.data);
-    }
-
-    /**
-     * Return typed body by const reference
-     */
-    template <PacketBody T>
-    const T& As() const noexcept
-    {
-      auto& self = *static_cast<const Derived*>(this);
-      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return *reinterpret_cast<const T*>(self.data);
-    }
-
-    /**
-     * Return typed body pointer
-     */
-    template <PacketBody T>
-    T* AsPtr() noexcept
-    {
-      auto& self = *static_cast<Derived*>(this);
-      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return static_cast<T*>(self.data);
-    }
-
-    /**
-     * Return typed body const pointer
-     */
-    template <PacketBody T>
-    const T* AsPtr() const noexcept
-    {
-      auto& self = *static_cast<const Derived*>(this);
-      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return static_cast<const T*>(self.data);
-    }
-
-    /**
-     * Write typed body and set sizes accordingly
-     */
-    template <PacketBody T>
-    void WriteBody(
-      const T& b
+    template <PacketBody T, class Self>
+    [[nodiscard]] LikePacket<Self, T>& As(
+      this Self& self
     ) noexcept
     {
-      auto& self = *static_cast<Derived*>(this);
-      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large for packet");
-      // Wire-format blob write: the typed body is serialized raw into the packet payload.
-      std::memcpy(self.data, &b, sizeof(T));
-      SetPayloadSize(static_cast<std::uint16_t>(sizeof(T)));
-    }
-
-    /**
-     * Fill common header fields (does not touch meta)
-     */
-    Derived& SetMetadata(
-      EPacketType st,
-      std::uint32_t mask,
-      std::uint16_t serial,
-      std::uint16_t inResp,
-      std::uint16_t seq,
-      std::uint16_t expected
-    ) noexcept
-    {
-      auto& self = *static_cast<Derived*>(this);
-      self.header.mType = st;
-      self.header.mEarlyMask = mask;
-      self.header.mSerialNumber = serial;
-      self.header.mInResponseTo = inResp;
-      self.header.mSequenceNumber = seq;
-      self.header.mExpectedSequenceNumber = expected;
-      return self;
+      static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
+      return *reinterpret_cast<LikePacket<Self, T>*>(self.data);
     }
   };
 
@@ -260,7 +151,7 @@ namespace moho
    * Network packet structure.
    * Size is dynamic, but typically `recvfrom()` reads 512 bytes only, so max is - 0x200 (512).
    */
-  struct SNetPacket : TDatList<SNetPacket, void>, SNetPacketMetadata, INetPacketOps<SNetPacket>
+  struct SNetPacket : TDatList<SNetPacket, void>, SNetPacketMetadata, INetPacketOps
   {
     SNetPacketHeader header{};
     uint8_t data[kNetPacketMaxPayload]{};
@@ -305,44 +196,6 @@ namespace moho
 #pragma pack(pop)
 
   /**
-   * Strongly typed packet view that shares exact `SNetPacket` layout.
-   *
-   * Host-only typed convenience over raw packet payload bytes.
-   */
-  template <PacketBody Body>
-  struct SPacketOf : SNetPacket
-  {
-    static_assert(sizeof(Body) <= sizeof(static_cast<SNetPacket*>(nullptr)->data), "Body too large for packet");
-
-    /**
-     * Mutable typed body view
-     */
-    Body* GetBody() noexcept
-    {
-      return static_cast<Body*>(data);
-    }
-
-    /**
-     * Const typed body view
-     */
-    const Body& GetBody() const noexcept
-    {
-      return *static_cast<const Body*>(data);
-    }
-
-    /**
-     * Finalize sizes when body is already written
-     */
-    SPacketOf& FinalizeSize(
-      const std::uint16_t payloadBytes
-    ) noexcept
-    {
-      this->SetPayloadSize(payloadBytes);
-      return *this;
-    }
-  };
-
-  /**
    * Packet structure definitions.
    */
 
@@ -366,12 +219,4 @@ namespace moho
   };
   static_assert(sizeof(SPacketBodyAnswer) == 77, "SPacketBodyAnswer size must be 77 bytes");
 #pragma pack(pop)
-
-  /**
-   * Packet aliases
-   */
-
-  using SNetPacketGameData = SPacketOf<SPacketBodyData>;
-  using SNetPacketGameConnect = SPacketOf<SPacketBodyConnect>;
-  using SNetPacketGameAnswer = SPacketOf<SPacketBodyAnswer>;
 } // namespace moho

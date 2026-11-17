@@ -16,7 +16,7 @@ namespace faf::editor
       const std::string& name
     )
     {
-      if (name.rfind("ARMY_", 0) != 0 || name.size() == 5) {
+      if (!name.starts_with("ARMY_") || name.size() == 5) {
         return false;
       }
       return std::all_of(name.begin() + 5, name.end(), [](const char c) {
@@ -61,14 +61,13 @@ namespace faf::editor
       return static_cast<std::uint16_t>(std::clamp(std::lround(units / scale), 0L, 65535L));
     }
 
-    bool Run(
+    std::expected<void, std::string> Run(
       const char* const op,
       field::OpArgs& args,
-      field::Grid& out,
-      std::string& error
+      field::Grid& out
     )
     {
-      return field::RunOpCpu(op, args, out, error);
+      return field::RunOpCpu(op, args, out);
     }
   } // namespace
 
@@ -134,7 +133,7 @@ namespace faf::editor
     }
     if (settings.cluster) {
       std::vector<std::size_t> parent(free.size());
-      std::iota(parent.begin(), parent.end(), std::size_t{0});
+      std::iota(parent.begin(), parent.end(), 0uz);
       const auto find = [&](std::size_t i) {
         while (parent[i] != i) {
           parent[i] = parent[parent[i]];
@@ -226,7 +225,7 @@ namespace faf::editor
     return text + part;
   }
 
-  int ApplyPads(
+  std::expected<int, std::string> ApplyPads(
     std::uint16_t* const heights,
     const int width,
     const int height,
@@ -234,17 +233,14 @@ namespace faf::editor
     const std::vector<Pad>& pads,
     const PadSettings& settings,
     const PadResult& previous,
-    PadResult& result,
-    std::string& error
+    PadResult& result
   )
   {
     if (heights == nullptr || width < 2 || height < 2) {
-      error = "no heights";
-      return -1;
+      return std::unexpected("no heights");
     }
     if (pads.empty()) {
-      error = "no start positions or resource markers (or every pad kind is off)";
-      return -1;
+      return std::unexpected("no start positions or resource markers (or every pad kind is off)");
     }
     // The pads' rect, with the previous result's: taking it off may change ground outside the new pads.
     float fx0 = 1e9f, fz0 = 1e9f, fx1 = -1e9f, fz1 = -1e9f;
@@ -268,8 +264,7 @@ namespace faf::editor
       z1 = std::max(z1, previous.z1);
     }
     if (x1 <= x0 || z1 <= z0) {
-      error = "the pads lie outside the map";
-      return -1;
+      return std::unexpected("the pads lie outside the map");
     }
     auto base = HeightGrid(heights, width, scale, x0, z0, x1, z1);
     if (!previous.Empty()) {
@@ -290,8 +285,8 @@ namespace faf::editor
     args.p.num["snap"] = 1.0;
     args.p.num["word"] = 1.0 / scale;
     field::Grid flattened;
-    if (!Run("pad_flatten", args, flattened, error)) {
-      return -1;
+    if (const auto ran = Run("pad_flatten", args, flattened); !ran) {
+      return std::unexpected(ran.error());
     }
     result = PadResult{};
     result.x0 = x0;
@@ -371,8 +366,7 @@ namespace faf::editor
       args.p.str["mode"] = "rating";
       args.p.num["window"] = cls.window;
       field::Grid rating;
-      std::string error;
-      if (!Run("slope", args, rating, error) || rating.v.empty()) {
+      if (!Run("slope", args, rating) || rating.v.empty()) {
         shares.push_back(0.0f);
         continue;
       }
@@ -385,18 +379,16 @@ namespace faf::editor
     return shares;
   }
 
-  int LimitSlopes(
+  std::expected<int, std::string> LimitSlopes(
     std::uint16_t* const heights,
     const int width,
     const int height,
     const float scale,
-    const SlopeLimitSettings& settings,
-    std::string& error
+    const SlopeLimitSettings& settings
   )
   {
     if (heights == nullptr || width < 2 || height < 2) {
-      error = "no heights";
-      return -1;
+      return std::unexpected("no heights");
     }
     field::OpArgs args;
     args.in["a"] = HeightGrid(heights, width, scale, 0, 0, width - 1, height - 1);
@@ -406,8 +398,8 @@ namespace faf::editor
     args.p.num["margin"] = settings.margin;
     args.p.num["strength"] = settings.strength;
     field::Grid out;
-    if (!Run("slope_limit", args, out, error)) {
-      return -1;
+    if (const auto ran = Run("slope_limit", args, out); !ran) {
+      return std::unexpected(ran.error());
     }
     int changed = 0;
     for (std::size_t k = 0; k < out.v.size(); ++k) {

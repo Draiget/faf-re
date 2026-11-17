@@ -1,4 +1,5 @@
 #include "moho/render/TemporalAA.h"
+#include "moho/render/camera/EyeRelative.h"
 
 #include <algorithm>
 #include <cmath>
@@ -67,8 +68,9 @@ namespace moho
       float lowRect[4];
       float jitter[4];
       float viewW[4];
+      float eye[4];
     };
-    static_assert(sizeof(TaaConstants) == 208, "TaaConstants matches the shader's cbuffer");
+    static_assert(sizeof(TaaConstants) == 224, "TaaConstants matches the shader's cbuffer");
 
     /** The radical inverse of `index` in `base`: the Halton sequence, 0 to 1. */
     [[nodiscard]] float Halton(
@@ -220,7 +222,10 @@ namespace moho
     mFullRect[2] = static_cast<int>(fullWidth);
     mFullRect[3] = static_cast<int>(fullHeight);
     mViewProjection = camera.viewProjection;
-    mInverseViewProjection = camera.inverseViewProjection;
+    mInverseViewProjection = EyeRelativeInverseViewProjection(camera);
+    mEye[0] = camera.inverseView.r[3].x;
+    mEye[1] = camera.inverseView.r[3].y;
+    mEye[2] = camera.inverseView.r[3].z;
     mPending = true;
     return &mJittered;
   }
@@ -287,6 +292,9 @@ namespace moho
     // resampled (and blurred) every frame by the offset.
     constants.inverseViewProjection = mInverseViewProjection;
     constants.prevViewProjection = mPrevViewProjection;
+    constants.eye[0] = mEye[0];
+    constants.eye[1] = mEye[1];
+    constants.eye[2] = mEye[2];
     constants.viewRect[0] = static_cast<float>(x);
     constants.viewRect[1] = static_cast<float>(y);
     constants.viewRect[2] = static_cast<float>(width);

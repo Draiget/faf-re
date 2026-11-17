@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include <print>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -89,7 +90,7 @@ namespace
       const std::string key = kv.substr(0, eq);
       const std::string val = kv.substr(eq + 1);
       double n = 0.0;
-      if (val.find(':') != std::string::npos || val.find(';') != std::string::npos) {
+      if (val.contains(':') || val.contains(';')) {
         std::vector<double> flat;
         for (const std::string& pt : Split(val, ';')) {
           for (const std::string& c : Split(pt, ':')) {
@@ -119,12 +120,11 @@ namespace
     ParseParams(params, a.p);
     a.in = in;
     auto g = std::make_shared<Grid>();
-    std::string e;
-    if (!RunOp(op, a, *g, e)) {
+    if (const auto ran = RunOp(op, a, *g); !ran) {
       if (err)
-        *err = e;
+        *err = ran.error();
       else
-        std::printf("op %s(%s) failed: %s\n", op.c_str(), params.c_str(), e.c_str());
+        std::println("op {}({}) failed: {}", op, params, ran.error());
       return nullptr;
     }
     return g;
@@ -165,13 +165,13 @@ namespace
     for (std::size_t i = 0; i < gLines.size(); ++i) {
       const std::string& l = gLines[i];
       if (!inside) {
-        if (l.find("Cases = [[") == 0) {
+        if (l.starts_with("Cases = [[")) {
           inside = true;
           gBegin = i + 1;
         }
         continue;
       }
-      if (l.find("]]") == 0) {
+      if (l.starts_with("]]")) {
         gEnd = i;
         break;
       }
@@ -242,9 +242,7 @@ namespace
       if (gCases[i].golden != now[i]) {
         ++wrong;
         if (!update)
-          std::printf(
-            "golden %s: file %s, now %s\n", gCases[i].label.c_str(), gCases[i].golden.c_str(), now[i].c_str()
-          );
+          std::println("golden {}: file {}, now {}", gCases[i].label, gCases[i].golden, now[i]);
       }
     }
     if (update) {
@@ -260,7 +258,7 @@ namespace
         f[4] = now[ci++];
         l = f[0] + "|" + f[1] + "|" + f[2] + "|" + f[3] + "|" + f[4];
       }
-      std::printf("updated %d goldens\n", wrong);
+      std::println("updated {} goldens", wrong);
     } else {
       CHECK(wrong == 0, "%d goldens differ (run with --update after checking the change is intended)", wrong);
     }
@@ -309,7 +307,7 @@ namespace
       const Stats s = Measure(*n);
       CHECK(s.min >= 0.0f && s.max <= 1.0f, "%s out of 0..1: %f %f", op, s.min, s.max);
       CHECK(s.sd > 0.03, "%s too flat: sd %f", op, s.sd);
-      std::printf("  %s: min %.3f max %.3f mean %.3f sd %.3f\n", op, s.min, s.max, s.mean, s.sd);
+      std::println("  {}: min {:.3f} max {:.3f} mean {:.3f} sd {:.3f}", op, s.min, s.max, s.mean, s.sd);
     }
     // seeds differ, the same seed repeats, noise depends on the world position and not on the grid origin
     {
@@ -339,7 +337,7 @@ namespace
         lo = std::min(lo, v);
         hi = std::max(hi, v);
       }
-      std::printf("  simplex single octave (0.5 s + 0.5, clamped): %.4f .. %.4f\n", lo, hi);
+      std::println("  simplex single octave (0.5 s + 0.5, clamped): {:.4f} .. {:.4f}", lo, hi);
       CHECK(hi > 0.9f && lo < 0.1f, "simplex scale is off");
     }
     // const / invert / clamp / affine
@@ -563,8 +561,8 @@ namespace
           amp += a * a;
         }
         const double rel = std::sqrt(rms / amp);
-        std::printf(
-          "  height_from_gradient %s: relative error %.4f (mean of result %.2g)\n",
+        std::println(
+          "  height_from_gradient {}: relative error {:.4f} (mean of result {:.2g})",
           periodic ? "periodic" : "mirrored",
           rel,
           m1
@@ -600,23 +598,23 @@ namespace
   {
     for (const int tc : {1, gDefaultThreads}) {
       SetThreads(tc);
-      std::printf("bench, %d thread(s), 1025 x 1025:\n", tc);
+      std::println("bench, {} thread(s), 1025 x 1025:", tc);
       double t = Now();
       const GridPtr n = RunField("perlin", "width=1025,height=1025,seed=3,scale=120,octaves=5");
-      std::printf("  perlin fBm 5 octaves   %8.1f ms\n", (Now() - t) * 1000);
+      std::println("  perlin fBm 5 octaves   {:8.1f} ms", (Now() - t) * 1000);
       const GridPtr h = RunField("affine", "mul=60,add=0", {{"a", n}});
       t = Now();
       const GridPtr b = RunField("blur", "radius=4", {{"a", h}});
-      std::printf("  gaussian blur sigma 4  %8.1f ms\n", (Now() - t) * 1000);
+      std::println("  gaussian blur sigma 4  {:8.1f} ms", (Now() - t) * 1000);
       t = Now();
       const GridPtr th = RunField("thermal", "iterations=50,talus=0.5", {{"a", h}});
-      std::printf("  thermal 50 iterations  %8.1f ms\n", (Now() - t) * 1000);
+      std::println("  thermal 50 iterations  {:8.1f} ms", (Now() - t) * 1000);
       t = Now();
       const GridPtr d = RunField("distance", "threshold=30", {{"a", h}});
-      std::printf("  distance field         %8.1f ms\n", (Now() - t) * 1000);
+      std::println("  distance field         {:8.1f} ms", (Now() - t) * 1000);
       t = Now();
       const GridPtr s = RunField("slope", "mode=rating,window=2", {{"a", h}});
-      std::printf("  slope rating window 2  %8.1f ms\n", (Now() - t) * 1000);
+      std::println("  slope rating window 2  {:8.1f} ms", (Now() - t) * 1000);
       (void)b;
       (void)th;
       (void)d;
@@ -650,7 +648,7 @@ namespace
     ASSERT_TRUE(LoadCases(FAF_FIELD_CASES)) << "cannot read " << FAF_FIELD_CASES;
     int skipped = 0;
     KeepKnownCases(skipped);
-    std::printf("field goldens: %zu cases, %d skipped (op not built)\n", gCases.size(), skipped);
+    std::println("field goldens: {} cases, {} skipped (op not built)", gCases.size(), skipped);
     ASSERT_FALSE(gCases.empty());
     TestGoldens(false);
   }

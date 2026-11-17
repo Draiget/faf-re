@@ -58,8 +58,7 @@ namespace faf::editor
         }
         card.settings = ReadArmySettings(entry);
         UnitGroup root;
-        std::string error;
-        if (ParseUnitGroup(entry.Get("Units"), root, error)) {
+        if (ParseUnitGroup(entry.Get("Units"), root)) {
           card.units = static_cast<int>(UnitNamesIn(root).size());
           for (const UnitGroup& group : root.groups) {
             char text[96];
@@ -346,7 +345,7 @@ namespace faf::editor
     const std::string wantedExtra = mNewExtraArmy;
     const bool known = std::find(extra.begin(), extra.end(), wantedExtra) != extra.end() ||
       std::find(players.begin(), players.end(), wantedExtra) != players.end();
-    ImGui::BeginDisabled(wantedExtra.empty() || known || wantedExtra.find(' ') != std::string::npos);
+    ImGui::BeginDisabled(wantedExtra.empty() || known || wantedExtra.contains(' '));
     if (ImGui::Button("Add")) {
       std::string list;
       for (const std::string& army : extra) {

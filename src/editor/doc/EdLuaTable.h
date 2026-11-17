@@ -7,12 +7,13 @@
 
 #include "editor/doc/EdJsonTree.h"
 
+#include <expected>
 #include <string>
 
 namespace faf::editor
 {
-  /** The top-level assignments of `text` as an object (name -> value); false with `error`. */
-  bool ParseLuaAssignments(const std::string& text, JsonTree& out, std::string& error);
+  /** The top-level assignments of `text` as an object (name -> value) in `out`; the error otherwise. */
+  [[nodiscard]] std::expected<void, std::string> ParseLuaAssignments(const std::string& text, JsonTree& out);
   /** One value (`{ ... }`, a string, a number ...) at the start of `text`. */
-  bool ParseLuaValue(const std::string& text, JsonTree& out, std::string& error);
+  [[nodiscard]] std::expected<JsonTree, std::string> ParseLuaValue(const std::string& text);
 } // namespace faf::editor

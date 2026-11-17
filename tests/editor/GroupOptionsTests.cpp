@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <sstream>
 
 namespace
@@ -335,19 +336,19 @@ end
     EXPECT_TRUE(faf::editor::LobbyRuleOfGroup(script, options, "Optional_Civilian_Base_2").Never());
     EXPECT_TRUE(faf::editor::LobbyRuleOfGroup(script, options, "Optional_Wreckage_Back_Top_UEF_2").Never());
     for (const std::string& line : faf::editor::DescribeLobbyRule(wreckage, options)) {
-      std::printf("%s\n", line.c_str());
+      std::println("{}", line);
     }
     // What the Properties panel offers ARMY_17's units.
     for (const auto& target : faf::editor::SpawnTargets(
            script, read("DualGap_Adaptive_options.lua"), "ARMY_17", {{"Optional_Wreckage_2"}}
          )) {
-      std::printf(
-        "%s%s: %s%s%s\n",
-        target.path.back().c_str(),
+      std::println(
+        "{}{}: {}{}{}",
+        target.path.back(),
         target.exists ? "" : " (new)",
-        target.when.c_str(),
+        target.when,
         target.optionsChange.empty() ? "" : "; ",
-        target.optionsChange.c_str()
+        target.optionsChange
       );
     }
   }

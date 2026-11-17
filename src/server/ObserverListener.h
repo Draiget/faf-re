@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -33,7 +34,7 @@ namespace faf::server
     CObserverListener& operator=(const CObserverListener&) = delete;
 
     /** Listens and starts the thread. */
-    [[nodiscard]] bool Start(const remote::net::SEndpoint& at, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Start(const remote::net::SEndpoint& at);
     void Stop();
 
     /** From any thread: a token an observer may watch with (the match file's, or one the organiser approved). */

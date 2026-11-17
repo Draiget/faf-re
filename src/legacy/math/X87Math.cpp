@@ -1,9 +1,10 @@
 #include "legacy/math/X87Math.h"
 #include "legacy/math/Libm.h"
+#include "legacy/math/X87Routines.h"
+#include "platform/FpControl.h"
 
 #include <bit>
 #include <cmath>
-#include <xmmintrin.h>
 
 // Moved here unchanged from moho/math/MathReflection.cpp (dedicated-server plan
 // WPL.23): the lane state belongs with the helpers that read it, and the
@@ -27,56 +28,7 @@ extern "C" int __cdecl SetSse2Mode(
   return mode;
 }
 
-// x64 (Windows x64 and System V): legacy/math/X87Math64.asm / X87Math64.S.
-#if defined(_M_X64) || defined(__x86_64__)
-// legacy/math/X87Math64.asm: the same instruction sequences for 64-bit code,
-// which has no inline assembly.
-extern "C" float __cdecl msvc8_x87_sinf(float x);
-extern "C" float __cdecl msvc8_x87_cosf(float x);
-extern "C" float __cdecl msvc8_x87_tanf(float x);
-extern "C" float __cdecl msvc8_x87_atan2f(float y, float x);
-extern "C" double __cdecl msvc8_x87_acos(double x);
-extern "C" double __cdecl msvc8_x87_asin(double x);
-extern "C" double __cdecl msvc8_x87_pow(double x, double y);
-extern "C" unsigned int __cdecl msvc8_x87_control_word();
-extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
-extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
-extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
-extern "C" float __cdecl msvc8_x87_sin_of_product_times(float a, float b, float factor);
-extern "C" float __cdecl msvc8_x87_twister_word_in_range(float lower, float upper, std::uint32_t word);
-extern "C" void __cdecl msvc8_x87_slerp_spherical_blend(
-  float* outLanes,
-  const float* q1Lanes,
-  const float* rhsLanes,
-  float angle,
-  float oneMinusT,
-  float t
-);
-extern "C" float __cdecl msvc8_x87_intrinsic_exp(float x);
-extern "C" float __cdecl msvc8_x87_intrinsic_ln(float x);
-extern "C" float __cdecl msvc8_x87_intrinsic_log10(float x);
-extern "C" float __cdecl msvc8_x87_intrinsic_ln_quotient(float x, double base);
-extern "C" float __cdecl msvc8_x87_scaled_ln_quotient(float numerator, float denominator, float scale);
-extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
-extern "C" float __cdecl
-msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
-extern "C" float __cdecl
-msvc8_x87_subtract_bilinear_height(float top, float h00, float h01, float h10, float h11, float fracX, float fracZ);
-extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
-extern "C" void __cdecl
-msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq);
-extern "C" void __cdecl
-msvc8_x87_scale_vector_to_length(float* destLanes, const float* sourceLanes, float lengthSq, float length);
-extern "C" void __cdecl msvc8_x87_scale_vector(float* destLanes, const float* sourceLanes, float scale);
-extern "C" float __cdecl msvc8_x87_box_radius_on_axis(const float* boxLanes, const float* axisLanes);
-extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
-  float* destLanes,
-  const float* sourceLanes,
-  const float* targetLanes,
-  float sourceLengthSq
-);
-extern "C" float __cdecl msvc8_x87_vector_length_zyx(const float* lanes);
-#endif
+// The 64-bit targets' msvc8_x87_* routines: legacy/math/X87Routines.h.
 
 namespace fa
 {
@@ -84,7 +36,7 @@ namespace fa
   {
     [[nodiscard]] unsigned int CurrentControlWord() noexcept
     {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
       unsigned short hardwareControlWord;
       __asm { fnstcw hardwareControlWord }
       return hardwareControlWord;
@@ -100,11 +52,24 @@ namespace fa
      * word's low byte at 0x7F. The game clears `global_mode_sse2` through
      * _set_SSE2_enable(0), so in game every entry takes its x87 body.
      */
+    /**
+     * The `_CI*` prologue's MXCSR test, every SSE exception masked (bits 7-12). ARM64 runs with
+     * every FPCR trap disabled (platform/FpControl.h), its counterpart.
+     */
+    [[nodiscard]] bool SimdExceptionsMasked() noexcept
+    {
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
+      return (platform::ReadMxcsr() & 0x1F80u) == 0x1F80u;
+#else
+      return (platform::ReadFpcr() & 0x9F00u) == 0;
+#endif
+    }
+
     [[nodiscard]] bool TakesSse2Lane(
       const unsigned int controlWord
     ) noexcept
     {
-      return global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu;
+      return global_mode_sse2 != 0 && SimdExceptionsMasked() && (controlWord & 0x7Fu) == 0x7Fu;
     }
 
     /**
@@ -171,7 +136,7 @@ namespace fa
     const float value
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     std::int32_t result;
     __asm {
       fld value
@@ -220,7 +185,7 @@ namespace fa
     float* const px = &x;
     float* const py = &y;
     float* const pz = &z;
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     __asm {
       mov eax, px
       mov edx, py
@@ -254,7 +219,7 @@ namespace fa
     const float targetLength
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     // 0x005B1CCF..0x005B1CF7: fld lenSq; fsqrt (FUN_0040EAF0); fdivr length;
     // x*scale, scale*y, scale*z, one float store each.
     __asm {
@@ -283,7 +248,7 @@ namespace fa
     const float scale
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     __asm {
       mov eax, destLanes
       mov ecx, sourceLanes
@@ -307,7 +272,7 @@ namespace fa
     const float* const axisLanes
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float radius;
     __asm {
       mov eax, boxLanes
@@ -373,7 +338,7 @@ namespace fa
     // positive one); glibc gives the negative NaN for both. NaN operands stay with the CRT,
     // which passes them through alike on both platforms. x86 keeps its CRT's answer (the
     // negative indefinite for both, tests/sim_math/known_windows-x86.txt).
-#if !defined(_M_IX86)
+#if !FAFRE_ARCH_X86
     if (!std::isnan(x) && !std::isnan(y)) {
       if (std::isinf(x)) {
         return std::bit_cast<double>(std::signbit(x) ? 0xFFF8000000000000ull : 0x7FF8000000000000ull);
@@ -456,7 +421,7 @@ namespace fa
     const float sourceLengthSq
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     // 0x0069A3A5..0x0069A3D3: ((tx*tx + ty*ty) + tz*tz) / srcLenSq, fsqrt,
     // then sx*scale, scale*sy, scale*sz with one float store each.
     __asm {
@@ -496,7 +461,7 @@ namespace fa
     const float fracZ
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     // Keep both rows on the x87 stack; arithmetic follows the active precision
     // control, which the original simulation thread sets to 24 bits.
@@ -536,7 +501,7 @@ namespace fa
     const float fracZ
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld h01
@@ -581,7 +546,7 @@ namespace fa
     const std::uint32_t twisterWord
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     // 0x0051B5C6..0x0051B5EA: `fild` the word as signed and add 2^32 back
     // when it loaded negative, then range, product, 2^-32 and the sum on the
     // stack (constants 0x00E4F710 and 0x00E4F7B0).
@@ -619,7 +584,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -639,7 +604,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -656,7 +621,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -678,7 +643,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld y
@@ -706,7 +671,7 @@ namespace fa
     const float secondX
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     const float firstAngle = atan2f(firstY, firstX);
     float result;
     // The original float atan2 returns an unspilled x87 result. Round only
@@ -730,7 +695,7 @@ namespace fa
     const float addend
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld y
@@ -750,7 +715,7 @@ namespace fa
     const float cosArg
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     // Simulation thread runs with 24-bit precision control; fsin/fcos ignore
     // it, so only the fmul rounds (0x00695397..0x006953B1).
@@ -774,7 +739,7 @@ namespace fa
     const float factor
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld a
@@ -798,7 +763,7 @@ namespace fa
     const float t
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     // Instruction for instruction 0x004EBD95..0x004EBDF2 (edi = q1, the
     // stack copy at [esp+20h] = rhs, ebx = out).
     __asm {
@@ -852,7 +817,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -879,7 +844,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -898,7 +863,7 @@ namespace fa
     const float x
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -918,7 +883,7 @@ namespace fa
     const double base
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld x
@@ -944,7 +909,7 @@ namespace fa
     const float scale
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld numerator
@@ -966,7 +931,7 @@ namespace fa
     const float secondArg
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     float result;
     __asm {
       fld secondArg
@@ -1006,15 +971,19 @@ namespace fa
     const double x
   ) noexcept
   {
-    // Engine addition (plan WPL.11): |x| > 1 and the infinities are a domain error.
-    if (!std::isnan(x) && !(x >= -1.0 && x <= 1.0)) {
+    // Engine addition (plan WPL.11): |x| > 1 and the infinities are a domain error, and a NaN
+    // comes back quieted as the Windows CRT returns it (macOS's libm returns a NaN of its own).
+    if (std::isnan(x)) {
+      return x + x;
+    }
+    if (!(x >= -1.0 && x <= 1.0)) {
       return DomainErrorNaN();
     }
-    if (TakesSse2Lane(CurrentControlWord()) || !(x >= -1.0 && x <= 1.0)) {
+    if (TakesSse2Lane(CurrentControlWord())) {
       return std::acos(x);
     }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     double result;
     // Original CRT valid-domain lane: (1+x)*(1-x), sqrt, then atan2.
     // Each arithmetic instruction uses the caller's x87 precision control.
@@ -1053,7 +1022,7 @@ namespace fa
       return std::asin(x);
     }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     double result;
     // 0x00AA7BD5: the body runs with (caller CW & precision) | 0x7F.
     const unsigned short bodyControlWord = static_cast<unsigned short>((controlWord & 0x300u) | 0x7Fu);
@@ -1118,7 +1087,7 @@ namespace fa
     const double y
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     double result;
     // 0x00AA7BD5: the body runs with (caller CW & precision) | 0x7F.
     const unsigned short bodyControlWord = static_cast<unsigned short>((controlWord & 0x300u) | 0x7Fu);
@@ -1175,7 +1144,7 @@ namespace fa
     const float* const lanes
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     // `length` is a MASM operator, so the result slot is `vectorLength`.
     float vectorLength;
     // 0x006A2846..0x006A2861: z*z, y*y, sum, x*x, sum, fsqrt, one store.

@@ -33,16 +33,17 @@ namespace
   )
   {
     LayerSettings layer;
-    std::string error;
-    ASSERT_TRUE(faf::editor::LayerFromScmsl(kScmsl, layer, error)) << error;
+    auto read = faf::editor::LayerFromScmsl(kScmsl, layer);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(layer.albedo, "/env/evergreen/layers/eg_gravel005_albedo.dds");
     EXPECT_EQ(layer.normals, "/env/evergreen/layers/eg_gravel005_normals.dds");
     EXPECT_FLOAT_EQ(layer.albedoSize, 4.0f);
     EXPECT_FLOAT_EQ(layer.normalsSize, 2.0f);
     LayerSettings again;
-    ASSERT_TRUE(faf::editor::LayerFromScmsl(faf::editor::LayerToScmsl(layer), again, error)) << error;
+    read = faf::editor::LayerFromScmsl(faf::editor::LayerToScmsl(layer), again);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(again == layer);
-    EXPECT_FALSE(faf::editor::LayerFromScmsl("{ \"LightingMultiplier\": 1 }", again, error));
+    EXPECT_FALSE(faf::editor::LayerFromScmsl("{ \"LightingMultiplier\": 1 }", again));
   }
 
   TEST(
@@ -60,14 +61,14 @@ namespace
     const std::string text = faf::editor::LayersToScmst("TTerrainXP", layers);
     std::string shader;
     std::vector<LayerSettings> read;
-    std::string error;
-    ASSERT_TRUE(faf::editor::LayersFromScmst(text, shader, read, error)) << error;
+    auto parsed = faf::editor::LayersFromScmst(text, shader, read);
+    ASSERT_TRUE(parsed) << parsed.error();
     EXPECT_EQ(shader, "TTerrainXP");
     ASSERT_EQ(read.size(), 10u);
     for (std::size_t i = 0; i < 10; ++i) {
       EXPECT_TRUE(read[i] == layers[i]) << "layer " << i;
     }
     // A layer file isn't a set.
-    EXPECT_FALSE(faf::editor::LayersFromScmst(kScmsl, shader, read, error));
+    EXPECT_FALSE(faf::editor::LayersFromScmst(kScmsl, shader, read));
   }
 } // namespace

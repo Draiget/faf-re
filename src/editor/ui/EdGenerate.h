@@ -109,6 +109,32 @@ namespace faf::editor
     }
     /** Selects the first node of a type (test runs, `/gentest`), for the inspector. */
     void SelectFirst(const std::string& type);
+    /** The graph's own undo and redo (FAF Studio's graph history): one step per edit, a drag or a slider one. */
+    void Undo();
+    void Redo();
+    [[nodiscard]] std::size_t UndoSteps() const noexcept
+    {
+      return mUndo.size();
+    }
+    /** The keys the graph takes while it has the keyboard (its undo, copy and paste, not the map's). */
+    [[nodiscard]] bool GraphKeepsChord(const std::string& chord) const;
+    /** A node's first output shown on the terrain as a mask (0: none). */
+    void ShowAsMask(int node);
+    [[nodiscard]] int MaskNode() const noexcept
+    {
+      return mMaskNode;
+    }
+    /** The mask to show, when it changed (empty: take it off). */
+    [[nodiscard]] bool TakeMaskAsk(field::Grid& out);
+    /** Runs the graph now (test runs). */
+    void EvaluateNow()
+    {
+      Evaluate();
+    }
+    [[nodiscard]] EdNodeCanvas& Canvas() noexcept
+    {
+      return mCanvas;
+    }
     /** The graph's symmetry setting (GraphSymmetryChoices' ids). */
     [[nodiscard]] const std::string& Symmetry() const noexcept
     {
@@ -148,6 +174,11 @@ namespace faf::editor
     void DrawToolbar();
     void DrawGraphMenu();
     void DrawParams(GraphNode& node);
+    void DrawNodeHead(GraphNode& node);
+    /** Part 0 above the settings (erosion presets), part 1 below them (the curve, the blueprint list). */
+    void DrawNodeHelpers(GraphNode& node, int part);
+    void TrackUndo();
+    void UpdateMaskShown();
     [[nodiscard]] std::filesystem::path OwnFolder() const;
     void Save();
 
@@ -178,6 +209,16 @@ namespace faf::editor
     bool mAsked = false;
     std::string mStatus;
     char mFilter[64] = {};
+    std::vector<std::string> mUndo;
+    std::vector<std::string> mRedo;
+    std::string mUndoTop;
+    std::uint64_t mUndoChanges = ~std::uint64_t{0};
+    bool mGraphFocused = false;
+    int mMaskNode = 0;
+    std::shared_ptr<const field::Grid> mMaskFrom;
+    field::Grid mMaskGrid;
+    bool mMaskAsked = false;
+    char mScatterAdd[256] = {};
     struct Thumb
     {
       std::uint64_t image = 0;

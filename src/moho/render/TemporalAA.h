@@ -112,7 +112,8 @@ namespace moho
     int mFullRect[4]{};       // the view's rectangle at full size
     GeomCamera3 mJittered;
     gpg::gal::Matrix mViewProjection{};        // this frame's unmoved view-projection
-    gpg::gal::Matrix mInverseViewProjection{}; // and its inverse
+    gpg::gal::Matrix mInverseViewProjection{}; // and its inverse, without the camera's position (EyeRelative.h)
+    float mEye[3]{};                           // the camera's position for it
     gpg::gal::Matrix mPrevViewProjection{};    // the last resolved frame's
   };
 } // namespace moho

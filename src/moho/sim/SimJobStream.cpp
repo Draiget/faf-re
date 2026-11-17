@@ -6,7 +6,7 @@
 #include <vector>
 
 #include <Windows.h>
-#include <immintrin.h>
+#include "platform/SpinPause.h"
 
 #include "gpg/core/profiling/Profiler.h"
 #include "moho/console/CConCommand.h"
@@ -67,7 +67,7 @@ namespace moho
       LARGE_INTEGER now{};
       ::QueryPerformanceCounter(&start);
       do {
-        _mm_pause();
+        platform::SpinPause();
         ::QueryPerformanceCounter(&now);
       } while (now.QuadPart - start.QuadPart < ticks);
     }
@@ -149,7 +149,7 @@ namespace moho
           return;
         }
         if (++idleRounds < kSpinRounds) {
-          _mm_pause();
+          platform::SpinPause();
           continue;
         }
         idleRounds = 0;
@@ -253,7 +253,7 @@ namespace moho
       LARGE_INTEGER end{};
       ::QueryPerformanceCounter(&start);
       while (slot.state.load(std::memory_order_acquire) != kDone) {
-        _mm_pause();
+        platform::SpinPause();
       }
       ::QueryPerformanceCounter(&end);
       ++stats.mWaited;

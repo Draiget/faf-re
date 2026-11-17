@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <print>
 
 #include "moho/effects/rendering/EffectOps.h"
 #include "server/EffectOpEncoder.h"
@@ -48,34 +49,31 @@ namespace faf::headless
 
   CReplayEffectOps::CReplayEffectOps() = default;
 
-  bool CReplayEffectOps::Open(
+  std::expected<void, std::string> CReplayEffectOps::Open(
     const std::string& countsPath,
-    const std::string& recordPath,
-    std::string& error
+    const std::string& recordPath
   )
   {
     if (countsPath.empty() && recordPath.empty()) {
-      return true;
+      return {};
     }
     if (!countsPath.empty()) {
       mFile = std::fopen(countsPath.c_str(), "w");
       if (mFile == nullptr) {
-        error = "cannot write " + countsPath;
-        return false;
+        return std::unexpected("cannot write " + countsPath);
       }
-      std::fprintf(mFile, "beat total");
+      std::print(mFile, "beat total");
       for (std::size_t op = 0; op < kOps; ++op) {
-        std::fprintf(mFile, " %s", moho::EffectOpName(static_cast<moho::EEffectOp>(op)));
+        std::print(mFile, " {}", moho::EffectOpName(static_cast<moho::EEffectOp>(op)));
       }
-      std::fprintf(mFile, "\n");
+      std::println(mFile, "");
     }
     if (!recordPath.empty()) {
       mRecordFile = std::fopen(recordPath.c_str(), "w");
       if (mRecordFile == nullptr) {
-        error = "cannot write " + recordPath;
-        return false;
+        return std::unexpected("cannot write " + recordPath);
       }
-      std::fprintf(mRecordFile, "beat ops bytes\n");
+      std::println(mRecordFile, "beat ops bytes");
       mRecorder = std::make_unique<server::CEffectOpRecorder>();
       mNames = std::make_unique<server::CEffectLaneNames>();
       mRecorder->Attach();
@@ -85,7 +83,7 @@ namespace faf::headless
       count.store(0u, std::memory_order_relaxed);
     }
     moho::gEffectOpHook = &CountOp;
-    return true;
+    return {};
   }
 
   std::pair<std::uint32_t, std::uint32_t> CReplayEffectOps::TakeLane()
@@ -121,11 +119,11 @@ namespace faf::headless
       }
     }
     if (mFile != nullptr && total != 0u) {
-      std::fprintf(mFile, "%d %llu", beat, static_cast<unsigned long long>(total));
+      std::print(mFile, "{} {}", beat, static_cast<unsigned long long>(total));
       for (std::size_t op = 0; op < kOps; ++op) {
-        std::fprintf(mFile, " %llu", static_cast<unsigned long long>(counts[op]));
+        std::print(mFile, " {}", static_cast<unsigned long long>(counts[op]));
       }
-      std::fprintf(mFile, "\n");
+      std::println(mFile, "");
     }
 
     if (mRecorder != nullptr) {
@@ -134,7 +132,7 @@ namespace faf::headless
       mRecordedOps += ops;
       mRecordedBytes += bytes;
       if (ops != 0u) {
-        std::fprintf(mRecordFile, "%d %u %u\n", beat, ops, bytes);
+        std::println(mRecordFile, "{} {} {}", beat, ops, bytes);
       }
     }
   }
@@ -159,8 +157,8 @@ namespace faf::headless
     for (const std::uint64_t total : mTotals) {
       all += total;
     }
-    std::printf(
-      "[%s] effect ops: %llu in %d beats (%d with any), %.1f a beat, busiest beat %d with %llu\n",
+    std::println(
+      "[{}] effect ops: {} in {} beats ({} with any), {:.1f} a beat, busiest beat {} with {}",
       label,
       static_cast<unsigned long long>(all),
       mBeats,
@@ -171,8 +169,8 @@ namespace faf::headless
     );
     for (std::size_t op = 0; op < kOps; ++op) {
       if (mTotals[op] != 0u) {
-        std::printf(
-          "[%s]   %-26s %10llu  most in a beat %llu\n",
+        std::println(
+          "[{}]   {:26} {:10}  most in a beat {}",
           label,
           moho::EffectOpName(static_cast<moho::EEffectOp>(op)),
           static_cast<unsigned long long>(mTotals[op]),
@@ -204,9 +202,9 @@ namespace faf::headless
     std::vector<std::uint32_t> sorted = mBeatBytes;
     std::sort(sorted.begin(), sorted.end());
     const double mean = sorted.empty() ? 0.0 : static_cast<double>(mRecordedBytes) / static_cast<double>(sorted.size());
-    std::printf(
-      "[%s] effect record: %llu ops encoded, %llu bytes (%.1f KB) in %zu beats; a beat mean %.1f p50 %u p95 %u p99 %u "
-      "max %u bytes; %.2f KB/s at 10 beats a second\n",
+    std::println(
+      "[{}] effect record: {} ops encoded, {} bytes ({:.1f} KB) in {} beats; a beat mean {:.1f} p50 {} p95 {} p99 {} "
+      "max {} bytes; {:.2f} KB/s at 10 beats a second",
       label,
       static_cast<unsigned long long>(mRecordedOps),
       static_cast<unsigned long long>(mRecordedBytes),
@@ -219,9 +217,9 @@ namespace faf::headless
       sorted.empty() ? 0u : sorted.back(),
       mean * 10.0 / 1024.0
     );
-    std::printf(
-      "[%s] effect record: derived destroys left out %llu, coalesced SetFloat %llu, dropped (effect never seen "
-      "created) %llu, blueprint names %zu, texture names %zu, names sent %llu, effects still live %zu\n",
+    std::println(
+      "[{}] effect record: derived destroys left out {}, coalesced SetFloat {}, dropped (effect never seen created) "
+      "{}, blueprint names {}, texture names {}, names sent {}, effects still live {}",
       label,
       static_cast<unsigned long long>(encoder.DerivedDestroys()),
       static_cast<unsigned long long>(encoder.Coalesced()),
@@ -239,8 +237,8 @@ namespace faf::headless
         continue;
       }
       const std::uint64_t bytes = encoder.EncodedBytes(effectOp);
-      std::printf(
-        "[%s]   record %-26s %10llu ops %12llu bytes %6.2f a op  dropped %llu\n",
+      std::println(
+        "[{}]   record {:26} {:10} ops {:12} bytes {:6.2f} a op  dropped {}",
         label,
         moho::EffectOpName(effectOp),
         static_cast<unsigned long long>(ops),

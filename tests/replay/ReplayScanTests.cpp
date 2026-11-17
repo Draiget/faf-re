@@ -6,6 +6,7 @@
 //
 // usage: faf_replay_scan_tests
 
+#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -74,7 +75,7 @@ namespace
     // The stream reads as if nothing had happened.
     moho::CMessage first;
     EXPECT_TRUE(first.Read(&stream));
-    EXPECT_TRUE(first.GetType().raw() == static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_SetCommandSource));
+    EXPECT_TRUE(first.GetType().raw() == std::to_underlying(moho::ECmdStreamOp::CMDST_SetCommandSource));
   }
 
   TEST(

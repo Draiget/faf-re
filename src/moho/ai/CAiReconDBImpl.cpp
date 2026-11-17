@@ -128,7 +128,7 @@ namespace
     const EReconFlags rhs
   ) noexcept
   {
-    return static_cast<EReconFlags>(static_cast<std::int32_t>(lhs) | static_cast<std::int32_t>(rhs));
+    return static_cast<EReconFlags>(std::to_underlying(lhs) | std::to_underlying(rhs));
   }
 
   [[nodiscard]] EReconFlags ClearFlag(
@@ -136,7 +136,7 @@ namespace
     const EReconFlags bit
   ) noexcept
   {
-    return static_cast<EReconFlags>(static_cast<std::int32_t>(value) & ~static_cast<std::int32_t>(bit));
+    return static_cast<EReconFlags>(std::to_underlying(value) & ~std::to_underlying(bit));
   }
 
   [[nodiscard]] bool HasFlag(
@@ -144,16 +144,15 @@ namespace
     const EReconFlags bit
   ) noexcept
   {
-    return (static_cast<std::int32_t>(value) & static_cast<std::int32_t>(bit)) != 0;
+    return (std::to_underlying(value) & std::to_underlying(bit)) != 0;
   }
 
   [[nodiscard]] bool UsesWaterSenseLane(
     const ELayer layer
   ) noexcept
   {
-    constexpr std::int32_t kWaterSenseMask =
-      static_cast<std::int32_t>(LAYER_Sub) | static_cast<std::int32_t>(LAYER_Water);
-    return (static_cast<std::int32_t>(layer) & kWaterSenseMask) != 0;
+    constexpr std::int32_t kWaterSenseMask = std::to_underlying(LAYER_Sub) | std::to_underlying(LAYER_Water);
+    return (std::to_underlying(layer) & kWaterSenseMask) != 0;
   }
 
   [[nodiscard]] const char* ReconSenseLexical(
@@ -2317,7 +2316,7 @@ namespace moho
   bool SReconKeyLess::operator()(
     const SReconKey& lhs,
     const SReconKey& rhs
-  ) const noexcept
+  ) noexcept
   {
     return lhs.sourceEntityId < rhs.sourceEntityId;
   }
