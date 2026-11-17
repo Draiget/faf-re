@@ -19,6 +19,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/SlabAllocator.h"
 #include "legacy/containers/String.h"
 
 /// Engine addition: the x86 allocator finds a size class by table (true) or by the binary's
@@ -1834,6 +1835,10 @@ void gpg::LogHighMemoryReservation()
     "mem: small-block pool %s (blocks up to %u bytes; /smallpool 0 or FAF_SMALLPOOL=0 turns it off)",
     small_pool::Enabled() ? "on" : "off",
     static_cast<unsigned int>(small_pool::kMaxPooledBytes)
+  );
+  gpg::Logf(
+    "mem: tree node slabs %s (32 nodes per tree; /treeslabs 0 or FAF_TREESLABS=0 turns them off)",
+    fa::TreeSlabsEnabled() ? "on" : "off"
   );
 
   if (!gHighMemoryReservation.requested) {

@@ -24,16 +24,17 @@ namespace fa
    * Layout is the shipped 12-byte `{proxy, _Myhead, _Mysize}` triplet with the
    * comparator empty-base-optimised away.
    */
-  template <class Key, class Less = std::less<Key>>
+  template <class Key, class Less = std::less<Key>, class Alloc = default_rb_allocator<Key>>
   class set
   {
-    using traits = detail::rb_set_traits<Key, Less>;
-    using tree_type = detail::rb_tree<traits>;
+    using traits = detail::rb_set_traits<Key, Less, Alloc>;
+    using tree_type = detail::rb_tree<traits, Alloc>;
 
   public:
     // -------- public aliases --------
     using key_type = Key;
     using value_type = Key;
+    using allocator_type = Alloc;
     using size_type = std::uint32_t;
     using difference_type = std::ptrdiff_t;
     using key_compare = Less;
@@ -48,9 +49,15 @@ namespace fa
     // -------- ctor/dtor --------
     set() MSVC8_SET_NOEXCEPT {}
     explicit set(
-      const key_compare& comp
+      const key_compare& comp,
+      const allocator_type& alloc = allocator_type()
     )
-      : tree_(comp)
+      : tree_(comp, alloc)
+    {}
+    explicit set(
+      const allocator_type& alloc
+    )
+      : tree_(alloc)
     {}
 
     /**
@@ -74,10 +81,23 @@ namespace fa
     template <class InputIt>
     set(
       InputIt first,
-      InputIt last
+      InputIt last,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
     )
+      : tree_(comp, alloc)
     {
       insert(first, last);
+    }
+
+    set(
+      std::initializer_list<value_type> init,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      insert(init.begin(), init.end());
     }
 
     /**
@@ -93,6 +113,12 @@ namespace fa
     )
       : tree_(o.tree_)
     {}
+    set(
+      const set& o,
+      const allocator_type& alloc
+    )
+      : tree_(o.tree_, alloc)
+    {}
     set& operator=(
       const set& o
     )
@@ -106,6 +132,12 @@ namespace fa
       tree_(
         std::move(o.tree_)
       )
+    {}
+    set(
+      set&& o,
+      const allocator_type& alloc
+    )
+      : tree_(std::move(o.tree_), alloc)
     {}
     set& operator=(
       set&& o
@@ -378,15 +410,16 @@ namespace fa
    * `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h) is the instantiation this
    * models; its emissions are cited on these members and on `rb_tree`.
    */
-  template <class Key, class Less = std::less<Key>>
+  template <class Key, class Less = std::less<Key>, class Alloc = default_rb_allocator<Key>>
   class multiset
   {
-    using traits = detail::rb_set_traits<Key, Less>;
-    using tree_type = detail::rb_tree<traits>;
+    using traits = detail::rb_set_traits<Key, Less, Alloc>;
+    using tree_type = detail::rb_tree<traits, Alloc>;
 
   public:
     using key_type = Key;
     using value_type = Key;
+    using allocator_type = Alloc;
     using size_type = std::uint32_t;
     using difference_type = std::ptrdiff_t;
     using key_compare = Less;
@@ -399,14 +432,52 @@ namespace fa
 
     multiset() {}
     explicit multiset(
-      const key_compare& comp
+      const key_compare& comp,
+      const allocator_type& alloc = allocator_type()
     )
-      : tree_(comp)
+      : tree_(comp, alloc)
     {}
+    explicit multiset(
+      const allocator_type& alloc
+    )
+      : tree_(alloc)
+    {}
+    template <class InputIt>
+    multiset(
+      InputIt first,
+      InputIt last,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      for (; first != last; ++first) {
+        insert(*first);
+      }
+    }
+
+    multiset(
+      std::initializer_list<value_type> init,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      for (const auto& item : init) {
+        insert(item);
+      }
+    }
+
     multiset(
       const multiset& o
     )
       : tree_(o.tree_)
+    {}
+    multiset(
+      const multiset& o,
+      const allocator_type& alloc
+    )
+      : tree_(o.tree_, alloc)
     {}
     multiset& operator=(
       const multiset& o
@@ -421,6 +492,12 @@ namespace fa
       tree_(
         std::move(o.tree_)
       )
+    {}
+    multiset(
+      multiset&& o,
+      const allocator_type& alloc
+    )
+      : tree_(std::move(o.tree_), alloc)
     {}
     multiset& operator=(
       multiset&& o
@@ -535,9 +612,12 @@ namespace fa
     tree_type tree_;
   };
 
-  // Size check (x86)
+  // The 2007 layout: 12 bytes, the comparator and std::allocator taking no storage. Checked in the
+  // clang-x86-retail-layout build (platform/LayoutAsserts.h turns static_assert off elsewhere).
+#if FAFRE_ARCH_X86
   static_assert(sizeof(set<int>) == 12, "fa::set must be 12 bytes on x86");
   static_assert(sizeof(multiset<int>) == 12, "fa::multiset must be 12 bytes on x86");
+#endif
 
 } // namespace fa
 

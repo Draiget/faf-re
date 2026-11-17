@@ -32,11 +32,15 @@ namespace fa
    * that the container frees what it holds, so `adopt` and the raw-header
    * constructor are gone; nothing in `src/ **` referenced them.
    */
-  template <class Key, class T, class Less = std::less<Key>>
+  template <
+    class Key,
+    class T,
+    class Less = std::less<Key>,
+    class Alloc = default_rb_allocator<std::pair<const Key, T>>>
   class map
   {
-    using traits = detail::rb_map_traits<Key, T, Less>;
-    using tree_type = detail::rb_tree<traits>;
+    using traits = detail::rb_map_traits<Key, T, Less, Alloc>;
+    using tree_type = detail::rb_tree<traits, Alloc>;
     using node_type = typename tree_type::node_type;
 
   public:
@@ -44,6 +48,7 @@ namespace fa
     using mapped_type = T;
     using value_type = std::pair<const Key, T>;
     using key_compare = Less;
+    using allocator_type = Alloc;
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
     using reference = value_type&;
@@ -56,9 +61,16 @@ namespace fa
 
     map() noexcept {}
     explicit map(
-      const key_compare& comp
+      const key_compare& comp,
+      const allocator_type& alloc = allocator_type()
     )
-      : tree_(comp)
+      : tree_(comp, alloc)
+    {}
+
+    explicit map(
+      const allocator_type& alloc
+    )
+      : tree_(alloc)
     {}
 
     /**
@@ -69,6 +81,13 @@ namespace fa
       const map& o
     )
       : tree_(o.tree_)
+    {}
+
+    map(
+      const map& o,
+      const allocator_type& alloc
+    )
+      : tree_(o.tree_, alloc)
     {}
     /**
      * Address: 0x0042C2C0 (FUN_0042C2C0 -- `operator=` -- clear, then clone the source tree node by node for the
@@ -99,12 +118,40 @@ namespace fa
     ) noexcept
       : tree_(std::move(o.tree_))
     {}
+    map(
+      map&& o,
+      const allocator_type& alloc
+    )
+      : tree_(std::move(o.tree_), alloc)
+    {}
     map& operator=(
       map&& o
     ) noexcept
     {
       tree_ = std::move(o.tree_);
       return *this;
+    }
+
+    template <class InputIt>
+    map(
+      InputIt first,
+      InputIt last,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      insert(first, last);
+    }
+
+    map(
+      std::initializer_list<value_type> init,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      insert(init.begin(), init.end());
     }
 
     // ---- observers --------------------------------------------------------
@@ -886,11 +933,15 @@ namespace fa
    * ordered on the key's `sourceEntityId`) is the instantiation this models;
    * its `insert` emission is cited on `rb_tree::insert_equal` in `RbTree.h`.
    */
-  template <class Key, class T, class Less = std::less<Key>>
+  template <
+    class Key,
+    class T,
+    class Less = std::less<Key>,
+    class Alloc = default_rb_allocator<std::pair<const Key, T>>>
   class multimap
   {
-    using traits = detail::rb_map_traits<Key, T, Less>;
-    using tree_type = detail::rb_tree<traits>;
+    using traits = detail::rb_map_traits<Key, T, Less, Alloc>;
+    using tree_type = detail::rb_tree<traits, Alloc>;
     using node_type = typename tree_type::node_type;
 
   public:
@@ -898,6 +949,7 @@ namespace fa
     using mapped_type = T;
     using value_type = std::pair<const Key, T>;
     using key_compare = Less;
+    using allocator_type = Alloc;
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
     using reference = value_type&;
@@ -908,14 +960,26 @@ namespace fa
 
     multimap() noexcept {}
     explicit multimap(
-      const key_compare& comp
+      const key_compare& comp,
+      const allocator_type& alloc = allocator_type()
     )
-      : tree_(comp)
+      : tree_(comp, alloc)
+    {}
+    explicit multimap(
+      const allocator_type& alloc
+    )
+      : tree_(alloc)
     {}
     multimap(
       const multimap& o
     )
       : tree_(o.tree_)
+    {}
+    multimap(
+      const multimap& o,
+      const allocator_type& alloc
+    )
+      : tree_(o.tree_, alloc)
     {}
     multimap& operator=(
       const multimap& o
@@ -931,6 +995,12 @@ namespace fa
     ) noexcept
       : tree_(std::move(o.tree_))
     {}
+    multimap(
+      multimap&& o,
+      const allocator_type& alloc
+    )
+      : tree_(std::move(o.tree_), alloc)
+    {}
     multimap& operator=(
       multimap&& o
     ) noexcept
@@ -939,6 +1009,32 @@ namespace fa
         tree_ = std::move(o.tree_);
       }
       return *this;
+    }
+
+    template <class InputIt>
+    multimap(
+      InputIt first,
+      InputIt last,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      for (; first != last; ++first) {
+        insert(*first);
+      }
+    }
+
+    multimap(
+      std::initializer_list<value_type> init,
+      const key_compare& comp = key_compare(),
+      const allocator_type& alloc = allocator_type()
+    )
+      : tree_(comp, alloc)
+    {
+      for (const auto& item : init) {
+        insert(item);
+      }
     }
 
     [[nodiscard]] iterator begin() noexcept
@@ -1084,9 +1180,12 @@ namespace fa
     tree_type tree_;
   };
 
-  // --------- Convenience: ensure 32-bit pointer size assumed ----------
-  static_assert(sizeof(map<void*, void*>) == 0x0C, "fa::map size should be 0x0C");
-  static_assert(sizeof(multimap<void*, void*>) == 0x0C, "fa::multimap size should be 0x0C");
+  // The 2007 layout: 12 bytes, the comparator and std::allocator taking no storage. Checked in the
+  // clang-x86-retail-layout build (platform/LayoutAsserts.h turns static_assert off elsewhere).
+#if FAFRE_ARCH_X86
+  static_assert(sizeof(map<void*, void*>) == 0x0C, "fa::map size should be 0x0C on x86");
+  static_assert(sizeof(multimap<void*, void*>) == 0x0C, "fa::multimap size should be 0x0C on x86");
+#endif
 
 } // namespace fa
 
