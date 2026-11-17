@@ -363,3 +363,11 @@ if(FAFRE_PLATFORM_MACOS) # MoltenVK and a source-built DXC: neither ships for ma
       "$<TARGET_FILE_DIR:faf_client>"
     VERBATIM)
 endif()
+
+# What a Vulkan swap chain is made with on a surface (VulkanSwapChain.h), as Windows runs it (tests/vulkan):
+# header-only, on the Vulkan headers alone.
+add_executable(faf_vulkan_swapchain_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/vulkan/SwapChainTests.cpp")
+target_include_directories(faf_vulkan_swapchain_tests PRIVATE
+  "${PROJECT_SOURCE_DIR}/src" "${FAF_DEPENDENCIES_DIR}/vulkan/include")
+target_link_libraries(faf_vulkan_swapchain_tests PRIVATE gtest_main)
+add_test(NAME vulkan_swap_chain COMMAND faf_vulkan_swapchain_tests)
