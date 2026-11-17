@@ -1,0 +1,33 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='760' height='340' viewBox='0 0 760 340' role='img' aria-label='Time the game stands still, network &#39;worst&#39;'>
+<rect width='760' height='340' rx='8' fill='#fcfcfb'/>
+<text x='16' y='26' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='15' font-weight='600' fill='#0b0b0b'>Time the game stands still, network &#39;worst&#39;</text>
+<text x='16' y='45' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='12' fill='#52514e'>from measured beat delivery, through the game&#39;s issue pacing</text>
+<line x1='64' x2='736' y1='288.0' y2='288.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='292.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>0</text>
+<line x1='64' x2='736' y1='220.7' y2='220.7' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='224.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>20,000</text>
+<line x1='64' x2='736' y1='153.3' y2='153.3' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='157.3' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>40,000</text>
+<line x1='64' x2='736' y1='86.0' y2='86.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='90.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>60,000</text>
+<text x='14' y='187.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle' transform='rotate(-90 14 187.0)'>stall (ms per minute)</text>
+<text x='400.0' y='330' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>net_Lag (ms)</text>
+<line x1='64' x2='736' y1='288' y2='288' stroke='#b9b8b2' stroke-width='1'/>
+<text x='170.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>200</text>
+<text x='311.6' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>400</text>
+<text x='453.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>600</text>
+<text x='594.5' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>800</text>
+<text x='736.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>1,000</text>
+<path d='M64.0,111.6 L81.7,162.1 L99.4,212.6 L117.1,272.6 L134.7,281.8 L152.4,281.9 L170.1,282.0 L187.8,282.1 L205.5,282.1 L223.2,282.2 L240.8,282.3 L258.5,282.4 L276.2,282.5 L293.9,282.6 L311.6,282.6 L329.3,282.7 L346.9,282.8 L364.6,282.9 L382.3,283.0 L400.0,283.1 L417.7,283.2 L435.4,283.2 L453.1,283.3 L470.7,283.4 L488.4,283.5 L506.1,283.6 L523.8,283.7 L541.5,283.7 L559.2,283.8 L576.8,283.9 L594.5,284.0 L612.2,284.1 L629.9,284.2 L647.6,284.2 L665.3,284.3 L682.9,284.4 L700.6,284.5 L718.3,284.6 L736.0,284.7' fill='none' stroke='#2a78d6' stroke-width='2' stroke-linejoin='round'><title>retail</title></path>
+<path d='M64.0,110.2 L81.7,160.7 L99.4,211.2 L117.1,274.7 L134.7,287.5 L152.4,287.6 L170.1,287.7 L187.8,287.8 L205.5,287.9 L223.2,287.9 L240.8,288.0 L258.5,288.0 L276.2,288.0 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eb6834' stroke-width='2' stroke-linejoin='round'><title>lane</title></path>
+<path d='M64.0,166.4 L81.7,216.9 L99.4,267.1 L117.1,285.4 L134.7,285.5 L152.4,285.5 L170.1,285.6 L187.8,285.7 L205.5,285.8 L223.2,285.9 L240.8,286.0 L258.5,286.0 L276.2,286.1 L293.9,286.2 L311.6,286.3 L329.3,286.4 L346.9,286.5 L364.6,286.6 L382.3,286.6 L400.0,286.7 L417.7,286.8 L435.4,286.9 L453.1,286.9 L470.7,287.0 L488.4,287.0 L506.1,287.1 L523.8,287.2 L541.5,287.2 L559.2,287.3 L576.8,287.3 L594.5,287.4 L612.2,287.4 L629.9,287.5 L647.6,287.6 L665.3,287.6 L682.9,287.7 L700.6,287.7 L718.3,287.8 L736.0,287.8' fill='none' stroke='#1baf7a' stroke-width='2' stroke-linejoin='round'><title>tuned</title></path>
+<path d='M64.0,137.8 L81.7,188.3 L99.4,238.7 L117.1,287.2 L134.7,287.5 L152.4,287.6 L170.1,287.7 L187.8,287.8 L205.5,287.9 L223.2,287.9 L240.8,288.0 L258.5,288.0 L276.2,288.0 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eda100' stroke-width='2' stroke-linejoin='round'><title>channel</title></path>
+<line x1='64' x2='80' y1='66' y2='66' stroke='#2a78d6' stroke-width='3'/>
+<text x='85' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>retail</text>
+<line x1='142.6' x2='158.6' y1='66' y2='66' stroke='#eb6834' stroke-width='3'/>
+<text x='163.6' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>lane</text>
+<line x1='208.0' x2='224.0' y1='66' y2='66' stroke='#1baf7a' stroke-width='3'/>
+<text x='229.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>tuned</text>
+<line x1='280.0' x2='296.0' y1='66' y2='66' stroke='#eda100' stroke-width='3'/>
+<text x='301.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>channel</text>
+</svg>

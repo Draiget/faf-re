@@ -1,0 +1,86 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='900' height='340' viewBox='0 0 900 340' role='img' aria-label='Order delay each network needs'>
+<rect width='900' height='340' rx='8' fill='#fcfcfb'/>
+<text x='16' y='26' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='15' font-weight='600' fill='#0b0b0b'>Order delay each network needs</text>
+<text x='16' y='45' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='12' fill='#52514e'>smallest net_Lag with under 0.1 % of play paused; the shipped game always uses 500</text>
+<line x1='64' x2='876' y1='288.0' y2='288.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='292.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>0</text>
+<line x1='64' x2='876' y1='247.6' y2='247.6' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='251.6' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>250</text>
+<line x1='64' x2='876' y1='207.2' y2='207.2' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='211.2' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>500</text>
+<line x1='64' x2='876' y1='166.8' y2='166.8' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='170.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>750</text>
+<line x1='64' x2='876' y1='126.4' y2='126.4' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='130.4' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>1,000</text>
+<line x1='64' x2='876' y1='86.0' y2='86.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='90.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>1,250</text>
+<text x='14' y='187.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle' transform='rotate(-90 14 187.0)'>lag (ms)</text>
+<line x1='64' x2='876' y1='288' y2='288' stroke='#b9b8b2' stroke-width='1'/>
+<path d='M81.4,288.0 V283.9 Q81.4,279.9 85.4,279.9 H96.2 Q100.2,279.9 100.2,283.9 V288.0 Z' fill='#2a78d6'><title>retail, lan: 50</title></path>
+<text x='90.8' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<path d='M102.2,288.0 V283.9 Q102.2,279.9 106.2,279.9 H117.0 Q121.0,279.9 121.0,283.9 V288.0 Z' fill='#eb6834'><title>lane, lan: 50</title></path>
+<text x='111.6' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<path d='M123.0,288.0 V283.9 Q123.0,279.9 127.0,279.9 H137.8 Q141.8,279.9 141.8,283.9 V288.0 Z' fill='#1baf7a'><title>tuned, lan: 50</title></path>
+<text x='132.4' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<path d='M143.8,288.0 V283.9 Q143.8,279.9 147.8,279.9 H158.6 Q162.6,279.9 162.6,283.9 V288.0 Z' fill='#eda100'><title>channel, lan: 50</title></path>
+<text x='153.2' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<text x='122.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>lan</text>
+<path d='M197.4,288.0 V275.8 Q197.4,271.8 201.4,271.8 H212.2 Q216.2,271.8 216.2,275.8 V288.0 Z' fill='#2a78d6'><title>retail, good: 100</title></path>
+<text x='206.8' y='267.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>100</text>
+<path d='M218.2,288.0 V275.8 Q218.2,271.8 222.2,271.8 H233.0 Q237.0,271.8 237.0,275.8 V288.0 Z' fill='#eb6834'><title>lane, good: 100</title></path>
+<text x='227.6' y='267.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>100</text>
+<path d='M239.0,288.0 V283.9 Q239.0,279.9 243.0,279.9 H253.8 Q257.8,279.9 257.8,283.9 V288.0 Z' fill='#1baf7a'><title>tuned, good: 50</title></path>
+<text x='248.4' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<path d='M259.8,288.0 V283.9 Q259.8,279.9 263.8,279.9 H274.6 Q278.6,279.9 278.6,283.9 V288.0 Z' fill='#eda100'><title>channel, good: 50</title></path>
+<text x='269.2' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<text x='238.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>good</text>
+<path d='M313.4,288.0 V263.7 Q313.4,259.7 317.4,259.7 H328.2 Q332.2,259.7 332.2,263.7 V288.0 Z' fill='#2a78d6'><title>retail, typical: 175</title></path>
+<text x='322.8' y='255.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>175</text>
+<path d='M334.2,288.0 V279.9 Q334.2,275.9 338.2,275.9 H349.0 Q353.0,275.9 353.0,279.9 V288.0 Z' fill='#eb6834'><title>lane, typical: 75</title></path>
+<text x='343.6' y='271.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>75</text>
+<path d='M355.0,288.0 V271.8 Q355.0,267.8 359.0,267.8 H369.8 Q373.8,267.8 373.8,271.8 V288.0 Z' fill='#1baf7a'><title>tuned, typical: 125</title></path>
+<text x='364.4' y='263.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>125</text>
+<path d='M375.8,288.0 V283.9 Q375.8,279.9 379.8,279.9 H390.6 Q394.6,279.9 394.6,283.9 V288.0 Z' fill='#eda100'><title>channel, typical: 50</title></path>
+<text x='385.2' y='275.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>50</text>
+<text x='354.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>typical</text>
+<path d='M429.4,288.0 V227.4 Q429.4,223.4 433.4,223.4 H444.2 Q448.2,223.4 448.2,227.4 V288.0 Z' fill='#2a78d6'><title>retail, wifi: 400</title></path>
+<text x='438.8' y='219.4' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>400</text>
+<path d='M450.2,288.0 V239.5 Q450.2,235.5 454.2,235.5 H465.0 Q469.0,235.5 469.0,239.5 V288.0 Z' fill='#eb6834'><title>lane, wifi: 325</title></path>
+<text x='459.6' y='231.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>325</text>
+<path d='M471.0,288.0 V243.5 Q471.0,239.5 475.0,239.5 H485.8 Q489.8,239.5 489.8,243.5 V288.0 Z' fill='#1baf7a'><title>tuned, wifi: 300</title></path>
+<text x='480.4' y='235.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>300</text>
+<path d='M491.8,288.0 V259.7 Q491.8,255.7 495.8,255.7 H506.6 Q510.6,255.7 510.6,259.7 V288.0 Z' fill='#eda100'><title>channel, wifi: 200</title></path>
+<text x='501.2' y='251.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>200</text>
+<text x='470.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>wifi</text>
+<path d='M545.4,288.0 V174.8 Q545.4,170.8 549.4,170.8 H560.2 Q564.2,170.8 564.2,174.8 V288.0 Z' fill='#2a78d6'><title>retail, bad: 725</title></path>
+<text x='554.8' y='166.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>725</text>
+<path d='M566.2,288.0 V243.5 Q566.2,239.5 570.2,239.5 H581.0 Q585.0,239.5 585.0,243.5 V288.0 Z' fill='#eb6834'><title>lane, bad: 300</title></path>
+<text x='575.6' y='235.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>300</text>
+<path d='M587.0,288.0 V166.8 Q587.0,162.8 591.0,162.8 H601.8 Q605.8,162.8 605.8,166.8 V288.0 Z' fill='#1baf7a'><title>tuned, bad: 775</title></path>
+<text x='596.4' y='158.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>775</text>
+<path d='M607.8,288.0 V243.5 Q607.8,239.5 611.8,239.5 H622.6 Q626.6,239.5 626.6,243.5 V288.0 Z' fill='#eda100'><title>channel, bad: 300</title></path>
+<text x='617.2' y='235.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>300</text>
+<text x='586.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>bad</text>
+<path d='M682.2,288.0 V251.6 Q682.2,247.6 686.2,247.6 H697.0 Q701.0,247.6 701.0,251.6 V288.0 Z' fill='#eb6834'><title>lane, worst: 250</title></path>
+<text x='691.6' y='243.6' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>250</text>
+<path d='M703.0,288.0 V122.3 Q703.0,118.3 707.0,118.3 H717.8 Q721.8,118.3 721.8,122.3 V288.0 Z' fill='#1baf7a'><title>tuned, worst: 1,050</title></path>
+<text x='712.4' y='114.3' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>1,050</text>
+<path d='M723.8,288.0 V251.6 Q723.8,247.6 727.8,247.6 H738.6 Q742.6,247.6 742.6,251.6 V288.0 Z' fill='#eda100'><title>channel, worst: 250</title></path>
+<text x='733.2' y='243.6' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>250</text>
+<text x='702.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>worst</text>
+<path d='M819.0,288.0 V275.8 Q819.0,271.8 823.0,271.8 H833.8 Q837.8,271.8 837.8,275.8 V288.0 Z' fill='#1baf7a'><title>tuned, order-burst: 100</title></path>
+<text x='828.4' y='267.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>100</text>
+<path d='M839.8,288.0 V279.9 Q839.8,275.9 843.8,275.9 H854.6 Q858.6,275.9 858.6,279.9 V288.0 Z' fill='#eda100'><title>channel, order-burst: 75</title></path>
+<text x='849.2' y='271.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>75</text>
+<text x='818.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>order-burst</text>
+<line x1='64' x2='876' y1='207.2' y2='207.2' stroke='#52514e' stroke-width='1.5' stroke-dasharray='6 4'/>
+<text x='872' y='202.2' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>shipped net_Lag 500 ms</text>
+<line x1='64' x2='80' y1='66' y2='66' stroke='#2a78d6' stroke-width='3'/>
+<text x='85' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>retail</text>
+<line x1='142.6' x2='158.6' y1='66' y2='66' stroke='#eb6834' stroke-width='3'/>
+<text x='163.6' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>lane</text>
+<line x1='208.0' x2='224.0' y1='66' y2='66' stroke='#1baf7a' stroke-width='3'/>
+<text x='229.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>tuned</text>
+<line x1='280.0' x2='296.0' y1='66' y2='66' stroke='#eda100' stroke-width='3'/>
+<text x='301.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>channel</text>
+</svg>

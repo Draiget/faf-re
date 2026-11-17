@@ -1,0 +1,35 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='760' height='340' viewBox='0 0 760 340' role='img' aria-label='Time the game stands still, network &#39;bad&#39;'>
+<rect width='760' height='340' rx='8' fill='#fcfcfb'/>
+<text x='16' y='26' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='15' font-weight='600' fill='#0b0b0b'>Time the game stands still, network &#39;bad&#39;</text>
+<text x='16' y='45' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='12' fill='#52514e'>from measured beat delivery, through the game&#39;s issue pacing</text>
+<line x1='64' x2='736' y1='288.0' y2='288.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='292.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>0</text>
+<line x1='64' x2='736' y1='237.5' y2='237.5' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='241.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>5,000</text>
+<line x1='64' x2='736' y1='187.0' y2='187.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='191.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>10,000</text>
+<line x1='64' x2='736' y1='136.5' y2='136.5' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='140.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>15,000</text>
+<line x1='64' x2='736' y1='86.0' y2='86.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='90.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>20,000</text>
+<text x='14' y='187.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle' transform='rotate(-90 14 187.0)'>stall (ms per minute)</text>
+<text x='400.0' y='330' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>net_Lag (ms)</text>
+<line x1='64' x2='736' y1='288' y2='288' stroke='#b9b8b2' stroke-width='1'/>
+<text x='170.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>200</text>
+<text x='311.6' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>400</text>
+<text x='453.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>600</text>
+<text x='594.5' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>800</text>
+<text x='736.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>1,000</text>
+<path d='M64.0,169.4 L81.7,280.9 L99.4,281.1 L117.1,281.4 L134.7,281.6 L152.4,281.9 L170.1,282.1 L187.8,282.4 L205.5,282.6 L223.2,282.9 L240.8,283.1 L258.5,283.4 L276.2,283.6 L293.9,283.9 L311.6,284.2 L329.3,284.4 L346.9,284.7 L364.6,284.9 L382.3,285.2 L400.0,285.4 L417.7,285.7 L435.4,285.9 L453.1,286.2 L470.7,286.4 L488.4,286.7 L506.1,286.9 L523.8,287.2 L541.5,287.4 L559.2,287.6 L576.8,287.8 L594.5,287.8 L612.2,287.9 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#2a78d6' stroke-width='2' stroke-linejoin='round'><title>retail</title></path>
+<path d='M64.0,138.8 L81.7,279.9 L99.4,285.5 L117.1,285.7 L134.7,286.0 L152.4,286.2 L170.1,286.5 L187.8,286.7 L205.5,287.0 L223.2,287.2 L240.8,287.5 L258.5,287.8 L276.2,288.0 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eb6834' stroke-width='2' stroke-linejoin='round'><title>lane</title></path>
+<path d='M64.0,249.6 L81.7,281.4 L99.4,281.7 L117.1,281.9 L134.7,282.2 L152.4,282.4 L170.1,282.7 L187.8,282.9 L205.5,283.2 L223.2,283.4 L240.8,283.7 L258.5,283.9 L276.2,284.2 L293.9,284.4 L311.6,284.7 L329.3,284.9 L346.9,285.2 L364.6,285.4 L382.3,285.7 L400.0,285.9 L417.7,286.2 L435.4,286.4 L453.1,286.6 L470.7,286.8 L488.4,287.0 L506.1,287.1 L523.8,287.3 L541.5,287.4 L559.2,287.4 L576.8,287.5 L594.5,287.6 L612.2,287.7 L629.9,287.8 L647.6,287.9 L665.3,287.9 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#1baf7a' stroke-width='2' stroke-linejoin='round'><title>tuned</title></path>
+<path d='M64.0,224.2 L81.7,285.3 L99.4,285.6 L117.1,285.8 L134.7,286.1 L152.4,286.3 L170.1,286.6 L187.8,286.8 L205.5,287.1 L223.2,287.3 L240.8,287.6 L258.5,287.8 L276.2,288.0 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eda100' stroke-width='2' stroke-linejoin='round'><title>channel</title></path>
+<line x1='64' x2='80' y1='66' y2='66' stroke='#2a78d6' stroke-width='3'/>
+<text x='85' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>retail</text>
+<line x1='142.6' x2='158.6' y1='66' y2='66' stroke='#eb6834' stroke-width='3'/>
+<text x='163.6' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>lane</text>
+<line x1='208.0' x2='224.0' y1='66' y2='66' stroke='#1baf7a' stroke-width='3'/>
+<text x='229.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>tuned</text>
+<line x1='280.0' x2='296.0' y1='66' y2='66' stroke='#eda100' stroke-width='3'/>
+<text x='301.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>channel</text>
+</svg>

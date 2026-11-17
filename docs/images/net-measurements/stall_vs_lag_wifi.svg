@@ -1,0 +1,37 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='760' height='340' viewBox='0 0 760 340' role='img' aria-label='Time the game stands still, network &#39;wifi&#39;'>
+<rect width='760' height='340' rx='8' fill='#fcfcfb'/>
+<text x='16' y='26' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='15' font-weight='600' fill='#0b0b0b'>Time the game stands still, network &#39;wifi&#39;</text>
+<text x='16' y='45' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='12' fill='#52514e'>from measured beat delivery, through the game&#39;s issue pacing</text>
+<line x1='64' x2='736' y1='288.0' y2='288.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='292.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>0</text>
+<line x1='64' x2='736' y1='247.6' y2='247.6' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='251.6' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>100</text>
+<line x1='64' x2='736' y1='207.2' y2='207.2' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='211.2' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>200</text>
+<line x1='64' x2='736' y1='166.8' y2='166.8' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='170.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>300</text>
+<line x1='64' x2='736' y1='126.4' y2='126.4' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='130.4' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>400</text>
+<line x1='64' x2='736' y1='86.0' y2='86.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='90.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>500</text>
+<text x='14' y='187.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle' transform='rotate(-90 14 187.0)'>stall (ms per minute)</text>
+<text x='400.0' y='330' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>net_Lag (ms)</text>
+<line x1='64' x2='736' y1='288' y2='288' stroke='#b9b8b2' stroke-width='1'/>
+<text x='170.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>200</text>
+<text x='311.6' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>400</text>
+<text x='453.1' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>600</text>
+<text x='594.5' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>800</text>
+<text x='736.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>1,000</text>
+<path d='M64.0,130.3 L81.7,140.4 L99.4,150.5 L117.1,160.6 L134.7,170.7 L152.4,180.8 L170.1,190.9 L187.8,201.0 L205.5,211.1 L223.2,221.2 L240.8,231.3 L258.5,241.4 L276.2,251.5 L293.9,261.6 L311.6,271.7 L329.3,280.0 L346.9,283.4 L364.6,286.8 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#2a78d6' stroke-width='2' stroke-linejoin='round'><title>retail</title></path>
+<path d='M64.0,168.6 L81.7,178.7 L99.4,188.8 L117.1,198.9 L134.7,209.0 L152.4,219.1 L170.1,229.2 L187.8,237.4 L205.5,244.1 L223.2,250.8 L240.8,257.6 L258.5,264.3 L276.2,271.0 L293.9,277.8 L311.6,284.5 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eb6834' stroke-width='2' stroke-linejoin='round'><title>lane</title></path>
+<path d='M64.0,171.9 L81.7,182.0 L99.4,192.1 L117.1,202.2 L134.7,212.3 L152.4,222.4 L170.1,232.5 L187.8,242.6 L205.5,252.7 L223.2,262.8 L240.8,272.9 L258.5,282.7 L276.2,286.7 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#1baf7a' stroke-width='2' stroke-linejoin='round'><title>tuned</title></path>
+<path d='M64.0,207.7 L81.7,217.8 L99.4,227.9 L117.1,238.0 L134.7,248.1 L152.4,258.2 L170.1,268.3 L187.8,278.4 L205.5,285.0 L223.2,288.0 L240.8,288.0 L258.5,288.0 L276.2,288.0 L293.9,288.0 L311.6,288.0 L329.3,288.0 L346.9,288.0 L364.6,288.0 L382.3,288.0 L400.0,288.0 L417.7,288.0 L435.4,288.0 L453.1,288.0 L470.7,288.0 L488.4,288.0 L506.1,288.0 L523.8,288.0 L541.5,288.0 L559.2,288.0 L576.8,288.0 L594.5,288.0 L612.2,288.0 L629.9,288.0 L647.6,288.0 L665.3,288.0 L682.9,288.0 L700.6,288.0 L718.3,288.0 L736.0,288.0' fill='none' stroke='#eda100' stroke-width='2' stroke-linejoin='round'><title>channel</title></path>
+<line x1='64' x2='80' y1='66' y2='66' stroke='#2a78d6' stroke-width='3'/>
+<text x='85' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>retail</text>
+<line x1='142.6' x2='158.6' y1='66' y2='66' stroke='#eb6834' stroke-width='3'/>
+<text x='163.6' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>lane</text>
+<line x1='208.0' x2='224.0' y1='66' y2='66' stroke='#1baf7a' stroke-width='3'/>
+<text x='229.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>tuned</text>
+<line x1='280.0' x2='296.0' y1='66' y2='66' stroke='#eda100' stroke-width='3'/>
+<text x='301.0' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>channel</text>
+</svg>
