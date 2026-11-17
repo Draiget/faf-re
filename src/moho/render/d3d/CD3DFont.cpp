@@ -1,4 +1,5 @@
 #include "CD3DFont.h"
+#include "gpg/gal/RenderProfiler.h"
 
 #include <array>
 #include <algorithm>
@@ -440,6 +441,9 @@ namespace moho
     MsdfAtlasPage sMsdfGamePage;
     MsdfAtlasPage sMsdfModPage;
 
+    // FAF_GPU_PROFILE: the glyph quads of the last string RenderMsdfText drew.
+    std::uint32_t sProfileMsdfGlyphs = 0U;
+
     [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(
       const SMsdfFontAtlas& atlas,
       const std::uint32_t codepoint
@@ -713,6 +717,7 @@ namespace moho
         primBatcher.SetTexture(std::static_pointer_cast<ID3DTextureSheet>(sheet));
       }
 
+      std::uint32_t profileDrawn = 0U; // FAF_GPU_PROFILE: glyph quads this string adds
       const float inverseWidth = 1.0f / static_cast<float>(kMsdfPageWidth);
       const float inverseHeight = 1.0f / static_cast<float>(kMsdfPageHeight);
       const auto corner = [&](const Vector3f& pen, const float x, const float y) {
@@ -732,6 +737,7 @@ namespace moho
         const float glyphPageY = static_cast<float>(fromFallback ? fallbackPageY : pageY);
         const SMsdfGlyph& glyph = *found;
         if (glyph.mAtlasRight > glyph.mAtlasLeft) {
+          ++profileDrawn;
           const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
           const Vector3f bottomRight = corner(cursor, glyph.mPlaneRight, glyph.mPlaneBottom);
           const float u0 = (glyph.mAtlasLeft + glyphPageX) * inverseWidth;
@@ -792,6 +798,7 @@ namespace moho
         effect->mCurrentTechnique = previousTechnique;
         primBatcher.SetTextureBinding(previousTexture);
       }
+      sProfileMsdfGlyphs = profileDrawn;
       outCursor = cursor;
       return true;
     }
@@ -1653,6 +1660,10 @@ namespace moho
       return charInfo;
     }
 
+    // FAF_GPU_PROFILE: a glyph built now, from the persistent cache or rasterised through GDI.
+    gpg::gal::CpuProfileScope profileBuild("UiGlyphBuild");
+    FAF_PROFILE_COUNT("ui.font.glyphbuilds", 1);
+
     // Engine addition (ren_GlyphCache): the glyph an earlier launch rasterized; the session's first
     // one is rasterized below as well and compared.
     std::uint64_t glyphKey = 0;
@@ -1988,10 +1999,12 @@ namespace moho
   {
     PollModFont();
     Vector3f cursor = origin;
+    gpg::gal::CpuProfileScope profileText("UiFontRender");
     if (
       (ren_MsdfText || IsModFont()) &&
       RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)
     ) {
+      FAF_PROFILE_COUNT("ui.font.msdfglyphs", sProfileMsdfGlyphs);
       return cursor;
     }
 
