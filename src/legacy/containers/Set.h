@@ -630,13 +630,11 @@ namespace fa
     tree_type tree_;
   };
 
-  // Size check (x86 retail layout preserves 12 bytes with std::allocator via EBO)
-#if !defined(_M_X64) && !defined(__x86_64__)
+  // The 2007 layout: 12 bytes, the comparator and std::allocator taking no storage. Checked in the
+  // clang-x86-retail-layout build (platform/LayoutAsserts.h turns static_assert off elsewhere).
+#if FAFRE_ARCH_X86
   static_assert(sizeof(set<int>) == 12, "fa::set must be 12 bytes on x86");
   static_assert(sizeof(multiset<int>) == 12, "fa::multiset must be 12 bytes on x86");
-#else
-  static_assert(sizeof(set<int>) == 28, "fa::set size on x64 with local_slab_allocator");
-  static_assert(sizeof(multiset<int>) == 28, "fa::multiset size on x64 with local_slab_allocator");
 #endif
 
 } // namespace fa

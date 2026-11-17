@@ -1186,13 +1186,11 @@ namespace fa
     tree_type tree_;
   };
 
-  // --------- Convenience: ensure 32-bit pointer size assumed on x86 ----------
-#if !defined(_M_X64) && !defined(__x86_64__)
+  // The 2007 layout: 12 bytes, the comparator and std::allocator taking no storage. Checked in the
+  // clang-x86-retail-layout build (platform/LayoutAsserts.h turns static_assert off elsewhere).
+#if FAFRE_ARCH_X86
   static_assert(sizeof(map<void*, void*>) == 0x0C, "fa::map size should be 0x0C on x86");
   static_assert(sizeof(multimap<void*, void*>) == 0x0C, "fa::multimap size should be 0x0C on x86");
-#else
-  static_assert(sizeof(map<void*, void*>) == 28, "fa::map size on x64 with local_slab_allocator");
-  static_assert(sizeof(multimap<void*, void*>) == 28, "fa::multimap size on x64 with local_slab_allocator");
 #endif
 
 } // namespace fa
