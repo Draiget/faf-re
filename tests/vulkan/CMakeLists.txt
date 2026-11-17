@@ -1,3 +1,13 @@
+# What DeviceVulkan checks against a device's limits (VulkanLimits.h): header-only, SDK structs only.
+add_executable(faf_vulkan_limits_tests EXCLUDE_FROM_ALL LimitsTests.cpp)
+target_include_directories(faf_vulkan_limits_tests PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/../../src
+  ${FAF_DEPENDENCIES_DIR}/vulkan/include)
+target_link_libraries(faf_vulkan_limits_tests PRIVATE gtest_main)
+set_target_properties(faf_vulkan_limits_tests PROPERTIES FOLDER "Tests/Vulkan")
+add_test(NAME vulkan_limits COMMAND faf_vulkan_limits_tests)
+set_tests_properties(vulkan_limits PROPERTIES LABELS "Vulkan" TIMEOUT 120)
+
 # The allocator is compiled directly, without the engine or a Vulkan driver.
 add_executable(faf_vulkan_allocator_tests EXCLUDE_FROM_ALL
   MemoryAllocatorTests.cpp
@@ -55,3 +65,11 @@ target_link_libraries(faf_vulkan_cache_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_vulkan_cache_tests PROPERTIES FOLDER "Tests/Vulkan")
 add_test(NAME vulkan_pipeline_cache COMMAND faf_vulkan_cache_tests)
 set_tests_properties(vulkan_pipeline_cache PROPERTIES LABELS "Vulkan" TIMEOUT 120)
+
+# When a head lets go of its window surface and takes the next (VulkanSurfaceLifecycle.h): header-only, no SDK.
+add_executable(faf_vulkan_surface_lifecycle_tests EXCLUDE_FROM_ALL SurfaceLifecycleTests.cpp)
+target_include_directories(faf_vulkan_surface_lifecycle_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
+target_link_libraries(faf_vulkan_surface_lifecycle_tests PRIVATE gtest_main)
+set_target_properties(faf_vulkan_surface_lifecycle_tests PROPERTIES FOLDER "Tests/Vulkan")
+add_test(NAME vulkan_surface_lifecycle COMMAND faf_vulkan_surface_lifecycle_tests)
+set_tests_properties(vulkan_surface_lifecycle PROPERTIES LABELS "Vulkan" TIMEOUT 120)

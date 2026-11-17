@@ -33,6 +33,7 @@
 #include "ResourcesVulkan.h"
 #include "VulkanCore.h"
 #include "GpuDrivenVulkan.h"
+#include "VulkanSurfaceLifecycle.h"
 #include <memory>
 #include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
@@ -210,6 +211,8 @@ namespace gpg::gal
     }
     /** The image of swap chain `swapChain` the frame draws into. */
     [[nodiscard]] std::uint32_t AcquiredImage(std::uint32_t swapChain);
+    /** Whether swap chain `swapChain` has an image the frame draws into (not after a failed acquire). */
+    [[nodiscard]] bool HasAcquiredImage(std::uint32_t swapChain) const noexcept;
 
     [[nodiscard]] vulkan::UploadAllocation AllocateUpload(VkDeviceSize bytes, VkDeviceSize alignment);
     [[nodiscard]] vulkan::TrackedBuffer CreateDeviceBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage);
@@ -287,6 +290,10 @@ namespace gpg::gal
       // Out of date for the window, or suboptimal where SuboptimalSwapChainIsStale says so: made again at the
       // window's size before the next acquire.
       bool stale = false;
+      // The surface went (VK_ERROR_SURFACE_LOST_KHR from an acquire, a present or a surface query), or no swap
+      // chain could be made again for it: TestCooperativeLevel lets go of it and takes the next. It goes with the
+      // surface (DestroySwapChain).
+      bool surfaceLost = false;
       void* window = nullptr;
     };
 
@@ -329,7 +336,12 @@ namespace gpg::gal
     void CreateSwapChains(const DeviceContext& context);
     void CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height);
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
-    /** A stale scaled swap chain made again at the window's current size; false while the window has no area. */
+    /** Makes the head's surface, once its window has one (VulkanSurface.h's WaitForWindowSurface). */
+    void TakeSurface(SwapChain& swapChain);
+    /**
+     * A stale scaled swap chain made again at the window's current size; false while the window has no area, and
+     * when the surface went or refused the swap chain (surfaceLost, the swap chain destroyed).
+     */
     bool RecreateStaleSwapChain(SwapChain& swapChain);
     /** Copies a scaled head's image into its acquired swap-chain image and leaves that ready to present. */
     void CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain);
@@ -342,6 +354,18 @@ namespace gpg::gal
     RenderTargetVulkan::Buffer CreateColorTargetImage(VkFormat format, std::uint32_t width, std::uint32_t height);
     void CreateRenderTargets();
     void ReleaseRenderTargets() noexcept;
+    /** A back buffer target's buffers for a swap chain's images: one empty buffer of their size without any. */
+    [[nodiscard]] std::vector<RenderTargetVulkan::Buffer> SwapChainBuffers(const SwapChain& swapChain);
+    /** Points a head that draws into its swap chain's images at the ones it has now (TestCooperativeLevel). */
+    void RebindSwapChainImages(std::size_t headIndex);
+    /** TestCooperativeLevel: lets go of a head's surface and swap chain; AttachSurface takes the next ones. */
+    void ReleaseSurface(std::size_t headIndex);
+    /**
+     * TestCooperativeLevel: makes a head without a surface its window's next one and a swap chain for it. True
+     * when the head has both; false while the window has none, is minimised, or its surface refuses (the
+     * surface lifecycle's verdict warns, or ends the program after its time).
+     */
+    [[nodiscard]] bool AttachSurface(std::size_t headIndex);
     void CheckAvailableFormats(DeviceContext* context);
     void Shutdown() noexcept;
     void ResetState();
@@ -395,6 +419,8 @@ namespace gpg::gal
     [[nodiscard]] bool PrepareDraw(std::uint32_t topologyToken, bool indexed);
     [[nodiscard]] VkImageView
     TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
+    /** Whether the bound colour target is a back buffer whose head has no image (TestCooperativeLevel). */
+    [[nodiscard]] bool TargetIsImagelessBackBuffer();
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
     void LogMemoryIfDue();
@@ -434,8 +460,10 @@ namespace gpg::gal
     VkSemaphore mTimeline = VK_NULL_HANDLE;
     std::uint64_t mSubmittedSerial = 0;
     bool mAnisotropy = false;
+    bool mBlockCompression = false; // BC textures; without, BC1 to BC3 decode on the CPU (CreateTexture)
     bool mWireframeSupported = false;
     bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
+    bool mDepthBiasClamp = false;        // the depthBiasClamp feature: pipelines keep the rasterizer state's clamp
     bool mMemoryBudget = false;          // VK_EXT_memory_budget enabled
     bool mSetUp = false;                 // Setup is done: a failed frame ends the program (CheckFrame)
     std::string mDriverName;             // VkPhysicalDeviceDriverProperties driverName + driverInfo
@@ -492,6 +520,7 @@ namespace gpg::gal
 
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;
+    vulkan::SurfaceLifecycle mSurfaceLifecycle; // TestCooperativeLevel's rules for the heads' window surfaces
     std::vector<OutputContext> mHeadOutputContexts;
     std::shared_ptr<PipelineStateVulkan> mPipelineState;
     WindowsCursor mCursor;
@@ -592,6 +621,9 @@ namespace gpg::gal
 
     bool mRayQuery = false;
     VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;
+    // mRayLayout's bindings (CreateLayouts), which the pipeline layouts that hold it count against the limits;
+    // none without ray queries.
+    std::vector<VkDescriptorSetLayoutBinding> mRaySceneBindings;
     VkDescriptorPool mRayPool = VK_NULL_HANDLE;
     VkDescriptorSet mRaySet = VK_NULL_HANDLE;
     // Engine addition (ren_RayAlphaShadows): set 2's bindings 1-4 (RayTracingVulkan.cpp WriteRaySet): the alpha-tested
@@ -620,6 +652,7 @@ namespace gpg::gal
     RayGeometryId mNextRayGeometry = 1U;
     std::vector<VkAccelerationStructureInstanceKHR> mRayInstances;
     VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout mGpuEmptySetLayout = VK_NULL_HANDLE; // set 1 of mGpuPipelineLayout, which no program uses
     VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
     VkSampler mGpuSamplers[3]{};          // by GpuSampler
     vulkan::TrackedBuffer mGpuNullBuffer; // unbound t0..t3 and u0..u1
