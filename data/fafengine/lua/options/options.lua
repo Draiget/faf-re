@@ -508,6 +508,54 @@ do
     end
 end
 
+-- Detailed water (ren_WaterDetail), on Direct3D 12 and Vulkan at high fidelity: on by default.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported('ren_WaterDetail') then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'atmosphere' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Detailed water',
+            key = 'water_detail',
+            type = 'toggle',
+            default = 1,
+            tip = 'Direct3D 12 and Vulkan, high fidelity: rolling waves, a sun path and sparkles on the water, clear '
+                .. 'shallows and foam at the shore.',
+            set = function(key, value, startup)
+                ConExecute('ren_WaterDetail ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end
+
 -- Texture filtering (ren_TextureAnisotropy), on Direct3D 12 and Vulkan: anisotropic filtering for the tiled ground
 -- and unit textures. Shown only by an engine that has the command, as the ones below.
 do

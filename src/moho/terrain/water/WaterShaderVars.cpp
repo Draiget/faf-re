@@ -191,6 +191,11 @@ namespace moho
     GetWater2WaterElevationTShorelineShaderVar,
     "WaterElevation"
   )
+  // Engine addition (ren_WaterDetail): water_hd.fx's switch between FAF's water and the detailed one.
+  DEFINE_WATER2_SHADER_VAR_GETTER(
+    GetWater2WaterHdEnabledShaderVar,
+    "WaterHdEnabled"
+  )
 } // namespace moho
 
 #undef DEFINE_WATER2_SHADER_VAR_GETTER

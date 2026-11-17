@@ -8,6 +8,9 @@
 
 namespace moho
 {
+  /** Engine addition: draw water_hd.fx's detailed water (Direct3D 12 and Vulkan; CD3DEffectTechnique.cpp). */
+  extern bool ren_WaterDetail;
+
   class ID3DRenderTarget;
   class CD3DIndexSheet;
   class CD3DVertexSheet;

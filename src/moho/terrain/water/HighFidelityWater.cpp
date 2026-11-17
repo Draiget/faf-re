@@ -377,6 +377,9 @@ namespace moho
     };
     SetShaderVarMem(GetWater2SunColorShaderVar(), 3U, sunColor);
     GetWater2SunGlowShaderVar().SetFloat(shaderState.mSunGlow);
+    // Engine addition (ren_WaterDetail): which water the pass draws; the effect has the switch only where
+    // water_hd.fx is appended (Direct3D 12 and Vulkan), elsewhere this does nothing.
+    GetWater2WaterHdEnabledShaderVar().SetFloat(ren_WaterDetail ? 1.0f : 0.0f);
 
     // 0x00810D6C: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
     IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
