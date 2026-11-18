@@ -1,6 +1,6 @@
 # Nightly releases
 
-The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes master's head as the latest release when that night's [Replay parity](../parity-data/README.md) run has new desyncs in at most 5 % of the replays it played. Replay parity starts at 20:00 UTC (00:00 UTC+4), and takes about 5 h 30 min.
+The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes master's head as the latest release when that night's [Replay parity](../parity-data/README.md) run has new desyncs in at most 5 % of the replays it played. Replay parity takes about 5 h 30 min. Its nightly schedule is off, so no nightly is published by itself now: a release is built by starting this workflow by hand (`publish` ticked, `parity_run` naming a parity run).
 
 | Job | What it does |
 |---|---|
