@@ -294,6 +294,10 @@ namespace gpg::gal
       // chain could be made again for it: TestCooperativeLevel lets go of it and takes the next. It goes with the
       // surface (DestroySwapChain).
       bool surfaceLost = false;
+      // Not scaled: the chain is out of date for the window, and the engine's Reset makes it again with the head's
+      // targets (TestCooperativeLevel answers 1, RequestSwapChainRecovery). Cleared by the Reset.
+      bool recover = false;
+      std::uint32_t recoveries = 0; // Resets asked for since this head's last present that succeeded
       void* window = nullptr;
     };
 
@@ -341,9 +345,7 @@ namespace gpg::gal
     /** The extent a swap chain made now would get; 0 x 0 for a minimised window. */
     [[nodiscard]] VkExtent2D SurfaceExtent(const SwapChain& swapChain, std::uint32_t width, std::uint32_t height) const;
     /** A swap chain the engine's Reset must make again (TestCooperativeLevel answers 1 until it has). */
-    void RequestSwapChainRecovery(const char* what, VkResult result);
-    /** True when every swap chain's window has no area (minimised): a Reset would rebuild nothing. */
-    [[nodiscard]] bool AllWindowsMinimised() const;
+    void RequestSwapChainRecovery(std::size_t headIndex, const char* what, VkResult result);
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
     /** Makes the head's surface, once its window has one (VulkanSurface.h's WaitForWindowSurface). */
     void TakeSurface(SwapChain& swapChain);
@@ -531,8 +533,6 @@ namespace gpg::gal
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;
     vulkan::SurfaceLifecycle mSurfaceLifecycle; // TestCooperativeLevel's rules for the heads' window surfaces
-    bool mRecoverRequested = false;
-    std::uint32_t mConsecutiveRecoveries = 0U; // recoveries since the last successful present
     std::vector<OutputContext> mHeadOutputContexts;
     std::shared_ptr<PipelineStateVulkan> mPipelineState;
     WindowsCursor mCursor;

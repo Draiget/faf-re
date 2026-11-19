@@ -225,3 +225,44 @@ TEST(
   EXPECT_FALSE(OtherChannelOrder(VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_BC3_UNORM_BLOCK));
   EXPECT_FALSE(OtherChannelOrder(VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_B8G8R8A8_UNORM));
 }
+
+TEST(
+  VulkanSwapChain,
+  AHeadAsksForThreeResetsInARowThenGivesUp
+)
+{
+  std::uint32_t tries = 0U;
+  for (std::uint32_t ask = 0U; ask < kRecoveryTries; ++ask) {
+    EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::Ask);
+  }
+  EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::GiveUp);
+  EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::GiveUp);
+  tries = 0U; // a present that succeeded
+  EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::Ask);
+}
+
+TEST(
+  VulkanSwapChain,
+  AMinimisedHeadAsksNothingAndSpendsNoTry
+)
+{
+  // A minimised window reports out of date on every frame on some drivers: asking would rebuild nothing, and
+  // with two heads the other head's chain would be made again each time.
+  std::uint32_t tries = 0U;
+  for (int frame = 0; frame < 100; ++frame) {
+    EXPECT_EQ(AskForRecovery(false, true, tries), RecoveryAsk::Skip);
+  }
+  EXPECT_EQ(tries, 0U);
+  EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::Ask) << "the window is back";
+}
+
+TEST(
+  VulkanSwapChain,
+  AHeadThatHasAskedAsksNoMoreUntilTheReset
+)
+{
+  std::uint32_t tries = 0U;
+  EXPECT_EQ(AskForRecovery(false, false, tries), RecoveryAsk::Ask);
+  EXPECT_EQ(AskForRecovery(true, false, tries), RecoveryAsk::Skip) << "acquire and present of one frame";
+  EXPECT_EQ(tries, 1U);
+}
