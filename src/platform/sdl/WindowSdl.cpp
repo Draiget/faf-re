@@ -426,7 +426,9 @@ namespace
       out.type = down ? EventType::MouseDown : EventType::MouseUp;
       out.window = window;
       out.button = button;
-      out.clicks = source.button.clicks;
+      // Issue #478: as Windows counts them, a press after a double click starts over, so only every
+      // second press of a run is a double click (SDL counts on: 3 for a triple click).
+      out.clicks = source.button.clicks >= 2 && source.button.clicks % 2 == 0 ? 2 : (source.button.clicks > 0 ? 1 : 0);
       ToPixels(window, source.button.x, source.button.y, out.x, out.y);
       out.buttonsDown = ButtonsDownOf(SDL_GetMouseState(nullptr, nullptr));
       out.modifiers = ModifiersOf(SDL_GetModState());

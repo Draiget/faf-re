@@ -239,6 +239,10 @@ namespace platform::window::sdl
 {
   void OnInit()
   {
+    // Issue #478: a second press counts as a double click only within 2 of the first, Windows'
+    // default double-click box (4 x 4, SM_CXDOUBLECLK) that the game was made with. SDL's own
+    // radius is 32, so two quick clicks on neighbouring list rows made a double click.
+    (void)SDL_SetHint(SDL_HINT_MOUSE_DOUBLE_CLICK_RADIUS, "2");
     platform::posix::gWarpCursorHook = &WarpCursor;
     platform::posix::gFocusHook = &Focus;
     platform::posix::gShowWindowHook = &ShowWindowCommand;

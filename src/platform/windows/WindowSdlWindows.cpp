@@ -158,6 +158,16 @@ namespace platform::window::sdl
     // A borderless window is a plain popup (WS_POPUP), as the window library made the full-screen
     // frame (style 0x200800), not SDL's popup with caption bits that it hides itself (#418).
     (void)SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "0");
+    // Issue #478: a second press counts as a double click only inside Windows' double-click box
+    // (SM_CXDOUBLECLK x SM_CYDOUBLECLK around the first press, 4 x 4 by default), as the window
+    // library had it from Windows. SDL's own radius is 32, so two quick clicks on neighbouring
+    // list rows made a double click.
+    const int width = ::GetSystemMetrics(SM_CXDOUBLECLK);
+    const int height = ::GetSystemMetrics(SM_CYDOUBLECLK);
+    const int radius = (width > height ? width : height) / 2;
+    if (radius > 0) {
+      (void)SDL_SetHint(SDL_HINT_MOUSE_DOUBLE_CLICK_RADIUS, std::to_string(radius).c_str());
+    }
   }
 
   void OnShutdown() {}
