@@ -279,7 +279,12 @@ size_t CNetTCPBuf::Read(
   }
 
   size_t bufferedSize = static_cast<size_t>(mReadEnd - mReadHead);
-  size_t copiedFromBuffer = 0;
+  // What reaches `buf`: the buffer's bytes and those received straight into it. Engine addition, not in the binary,
+  // whose count is the buffer's alone (0x00482F63 moves `buf` past a direct receive, not the count): there a read
+  // with 2 KB or more left after the buffer's bytes comes back short though all of them have arrived, and its
+  // readers trust the count. BinaryReader::Read throws PrematureEOF (a GPGNet argument), and CMessage::Read reads
+  // the stream's next bytes over the uncounted ones (a live replay's message).
+  size_t delivered = 0;
 
   if (len > bufferedSize) {
     while (true) {
@@ -288,7 +293,7 @@ size_t CNetTCPBuf::Read(
         std::copy_n(mReadHead, bufferedSize, buf);
         buf += bufferedSize;
         len -= bufferedSize;
-        copiedFromBuffer += bufferedSize;
+        delivered += bufferedSize;
       }
 
       mReadHead = mBuffer;
@@ -299,7 +304,7 @@ size_t CNetTCPBuf::Read(
           if (!isBlocking) {
             const int selectRes = platform::net::PollReadable(mSocket);
             if (selectRes != platform::net::kSocketError && selectRes <= 0) {
-              return copiedFromBuffer;
+              return delivered;
             }
           }
 
@@ -307,18 +312,18 @@ size_t CNetTCPBuf::Read(
           if (received == platform::net::kSocketError) {
             gpg::Logf("CNetTCPBuf::Read(): recv() failed: %s", NET_GetWinsockErrorString());
             mFailed = 1;
-            return copiedFromBuffer;
+            return delivered;
           }
           if (received == 0) {
             mFailed = 1;
-            return copiedFromBuffer;
+            return delivered;
           }
 
           buf += received;
           len -= static_cast<size_t>(received);
+          delivered += static_cast<size_t>(received);
           if (len == 0) {
-            // Intentionally matches binary behavior (returns copied-from-buffer count only).
-            return copiedFromBuffer;
+            return delivered;
           }
 
           if (buf == nullptr) {
@@ -328,18 +333,18 @@ size_t CNetTCPBuf::Read(
       }
 
       if (!isBlocking && !Select()) {
-        return copiedFromBuffer;
+        return delivered;
       }
 
       const int received = platform::net::Recv(mSocket, mBuffer, static_cast<int>(kChunkSize));
       if (received < 0) {
         gpg::Logf("CNetTCPBuf::Read(): recv() failed: %s", NET_GetWinsockErrorString());
         mFailed = 1;
-        return copiedFromBuffer;
+        return delivered;
       }
       if (received == 0) {
         mFailed = 1;
-        return copiedFromBuffer;
+        return delivered;
       }
 
       mReadEnd = mBuffer + received;
@@ -348,7 +353,7 @@ size_t CNetTCPBuf::Read(
         // Raw TCP recv-buffer blob copy.
         std::copy_n(mReadHead, len, buf);
         mReadHead += len;
-        return copiedFromBuffer + len;
+        return delivered + len;
       }
     }
   }

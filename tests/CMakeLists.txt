@@ -37,6 +37,14 @@ set_target_properties(faf_lobby_wire_tests PROPERTIES FOLDER "Tests/Net")
 add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
 set_tests_properties(lobby_wire PROPERTIES LABELS "Net")
 
+# The game's TCP stream (moho/net/CNetTCPBuf.cpp), GPGNet's link and a live replay's stream: what
+# a read takes straight from the socket counts; Linux runs the same file (cmake/FafPosix.cmake).
+add_executable(faf_tcp_stream_tests EXCLUDE_FROM_ALL net/TcpStreamTests.cpp)
+target_link_libraries(faf_tcp_stream_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_tcp_stream_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME net_tcp_stream COMMAND faf_tcp_stream_tests)
+set_tests_properties(net_tcp_stream PROPERTIES LABELS "Net")
+
 # net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
 # switch off and on, at a fast rate and at the game's rate.
 add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL net/FastRetransmitTests.cpp)

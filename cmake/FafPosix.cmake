@@ -470,6 +470,12 @@ add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/test
 target_link_libraries(faf_lobby_wire_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_lobby_wire_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
+# The game's TCP stream (GPGNet's link, a live replay's stream) over loopback sockets, as Windows
+# runs it.
+add_executable(faf_tcp_stream_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/TcpStreamTests.cpp")
+target_link_libraries(faf_tcp_stream_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_tcp_stream_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
+add_test(NAME net_tcp_stream COMMAND faf_tcp_stream_tests)
 # The Win32 shim's handles when one thread closes what another still uses, its shell folders and
 # its shell deletes (Windows' behaviour).
 add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp"
