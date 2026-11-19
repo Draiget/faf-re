@@ -1137,6 +1137,7 @@ struct MONITORINFO
 #define MONITOR_DEFAULTTONEAREST 0x2u
 #define MONITORINFOF_PRIMARY 0x1u
 HMONITOR MonitorFromPoint(POINT point, DWORD flags);
+HMONITOR MonitorFromWindow(HWND window, DWORD flags);
 BOOL GetMonitorInfoW(HMONITOR monitor, MONITORINFO* info);
 // Window state the main loop and the title bar use, answered from the window system's reports.
 BOOL IsIconic(HWND window);

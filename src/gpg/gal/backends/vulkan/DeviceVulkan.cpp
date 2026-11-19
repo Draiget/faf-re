@@ -3047,8 +3047,10 @@ namespace gpg::gal
       for (int headIndex = 0; headIndex < heads; ++headIndex) {
         const Head& requested = context->GetHead(static_cast<std::uint32_t>(headIndex));
         Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
+        head.mWindowed = requested.mWindowed;
         head.mWidth = requested.mWidth;
         head.mHeight = requested.mHeight;
+        head.framesPerSecond = requested.framesPerSecond;
       }
     }
     ReleaseRenderTargets();

@@ -9,8 +9,16 @@
 #include "moho/app/IWinApp.h"
 #include "moho/app/AppRuntimeTypes.h"
 
+class ShellPoint;
+
 namespace moho
 {
+  /**
+   * Engine addition: clamps `inOutPosition` so that a window of dimensions `width`x`height`
+   * does not end up entirely off-screen or invisible on the nearest monitor.
+   */
+  void ClampPositionToMonitor(ShellPoint* inOutPosition, std::uint32_t width, std::uint32_t height);
+
   /**
    * Engine addition (the map editor, src/editor): when not empty, the renderers `CScApp::CreateDevice`
    * tries, in this order, in place of the `graphics_api` option and the command-line switches, with
