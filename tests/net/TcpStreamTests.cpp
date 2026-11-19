@@ -192,3 +192,55 @@ TEST_F(
     EXPECT_TRUE(bytes(received) == bytes(*sent)) << "a whole message of other bytes than the ones sent";
   }
 }
+
+// A live replay's 6 KB sim callback that arrives in two parts: the read without blocking stops in the middle of the
+// receive straight into the message, once the socket has nothing more, and the bytes it took there count. The rest
+// and the beat after it then arrive whole and in step.
+TEST_F(
+  TcpStream,
+  ALiveReplaysMessageInTwoPartsStaysInStep
+)
+{
+  moho::CMessage callback{moho::ECmdStreamOp::CMDST_LuaSimCallback};
+  const std::string payload = RandomText(3 * kBuffer, 7);
+  callback.Append(payload.data(), payload.size());
+  moho::CMessage advance{moho::ECmdStreamOp::CMDST_Advance};
+  const std::int32_t beats = 1;
+  advance.Append(reinterpret_cast<const char*>(&beats), sizeof(beats));
+  const std::size_t firstPart = kBuffer + kBuffer / 4; // 2.5 KB: the buffer's 2 KB, then 512 bytes straight
+  launcher->Write(callback.mBuff.start_, firstPart);
+  launcher->VirtFlush();
+
+  // The first part may come over the loopback in pieces: read until all of it is counted, or 5 s pass.
+  moho::CMessage first;
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (first.mPos < static_cast<int>(firstPart) && std::chrono::steady_clock::now() < deadline) {
+    ASSERT_FALSE(first.Read(game.get())) << "a whole message from part of it";
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_EQ(first.mPos, static_cast<int>(firstPart)) << "bytes counted from the first part after 5 s";
+
+  launcher->Write(callback.mBuff.start_ + firstPart, callback.mBuff.Size() - firstPart);
+  launcher->Write(advance.mBuff.start_, advance.mBuff.Size());
+  launcher->VirtFlush();
+
+  const auto bytes = [](const moho::CMessage& message) {
+    return std::string(message.mBuff.start_, message.mBuff.end_);
+  };
+  const auto readWhole = [&](moho::CMessage& message) {
+    deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    bool whole = message.Read(game.get());
+    while (!whole && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      whole = message.Read(game.get());
+    }
+    return whole;
+  };
+
+  ASSERT_TRUE(readWhole(first)) << first.mPos << " of " << callback.mBuff.Size() << " bytes counted after 5 s";
+  EXPECT_TRUE(bytes(first) == bytes(callback)) << "a whole message of other bytes than the ones sent";
+
+  moho::CMessage second;
+  ASSERT_TRUE(readWhole(second)) << second.mPos << " of " << advance.mBuff.Size() << " bytes counted after 5 s";
+  EXPECT_TRUE(bytes(second) == bytes(advance)) << "the beat after it is out of step";
+}
