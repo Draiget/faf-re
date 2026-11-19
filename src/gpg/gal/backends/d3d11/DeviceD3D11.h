@@ -300,10 +300,12 @@ namespace gpg::gal
     Microsoft::WRL::ComPtr<ID3D11BlendState> mClearBlend[2];
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> mClearDepthStencil[4];
     std::uint32_t mFrameIndex = 0U;
-    // A present the chain keeps refusing asks the engine for a Reset
-    // (TestCooperativeLevel answers 1), which builds the chains again.
+    // A present a head's chain keeps refusing asks the engine for a Reset
+    // (TestCooperativeLevel answers 1), which builds that head's chain again,
+    // three times in a row at most for each head.
     bool mRecoverRequested = false;
-    std::uint32_t mConsecutiveRecoveries = 0U;
+    std::vector<bool> mRecoverHeads;            // per head: its chain is made again by the next Reset
+    std::vector<std::uint32_t> mHeadRecoveries; // per head: Resets asked for since its last present that went through
     bool mTracing = false;
     std::uint32_t mDumpSequence = 0U;
     std::int32_t mStreamFrequencies[16]{};

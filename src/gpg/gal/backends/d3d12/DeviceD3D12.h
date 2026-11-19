@@ -621,10 +621,12 @@ namespace gpg::gal
     bool mTracing = false;
     std::set<int> mLoggedMessages;
     bool mRemovalReported = false;
-    // A present the chain keeps refusing asks the engine for a Reset
-    // (TestCooperativeLevel answers 1), which builds the chains again.
+    // A present a head's chain keeps refusing asks the engine for a Reset
+    // (TestCooperativeLevel answers 1), which builds that head's chain again,
+    // three times in a row at most for each head.
     bool mRecoverRequested = false;
-    std::uint32_t mConsecutiveRecoveries = 0U;
+    std::vector<bool> mRecoverHeads;            // per head: its chain is made again by the next Reset
+    std::vector<std::uint32_t> mHeadRecoveries; // per head: Resets asked for since its last present that went through
     bool mDredEnabled = false;
     // With DRED: numbered markers around each draw, dispatch and copy, written
     // by the GPU into system memory that survives a device removal (reached

@@ -1827,6 +1827,10 @@ namespace gpg::gal
     }
     const bool force = mRecoverRequested;
     mRecoverRequested = false;
+    // Only the heads whose chain refused to present are made again by force.
+    std::vector<bool> forceHead = mRecoverHeads;
+    forceHead.resize(mSwapChains.size(), false);
+    mRecoverHeads.assign(mSwapChains.size(), false);
 
     bool vsyncChanged = false;
     if (context != nullptr && context != &mDeviceContext) {
@@ -1880,7 +1884,7 @@ namespace gpg::gal
       const dxgi::SwapChainDesc& desc = wanted[headIndex];
       dxgi::ResetAction action = dxgi::ResetAction::None;
       const HRESULT result = mSwapChains[headIndex]->Reconfigure(
-        mFactory, mDevice.Get(), desc, force, dxgi::IsWindowMinimized(desc.window), [this] {
+        mFactory, mDevice.Get(), desc, forceHead[headIndex], dxgi::IsWindowMinimized(desc.window), [this] {
         FlushImmediate();
       }, &action
       );
@@ -2096,23 +2100,28 @@ namespace gpg::gal
     }
     const bool vsync = mDeviceContext.mVSync;
     bool flipModel = false;
-    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
+    mRecoverHeads.resize(mSwapChains.size(), false);
+    mHeadRecoveries.resize(mSwapChains.size(), 0U);
+    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
+      const std::unique_ptr<dxgi::SwapChain>& swapChain = mSwapChains[headIndex];
       const dxgi::PresentResult present = swapChain->Present(vsync);
       switch (present.status) {
       case dxgi::PresentStatus::Presented:
       case dxgi::PresentStatus::Occluded: // success: nothing is shown and Present did not wait
-        mConsecutiveRecoveries = 0U;
+        mHeadRecoveries[headIndex] = 0U;
         break;
       case dxgi::PresentStatus::Skipped:
         break; // the frame is dropped, the next one goes through
       case dxgi::PresentStatus::InvalidCall:
         // The chain refuses even a plain present: build it again through the
         // engine's own Reset (TestCooperativeLevel), a few times at most.
-        if (++mConsecutiveRecoveries <= 3U) {
+        if (++mHeadRecoveries[headIndex] <= 3U) {
           gpg::Warnf(
-            "D3D11: the swap chain refuses to present (0x%08lX); it is rebuilt",
+            "D3D11: head %u's swap chain refuses to present (0x%08lX); it is rebuilt",
+            static_cast<unsigned>(headIndex),
             static_cast<unsigned long>(present.result)
           );
+          mRecoverHeads[headIndex] = true;
           mRecoverRequested = true;
           break;
         }
