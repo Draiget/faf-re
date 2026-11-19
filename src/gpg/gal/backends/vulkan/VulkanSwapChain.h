@@ -143,4 +143,37 @@ namespace gpg::gal::vulkan
     };
     return swapped(first, second) || swapped(second, first);
   }
+
+  /** What a head does with an out-of-date result it can't follow by itself (DeviceVulkan::RequestSwapChainRecovery). */
+  enum class RecoveryAsk : std::uint8_t
+  {
+    Ask,    // the head asks the engine for a Reset (TestCooperativeLevel answers 1)
+    Skip,   // nothing: the head has asked already, or a Reset would rebuild nothing for it
+    GiveUp, // the head asked kRecoveryTries times in a row and is out of date again: it asks no more
+  };
+
+  /** Resets a head may ask for in a row; a present that succeeds sets its count back to 0. */
+  inline constexpr std::uint32_t kRecoveryTries = 3U;
+
+  /**
+   * Whether a head that draws into its swap chain's images (not scaled) asks the engine for a Reset after an
+   * out-of-date or suboptimal result: not while it has asked since the last Reset (`asked`), and not while its
+   * window has no area (`minimised`), where the Reset would keep its chain; neither spends one of its `tries`.
+   * Engine addition: a chain that is out of date again right after each Reset would otherwise ask on every frame.
+   */
+  [[nodiscard]] inline RecoveryAsk AskForRecovery(
+    const bool asked,
+    const bool minimised,
+    std::uint32_t& tries
+  ) noexcept
+  {
+    if (asked || minimised) {
+      return RecoveryAsk::Skip;
+    }
+    if (tries >= kRecoveryTries) {
+      return RecoveryAsk::GiveUp;
+    }
+    ++tries;
+    return RecoveryAsk::Ask;
+  }
 } // namespace gpg::gal::vulkan
