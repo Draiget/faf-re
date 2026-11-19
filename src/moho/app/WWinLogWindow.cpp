@@ -371,6 +371,9 @@ moho::WWinLogWindow::WWinLogWindow()
   mSavedY = preferences->GetInteger(fa::string(kLogWindowYPreferenceKey), kLogWindowGeometryFallback);
   mSavedX = preferences->GetInteger(fa::string(kLogWindowXPreferenceKey), kLogWindowGeometryFallback);
   SetBounds(mSavedX, mSavedY, mSavedWidth, mSavedHeight);
+  // Every change to the output goes through AppendOutput or Clear, which ask for a frame; an idle
+  // log window draws nothing (SDL's software renderer drew the whole window every game frame).
+  SetIdleRefreshMs(0u);
 
   RebuildVisibleLinesFromControls();
 }
@@ -458,6 +461,7 @@ void moho::WWinLogWindow::Clear()
   mOutput.clear();
   mFirstVisibleLine = 0;
   mOwnerTarget->ResetCommittedLinesFromReplayBuffer(mBufferedLines);
+  RequestRedraw();
 }
 
 void moho::WWinLogWindow::AppendOutput(
@@ -480,6 +484,7 @@ void moho::WWinLogWindow::AppendOutput(
     mOutput.erase(mOutput.begin(), mOutput.begin() + static_cast<std::ptrdiff_t>(kMaxCommittedLogLines / 2u));
   }
   mScrollToEnd = true;
+  RequestRedraw();
 }
 bool moho::WWinLogWindow::ShouldDisplayCommittedLine(
   const CWinLogLine& line
@@ -567,6 +572,7 @@ void moho::WWinLogWindow::RebuildVisibleLinesFromControls()
   mFilterText = gpg::STR_ToLower(mFilterEdit.data());
 
   mOutput.clear();
+  RequestRedraw();
   mFirstVisibleLine = 0;
   mBufferedLines.clear();
 

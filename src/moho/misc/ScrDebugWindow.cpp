@@ -427,6 +427,9 @@ void moho::ScrDebugWindow::Tick()
   for (const auto& [source, line] : pauses) {
     OnScriptPause(source, line);
   }
+  if (!pauses.empty()) {
+    RequestRedraw();
+  }
   SaveGeometry();
 }
 

@@ -1522,6 +1522,7 @@ void moho::WEmitterEditor::Tick()
   const FilePick purpose = mPickInFlight;
   mPickInFlight = FilePick::None;
   OnFileChosen(purpose, path);
+  RequestRedraw();
 }
 
 void moho::WEmitterEditor::OnCloseRequested()

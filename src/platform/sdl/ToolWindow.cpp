@@ -50,6 +50,14 @@ namespace platform::tools
       }
       (void)io.Fonts->AddFontDefault();
     }
+    // A frame at most this often while the window gets input, and for content changes alone.
+    constexpr Uint64 kInputFrameMs = 16u;
+    constexpr Uint64 kContentFrameMs = 100u;
+    // How long after an event the window keeps the input rate: ImGui's tooltip delay (0.4 s by
+    // default) and hover states need frames with no event of their own.
+    constexpr Uint64 kInputSettleMs = 1000u;
+    // ImGui applies a scroll request or a new layout one frame after the one that asked.
+    constexpr int kContentFrames = 2;
   } // namespace
 
   // The window system's hook (WindowSdlPlatform.h): an event for a tool window goes to its ImGui.
@@ -74,6 +82,8 @@ namespace platform::tools
       ImGui::SetCurrentContext(tool->mContext);
       (void)ImGui_ImplSDL3_ProcessEvent(&event);
       ImGui::SetCurrentContext(previous);
+      // Input, a resize or an expose: draw at the input rate for a while.
+      tool->mInputUntilTicks = SDL_GetTicks() + kInputSettleMs;
       return true;
     }
     return false;
@@ -114,6 +124,8 @@ namespace platform::tools
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // An idle window isn't drawn, so a blinking caret would stop in whichever phase it was.
+    io.ConfigInputTextCursorBlink = false;
     ImGui::StyleColorsDark();
     AddSystemFont(io);
     (void)ImGui_ImplSDL3_InitForSDLRenderer(mWindow, mRenderer);
@@ -161,6 +173,7 @@ namespace platform::tools
       (void)SDL_ShowWindow(mWindow);
       (void)SDL_RaiseWindow(mWindow);
       mLastFrameTicks = 0;
+      mInputUntilTicks = SDL_GetTicks() + kInputSettleMs;
       Render();
     } else {
       (void)SDL_HideWindow(mWindow);
@@ -191,11 +204,27 @@ namespace platform::tools
     if ((SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED) != 0) {
       return;
     }
+    // A frame only when one is due: each is drawn on the CPU over the whole client area, and the
+    // main loop calls this every game frame.
     const Uint64 now = SDL_GetTicks();
-    if (mLastFrameTicks != 0 && now - mLastFrameTicks < 16u) {
+    const Uint64 sinceLast = now - mLastFrameTicks;
+    bool due = mLastFrameTicks == 0;
+    if (!due && now < mInputUntilTicks) {
+      due = sinceLast >= kInputFrameMs;
+    }
+    if (!due && mPendingFrames > 0) {
+      due = sinceLast >= kContentFrameMs;
+    }
+    if (!due && mIdleRefreshMs != 0u) {
+      due = sinceLast >= mIdleRefreshMs;
+    }
+    if (!due) {
       return;
     }
     mLastFrameTicks = now;
+    if (mPendingFrames > 0) {
+      --mPendingFrames;
+    }
 
     ImGuiContext* const previous = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(mContext);
@@ -223,6 +252,11 @@ namespace platform::tools
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), mRenderer);
     (void)SDL_RenderPresent(mRenderer);
     ImGui::SetCurrentContext(previous);
+  }
+
+  void ToolWindow::RequestRedraw()
+  {
+    mPendingFrames = kContentFrames;
   }
 
   void ToolWindow::SetBounds(
