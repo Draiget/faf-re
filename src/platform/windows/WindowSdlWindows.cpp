@@ -3,7 +3,8 @@
 // work on the SDL window's HWND as they did on wx's, so nothing is published here. Two messages
 // the retail window procedures handled are taken before SDL's: WM_SETCURSOR over the client area
 // (WD3DViewport::MSWWindowProc, 0x00430B90) and the system-menu items the engine adds
-// (WSupComFrame::MSWWindowProc, 0x008CDD40).
+// (WSupComFrame::MSWWindowProc, 0x008CDD40). The frame also hands the mouse wheel to the viewport
+// under the cursor, so SDL never moves its mouse focus off the viewport and sets its arrow.
 
 #include "platform/sdl/WindowSdlPlatform.h"
 
@@ -54,6 +55,46 @@ namespace
     return wide;
   }
 
+  LRESULT CALLBACK
+  SubclassProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId, DWORD_PTR referenceData);
+
+  // The SDL child window of ours (the viewport) at a screen point in `window`'s client area, or
+  // null. Only `window`'s own children are looked at, so another program's window in front (an
+  // overlay) doesn't hide the viewport.
+  [[nodiscard]] HWND OwnChildAt(
+    HWND const window,
+    const POINT screenPoint
+  )
+  {
+    POINT clientPoint = screenPoint;
+    if (::ScreenToClient(window, &clientPoint) == FALSE) {
+      return nullptr;
+    }
+    HWND const child =
+      ::ChildWindowFromPointEx(window, clientPoint, CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT);
+    if (child == nullptr || child == window || !IsChildHwnd(child)) {
+      return nullptr;
+    }
+    DWORD_PTR reference = 0;
+    return ::GetWindowSubclass(child, &SubclassProc, kSubclassId, &reference) != FALSE ? child : nullptr;
+  }
+
+  // The child windows' class procedure. SDL reports a child's wheel itself and then calls this;
+  // DefWindowProc passed the wheel on to the frame, which SDL reported again for the frame,
+  // moving its mouse focus there: the arrow showed on every zoom step over the map.
+  LRESULT CALLBACK ChildWindowProc(
+    HWND const window,
+    UINT const message,
+    WPARAM const wParam,
+    LPARAM const lParam
+  )
+  {
+    if (message == WM_MOUSEWHEEL || message == WM_MOUSEHWHEEL) {
+      return 0;
+    }
+    return ::DefWindowProcW(window, message, wParam, lParam);
+  }
+
   LRESULT CALLBACK SubclassProc(
     HWND const window,
     UINT const message,
@@ -66,6 +107,20 @@ namespace
     (void)subclassId;
     auto* const sdlWindow = reinterpret_cast<SDL_Window*>(referenceData);
     switch (message) {
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL:
+      // A wheel sent to the frame (Windows' focus window at the time) goes to the viewport under
+      // the cursor. SDL would report it for the frame and move its mouse focus there, and a
+      // mouse-focus change makes SDL set its own cursor (the arrow) over the game's; the frame's
+      // wheel never reached the map either. With the viewport taking it, SDL's mouse focus stays
+      // where the cursor is.
+      if (!IsChildHwnd(window)) {
+        const POINT screenPoint{static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        if (HWND const child = OwnChildAt(window, screenPoint); child != nullptr) {
+          return ::SendMessageW(child, message, wParam, lParam);
+        }
+      }
+      break;
     case WM_SETCURSOR:
       // SDL would put its own cursor back; the engine's cursor code sets the game's here, as the
       // viewport's window procedure did.
@@ -241,7 +296,7 @@ namespace platform::window::sdl
       WNDCLASSEXW windowClass{};
       windowClass.cbSize = sizeof(windowClass);
       windowClass.style = CS_DBLCLKS;
-      windowClass.lpfnWndProc = &::DefWindowProcW;
+      windowClass.lpfnWndProc = &ChildWindowProc;
       windowClass.hInstance = instance;
       windowClass.lpszClassName = kChildWindowClass;
       return ::RegisterClassExW(&windowClass) != 0;

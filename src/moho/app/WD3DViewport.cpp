@@ -254,6 +254,27 @@ namespace
     }
   }
 
+  // The game window's events: the main frame's, or its native child's, the viewport on Windows,
+  // where the window system names the child for the mouse over it (and, since the frame hands
+  // it on, for the wheel).
+  [[nodiscard]] bool IsGameWindowEvent(
+    const platform::window::Event& event
+  )
+  {
+    if (moho::sMainWindow == nullptr || event.window == nullptr) {
+      return false;
+    }
+    if (event.window == moho::sMainWindow->GetPlatformWindow()) {
+      return true;
+    }
+    for (const ShellWindow* const child : moho::sMainWindow->GetChildren()) {
+      if (child->IsNativeChild() && child->GetPlatformWindow() == event.window) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * The rest of WD3DViewport::MSWWindowProc (0x00430B90): what the game window's events meet
    * before the UI does.
@@ -263,7 +284,7 @@ namespace
   )
   {
     using platform::window::EventType;
-    if (moho::sMainWindow == nullptr || event.window != moho::sMainWindow->GetPlatformWindow()) {
+    if (!IsGameWindowEvent(event)) {
       return false;
     }
 
