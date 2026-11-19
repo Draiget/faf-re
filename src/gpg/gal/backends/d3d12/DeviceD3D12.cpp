@@ -2865,6 +2865,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     const bool force = mRecoverRequested;
     mRecoverRequested = false;
+    // Only the heads whose chain refused to present are made again by force.
+    std::vector<bool> forceHead = mRecoverHeads;
+    forceHead.resize(mSwapChains.size(), false);
+    mRecoverHeads.assign(mSwapChains.size(), false);
 
     bool vsyncChanged = false;
     if (context != nullptr && context != &mDeviceContext) {
@@ -2917,7 +2921,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       const dxgi::SwapChainDesc& desc = wanted[headIndex];
       dxgi::ResetAction action = dxgi::ResetAction::None;
       const HRESULT result = mSwapChains[headIndex]->Reconfigure(
-        mFactory, mQueue.Get(), desc, force, dxgi::IsWindowMinimized(desc.window), [this] {
+        mFactory, mQueue.Get(), desc, forceHead[headIndex], dxgi::IsWindowMinimized(desc.window), [this] {
         DrainGpu();
       }, &action
       );
@@ -3157,23 +3161,28 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   void DeviceD3D12::PresentSwapChains()
   {
     const bool vsync = mDeviceContext.mVSync;
-    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
+    mRecoverHeads.resize(mSwapChains.size(), false);
+    mHeadRecoveries.resize(mSwapChains.size(), 0U);
+    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
+      const std::unique_ptr<dxgi::SwapChain>& swapChain = mSwapChains[headIndex];
       const dxgi::PresentResult present = swapChain->Present(vsync);
       switch (present.status) {
       case dxgi::PresentStatus::Presented:
       case dxgi::PresentStatus::Occluded: // success: nothing is shown and Present did not wait
-        mConsecutiveRecoveries = 0U;
+        mHeadRecoveries[headIndex] = 0U;
         break;
       case dxgi::PresentStatus::Skipped:
         break; // the frame is dropped, the next one goes through
       case dxgi::PresentStatus::InvalidCall:
         // The chain refuses even a plain present: build it again through the
         // engine's own Reset (TestCooperativeLevel), a few times at most.
-        if (++mConsecutiveRecoveries <= 3U) {
+        if (++mHeadRecoveries[headIndex] <= 3U) {
           gpg::Warnf(
-            "D3D12: the swap chain refuses to present (0x%08lX); it is rebuilt",
+            "D3D12: head %u's swap chain refuses to present (0x%08lX); it is rebuilt",
+            static_cast<unsigned>(headIndex),
             static_cast<unsigned long>(present.result)
           );
+          mRecoverHeads[headIndex] = true;
           mRecoverRequested = true;
         } else {
           CheckDeviceHresult(__LINE__, present.result, "present");

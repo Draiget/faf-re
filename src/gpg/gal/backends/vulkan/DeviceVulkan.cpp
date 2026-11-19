@@ -1094,20 +1094,15 @@ namespace gpg::gal
       }
     };
     createWithModes();
-    if (result != VK_SUCCESS) {
-      // Every mode failed: the old swap chain (a retired one still holds the window on some drivers) or the surface
-      // itself is the usual cause. Drop the old chain, make the surface again if it was lost, and go through the
-      // modes once more.
+    if (result != VK_SUCCESS && result != VK_ERROR_SURFACE_LOST_KHR) {
+      // Every mode failed: the old swap chain (a retired one still holds the window on some drivers) is the usual
+      // cause. Drop it and go through the modes once more. A lost surface throws below instead: the callers let go
+      // of it, and TestCooperativeLevel takes the next one (VulkanSurfaceLifecycle.h).
       gpg::Warnf(
         "Vulkan: creating the swap chain failed (%s); trying again without the old one", vulkan::ResultName(result)
       );
       Vk().vkDeviceWaitIdle(mDevice);
-      const bool surfaceLost = result == VK_ERROR_SURFACE_LOST_KHR;
-      DestroySwapChain(swapChain, !surfaceLost);
-      if (surfaceLost) {
-        TakeSurface(swapChain);
-        info.surface = swapChain.surface;
-      }
+      DestroySwapChain(swapChain, true);
       createWithModes();
     }
     CheckVk("DeviceVulkan.cpp", __LINE__, result);
@@ -3306,17 +3301,23 @@ namespace gpg::gal
       } else {
         const VkExtent2D previous = swapChain.extent;
         try {
-          CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height);
-          newSize = vulkan::SurfaceLifecycle::NewSize(
-            swapChain.scaled, previous.width, previous.height, swapChain.extent.width, swapChain.extent.height
-          );
-          if (!swapChain.scaled) {
-            // The head draws into the new images, at the size the platform gave its surface, which the engine
-            // lays out by (CD3DDevice::GetHeadWidth) once TestCooperativeLevel answers 1.
-            RebindSwapChainImages(headIndex);
-            Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
-            head.mWidth = swapChain.extent.width;
-            head.mHeight = swapChain.extent.height;
+          if (!CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height)) {
+            // The window lost its area since the query above: the head waits for it as for one minimised.
+            outcome = Attach::NoArea;
+          } else {
+            // A new surface starts its Reset requests over (RequestSwapChainRecovery).
+            swapChain.recoveries = 0U;
+            newSize = vulkan::SurfaceLifecycle::NewSize(
+              swapChain.scaled, previous.width, previous.height, swapChain.extent.width, swapChain.extent.height
+            );
+            if (!swapChain.scaled) {
+              // The head draws into the new images, at the size the platform gave its surface, which the engine
+              // lays out by (CD3DDevice::GetHeadWidth) once TestCooperativeLevel answers 1.
+              RebindSwapChainImages(headIndex);
+              Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
+              head.mWidth = swapChain.extent.width;
+              head.mHeight = swapChain.extent.height;
+            }
           }
         } catch (const Error& error) {
           // One that went again in the meantime is waited for, as one not there yet.
