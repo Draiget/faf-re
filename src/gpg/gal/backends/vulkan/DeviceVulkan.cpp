@@ -1870,11 +1870,6 @@ namespace gpg::gal
         swapChain.stale = true;
       } else if (result == VK_ERROR_DEVICE_LOST) {
         CheckFrame(__LINE__, result, "acquiring a swap-chain image");
-      } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // A head that draws into the swap chain's own images (not scaled) can only follow the window through the
-        // engine's Reset, which makes its targets again. A lost surface goes below: TestCooperativeLevel takes
-        // the next one.
-        RequestSwapChainRecovery(index, "acquire", result);
       } else {
         gpg::Warnf(
           "Vulkan: acquiring head %u's image failed (%s)", static_cast<unsigned>(index), vulkan::ResultName(result)
@@ -1882,48 +1877,6 @@ namespace gpg::gal
         // A surface that went: TestCooperativeLevel lets go of it and takes the next.
         swapChain.surfaceLost = swapChain.surfaceLost || result == VK_ERROR_SURFACE_LOST_KHR;
       }
-    }
-  }
-
-  void DeviceVulkan::RequestSwapChainRecovery(
-    const std::size_t headIndex,
-    const char* const what,
-    const VkResult result
-  )
-  {
-    SwapChain& swapChain = mSwapChains[headIndex];
-    if (swapChain.surface == VK_NULL_HANDLE) {
-      return; // TestCooperativeLevel gives it a swap chain with its next surface
-    }
-    // This head's window, not every window: with two heads and one minimised, the other's chain stays as it is.
-    VkSurfaceCapabilitiesKHR capabilities{};
-    const bool minimised =
-      Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) == VK_SUCCESS &&
-      (capabilities.currentExtent.width == 0U || capabilities.currentExtent.height == 0U);
-    switch (vulkan::AskForRecovery(swapChain.recover, minimised, swapChain.recoveries)) {
-    case vulkan::RecoveryAsk::Ask:
-      gpg::Warnf(
-        "Vulkan: %s of head %u's swap chain: %s; it is rebuilt",
-        what,
-        static_cast<unsigned>(headIndex),
-        vulkan::ResultName(result)
-      );
-      swapChain.recover = true;
-      break;
-    case vulkan::RecoveryAsk::GiveUp: {
-      static int logged = 0;
-      if (logged++ < 4) {
-        gpg::Warnf(
-          "Vulkan: %s of head %u's swap chain: %s again; not rebuilding it any more",
-          what,
-          static_cast<unsigned>(headIndex),
-          vulkan::ResultName(result)
-        );
-      }
-      break;
-    }
-    case vulkan::RecoveryAsk::Skip:
-      break;
     }
   }
 
@@ -3156,14 +3109,6 @@ namespace gpg::gal
       return;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    // The heads whose chain asked to be made again (RequestSwapChainRecovery); the request ends with this Reset.
-    std::vector<bool> force(mSwapChains.size(), false);
-    bool anyForced = false;
-    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
-      force[headIndex] = mSwapChains[headIndex].recover;
-      anyForced = anyForced || force[headIndex];
-      mSwapChains[headIndex].recover = false;
-    }
     if (context != nullptr && context != &mDeviceContext) {
       mDeviceContext.mVSync = context->mVSync;
       const int heads = std::min(context->GetHeadCount(), mDeviceContext.GetHeadCount());
@@ -3203,10 +3148,9 @@ namespace gpg::gal
       if (extent.width == 0U || extent.height == 0U) {
         continue; // minimised
       }
-      rebuild[headIndex] = force[headIndex] || swapChain.swapchain == VK_NULL_HANDLE ||
-        extent.width != swapChain.extent.width || extent.height != swapChain.extent.height ||
-        extent.width != swapChain.headWidth || extent.height != swapChain.headHeight ||
-        SelectPresentModes(swapChain).front() != swapChain.presentMode;
+      rebuild[headIndex] = swapChain.swapchain == VK_NULL_HANDLE || extent.width != swapChain.extent.width ||
+        extent.height != swapChain.extent.height || extent.width != swapChain.headWidth ||
+        extent.height != swapChain.headHeight || SelectPresentModes(swapChain).front() != swapChain.presentMode;
       anyChange = anyChange || rebuild[headIndex];
     }
     if (!anyChange) {
@@ -3216,7 +3160,7 @@ namespace gpg::gal
       BindDefaultOutput();
       return;
     }
-    gpg::Logf("Vulkan: Reset requested%s", anyForced ? " (swap chain recovery)" : "");
+    gpg::Logf("Vulkan: Reset requested");
 
     ReleaseRenderTargets();
     Vk().vkDeviceWaitIdle(mDevice);
@@ -3305,8 +3249,6 @@ namespace gpg::gal
             // The window lost its area since the query above: the head waits for it as for one minimised.
             outcome = Attach::NoArea;
           } else {
-            // A new surface starts its Reset requests over (RequestSwapChainRecovery).
-            swapChain.recoveries = 0U;
             newSize = vulkan::SurfaceLifecycle::NewSize(
               swapChain.scaled, previous.width, previous.height, swapChain.extent.width, swapChain.extent.height
             );
@@ -3375,13 +3317,7 @@ namespace gpg::gal
         everyHeadHasSurface = false;
       }
     }
-    const int answer = mSurfaceLifecycle.Answer(everyHeadHasSurface);
-    // A head that draws into the swap chain's images and whose chain is out of date (RequestSwapChainRecovery)
-    // goes through InitContext too, which makes its chain and targets again; it waits through an answer of 2.
-    const bool recover = std::any_of(mSwapChains.begin(), mSwapChains.end(), [](const SwapChain& swapChain) {
-      return swapChain.recover;
-    });
-    return (answer == 0 && recover) ? 1 : answer;
+    return mSurfaceLifecycle.Answer(everyHeadHasSurface);
   }
 
   void DeviceVulkan::BeginScene() {}
@@ -3508,23 +3444,7 @@ namespace gpg::gal
       } else if (swapChain.scaled && (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)) {
         swapChain.stale =
           swapChain.stale || result == VK_ERROR_OUT_OF_DATE_KHR || SuboptimalSwapChainIsStale(swapChain);
-      } else if (result == VK_SUCCESS) {
-        swapChain.recoveries = 0U;
-      } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // Not scaled: the engine's Reset makes the chain and the head's targets again.
-        RequestSwapChainRecovery(index, "present", result);
-      } else if (result == VK_SUBOPTIMAL_KHR) {
-        // On Windows "suboptimal" means the window no longer has the chain's size; a chain of the right size that
-        // still says so is left alone. The surface reports the window's size, so the chain's own is passed as the
-        // fallback.
-        const VkExtent2D extent = SurfaceExtent(swapChain, swapChain.extent.width, swapChain.extent.height);
-        if (
-          extent.width != 0U && extent.height != 0U &&
-          (extent.width != swapChain.extent.width || extent.height != swapChain.extent.height)
-        ) {
-          RequestSwapChainRecovery(index, "present", result);
-        }
-      } else {
+      } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         // A surface that went: TestCooperativeLevel lets go of it and takes the next.
         swapChain.surfaceLost = swapChain.surfaceLost || result == VK_ERROR_SURFACE_LOST_KHR;
         static int logged = 0;

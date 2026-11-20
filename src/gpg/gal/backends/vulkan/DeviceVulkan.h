@@ -294,10 +294,6 @@ namespace gpg::gal
       // chain could be made again for it: TestCooperativeLevel lets go of it and takes the next. It goes with the
       // surface (DestroySwapChain).
       bool surfaceLost = false;
-      // Not scaled: the chain is out of date for the window, and the engine's Reset makes it again with the head's
-      // targets (TestCooperativeLevel answers 1, RequestSwapChainRecovery). Cleared by the Reset.
-      bool recover = false;
-      std::uint32_t recoveries = 0; // Resets asked for since this head's last present that succeeded
       void* window = nullptr;
     };
 
@@ -344,8 +340,6 @@ namespace gpg::gal
     [[nodiscard]] std::vector<VkPresentModeKHR> SelectPresentModes(const SwapChain& swapChain) const;
     /** The extent a swap chain made now would get; 0 x 0 for a minimised window. */
     [[nodiscard]] VkExtent2D SurfaceExtent(const SwapChain& swapChain, std::uint32_t width, std::uint32_t height) const;
-    /** A swap chain the engine's Reset must make again (TestCooperativeLevel answers 1 until it has). */
-    void RequestSwapChainRecovery(std::size_t headIndex, const char* what, VkResult result);
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
     /** Makes the head's surface, once its window has one (VulkanSurface.h's WaitForWindowSurface). */
     void TakeSurface(SwapChain& swapChain);
