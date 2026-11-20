@@ -119,9 +119,6 @@ namespace gpg::gal::dxgi
                                                                               : ResetAction::None;
   }
 
-  /** Frame-latency waits that time out this many times in a row are switched off. */
-  constexpr std::uint32_t kFrameLatencyTimeoutLimit = 3U;
-
   /** The Present retries without tearing at most once before the chain is called broken. */
   [[nodiscard]] constexpr bool ShouldRetryWithoutTearing(
     const PresentStatus status,
@@ -129,18 +126,5 @@ namespace gpg::gal::dxgi
   ) noexcept
   {
     return status == PresentStatus::InvalidCall && (flags & DXGI_PRESENT_ALLOW_TEARING) != 0U;
-  }
-
-  /** `SetMaximumFrameLatency` argument from the setting: 0 = off, 1 and up = latency, clamped to the buffer count. */
-  [[nodiscard]] constexpr std::uint32_t ClampFrameLatency(
-    const std::int64_t setting,
-    const std::uint32_t bufferCount
-  ) noexcept
-  {
-    if (setting <= 0) {
-      return 0U;
-    }
-    const std::uint32_t buffers = (bufferCount < 1U) ? 1U : bufferCount;
-    return (static_cast<std::uint64_t>(setting) > buffers) ? buffers : static_cast<std::uint32_t>(setting);
   }
 } // namespace gpg::gal::dxgi

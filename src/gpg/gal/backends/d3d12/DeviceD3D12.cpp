@@ -3194,10 +3194,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         break;
       }
     }
-    // Frame-latency chains wait here, before the next frame is recorded.
-    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
-      static_cast<void>(swapChain->WaitForFrameLatency(100U));
-    }
   }
 
   void DeviceD3D12::SetCursor(
