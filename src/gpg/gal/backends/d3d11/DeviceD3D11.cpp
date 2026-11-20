@@ -2136,11 +2136,6 @@ namespace gpg::gal
       }
       flipModel = flipModel || swapChain->IsFlipModel();
     }
-    // Frame-latency chains wait here, before the next frame is recorded.
-    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
-      static_cast<void>(swapChain->WaitForFrameLatency(100U));
-    }
-
     // A flip-model present unbinds the back buffer from the output merger;
     // D3D9 and D3D10 keep it bound, and the engine does not rebind it.
     if (flipModel) {

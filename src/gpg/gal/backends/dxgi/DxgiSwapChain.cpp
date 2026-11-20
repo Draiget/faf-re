@@ -28,16 +28,6 @@ namespace gpg::gal::dxgi
     FAF_UNREACHABLE();
   }
 
-  std::uint32_t FrameLatencySetting()
-  {
-    static const std::uint32_t setting = [] {
-      const char* const value = std::getenv("FAF_GAL_FRAME_LATENCY");
-      const long parsed = (value != nullptr) ? std::strtol(value, nullptr, 10) : 0L;
-      return ClampFrameLatency(parsed, 3U);
-    }();
-    return setting;
-  }
-
   SwapChainDesc DescribeHeadChain(
     const Head& head,
     const std::uint32_t bufferCount,
@@ -54,7 +44,6 @@ namespace gpg::gal::dxgi
     desc.usage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
     desc.bufferCount = bufferCount;
     desc.allowFlipModel = allowFlipModel;
-    desc.frameLatency = FrameLatencySetting();
     if (desc.width == 0U || desc.height == 0U) {
       RECT client{};
       ::GetClientRect(desc.window, &client);
@@ -90,9 +79,8 @@ namespace gpg::gal::dxgi
 
     // Flip model: no MSAA back buffer, at least two buffers. A full-screen
     // flip swap chain is created windowed and switched afterwards, which is
-    // what DXGI recommends for both models. The optional flags (tearing, the
-    // frame-latency object) are dropped one after the other when a driver
-    // refuses the chain with them, before the next model is tried.
+    // what DXGI recommends for both models. The optional tearing flag is
+    // dropped when a driver refuses the chain with it, before the next model is tried.
     if (desc.allowFlipModel && factory2 != nullptr) {
       const SwapModel candidates[] = {SwapModel::FlipDiscard, SwapModel::FlipSequential};
       for (const SwapModel model : candidates) {
@@ -101,14 +89,11 @@ namespace gpg::gal::dxgi
         }
 
         const bool wantTearing = factory.SupportsTearing() && !desc.fullscreen;
-        const bool wantLatency = desc.frameLatency > 0U;
-        // Attempt 0: everything asked for; 1: without the latency object;
-        // 2: without tearing either. An attempt that would repeat the one
-        // before (nothing left to drop) is skipped.
-        for (int attempt = 0; attempt < 3 && mSwapChain == nullptr; ++attempt) {
-          const bool latency = wantLatency && attempt < 1;
-          const bool tearing = wantTearing && attempt < 2;
-          if ((attempt == 1 && !wantLatency) || (attempt == 2 && !wantTearing)) {
+        // Attempt 0: everything asked for; 1: without tearing. An attempt that would repeat the one before
+        // (nothing left to drop) is skipped.
+        for (int attempt = 0; attempt < 2 && mSwapChain == nullptr; ++attempt) {
+          const bool tearing = wantTearing && attempt < 1;
+          if (attempt == 1 && !wantTearing) {
             continue;
           }
 
@@ -126,8 +111,7 @@ namespace gpg::gal::dxgi
             (model == SwapModel::FlipDiscard) ? DXGI_SWAP_EFFECT_FLIP_DISCARD : DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
           chainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
           chainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH |
-            (tearing ? static_cast<UINT>(DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) : 0U) |
-            (latency ? static_cast<UINT>(DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT) : 0U);
+            (tearing ? static_cast<UINT>(DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) : 0U);
 
           DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullscreenDesc{};
           fullscreenDesc.RefreshRate.Numerator = desc.refreshHz;
@@ -144,18 +128,14 @@ namespace gpg::gal::dxgi
             mAllowTearing = tearing;
             mFlags = chainDesc.Flags;
             mDesc.bufferCount = chainDesc.BufferCount;
-            if (latency) {
-              ApplyFrameLatency();
-            }
           } else {
             gpg::Warnf(
-              "DXGI: %s swap chain %ux%u refused (HRESULT 0x%08lX)%s%s",
+              "DXGI: %s swap chain %ux%u refused (HRESULT 0x%08lX)%s",
               SwapModelName(model),
               desc.width,
               desc.height,
               static_cast<unsigned long>(result),
-              tearing ? ", with tearing" : "",
-              latency ? ", with a frame-latency object" : ""
+              tearing ? ", with tearing" : ""
             );
           }
         }
@@ -247,60 +227,6 @@ namespace gpg::gal::dxgi
     return present;
   }
 
-  bool SwapChain::WaitForFrameLatency(
-    const std::uint32_t timeoutMs
-  )
-  {
-    if (
-      mFrameLatencyObject == nullptr || mFrameLatencyTimeouts >= kFrameLatencyTimeoutLimit ||
-      mLastPresent == PresentStatus::Occluded
-    ) {
-      return true;
-    }
-    const DWORD waited = ::WaitForSingleObjectEx(mFrameLatencyObject, timeoutMs, TRUE);
-    if (waited == WAIT_TIMEOUT) {
-      // Resizes and mode changes can leave the object unsignalled; it never holds the frame loop for long.
-      if (++mFrameLatencyTimeouts >= kFrameLatencyTimeoutLimit) {
-        gpg::Warnf(
-          "DXGI: the frame-latency wait timed out %u times in a row; waiting is off for this swap chain",
-          mFrameLatencyTimeouts
-        );
-      }
-      return false;
-    }
-    mFrameLatencyTimeouts = 0U;
-    return true;
-  }
-
-  void SwapChain::ApplyFrameLatency() noexcept
-  {
-    CloseFrameLatencyObject();
-    mFrameLatencyTimeouts = 0U;
-    ComPtr<IDXGISwapChain2> chain2;
-    if (
-      mSwapChain == nullptr || (mFlags & DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT) == 0U ||
-      FAILED(mSwapChain.As(&chain2))
-    ) {
-      return;
-    }
-    const std::uint32_t latency = ClampFrameLatency(mDesc.frameLatency, mDesc.bufferCount);
-    if (latency == 0U || FAILED(chain2->SetMaximumFrameLatency(latency))) {
-      return;
-    }
-    mFrameLatencyObject = chain2->GetFrameLatencyWaitableObject();
-    if (mFrameLatencyObject != nullptr) {
-      gpg::Logf("DXGI: frame-latency wait on, at most %u frame(s) queued", latency);
-    }
-  }
-
-  void SwapChain::CloseFrameLatencyObject() noexcept
-  {
-    if (mFrameLatencyObject != nullptr) {
-      ::CloseHandle(mFrameLatencyObject);
-      mFrameLatencyObject = nullptr;
-    }
-  }
-
   HRESULT SwapChain::Resize(
     const std::uint32_t width,
     const std::uint32_t height
@@ -313,7 +239,6 @@ namespace gpg::gal::dxgi
     if (SUCCEEDED(result)) {
       mDesc.width = width;
       mDesc.height = height;
-      ApplyFrameLatency(); // the object is made again with the buffers
     }
     return result;
   }
@@ -438,13 +363,11 @@ namespace gpg::gal::dxgi
         static_cast<void>(mSwapChain->SetFullscreenState(FALSE, nullptr));
       }
     }
-    CloseFrameLatencyObject();
     mSwapChain.Reset();
     mModel = SwapModel::BltDiscard;
     mAllowTearing = false;
     mTearingDisabled = false;
     mFlags = 0U;
-    mFrameLatencyTimeouts = 0U;
     mLastPresent = PresentStatus::Presented;
     mSkippedPresents = 0U;
   }

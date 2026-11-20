@@ -45,10 +45,6 @@ namespace gpg::gal::dxgi
     DXGI_USAGE usage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     std::uint32_t bufferCount = 2;
     bool allowFlipModel = true; // false forces BltDiscard
-    // Flip model only: > 0 makes the chain wait on a frame-latency object
-    // (DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT) with this many
-    // frames queued at most. 0 (the default) leaves the chain as it was.
-    std::uint32_t frameLatency = 0;
   };
 
   /**
@@ -67,9 +63,6 @@ namespace gpg::gal::dxgi
     HRESULT result = S_OK;
     PresentStatus status = PresentStatus::Presented;
   };
-
-  /** The frame-latency setting: `FAF_GAL_FRAME_LATENCY` (0 or unset = off, 1-3 = frames queued at most). */
-  [[nodiscard]] std::uint32_t FrameLatencySetting();
 
   class SwapChain
   {
@@ -94,14 +87,6 @@ namespace gpg::gal::dxgi
      * that keeps refusing) is for the caller, see `PresentStatus`.
      */
     PresentResult Present(bool vsync);
-
-    /**
-     * Waits until DXGI accepts another frame (frame-latency chains only;
-     * returns at once otherwise, while the window is occluded, and after the
-     * wait timed out `kFrameLatencyTimeoutLimit` times in a row, which turns
-     * it off). Call after Present, before recording the next frame.
-     */
-    bool WaitForFrameLatency(std::uint32_t timeoutMs);
 
     /**
      * Brings the chain to `wanted` the way `PlanReset` says: nothing when
@@ -131,10 +116,6 @@ namespace gpg::gal::dxgi
     [[nodiscard]] bool TearingDisabled() const noexcept
     {
       return mTearingDisabled;
-    }
-    [[nodiscard]] bool WaitsForFrameLatency() const noexcept
-    {
-      return mFrameLatencyObject != nullptr;
     }
 
     /**
@@ -187,17 +168,12 @@ namespace gpg::gal::dxgi
     [[nodiscard]] std::uint32_t BufferCount() const;
 
   private:
-    void ApplyFrameLatency() noexcept;
-    void CloseFrameLatencyObject() noexcept;
-
     Microsoft::WRL::ComPtr<IDXGISwapChain> mSwapChain;
     SwapChainDesc mDesc{};
     SwapModel mModel = SwapModel::BltDiscard;
     bool mAllowTearing = false;
     bool mTearingDisabled = false; // the driver refused a tearing present: not tried again
     UINT mFlags = 0U;
-    HANDLE mFrameLatencyObject = nullptr;
-    std::uint32_t mFrameLatencyTimeouts = 0U;
     PresentStatus mLastPresent = PresentStatus::Presented;
     std::uint32_t mSkippedPresents = 0U;
   };

@@ -1,6 +1,5 @@
 // Host test of the swap-chain decisions that need no device (src/gpg/gal/backends/dxgi/DxgiSwapChainPolicy.h): how a
-// Present result is read, the Present flags, what a Reset does to a chain (a vsync-only change must do nothing) and the
-// frame-latency clamp.
+// Present result is read, the Present flags, what a Reset does to a chain (a vsync-only change must do nothing).
 
 #include <cstdint>
 
@@ -77,16 +76,6 @@ namespace
     CHECK(PlanReset(windowed, windowed, true, true) == ResetAction::Recreate);
   }
 
-  void CheckFrameLatency()
-  {
-    CHECK(ClampFrameLatency(0, 2U) == 0U);
-    CHECK(ClampFrameLatency(-5, 2U) == 0U);
-    CHECK(ClampFrameLatency(1, 2U) == 1U);
-    CHECK(ClampFrameLatency(2, 2U) == 2U);
-    CHECK(ClampFrameLatency(3, 2U) == 2U); // never more frames than buffers
-    CHECK(ClampFrameLatency(100, 3U) == 3U);
-    CHECK(ClampFrameLatency(2, 0U) == 1U);
-  }
 } // namespace
 
 TEST(
@@ -109,11 +98,4 @@ TEST(
 )
 {
   CheckPlanReset();
-}
-TEST(
-  SwapChainPolicy,
-  FrameLatency
-)
-{
-  CheckFrameLatency();
 }
