@@ -1,6 +1,7 @@
 // Engine addition, not in the shipped binary (see MsdfTextGpuRenderer.h).
 
 #include "moho/render/font/MsdfTextGpuRenderer.h"
+#include "gpg/gal/RenderProfiler.h"
 
 #include <algorithm>
 #include <cstring>
@@ -192,6 +193,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
   )
   {
     if (!mPending.empty() && (mBatcher != &batcher || mAlphaMultiplier != batcher.mAlphaMultiplier)) {
+      FAF_PROFILE_COUNT("ui.msdf.flush.switch", 1);
       Flush();
     }
     if (mPending.empty()) {
@@ -207,6 +209,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
   )
   {
     if (mPending.size() >= kMaxPendingQuads) {
+      FAF_PROFILE_COUNT("ui.msdf.flush.cap", 1);
       Flush();
     }
     mPending.push_back(quad);
@@ -230,6 +233,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
       batcher.Flush();
     }
     if (mPage.get() != texture.get()) {
+      FAF_PROFILE_COUNT("ui.msdf.flush.switch", 1);
       Flush(); // a device reset made a new page
       mPage = texture;
     }
@@ -297,6 +301,9 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
       return;
     }
     const auto count = static_cast<std::uint32_t>(mPending.size());
+    // FAF_GPU_PROFILE: one instanced draw and its quads.
+    gpg::gal::CpuProfileScope profileFlush("UiMsdfFlush");
+    FAF_PROFILE_COUNT("ui.msdf.quads", count);
     if (mNextQuad + count > kBufferQuads) {
       mNextQuad = 0u;
     }

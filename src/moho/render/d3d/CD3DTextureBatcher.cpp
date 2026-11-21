@@ -1,4 +1,5 @@
 #include "moho/render/d3d/CD3DTextureBatcher.h"
+#include "gpg/gal/RenderProfiler.h"
 #include <algorithm>
 #include <cstring>
 
@@ -193,9 +194,11 @@ namespace moho
       const int requiredHeight = (static_cast<int>(texture->mHeight) + (2 * border) + 3) & ~3;
 
       if (!FindRect(allocatedRect, requiredWidth, requiredHeight)) {
+        FAF_PROFILE_COUNT("ui.atlas.full", 1);
         return nullptr;
       }
 
+      FAF_PROFILE_COUNT("ui.atlas.inserted", 1);
       AllocateRect(allocatedRect);
 
       TextureAtlasEntry insertedEntry{};
@@ -230,6 +233,7 @@ namespace moho
    */
   void CD3DTextureBatcher::Reset()
   {
+    FAF_PROFILE_COUNT("ui.atlas.resets", 1);
     std::memset(sAtlasCache, 0, sizeof(sAtlasCache));
     mMap.clear();
     mRects.clear();
@@ -255,6 +259,10 @@ namespace moho
   {
     const std::uint32_t dirtyLane = static_cast<std::uint32_t>(mDirty);
     if (!IsZero(&dirtyLane)) {
+      gpg::gal::CpuProfileScope profileUpload("UiAtlasUpload");
+      FAF_PROFILE_COUNT(
+        "ui.atlas.uploadpixels", static_cast<std::uint64_t>(mWidth) * static_cast<std::uint64_t>(mHeight)
+      );
       std::uint32_t pitch = 0;
       void* lockedBits = nullptr;
 
