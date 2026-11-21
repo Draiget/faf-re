@@ -32,6 +32,10 @@ GitHub starts no workflow from what the workflow token does, so a parity run tha
 
 Started by hand, the workflow builds the commit and writes the notes as artifacts. It publishes only with `publish` ticked, and such a build has passed no parity run, as its notes say. Give `parity_run` to report a run in the notes, with any new failures named, and `note` for a line of your own, such as what was fixed after that run.
 
+## Releases
+
+A release is started by hand like a nightly, with `release` ticked as well: its tag is the month's next number without `-nightly` (`2026.11.014`), its title `2026.11.014 x64\Linux`. Before starting it, commit its changelog to master as `tools/release/changelog/<tag>.md`: what changed since the previous nightly or release, written for players and testers, grouped by what they notice. The notes put it on top, then the parity run, then every commit as a nightly lists them; the `plan` job stops when the file is missing. The number is counted when the run starts, so name the file after the number the next nightly would take.
+
 Nightly tags and releases stay until someone deletes them; nothing removes old ones.
 
 ## The version a build shows

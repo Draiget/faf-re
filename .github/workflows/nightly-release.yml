@@ -2,7 +2,8 @@ name: Nightly release
 
 # Publishes master's head as the latest release unless more than 5 % of that night's Replay parity desynced anew: the x64 and
 # x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
-# it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
+# it only builds and writes the notes, unless `publish` is ticked; with `release` ticked it makes a release
+# (YYYY.MM.NNN, its changelog on top of the notes) instead of a nightly. tools/release/README.md.
 on:
   workflow_run:
     workflows: ["Replay parity"]
@@ -16,6 +17,10 @@ on:
         default: master
       publish:
         description: Also publish the release as the latest (otherwise the zips and notes stay this run's artifacts)
+        type: boolean
+        default: false
+      release:
+        description: A release (YYYY.MM.NNN, with tools/release/changelog/<tag>.md on top of its notes) instead of a nightly (YYYY.MM.NNN-nightly)
         type: boolean
         default: false
       parity_run:
@@ -63,21 +68,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REF: ${{ github.event.workflow_run.head_sha || inputs.ref }}
           PARITY_RUN: ${{ github.event.workflow_run.id }}
+          RELEASE: ${{ inputs.release && 'true' || 'false' }}
         run: |
           sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
-          # YYYY.MM.NNN-nightly: the month's next number, counting its releases and nightlies alike.
-          # Three digits, so it can't be read as a day. The sed pattern leaves out the old
-          # YYYY.DD.MM.NNN tags, which have one more part.
+          # YYYY.MM.NNN-nightly, or YYYY.MM.NNN for a release: the month's next number, counting its
+          # releases and nightlies alike. Three digits, so it can't be read as a day. The sed pattern
+          # leaves out the old YYYY.DD.MM.NNN tags, which have one more part.
           month=$(date -u +%Y.%m)
           last=$(git tag --list "$month.*" | sed -nE "s/^$month\.([0-9]+)(-nightly)?$/\1/p" | sort -n | tail -n 1)
-          tag=$(printf '%s.%03d-nightly' "$month" "$((10#${last:-0} + 1))")
+          suffix=-nightly
+          kind=nightly
+          if [ "$RELEASE" = true ]; then suffix=; kind=release; fi
+          tag=$(printf '%s.%03d%s' "$month" "$((10#${last:-0} + 1))" "$suffix")
+          # A release needs its changelog in the commit it builds (tools/release/README.md).
+          if [ "$RELEASE" = true ] && ! git cat-file -e "$sha:tools/release/changelog/$tag.md" 2>/dev/null; then
+            echo "No tools/release/changelog/$tag.md at $sha: commit it before making release $tag." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           # The newest release or nightly the commit descends from.
           previous=$(git tag --merged "$sha" --sort=-creatordate | head -n 1)
-          # Master did not move since the last nightly: that release already holds this commit.
+          # Master did not move since the last nightly (or release): that one already holds this commit.
           skip=false
-          if [ -n "$(git tag --points-at "$sha" --list '*-nightly*')" ]; then skip=true; fi
+          if [ "$RELEASE" = true ]; then
+            if git tag --points-at "$sha" | grep -qE '^[0-9]{4}\.[0-9]{2}\.[0-9]+$'; then skip=true; fi
+          elif [ -n "$(git tag --points-at "$sha" --list '*-nightly*')" ]; then
+            skip=true
+          fi
           if [ "$skip" = true ]; then
-            echo "$sha already has a nightly: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "$sha already has a $kind: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
           # More than 5 % of the played replays desync where they didn't before: nothing to publish
           # (tools/release/parity_gate.py; crashes and other failures don't count). No report at
@@ -267,6 +285,7 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag }}
           PREVIOUS: ${{ needs.plan.outputs.previous }}
           NOTE: ${{ inputs.note }}
+          RELEASE: ${{ inputs.release && 'true' || 'false' }}
           PARITY_RUN: ${{ github.event.workflow_run.id || inputs.parity_run }}
           PARITY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || inputs.parity_run }}
         run: |

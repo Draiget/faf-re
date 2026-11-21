@@ -1,7 +1,7 @@
-"""Writes a nightly release's notes: the parity run it passed, every commit since the previous
-nightly (or release), how to install it, and the zips' checksums.
+"""Writes a nightly's or a release's notes: a release's changelog (tools/release/changelog/<tag>.md), the parity run
+it passed, every commit since the previous nightly (or release), how to install it, and the zips' checksums.
 
-usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
+usage: TAG=... SHA=... PREVIOUS=... [RELEASE=true PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
            [--player-notes player-notes.md]
 
 --player-notes also writes the short notes for players that FAF Develop's changelog shows (issue #323):
@@ -64,7 +64,7 @@ def parity_line():
         with open("report/report.json", encoding="utf-8") as f:
             report = json.load(f)
         counts, new = report["counts"], report.get("regressions", [])
-    text = ("**Built despite new failures in** the [nightly replay parity](%s)" if new else "Passed the [nightly replay parity](%s)") % url
+    text = ("**Built despite new failures in** the [replay parity run](%s)" if new else "Passed the [replay parity run](%s)") % url
     if counts:
         shown = [(counts.get(k, 0), k) for k in ("pass", "desync", "crash", "expected-desync", "expected-crash", "not-run")]
         text += " on Linux x64: " + ", ".join("%d %s" % (n, k.replace("expected-", "expected ")) for n, k in shown if n)
@@ -93,9 +93,16 @@ def main():
     with open("zips/SHA256SUMS.txt", encoding="utf-8") as f:
         sums = f.read().strip()
 
-    lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below."
-             % (sha[:7], REPO, sha), "",
-             parity_line(), ""] + ([os.environ["NOTE"], ""] if os.environ.get("NOTE") else []) + [
+    if os.environ.get("RELEASE") == "true":
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "changelog", tag + ".md"), encoding="utf-8") as f:
+            changelog = f.read().strip()
+        lines = ["Release %s, built from master at [`%s`](%s/commit/%s)." % (tag, sha[:7], REPO, sha), "",
+                 changelog, "", "## Checks", "", parity_line(), ""]
+    else:
+        lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below."
+                 % (sha[:7], REPO, sha), "",
+                 parity_line(), ""]
+    lines += ([os.environ["NOTE"], ""] if os.environ.get("NOTE") else []) + [
              "## Changes since %s (%d)" % (previous, len(commits)), ""]
     lines += shown or ["No commits."]
     if len(shown) < len(commits):
