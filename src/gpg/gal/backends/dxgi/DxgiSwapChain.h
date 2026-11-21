@@ -8,9 +8,17 @@
 // flags and the resize rules are the same for both.
 
 #include <cstdint>
+#include <functional>
 
 #include <dxgi1_6.h>
 #include <wrl/client.h>
+
+#include "DxgiSwapChainPolicy.h"
+
+namespace gpg::gal
+{
+  class Head;
+}
 
 namespace gpg::gal::dxgi
 {
@@ -39,6 +47,23 @@ namespace gpg::gal::dxgi
     bool allowFlipModel = true; // false forces BltDiscard
   };
 
+  /**
+   * The swap chain one head asks for. `Head::mWindowed` is a full-screen flag
+   * (the D3D10 backend writes DXGI's Windowed as its negation); a size of 0
+   * stands for the window's client area.
+   */
+  [[nodiscard]] SwapChainDesc DescribeHeadChain(const Head& head, std::uint32_t bufferCount, bool allowFlipModel);
+
+  /** True while the window is minimised (no client area to resize to). */
+  [[nodiscard]] bool IsWindowMinimized(HWND window) noexcept;
+
+  /** The result of one Present: the HRESULT and how the frame loop should read it. */
+  struct PresentResult
+  {
+    HRESULT result = S_OK;
+    PresentStatus status = PresentStatus::Presented;
+  };
+
   class SwapChain
   {
   public:
@@ -55,8 +80,43 @@ namespace gpg::gal::dxgi
      */
     HRESULT Create(const Factory& factory, IUnknown* device, const SwapChainDesc& desc);
 
-    /** Presents; `vsync` waits for one vertical blank. */
-    HRESULT Present(bool vsync);
+    /**
+     * Presents; `vsync` waits for one vertical blank. An occluded window
+     * (success code), a mode change in progress and a tearing flag the
+     * chain refuses are handled here; what is left (a lost device, a chain
+     * that keeps refusing) is for the caller, see `PresentStatus`.
+     */
+    PresentResult Present(bool vsync);
+
+    /**
+     * Brings the chain to `wanted` the way `PlanReset` says: nothing when
+     * only the vsync changed, ResizeBuffers for a windowed size change,
+     * a new chain for a window-mode change. A failed resize is retried once
+     * after `flushGpu` (the caller drains the GPU), then the chain is
+     * recreated; a failed full-screen chain falls back to a windowed one, and
+     * as the last resort the old chain is built again. Every reference to a
+     * back buffer must be released before the call. Returns the failing
+     * HRESULT only when no chain could be made.
+     */
+    HRESULT Reconfigure(
+      const Factory& factory,
+      IUnknown* device,
+      const SwapChainDesc& wanted,
+      bool force,
+      bool minimized,
+      const std::function<void()>& flushGpu,
+      ResetAction* outAction = nullptr
+    );
+
+    /** Where the chain stands (the requested window mode, not what DXGI granted). */
+    [[nodiscard]] ChainState State() const noexcept
+    {
+      return ChainState{mDesc.width, mDesc.height, mDesc.fullscreen, mDesc.fullscreen ? mDesc.refreshHz : 0U};
+    }
+    [[nodiscard]] bool TearingDisabled() const noexcept
+    {
+      return mTearingDisabled;
+    }
 
     /**
      * Resizes the buffers to `width` x `height`. Every reference to a back
@@ -112,6 +172,9 @@ namespace gpg::gal::dxgi
     SwapChainDesc mDesc{};
     SwapModel mModel = SwapModel::BltDiscard;
     bool mAllowTearing = false;
+    bool mTearingDisabled = false; // the driver refused a tearing present: not tried again
     UINT mFlags = 0U;
+    PresentStatus mLastPresent = PresentStatus::Presented;
+    std::uint32_t mSkippedPresents = 0U;
   };
 } // namespace gpg::gal::dxgi
