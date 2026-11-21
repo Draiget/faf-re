@@ -41,6 +41,7 @@ namespace moho
     int sim_FixShieldRepair = -1;
     int sim_FixProjectileMapEdgeCollision = -1;
     int sim_FixWaterBodies = -1;
+    int sim_FixWadingTargetLayer = -1;
 
     TConVar<int> gTConVar_sim_FixAimLeadOncePerTick(
       "sim_FixAimLeadOncePerTick",
@@ -82,6 +83,13 @@ namespace moho
       "has it yet, 0 off, 1 on). Every player of a game must use the same value.",
       &sim_FixWaterBodies
     );
+    TConVar<int> gTConVar_sim_FixWadingTargetLayer(
+      "sim_FixWadingTargetLayer",
+      "Engine addition (no FAF patch): a Land unit standing in water counts as Seabed for weapons that cannot target "
+      "Land, so torpedo bombers can attack a half-submerged experimental (-1 and 0 off, 1 on). Changes the sim "
+      "against the FAF exe: every client of a game and every replay of it must use the same value.",
+      &sim_FixWadingTargetLayer
+    );
 
     struct SFafSimFixInfo
     {
@@ -106,6 +114,7 @@ namespace moho
       {"sim_FixShieldRepair", 3840, &sim_FixShieldRepair},
       {"sim_FixProjectileMapEdgeCollision", 3841, &sim_FixProjectileMapEdgeCollision},
       {"sim_FixWaterBodies", kFafGameVersionUnreleased, &sim_FixWaterBodies},
+      {"sim_FixWadingTargetLayer", kFafGameVersionUnreleased, &sim_FixWadingTargetLayer},
     }};
 
     int sSessionGameVersion = kFafGameVersionLatest;
