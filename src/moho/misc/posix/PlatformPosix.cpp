@@ -2,8 +2,9 @@
 // moho/misc/WinPlatform.cpp for the Linux build, which leaves that file out (it is built on
 // dbghelp, message boxes and the crash-report attachment list).
 //
-// Call stacks come from backtrace(3) and are symbolised with dladdr(3); a message box is a
-// line on stderr; the error-report attachments are kept as on Windows but nothing sends them.
+// Call stacks come from platform/posix/Backtrace.h (backtrace(3); the unwinder on Android) and are
+// symbolised with dladdr(3); a message box is a line on stderr; the error-report attachments are
+// kept as on Windows but nothing sends them.
 
 #if !FAFRE_PLATFORM_WINDOWS
 
@@ -20,9 +21,9 @@
 
 #include <cxxabi.h>
 #include <dlfcn.h>
-#include <execinfo.h>
 
 #include "gpg/core/containers/String.h"
+#include "platform/posix/Backtrace.h"
 
 // Declared in WinApp.h; the client's TUs set them (none on Linux).
 moho::OkBoxPresenterHook moho::sOkBoxPresenter = nullptr;
@@ -86,7 +87,7 @@ std::uint32_t moho::PLAT_GetCallStack(
     return 0;
   }
   std::vector<void*> frames(maxFrames + 1u);
-  const int count = ::backtrace(frames.data(), static_cast<int>(frames.size()));
+  const int count = platform::posix::Backtrace(frames.data(), static_cast<int>(frames.size()));
   // Frame 0 is this function, as the Windows walk starts at its caller.
   std::uint32_t written = 0;
   for (int index = 1; index < count && written < maxFrames; ++index) {

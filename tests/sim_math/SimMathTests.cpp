@@ -615,6 +615,10 @@ namespace
     return "windows-x64";
 #elif FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X86
     return "windows-x86";
+#elif FAFRE_PLATFORM_ANDROID && FAFRE_ARCH_ARM64 // Android, which is Linux to the other macros
+    return "android-arm64";
+#elif FAFRE_PLATFORM_ANDROID && FAFRE_ARCH_X64
+    return "android-x64";
 #elif FAFRE_PLATFORM_LINUX && FAFRE_ARCH_X64 // the platform's own name, for its known_*.txt
     return "linux-x64";
 #elif FAFRE_PLATFORM_MACOS_ARM64             // the platform's own name, for its known_*.txt

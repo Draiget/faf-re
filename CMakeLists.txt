@@ -29,8 +29,9 @@ option(FAF_SYNTAX_ONLY "Check faf_engine's sources without generating code" OFF)
 
 # Engine addition (dedicated-server plan WPL.2): the Linux and macOS builds, chosen by their
 # toolchain files (cmake/toolchains/linux-clang-*.cmake, macos-clang-*.cmake, read by project())
-# and described in cmake/FafPosix.cmake. Nothing below this block runs for them.
-if(CMAKE_TOOLCHAIN_FILE MATCHES "/(linux|macos)-clang-[^/]*\\.cmake$")
+# and described in cmake/FafPosix.cmake. The Android toolchains (cmake/toolchains/android-*.cmake)
+# build the Linux project against bionic. Nothing below this block runs for them.
+if(CMAKE_TOOLCHAIN_FILE MATCHES "/((linux|macos)-clang|android)-[^/]*\\.cmake$")
   project(faf_engine LANGUAGES C CXX)
   include(cmake/FafPlatform.cmake)
   include(cmake/FafPosix.cmake)

@@ -15,6 +15,7 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
+#include "platform/posix/Backtrace.h"
 
 #include <algorithm>
 #include <array>
@@ -30,7 +31,6 @@
 #include <csignal>
 #include <print>
 #include <dlfcn.h>
-#include <execinfo.h>
 #include <fcntl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -104,7 +104,7 @@ namespace
   )
   {
     void* frames[kMaxFrames]{};
-    const int count = ::backtrace(frames, kMaxFrames);
+    const int count = platform::posix::Backtrace(frames, kMaxFrames);
     for (int index = skipFrames; index < count; ++index) {
       char line[1024]{};
       gpg::diag::DiagDescribeAddress(frames[index], line, sizeof(line));
@@ -169,8 +169,8 @@ namespace
     );
     (void)::write(2, line, static_cast<std::size_t>(length));
     void* frames[kMaxFrames];
-    const int count = ::backtrace(frames, kMaxFrames);
-    ::backtrace_symbols_fd(frames, count, 2);
+    const int count = platform::posix::Backtrace(frames, kMaxFrames);
+    platform::posix::BacktraceSymbolsFd(frames, count, 2);
     std::signal(signalNumber, SIG_DFL);
     (void)::raise(signalNumber);
   }
@@ -262,7 +262,7 @@ namespace gpg::diag
   {
     DiagLine("stack (%s):", tag != nullptr ? tag : "");
     void* frames[kMaxFrames]{};
-    const int count = ::backtrace(frames, kMaxFrames);
+    const int count = platform::posix::Backtrace(frames, kMaxFrames);
     for (int index = 1; index < count; ++index) {
       char line[1024]{};
       DiagDescribeAddress(frames[index], line, sizeof(line));

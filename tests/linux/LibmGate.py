@@ -10,11 +10,22 @@ faf_sim objects that calls one (nm -u, then objdump relocations) and fails on an
 calling sin/cos are allowed as a class: they are the Wm3 axis-angle constants of
 QuaternionMath.h, whose float results are millions of ulps from any rounding boundary (WPR.57).
 
-Usage: LibmGate.py <allowlist> <object>...
+Usage: LibmGate.py <allowlist> <object>|@<file with one object per line>...
+
+FAF_NM and FAF_OBJDUMP name the tools (default nm and objdump); the Android build passes the
+NDK's llvm-nm and llvm-objdump (cmake/FafPosix.cmake), which read its AArch64 objects. A tool
+named so must read every object it is given: its failure fails the gate. nm and objdump from
+PATH are not held to that: the PGO preset's objects are ThinLTO bitcode, which objdump cannot
+disassemble (it exits 1), so the gate reads no call from them.
 """
+import os
 import re
 import subprocess
 import sys
+
+NM = os.environ.get("FAF_NM") or "nm"
+OBJDUMP = os.environ.get("FAF_OBJDUMP") or "objdump"
+NAMED_TOOLS = {tool for tool in (os.environ.get("FAF_NM"), os.environ.get("FAF_OBJDUMP")) if tool}
 
 TRANSCENDENTALS = {
     "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "exp", "exp2", "expm1", "log", "log2",
@@ -27,8 +38,9 @@ TRANSCENDENTALS |= {"sincos", "sincosf", "sincosl", "__sincos", "__sincosf", "__
 
 
 def normalized(function):
-    """A demangled name with the demanglers' spacing differences removed ("> >" and ">>")."""
-    return re.sub(r"\s+(?=>)", "", function)
+    """A demangled name with the demanglers' spacing differences removed ("> >" and ">>"), and
+    libc++'s inline namespace as Linux and macOS spell it (std::__1; the NDK's is std::__ndk1)."""
+    return re.sub(r"\s+(?=>)", "", function).replace("std::__ndk1::", "std::__1::")
 
 
 def load_allowlist(path):
@@ -47,10 +59,18 @@ def is_mach_o(obj):
         return f.read(4) in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe")
 
 
+def output(command):
+    """The standard output of a tool run; the gate fails when a tool in NAMED_TOOLS fails."""
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0 and command[0] in NAMED_TOOLS:
+        sys.exit(f"libm gate: {' '.join(command)} exited with {result.returncode}: {result.stderr.strip()}")
+    return result.stdout
+
+
 def mach_o_names(obj):
     """{address: demangled name} of an object's defined symbols, without the assembler's ltmp labels."""
     names = {}
-    listing = subprocess.run(["nm", "-n", "--defined-only", "-C", obj], capture_output=True, text=True).stdout
+    listing = output([NM, "-n", "--defined-only", "-C", obj])
     for line in listing.splitlines():
         parts = line.split(" ", 2)
         if len(parts) == 3 and not parts[2].startswith("ltmp"):
@@ -61,12 +81,12 @@ def mach_o_names(obj):
 def calls(obj):
     """(symbol, demangled caller) for every transcendental this object calls."""
     mach_o = is_mach_o(obj)
-    undefined = subprocess.run(["nm", "-u", obj], capture_output=True, text=True).stdout.split()
+    undefined = output([NM, "-u", obj]).split()
     if mach_o:
         undefined = [name[1:] if name.startswith("_") else name for name in undefined]
     if not TRANSCENDENTALS.intersection(undefined):
         return set()
-    listing = subprocess.run(["objdump", "-dr", "--no-show-raw-insn", "-C", obj], capture_output=True, text=True).stdout
+    listing = output([OBJDUMP, "-dr", "--no-show-raw-insn", "-C", obj])
     names = mach_o_names(obj) if mach_o else {}
     found, function, section = set(), "?", ""
     for line in listing.splitlines():
@@ -90,16 +110,32 @@ def calls(obj):
             # ARM64: a call is BRANCH26; an address taken goes through the GOT.
             reloc = re.search(r"ARM64_RELOC_(?:BRANCH26|GOT_LOAD_PAGE21|GOT_LOAD_PAGEOFF12)\s+_(\w+)", line)
         else:
-            reloc = re.search(r"R_X86_64_(?:PLT32|PC32|GOTPCREL\w*)\s+(\w+)(?:-0x[0-9a-f]+)?$", line)
+            # ELF: x86-64's calls and GOT loads; AArch64's (Android) calls, tail calls and GOT loads.
+            reloc = re.search(
+                r"R_(?:X86_64_(?:PLT32|PC32|GOTPCREL\w*)|AARCH64_(?:CALL26|JUMP26|ADR_GOT_PAGE|LD64_GOT_LO12_NC))"
+                r"\s+(\w+)(?:[-+]0x[0-9a-f]+)?$",
+                line,
+            )
         if reloc and reloc.group(1) in TRANSCENDENTALS:
             found.add((reloc.group(1), normalized(function)))
     return found
 
 
+def objects(arguments):
+    """The object paths, with each @<file> argument replaced by the lines of that file."""
+    for argument in arguments:
+        if argument.startswith("@"):
+            with open(argument[1:], encoding="utf-8") as listing:
+                yield from (line.strip() for line in listing if line.strip())
+        else:
+            yield argument
+
+
 def main():
     allowed = load_allowlist(sys.argv[1])
     unexpected = []
-    for obj in sys.argv[2:]:
+    paths = list(objects(sys.argv[2:]))
+    for obj in paths:
         for symbol, function in sorted(calls(obj)):
             if function.startswith("_GLOBAL__sub_I_") and symbol in ("sin", "cos", "sincos", "__sincos_stret"):
                 continue
@@ -110,7 +146,7 @@ def main():
         for line in unexpected:
             print("  " + line)
         return 1
-    print(f"libm gate: {len(sys.argv) - 2} objects, no unreviewed transcendental call")
+    print(f"libm gate: {len(paths)} objects, no unreviewed transcendental call")
     return 0
 
 

@@ -186,11 +186,13 @@ namespace platform::posix
     const std::uint64_t mask
   ) noexcept
   {
+    // sched_*affinity on pid 0 is the calling thread's mask, as pthread_*affinity_np on
+    // pthread_self(), which bionic declares from API level 36 only (Android port).
     cpu_set_t previous;
     CPU_ZERO(&previous);
-    (void)::pthread_getaffinity_np(::pthread_self(), sizeof(previous), &previous);
+    (void)::sched_getaffinity(0, sizeof(previous), &previous);
     const cpu_set_t wanted = SetOf(mask);
-    if (::pthread_setaffinity_np(::pthread_self(), sizeof(wanted), &wanted) != 0) {
+    if (::sched_setaffinity(0, sizeof(wanted), &wanted) != 0) {
       return 0;
     }
     const std::uint64_t previousMask = MaskOf(previous);

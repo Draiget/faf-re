@@ -1,6 +1,6 @@
-// Engine addition (dedicated-server plan WPL.2): checks that the Linux and macOS toolchains
-// build code the way the engine's simulation needs, and prints the facts later work depends on
-// (data model, default floating-point environment).
+// Engine addition (dedicated-server plan WPL.2): checks that the Linux, macOS and Android
+// toolchains build code the way the engine's simulation needs, and prints the facts later work
+// depends on (data model, default floating-point environment).
 
 #include <gtest/gtest.h>
 
@@ -139,7 +139,7 @@ TEST(
 #endif
 }
 
-#if FAFRE_ARCH_ARM64
+#if FAFRE_PLATFORM_MACOS_ARM64
 // A new thread starts at FPCR 0 even when its creator runs with flush-to-zero (FPCR.FZ, bit 24)
 // and default NaN (bit 25): the kernel gives it the default, not the creator's value. The engine
 // relies on it instead of wrapping thread creation (platform/FpControl.h).
@@ -157,6 +157,27 @@ TEST(
   worker.join();
   platform::WriteFpcr(saved);
   EXPECT_EQ(seen, platform::kSimFpcr);
+}
+#elif FAFRE_ARCH_ARM64
+// Linux (Android) gives a new thread its creator's FPCR, as POSIX's pthread_create gives it the
+// creator's floating-point environment. The engine's threads start at 0 because the threads that
+// start them run at 0 (the main thread from platform/posix/FpEnvPosix.cpp), and every simulation
+// thread loads it again (platform/FpControl.h).
+TEST(
+  LinuxToolchain,
+  NewThreadInheritsFpcr
+)
+{
+  const std::uint64_t saved = platform::ReadFpcr();
+  const std::uint64_t creator = saved | (1ull << 24) | (1ull << 25);
+  platform::WriteFpcr(creator);
+  std::uint64_t seen = 0;
+  std::thread worker([&seen] {
+    seen = platform::ReadFpcr();
+  });
+  worker.join();
+  platform::WriteFpcr(saved);
+  EXPECT_EQ(seen, creator);
 }
 #endif
 
