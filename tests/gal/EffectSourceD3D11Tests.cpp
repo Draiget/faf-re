@@ -466,9 +466,9 @@ technique10 TBlurHorizontal { pass P0 { VertexShader = compile vs_4_0 FixedFuncB
   EXPECT_FALSE(HasNote(translated, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices"));
   EXPECT_TRUE(Contains(translated.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncVS(In);"));
   EXPECT_TRUE(Contains(translated.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncBloomVS(In);"));
-  EXPECT_TRUE(Contains(
-    translated.source, "faf_out.Pos.xy += float2(-2.0, 2.0) * frac(faf_ViewportSize.xy) * faf_ViewportSize.zw"
-  ));
+  EXPECT_TRUE(
+    Contains(translated.source, "faf_out.Pos.xy += float2(-2.0, 2.0) * frac(faf_ViewportSize.xy) * faf_ViewportSize.zw")
+  );
   const std::size_t declaration = translated.source.find("float4 faf_ViewportSize;");
   ASSERT_NE(declaration, std::string::npos);
   EXPECT_EQ(translated.source.find("float4 faf_ViewportSize;", declaration + 1U), std::string::npos)
