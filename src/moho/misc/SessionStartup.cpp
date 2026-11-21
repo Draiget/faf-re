@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
+#include <vector>
 
 #include <memory>
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -920,6 +921,8 @@ namespace moho
     CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
     IClient* const localClient = clientManager->GetLocalClient();
     const std::size_t clientCount = clientManager->NumberOfClients();
+    // Engine addition: wait timing per client, read once for the whole table.
+    const std::vector<NetworkWaitMetrics> waitMetrics = clientManager->GetNetworkWaitMetrics();
 
     for (std::size_t clientIndex = 0; clientIndex < clientCount; ++clientIndex) {
       auto* const client = static_cast<CClientBase*>(clientManager->GetClient(static_cast<int>(clientIndex)));
@@ -974,6 +977,66 @@ namespace moho
             }
           }
         }
+      }
+
+      // Engine addition: `fafReNetwork`, what this client's Connectivity screen can show
+      // beyond retail's ping and quiet time. Wait timing (`NetworkWaitTracker`), the
+      // beats this client has from the peer and each peer's acknowledged lead (the
+      // buffers DrawNetworkStats draws). Reads only; nothing is sent.
+      {
+        uint32_t dispatched = 0;
+        uint32_t available = 0;
+        std::vector<int32_t> acks;
+        {
+          // Copy under the manager lock and release it before any Lua allocation.
+          std::scoped_lock networkLock(clientManager->mLock);
+          client->GetLatestBeatDispatchedRemote(dispatched);
+          client->GetAvailableBeatRemote(available);
+          const fa::vector<int32_t>* const latestAcks = client->GetLatestAcksVector();
+          if (latestAcks != nullptr && dispatched != 0) {
+            for (std::size_t peer = 0; peer < clientCount && peer < latestAcks->size(); ++peer) {
+              acks.push_back((*latestAcks)[peer]);
+            }
+          }
+        }
+
+        LuaPlus::LuaObject network{};
+        network.AssignNewTable(state, 0, 0);
+        network.SetInteger("version", 1);
+        if (clientIndex < waitMetrics.size()) {
+          const NetworkWaitMetrics& waits = waitMetrics[clientIndex];
+          network.SetInteger("waitVersion", 1);
+          network.SetNumber("waitObservedSeconds", static_cast<float>(waits.observedSeconds));
+          network.SetNumber(
+            "waitPercent",
+            static_cast<float>(waits.observedSeconds > 0 ? waits.waitingMs / (waits.observedSeconds * 10.0) : 0.0)
+          );
+          network.SetNumber("longestWaitMs", static_cast<float>(waits.longestMs));
+          network.SetNumber("gameWaitSeconds", static_cast<float>(waits.gameSeconds));
+          network.SetNumber("gameWaitPercent", static_cast<float>(waits.gameWaitPercent));
+          network.SetNumber("gameWaitEpisodes", static_cast<float>(waits.gameWaitEpisodes));
+          network.SetNumber("gameAverageWaitMs", static_cast<float>(waits.gameAverageWaitMs));
+        }
+        network.SetNumber("dispatched", static_cast<float>(dispatched));
+        network.SetInteger("available", static_cast<int32_t>(available - dispatched));
+        if (static_cast<IClient*>(client) == localClient) {
+          fa::string bottleneck;
+          FormatBottleneckLabel(clientManager->GetBottleneckInfo(), bottleneck);
+          network.SetString("bottleneck", bottleneck.c_str());
+          network.SetInteger("actualRate", clientManager->GetSimRate());
+          network.SetInteger("requestedRate", clientManager->GetSimRateRequested());
+        }
+        LuaPlus::LuaObject buffers{};
+        buffers.AssignNewTable(state, 0, 0);
+        for (std::size_t peer = 0; peer < acks.size(); ++peer) {
+          if (acks[peer] >= 0) {
+            buffers.SetInteger(
+              static_cast<int>(peer + 1), static_cast<int32_t>(static_cast<uint32_t>(acks[peer]) - dispatched)
+            );
+          }
+        }
+        network.SetObject("buffers", buffers);
+        clientEntry.SetObject("fafReNetwork", network);
       }
 
       LuaPlus::LuaObject commandSources{};
