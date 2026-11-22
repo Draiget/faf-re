@@ -418,12 +418,83 @@ TEST(
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_TRUE(HasNote(translated, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices"));
   EXPECT_TRUE(HasNote(translated, "technique Bloom dropped: it uses the undefined D3D9 fixed-function FixedFuncPS"));
+  // The emulation already cancels the viewport's shift; moving it back again would put
+  // every emulated pass half a pixel up and left.
+  EXPECT_FALSE(HasNote(translated, "FixedFuncVS moved back by the viewport's D3D9 pixel-centre shift"));
+  EXPECT_FALSE(Contains(translated.source, "faf_D3D10CentredFixedFuncVS"));
   const EffectDescription description = ParseEffect(translated.source);
   EXPECT_EQ(description.FindTechnique("Bloom"), nullptr);
   EXPECT_NE(description.FindTechnique("Overlay"), nullptr);
   const Parameter* const viewport = description.FindParameter("faf_ViewportSize");
   ASSERT_NE(viewport, nullptr) << "the emulation reads the viewport the backend writes";
   EXPECT_EQ(viewport->columns, 4U);
+}
+
+TEST(
+  GalEffectSourceD3D11,
+  EffectFixedFunctionShadersCancelTheViewportShift
+)
+{
+  // frame.fx's own D3D10 versions: they add D3D10's half pixel themselves.
+  const char* const preprocessed = R"fx(
+float framewidth;
+float frameheight;
+texture FrameTexture1;
+sampler2D FrameSampler1 = sampler_state { Texture = (FrameTexture1); };
+struct VS_IN { float4 Pos : POSITION; float2 Tex1 : TEXCOORD0; };
+struct VS_OUT { float4 Pos : POSITION; float2 Tex1 : TEXCOORD0; float2 Tex2 : TEXCOORD1; };
+VS_OUT FixedFuncVS( VS_IN In )
+{
+    VS_OUT Out = (VS_OUT)0;
+    float2 position = ( In.Pos.xy + float2(0.5,0.5) ) / float2(framewidth,frameheight);
+    Out.Pos = float4(2 * position.x - 1, 1 - 2 * position.y, In.Pos.z, In.Pos.w);
+    Out.Tex1 = In.Tex1;
+    return Out;
+}
+VS_OUT FixedFuncBloomVS( VS_IN In )
+{
+    VS_OUT Out = (VS_OUT)0;
+    Out.Pos = float4(In.Pos.xy, In.Pos.z, In.Pos.w);
+    return Out;
+}
+float4 AddPS( float4 Pos : POSITION, float2 Tex1 : TEXCOORD0, float2 Tex2 : TEXCOORD1 ) : COLOR
+{
+    return tex2D(FrameSampler1, Tex1);
+}
+technique10 TFrameAdd { pass P0 { VertexShader = compile vs_4_0 FixedFuncVS(); PixelShader = compile ps_4_0 AddPS(); } }
+technique10 TBlurHorizontal { pass P0 { VertexShader = compile vs_4_0 FixedFuncBloomVS(); PixelShader = compile ps_4_0 AddPS(); } }
+)fx";
+  const TranslatedEffectSource translated = TranslateEffectSource(preprocessed, false, {});
+  EXPECT_TRUE(HasNote(translated, "FixedFuncVS moved back by the viewport's D3D9 pixel-centre shift"));
+  EXPECT_TRUE(HasNote(translated, "FixedFuncBloomVS moved back by the viewport's D3D9 pixel-centre shift"));
+  EXPECT_FALSE(HasNote(translated, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices"));
+  EXPECT_TRUE(Contains(translated.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncVS(In);"));
+  EXPECT_TRUE(Contains(translated.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncBloomVS(In);"));
+  EXPECT_TRUE(
+    Contains(translated.source, "faf_out.Pos.xy += float2(-2.0, 2.0) * frac(faf_ViewportSize.xy) * faf_ViewportSize.zw")
+  );
+  const std::size_t declaration = translated.source.find("float4 faf_ViewportSize;");
+  ASSERT_NE(declaration, std::string::npos);
+  EXPECT_EQ(translated.source.find("float4 faf_ViewportSize;", declaration + 1U), std::string::npos)
+    << "declared once for both functions";
+
+  const EffectDescription description = ParseEffect(translated.source);
+  EXPECT_EQ(OnlyPass(description, "TFrameAdd").vertexShader.function, "FixedFuncVS");
+  EXPECT_EQ(OnlyPass(description, "TBlurHorizontal").vertexShader.function, "FixedFuncBloomVS");
+  const Parameter* const viewport = description.FindParameter("faf_ViewportSize");
+  ASSERT_NE(viewport, nullptr) << "the wrappers read the viewport the backend writes";
+  EXPECT_EQ(viewport->columns, 4U);
+
+  // D3D12 and Vulkan translate for shader model 4.1, with either scan (ren_EffectFastScan).
+  const bool fast = gpg::gal::d3d11::gEffectFastScan;
+  for (const bool scan : {true, false}) {
+    gpg::gal::d3d11::gEffectFastScan = scan;
+    const TranslatedEffectSource modern = TranslateEffectSource(preprocessed, true, {});
+    EXPECT_TRUE(Contains(modern.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncVS(In);")) << scan;
+    EXPECT_TRUE(Contains(modern.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncBloomVS(In);")) << scan;
+    EXPECT_FALSE(HasNote(modern, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices")) << scan;
+  }
+  gpg::gal::d3d11::gEffectFastScan = fast;
 }
 
 TEST(
