@@ -418,6 +418,10 @@ TEST(
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_TRUE(HasNote(translated, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices"));
   EXPECT_TRUE(HasNote(translated, "technique Bloom dropped: it uses the undefined D3D9 fixed-function FixedFuncPS"));
+  // The emulation already cancels the viewport's shift; moving it back again would put
+  // every emulated pass half a pixel up and left.
+  EXPECT_FALSE(HasNote(translated, "FixedFuncVS moved back by the viewport's D3D9 pixel-centre shift"));
+  EXPECT_FALSE(Contains(translated.source, "faf_D3D10CentredFixedFuncVS"));
   const EffectDescription description = ParseEffect(translated.source);
   EXPECT_EQ(description.FindTechnique("Bloom"), nullptr);
   EXPECT_NE(description.FindTechnique("Overlay"), nullptr);

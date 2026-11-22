@@ -1179,6 +1179,11 @@ namespace gpg::gal::d3d11
       void CancelViewportShiftInEffectFixedFunction()
       {
         for (const char* const function : {"FixedFuncVS", "FixedFuncBloomVS"}) {
+          // The emulation (DropUndefinedFixedFunctionTechniques) already maps into the
+          // shifted viewport (cartographic.fx's Terrain_Stage1 uses it).
+          if (mEmulatedFixedFuncVS && std::string_view(function) == "FixedFuncVS") {
+            continue;
+          }
           const auto found = mFunctions.find(function);
           if (found == mFunctions.end()) {
             continue;
@@ -1279,6 +1284,7 @@ namespace gpg::gal::d3d11
               "}\n"
             );
             mNotes.push_back("D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices");
+            mEmulatedFixedFuncVS = true;
             continue;
           }
           static const std::regex techniqueHead(R"(\btechnique1[01]\s+(\w+)\s*(<(?:[^>"]|"[^"]*")*>)?\s*\{)");
@@ -2099,6 +2105,7 @@ namespace gpg::gal::d3d11
       std::map<std::string, std::string> mAlphaTestWrappers; // pixel shader | function | reference -> wrapper
       std::size_t mAlphaTestedPasses = 0U;
       bool mShaderModel41 = false;
+      bool mEmulatedFixedFuncVS = false; // FixedFuncVS is the translator's emulation, not the effect's
     };
   } // namespace
 
