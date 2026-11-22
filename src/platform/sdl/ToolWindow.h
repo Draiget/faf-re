@@ -33,6 +33,13 @@ namespace platform::tools
       return mShown;
     }
     void Raise();
+    // Makes the window owned by `owner` (a platform::window::Handle; null for none), as the retail
+    // window library made a dialog without a parent owned by the app's top window: it stays above
+    // its owner and has no taskbar or Alt+Tab entry of its own.
+    void SetOwner(void* owner);
+    // Takes the minimize and maximize buttons off the frame, leaving the close button, as on a
+    // dialog of the retail window library made without wxMINIMIZE_BOX and wxMAXIMIZE_BOX.
+    void SetDialogFrame();
     void SetTitle(const char* utf8Title);
     // False when the window couldn't be made (no window system, no renderer).
     [[nodiscard]] bool IsValid() const

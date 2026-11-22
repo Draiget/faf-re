@@ -187,6 +187,27 @@ namespace platform::tools
     }
   }
 
+  void ToolWindow::SetOwner(
+    void* const owner
+  )
+  {
+    if (mWindow == nullptr) {
+      return;
+    }
+    // SDL makes it the owner of a top-level window (GWLP_HWNDPARENT on Windows, transient-for
+    // elsewhere). platform::window::Destroy lets go of the owned windows before the owner goes.
+    if (!SDL_SetWindowParent(mWindow, static_cast<SDL_Window*>(owner))) {
+      gpg::Warnf("Tool window \"%s\": no owner: %s", SDL_GetWindowTitle(mWindow), SDL_GetError());
+    }
+  }
+
+  void ToolWindow::SetDialogFrame()
+  {
+    if (mWindow != nullptr) {
+      platform::window::sdl::SetDialogFrame(mWindow);
+    }
+  }
+
   void ToolWindow::SetTitle(
     const char* const utf8Title
   )

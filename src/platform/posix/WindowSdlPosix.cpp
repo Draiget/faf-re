@@ -417,6 +417,15 @@ namespace platform::window::sdl
     (void)clip;
   }
 
+  void SetDialogFrame(
+    SDL_Window* const window
+  )
+  {
+    // The window manager draws the frame; a transient-for window (ToolWindow::SetOwner) is
+    // usually given a dialog's frame already.
+    (void)window;
+  }
+
   bool SetChildBounds(
     SDL_Window* const window,
     const int x,
