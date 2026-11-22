@@ -134,7 +134,13 @@ namespace moho
     mCurThread = nullptr;
     mRules = static_cast<RRuleGameRulesImpl*>(rulesOwner.release());
     mWldMap = wldMap.release();
-    mLaunchInfo = sessionInfo.mLaunchInfo;
+    // 0x008931B4/0x008931B7: the session's own launch-info owner (+0x20) starts
+    // empty; the constructor reads the launch info from `sessionInfo` (`[edi+1Ch]`).
+    // Only a single-player, non-replay load gives the session one afterwards
+    // (`WLD_DoLoading`), and `RestartSession`, `SessionCanRestart` and saving test
+    // it. Copying it here let a replay or a multiplayer game restart; a replay
+    // has no local command source, so the restart read past the command sources.
+    const std::shared_ptr<LaunchInfoBase>& sessionLaunchInfo = sessionInfo.mLaunchInfo;
 
     mMapName = sessionInfo.mMapName;
 
@@ -196,10 +202,10 @@ namespace moho
     // Engine addition (issues #216, #218): the desync dump's header names the map, the game mods
     // and the session kind; telemetry is sent for live multiplayer games only.
     CDesyncRecorder::SetSessionInfo(
-      mMapName.c_str(), mLaunchInfo.get() != nullptr ? mLaunchInfo->mGameMods.c_str() : "", IsReplay, IsMultiplayer
+      mMapName.c_str(), sessionLaunchInfo != nullptr ? sessionLaunchInfo->mGameMods.c_str() : "", IsReplay, IsMultiplayer
     );
 
-    if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
+    if (const LaunchInfoBase* const launchInfo = sessionLaunchInfo.get(); launchInfo != nullptr) {
       // One null army slot per launch-info army (0x008932A7): the run has to
       // exist before the first beat, because `DoBeat` addresses it by army
       // index (`userArmies[army->mArmyIndex] = army`) rather than appending,
@@ -302,7 +308,7 @@ namespace moho
     // default-constructed gives it a null owning state, so every
     // `SessionGetScenarioInfo` call from the in-game UI throws inside
     // `LuaObject::PushStack` before it can even compare global states.
-    if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
+    if (const LaunchInfoBase* const launchInfo = sessionLaunchInfo.get(); launchInfo != nullptr) {
       LuaPlus::LuaObject parsedScenario;
       (void)SCR_FromString(&parsedScenario, launchInfo->mScenarioInfo, mState);
       mScenarioInfo = parsedScenario;
