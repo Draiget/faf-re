@@ -202,7 +202,10 @@ namespace moho
     // Engine addition (issues #216, #218): the desync dump's header names the map, the game mods
     // and the session kind; telemetry is sent for live multiplayer games only.
     CDesyncRecorder::SetSessionInfo(
-      mMapName.c_str(), sessionLaunchInfo != nullptr ? sessionLaunchInfo->mGameMods.c_str() : "", IsReplay, IsMultiplayer
+      mMapName.c_str(),
+      sessionLaunchInfo != nullptr ? sessionLaunchInfo->mGameMods.c_str() : "",
+      IsReplay,
+      IsMultiplayer
     );
 
     if (const LaunchInfoBase* const launchInfo = sessionLaunchInfo.get(); launchInfo != nullptr) {
