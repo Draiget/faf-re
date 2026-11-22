@@ -285,7 +285,7 @@ namespace
 
     if (args.size() < 2) {
       *value = !*value;
-      gpg::Logf("toggled %s is now %s", name ? name : "", *value ? "on" : "off");
+      CON_Printf("toggled %s is now %s", name ? name : "", *value ? "on" : "off");
       return;
     }
 
@@ -305,7 +305,7 @@ namespace
       return;
     }
     if (TokenEqNoCase(op, "show")) {
-      gpg::Logf("bool %s is %s", name ? name : "", *value ? "on" : "off");
+      CON_Printf("bool %s is %s", name ? name : "", *value ? "on" : "off");
       return;
     }
     if (TokenEqNoCase(op, "tog")) {
@@ -433,7 +433,7 @@ namespace
       return;
     }
 
-    gpg::Logf("string %s == %s", name ? name : "", value->c_str());
+    CON_Printf("string %s == %s", name ? name : "", value->c_str());
   }
 
   struct ConsoleCommandNameLess
@@ -1664,7 +1664,7 @@ void moho::TConVar<int>::Handle(
   if (args.size() >= 2) {
     HandleIntConVarCommand(args, value);
   } else {
-    gpg::Logf("int %s == %d", mName ? mName : "", *value);
+    CON_Printf("int %s == %d", mName ? mName : "", *value);
   }
 }
 
@@ -1688,7 +1688,7 @@ void moho::TConVar<std::uint8_t>::Handle(
   if (args.size() >= 2) {
     HandleUInt8ConVarCommand(args, value);
   } else {
-    gpg::Logf("uint8 %s == %d", mName ? mName : "", static_cast<int>(*value));
+    CON_Printf("uint8 %s == %d", mName ? mName : "", static_cast<int>(*value));
   }
 }
 
@@ -1712,7 +1712,7 @@ void moho::TConVar<float>::Handle(
   if (args.size() >= 2) {
     HandleFloatConVarCommand(args, value);
   } else {
-    gpg::Logf("float %s == %.4f", mName ? mName : "", *value);
+    CON_Printf("float %s == %.4f", mName ? mName : "", *value);
   }
 }
 

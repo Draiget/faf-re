@@ -5,6 +5,8 @@
 
 #include "legacy/exceptions/StdExcept.h"
 #include "moho/console/CConCommand.h"
+#include "moho/core/Thread.h"
+#include "moho/misc/IConOutputHandler.h"
 
 #include "gpg/core/utils/Logging.h"
 
@@ -74,6 +76,36 @@ namespace
         }
       }
       return false;
+    }
+
+    std::vector<std::string> mLines;
+  };
+
+  /** Keeps every console line, to read what a variable printed (CON_Printf, as the binary). */
+  class ConsoleLines final : public moho::IConOutputHandler
+  {
+  public:
+    ConsoleLines()
+    {
+      // CON_Printf prints in place only on the thread THREAD_InitInvoke recorded; the test runs there.
+      moho::THREAD_InitInvoke();
+      ListLinkBefore(&moho::CON_GetOutputHandlers());
+    }
+
+    void Handle(
+      const char* const text
+    ) override
+    {
+      mLines.emplace_back(text != nullptr ? text : "");
+    }
+
+    bool Has(
+      const std::string& text
+    ) const
+    {
+      return std::ranges::any_of(mLines, [&text](const std::string& line) {
+        return line.contains(text);
+      });
     }
 
     std::vector<std::string> mLines;
@@ -249,13 +281,15 @@ TEST_F(
   BoolVariableTogglesShowsAndParses
 )
 {
+  ConsoleLines console;
   LogLines log;
   moho::con_TestVarBool = false;
   moho::CON_Execute("con_TestVarBool");
   EXPECT_TRUE(moho::con_TestVarBool) << "no argument toggles";
-  EXPECT_TRUE(log.Has("toggled con_TestVarBool is now on"));
+  EXPECT_TRUE(console.Has("toggled con_TestVarBool is now on"));
   moho::CON_Execute("con_TestVarBool show");
-  EXPECT_TRUE(log.Has("bool con_TestVarBool is on"));
+  EXPECT_TRUE(console.Has("bool con_TestVarBool is on"));
+  EXPECT_FALSE(log.Has("con_TestVarBool is")) << "the binary prints these to the console only";
 
   moho::CON_Execute("con_TestVarBool = 0");
   EXPECT_FALSE(moho::con_TestVarBool);
@@ -276,13 +310,39 @@ TEST_F(
   StringVariableAssignsAndPrints
 )
 {
+  ConsoleLines console;
   LogLines log;
   moho::CON_Execute("con_TestVarStr hello");
   EXPECT_STREQ(moho::con_TestVarStr.c_str(), "hello");
   moho::CON_Execute("con_TestVarStr = \"two words\"");
   EXPECT_STREQ(moho::con_TestVarStr.c_str(), "two words");
   moho::CON_Execute("con_TestVarStr");
-  EXPECT_TRUE(log.Has("string con_TestVarStr == two words"));
+  EXPECT_TRUE(console.Has("string con_TestVarStr == two words"));
+  EXPECT_FALSE(log.Has("string con_TestVarStr ==")) << "the binary prints this to the console only";
+}
+
+TEST_F(
+  Console,
+  NumberVariablesPrintTheirValueToTheConsole
+)
+{
+  ConsoleLines console;
+  LogLines log;
+  moho::CON_Execute("con_TestVar 42");
+  moho::CON_Execute("con_TestVar");
+  EXPECT_TRUE(console.Has("int con_TestVar == 42"));
+  moho::CON_Execute("con_TestVarUByte 7");
+  moho::CON_Execute("con_TestVarUByte");
+  EXPECT_TRUE(console.Has("uint8 con_TestVarUByte == 7"));
+  moho::CON_Execute("con_TestVarFloat 0.5");
+  moho::CON_Execute("con_TestVarFloat");
+  EXPECT_TRUE(console.Has("float con_TestVarFloat == 0.5000"));
+  moho::CON_Execute("test_ConsoleU32 26");
+  moho::CON_Execute("test_ConsoleU32");
+  EXPECT_TRUE(console.Has("uint32 test_ConsoleU32 == 26 (1a)"));
+  for (const std::string& line : log.mLines) {
+    EXPECT_FALSE(line.contains(" == ")) << "the binary prints these to the console only: " << line;
+  }
 }
 
 TEST_F(
