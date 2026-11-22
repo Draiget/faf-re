@@ -581,3 +581,69 @@ TEST(
   std::error_code ignored;
   std::filesystem::remove_all(folder, ignored);
 }
+
+// The effect translator wraps an effect's own FixedFuncVS and FixedFuncBloomVS (frame.fx, terrain.fx) to take
+// the viewport's D3D9 pixel-centre shift back off; the wrappers compile for both targets, and the translator's
+// own FixedFuncVS emulation (cartographic.fx) compiles unwrapped beside them.
+TEST(
+  GalShaderCompiler,
+  FixedFunctionViewportShiftWrappersCompileForBothTargets
+)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  const char* const frame = R"fx(
+float framewidth;
+float frameheight;
+texture FrameTexture1;
+sampler2D FrameSampler1 = sampler_state { Texture = (FrameTexture1); };
+struct VS_IN { float4 Pos : POSITION; float2 Tex1 : TEXCOORD0; };
+struct VS_OUT { float4 Pos : POSITION; float2 Tex1 : TEXCOORD0; float2 Tex2 : TEXCOORD1; };
+VS_OUT FixedFuncVS( VS_IN In )
+{
+    VS_OUT Out = (VS_OUT)0;
+    float2 position = ( In.Pos.xy + float2(0.5,0.5) ) / float2(framewidth,frameheight);
+    Out.Pos = float4(2 * position.x - 1, 1 - 2 * position.y, In.Pos.z, In.Pos.w);
+    Out.Tex1 = In.Tex1;
+    return Out;
+}
+VS_OUT FixedFuncBloomVS( VS_IN In )
+{
+    VS_OUT Out = (VS_OUT)0;
+    Out.Pos = float4(In.Pos.xy, In.Pos.z, In.Pos.w);
+    Out.Tex1 = In.Tex1;
+    return Out;
+}
+float4 AddPS( float4 Pos : POSITION, float2 Tex1 : TEXCOORD0, float2 Tex2 : TEXCOORD1 ) : COLOR
+{
+    return tex2D(FrameSampler1, Tex1);
+}
+technique10 TFrameAdd { pass P0 { VertexShader = compile vs_4_0 FixedFuncVS(); PixelShader = compile ps_4_0 AddPS(); } }
+technique10 TBlurHorizontal { pass P0 { VertexShader = compile vs_4_0 FixedFuncBloomVS(); PixelShader = compile ps_4_0 AddPS(); } }
+)fx";
+  const char* const cartographic = R"fx(
+texture StageTexture;
+sampler2D StageSampler = sampler_state { Texture = (StageTexture); };
+float4 StagePS( float4 Pos : POSITION, float2 Tex : TEXCOORD0 ) : COLOR
+{
+    return tex2D(StageSampler, Tex);
+}
+technique10 Terrain_Stage1 { pass P0 { VertexShader = compile vs_4_0 FixedFuncVS(); PixelShader = compile ps_4_0 StagePS(); } }
+)fx";
+  for (const char* const preprocessed : {frame, cartographic}) {
+    const gpg::gal::d3d11::TranslatedEffectSource translated =
+      gpg::gal::d3d11::TranslateEffectSource(preprocessed, true, {});
+    EXPECT_EQ(translated.source.find("faf_D3D10CentredFixedFuncVS") != std::string::npos, preprocessed == frame)
+      << translated.source;
+    const Generated generated = Generate(translated.source);
+    ASSERT_FALSE(generated.modern.entries.empty());
+    for (const ShaderEntry& entry : generated.modern.entries) {
+      const CompiledShader dxil = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Dxil);
+      EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+      const CompiledShader spirv = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Spirv);
+      EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+    }
+  }
+}

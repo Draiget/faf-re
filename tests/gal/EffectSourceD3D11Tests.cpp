@@ -484,6 +484,17 @@ technique10 TBlurHorizontal { pass P0 { VertexShader = compile vs_4_0 FixedFuncB
   const Parameter* const viewport = description.FindParameter("faf_ViewportSize");
   ASSERT_NE(viewport, nullptr) << "the wrappers read the viewport the backend writes";
   EXPECT_EQ(viewport->columns, 4U);
+
+  // D3D12 and Vulkan translate for shader model 4.1, with either scan (ren_EffectFastScan).
+  const bool fast = gpg::gal::d3d11::gEffectFastScan;
+  for (const bool scan : {true, false}) {
+    gpg::gal::d3d11::gEffectFastScan = scan;
+    const TranslatedEffectSource modern = TranslateEffectSource(preprocessed, true, {});
+    EXPECT_TRUE(Contains(modern.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncVS(In);")) << scan;
+    EXPECT_TRUE(Contains(modern.source, "VS_OUT faf_out = faf_D3D10CentredFixedFuncBloomVS(In);")) << scan;
+    EXPECT_FALSE(HasNote(modern, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices")) << scan;
+  }
+  gpg::gal::d3d11::gEffectFastScan = fast;
 }
 
 TEST(
