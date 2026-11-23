@@ -788,7 +788,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         headIndex,
         desc.width,
         desc.height,
-        desc.fullscreen ? "full screen" : "windowed",
+        swapChain->ModeName(),
         dxgi::SwapModelName(swapChain->Model()),
         swapChain->BufferCount(),
         swapChain->AllowsTearing() ? ", tearing allowed" : ""
@@ -2938,7 +2938,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
           (action == dxgi::ResetAction::Recreate) ? "recreated" : "resized",
           state.width,
           state.height,
-          state.fullscreen ? "full screen" : "windowed"
+          mSwapChains[headIndex]->ModeName()
         );
       }
     }

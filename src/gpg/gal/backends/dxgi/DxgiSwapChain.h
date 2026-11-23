@@ -113,6 +113,11 @@ namespace gpg::gal::dxgi
     {
       return ChainState{mDesc.width, mDesc.height, mDesc.fullscreen, mDesc.fullscreen ? mDesc.refreshHz : 0U};
     }
+    /** "full screen", "windowed", or "windowed (full screen refused)" for a log line. */
+    [[nodiscard]] const char* ModeName() const noexcept
+    {
+      return mExclusive ? "full screen" : (mDesc.fullscreen ? "windowed (full screen refused)" : "windowed");
+    }
     [[nodiscard]] bool TearingDisabled() const noexcept
     {
       return mTearingDisabled;
@@ -173,6 +178,7 @@ namespace gpg::gal::dxgi
     SwapModel mModel = SwapModel::BltDiscard;
     bool mAllowTearing = false;
     bool mTearingDisabled = false; // the driver refused a tearing present: not tried again
+    bool mExclusive = false;       // DXGI granted exclusive full screen
     UINT mFlags = 0U;
     PresentStatus mLastPresent = PresentStatus::Presented;
     std::uint32_t mSkippedPresents = 0U;

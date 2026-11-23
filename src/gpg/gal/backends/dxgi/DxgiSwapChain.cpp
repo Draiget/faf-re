@@ -1,7 +1,5 @@
 #include "DxgiSwapChain.h"
 
-#include <cstdlib>
-
 #include <algorithm>
 
 #include "DxgiFactory.h"
@@ -173,10 +171,24 @@ namespace gpg::gal::dxgi
     // The engine handles Alt+Enter itself (and D3D9 never saw it).
     static_cast<void>(factory.Get()->MakeWindowAssociation(desc.window, DXGI_MWA_NO_ALT_ENTER));
 
+    mExclusive = false;
     if (desc.fullscreen) {
       // Failing to go exclusive (another app holds the output, a remote
-      // session) leaves a working windowed swap chain.
-      static_cast<void>(mSwapChain->SetFullscreenState(TRUE, nullptr));
+      // session, DXGI refusing a chain whose window is a child) leaves a
+      // working windowed swap chain. What DXGI says is read back and logged
+      // once, so that the log never calls a windowed chain full screen.
+      const HRESULT requested = mSwapChain->SetFullscreenState(TRUE, nullptr);
+      BOOL granted = FALSE;
+      static_cast<void>(mSwapChain->GetFullscreenState(&granted, nullptr));
+      mExclusive = granted != FALSE;
+      static bool logged = false;
+      if (!mExclusive && !logged) {
+        logged = true;
+        gpg::Warnf(
+          "DXGI: SetFullscreenState(TRUE) returned 0x%08lX; the swap chain stays windowed (logged once)",
+          static_cast<unsigned long>(requested)
+        );
+      }
     }
 
     return S_OK;
@@ -364,6 +376,7 @@ namespace gpg::gal::dxgi
       }
     }
     mSwapChain.Reset();
+    mExclusive = false;
     mModel = SwapModel::BltDiscard;
     mAllowTearing = false;
     mTearingDisabled = false;

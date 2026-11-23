@@ -509,7 +509,7 @@ namespace gpg::gal
         headIndex,
         desc.width,
         desc.height,
-        desc.fullscreen ? "full screen" : "windowed",
+        swapChain->ModeName(),
         dxgi::SwapModelName(swapChain->Model()),
         swapChain->AllowsTearing() ? ", tearing allowed" : ""
       );
@@ -1902,7 +1902,7 @@ namespace gpg::gal
           (action == dxgi::ResetAction::Recreate) ? "recreated" : "resized",
           state.width,
           state.height,
-          state.fullscreen ? "full screen" : "windowed"
+          mSwapChains[headIndex]->ModeName()
         );
       }
     }
