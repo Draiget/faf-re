@@ -434,6 +434,63 @@ HMONITOR MonitorFromPoint(
   return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(1uz) : nullptr;
 }
 
+HMONITOR MonitorFromWindow(
+  const HWND window,
+  const DWORD flags
+)
+{
+  Monitors& monitors = AllMonitors();
+  const std::lock_guard<std::mutex> lock(monitors.mutex);
+  if (monitors.rects.empty()) {
+    return nullptr;
+  }
+  if (window != nullptr) {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> stateLock(state.mutex);
+    const auto it = state.windowRects.find(window);
+    if (it != state.windowRects.end()) {
+      const RECT& wr = it->second;
+      std::size_t bestMonitor = 0;
+      long long maxIntersection = 0;
+      for (std::size_t index = 0; index < monitors.rects.size(); ++index) {
+        const RECT& mr = monitors.rects[index];
+        const long left = (std::max)(wr.left, mr.left);
+        const long right = (std::min)(wr.right, mr.right);
+        const long top = (std::max)(wr.top, mr.top);
+        const long bottom = (std::min)(wr.bottom, mr.bottom);
+        if (right > left && bottom > top) {
+          const long long area = static_cast<long long>(right - left) * (bottom - top);
+          if (area > maxIntersection) {
+            maxIntersection = area;
+            bestMonitor = index;
+          }
+        }
+      }
+      if (maxIntersection > 0) {
+        return reinterpret_cast<HMONITOR>(bestMonitor + 1);
+      }
+      const POINT center{wr.left + (wr.right - wr.left) / 2, wr.top + (wr.bottom - wr.top) / 2};
+      std::size_t nearest = 0;
+      long long nearestDistance = -1;
+      for (std::size_t index = 0; index < monitors.rects.size(); ++index) {
+        const long long dist = DistanceSquared(center, monitors.rects[index]);
+        if (nearestDistance < 0 || dist < nearestDistance) {
+          nearest = index;
+          nearestDistance = dist;
+        }
+      }
+      if (flags == MONITOR_DEFAULTTONEAREST) {
+        return reinterpret_cast<HMONITOR>(nearest + 1);
+      }
+      return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(1uz) : nullptr;
+    }
+  }
+  if (flags == MONITOR_DEFAULTTONEAREST || flags == MONITOR_DEFAULTTOPRIMARY) {
+    return reinterpret_cast<HMONITOR>(1uz);
+  }
+  return nullptr;
+}
+
 BOOL GetMonitorInfoW(
   const HMONITOR monitor,
   MONITORINFO* const info

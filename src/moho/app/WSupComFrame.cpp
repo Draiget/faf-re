@@ -248,7 +248,7 @@ void WSupComFrame::OnMove(
 )
 {
   (void)event;
-  if (moho::sDeviceLock || IsIconized()) {
+  if (moho::sDeviceLock || IsIconized() || !DeviceFollowsFrame()) {
     return;
   }
 

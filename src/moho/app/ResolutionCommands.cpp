@@ -2,6 +2,8 @@
 
 #include <Windows.h>
 
+#include <algorithm>
+#include <climits>
 #include <cstdint>
 #include <cstdlib>
 
@@ -15,6 +17,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/WRenViewport.h"
+#include "platform/shell/gdicmn.h"
 #include "platform/shell/toplevel.h"
 
 namespace
@@ -94,11 +97,20 @@ namespace
 
   constexpr const char* kPreviousWidthPrefKey = "Windows.Main.Previous.width";
   constexpr const char* kPreviousHeightPrefKey = "Windows.Main.Previous.height";
+  constexpr const char* kSupComFrameXPreferenceKey = "Windows.Main.x";
+  constexpr const char* kSupComFrameYPreferenceKey = "Windows.Main.y";
+  constexpr const char* kSupComFrameWidthPreferenceKey = "Windows.Main.width";
+  constexpr const char* kSupComFrameHeightPreferenceKey = "Windows.Main.height";
   constexpr const char* kLockFullscreenCursorOptionKey = "lock_fullscreen_cursor_to_window";
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x008D34D0 (FUN_008D34D0, sub_8D34D0)
+   *
+   * Handles the `primary_adapter` console command (display resolution / fullscreen / windowed mode switch).
+   */
   void SC_PrimaryAdapter(
     const fa::vector<fa::string>& args
   )
@@ -159,23 +171,67 @@ namespace moho
         head.mWidth = static_cast<std::uint32_t>(parsedResolution.width);
         head.mHeight = static_cast<std::uint32_t>(parsedResolution.height);
         head.framesPerSecond = static_cast<std::uint32_t>(parsedResolution.framesPerSecond);
+
+        // Engine addition: position fullscreen window on the monitor containing the window.
+        int monitorX = 0;
+        int monitorY = 0;
+        const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(mainWindow->GetHandle()));
+        if (windowHandle != nullptr) {
+          const HMONITOR monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
+          MONITORINFO monitorInfo{};
+          monitorInfo.cbSize = sizeof(monitorInfo);
+          if (monitor != nullptr && ::GetMonitorInfoW(monitor, &monitorInfo) != FALSE) {
+            monitorX = static_cast<int>(monitorInfo.rcMonitor.left);
+            monitorY = static_cast<int>(monitorInfo.rcMonitor.top);
+          }
+        }
+        mainWindow->SetSize(monitorX, monitorY, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+        if (windowHandle != nullptr) {
+          ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+        }
       } else {
         mainWindow->SetWindowStyleFlag(kBorderedAdapterStyle);
 
         IUserPrefs* const preferences = USER_GetPreferences();
-        head.mWidth = static_cast<std::uint32_t>(
-          preferences->GetInteger(fa::string(kPreviousWidthPrefKey), static_cast<std::int32_t>(wnd_DefaultCreateWidth))
-        );
-        head.mHeight = static_cast<std::uint32_t>(preferences->GetInteger(
-          fa::string(kPreviousHeightPrefKey), static_cast<std::int32_t>(wnd_DefaultCreateHeight)
-        ));
+        const std::int32_t defaultWidth = static_cast<std::int32_t>(wnd_DefaultCreateWidth);
+        const std::int32_t defaultHeight = static_cast<std::int32_t>(wnd_DefaultCreateHeight);
+        std::int32_t savedWidth = defaultWidth;
+        std::int32_t savedHeight = defaultHeight;
+        if (preferences != nullptr) {
+          savedWidth = preferences->GetInteger(
+            fa::string(kPreviousWidthPrefKey),
+            preferences->GetInteger(fa::string(kSupComFrameWidthPreferenceKey), defaultWidth)
+          );
+          savedHeight = preferences->GetInteger(
+            fa::string(kPreviousHeightPrefKey),
+            preferences->GetInteger(fa::string(kSupComFrameHeightPreferenceKey), defaultHeight)
+          );
+        }
+        head.mWidth = static_cast<std::uint32_t>(savedWidth);
+        head.mHeight = static_cast<std::uint32_t>(savedHeight);
         head.framesPerSecond = 0;
 
+        // Engine addition: restore and clamp window position when returning to windowed mode.
+        int posX = INT_MIN;
+        int posY = INT_MIN;
+        if (preferences != nullptr) {
+          posX = preferences->GetInteger(fa::string(kSupComFrameXPreferenceKey), INT_MIN);
+          posY = preferences->GetInteger(fa::string(kSupComFrameYPreferenceKey), INT_MIN);
+        }
+
         const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(mainWindow->GetHandle()));
-        ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        if (posX != INT_MIN && posY != INT_MIN) {
+          ShellPoint pos(posX, posY);
+          moho::ClampPositionToMonitor(&pos, head.mWidth, head.mHeight);
+          mainWindow->SetSize(pos.x, pos.y, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+        } else {
+          mainWindow->SetClientSize(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+        }
+        if (windowHandle != nullptr) {
+          ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+        }
       }
 
-      mainWindow->SetClientSize(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
       mainWindow->Refresh(true, nullptr);
       ren_Viewport->SetSize(
         -1, -1, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight), SHELL_SIZE_USE_EXISTING
