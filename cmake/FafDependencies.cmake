@@ -524,6 +524,8 @@ faf_dependency_patches(libjuice download
   libjuice_1_7_4_faf_turn_release.patch)
 faf_dependency_patches(libdatachannel download
   libdatachannel_0_24_6_faf_algorithm_include.patch)
+faf_dependency_patches(SDL3 download
+  sdl3_3_4_18_faf_clipboard_window.patch)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_patches(freetype download
     freetype_2_15_0_faf_oom.patch)

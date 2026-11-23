@@ -1,0 +1,20 @@
+diff -ruN a/src/video/windows/SDL_windowsclipboard.c b/src/video/windows/SDL_windowsclipboard.c
+--- a/src/video/windows/SDL_windowsclipboard.c
++++ b/src/video/windows/SDL_windowsclipboard.c
+@@ -50,8 +50,14 @@
+     int attempt;
+     HWND hwnd = NULL;
+ 
+-    if (_this->windows) {
+-        hwnd = _this->windows->internal->hwnd;
++    // faf-re: SDL_CreateWindow puts a window at the head of the list before its
++    // Windows data exists, and a focus change in another window while CreateWindowEx runs
++    // checks the clipboard from here. Take the first window that has its data.
++    for (SDL_Window *window = _this->windows; window; window = window->next) {
++        if (window->internal) {
++            hwnd = window->internal->hwnd;
++            break;
++        }
+     }
+     for (attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+         if (OpenClipboard(hwnd)) {
