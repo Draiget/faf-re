@@ -803,6 +803,12 @@ namespace moho
       return; // No-rush rejection; the by-value `data` destructs on return.
     }
 
+    if (units.empty()) {
+      UI_OnCommandIssued(units, data, clearQueue);
+      session->DirtyCommandGraph();
+      return; // Zero Sim Stream: Do not dispatch network commands when no units are selected
+    }
+
     // The driver returns the beat that acknowledges this issue. Queue edits
     // and the helper's retirement use that beat (0x008B0405/0x008B0451),
     // while the published command keeps its packed source/id identity.
