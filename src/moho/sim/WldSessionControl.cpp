@@ -1089,8 +1089,13 @@ namespace moho
       sessionInfo->mClientManager = nullptr;
       sessionInfo->mSourceId = 0xFFu;
 
-      const SSTICommandSource& localSource = session->cmdSources[static_cast<std::size_t>(session->ourCmdSource)];
-      SetupSinglePlayerCommandSourceLane(*sessionInfo, localSource.mName.c_str());
+      // Engine addition: the binary indexes the command sources unchecked. Only a
+      // single-player session can get here (see `cfunc_RestartSessionL`), but a
+      // session without a local source (0xFF) would read past the vector.
+      const std::size_t localSourceIndex = static_cast<std::uint32_t>(session->ourCmdSource);
+      const char* const localName =
+        localSourceIndex < session->cmdSources.size() ? session->cmdSources[localSourceIndex].mName.c_str() : "";
+      SetupSinglePlayerCommandSourceLane(*sessionInfo, localName);
       WLD_BeginSession(sessionInfo);
     }
   } // namespace
