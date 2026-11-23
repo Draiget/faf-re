@@ -317,6 +317,20 @@ namespace faf::netbridge
     setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&noDelay), sizeof(noDelay));
     mRpcClient = s;
     Log("RPC client connected");
+    if (!mRpcEverConnected) {
+      mRpcEverConnected = true;
+      std::vector<std::string> pending;
+      pending.swap(mRpcPending);
+      if (!pending.empty()) {
+        Log("sending " + std::to_string(pending.size()) + " message(s) that waited for the RPC client");
+      }
+      for (const std::string& line : pending) {
+        if (!SendAll(mRpcClient, line.data(), line.size())) {
+          OnRpcLost();
+          return;
+        }
+      }
+    }
   }
 
   void Bridge::ReadRpc()
@@ -397,10 +411,15 @@ namespace faf::netbridge
     const JsonValue& msg
   )
   {
+    const std::string line = netlink::WriteJson(msg) + "\n"; // println
     if (mRpcClient == kInvalidSocket) {
+      // Before the first client the Java adapter's sender waits for it
+      // (RPCService.getPeerOrWait); after a lost client it has no one to send to.
+      if (!mRpcEverConnected) {
+        mRpcPending.push_back(line);
+      }
       return;
     }
-    const std::string line = netlink::WriteJson(msg) + "\n"; // println
     if (!SendAll(mRpcClient, line.data(), line.size())) {
       OnRpcLost();
     }

@@ -166,6 +166,10 @@ namespace faf::netbridge
     SocketHandle mGpgListen = kInvalidSocket;
     SocketHandle mGpgClient = kInvalidSocket;
     std::string mRpcIn;
+    // RPCService.getPeerOrWait: what goes to the client before its first RPC
+    // connection waits for it and is sent in order once it connects (#483).
+    bool mRpcEverConnected = false;
+    std::vector<std::string> mRpcPending;
     GpgDecoder mGpgIn;
 
     std::string mGameState;
