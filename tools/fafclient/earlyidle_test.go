@@ -82,6 +82,9 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 		t.Fatal(err)
 	}
 	defer func() {
+		if os.Getenv("FAF_EARLYIDLE_LOGDIR") != "" {
+			time.Sleep(time.Second) // let the adapter finish writing a stack trace
+		}
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 	}()
