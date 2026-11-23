@@ -2,7 +2,7 @@
 
 Issue #274. With the switch `/nativenet` the game runs every peer link itself: ICE over libjuice, a link that FAF's Java ICE adapter accepts as one of its own, and WebRTC between two of our builds. The launcher starts no adapter. It talks to the game over GPGNet directly, as FAF clients did before ICE adapters existed. Without the switch nothing changes: the game talks to an adapter as described in [LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md).
 
-This page is what a launcher needs to support the mode: downlords-faf-client (open PR [FAForever/downlords-faf-client#3599](https://github.com/FAForever/downlords-faf-client/pull/3599), for `fafdevelop` games whose exe is ours, unless the player turns its "Game's own network on FAF Develop" setting off; returning after a crash is [#3590](https://github.com/FAForever/downlords-faf-client/pull/3590), on top of it), FAForeverRustClient (not started), and `tools/seat` (mpemu) today. The lobby server needs no change.
+This page is what a launcher needs to support the mode: downlords-faf-client (open PR [FAForever/downlords-faf-client#3599](https://github.com/FAForever/downlords-faf-client/pull/3599), for games whose exe is ours, on any featured mod, unless the player turns its "Game's own network with the rebuilt engine" setting off; returning after a crash is [#3590](https://github.com/FAForever/downlords-faf-client/pull/3590), on top of it), FAForeverRustClient (not started), and `tools/seat` (mpemu) today. The lobby server needs no change.
 
 ## What the launcher does
 
@@ -119,7 +119,7 @@ The icon has its own thread and window, so the menu works while the game window 
 
 From reading both clients (Java: downlords-faf-client `develop` 66e624f119; Rust: FAForeverRustClient `develop` 70c88a5f9b, both 2026-10-31):
 
-- **downlords-faf-client.** Implement a second `IceAdapter` (`fa/relay/ice/IceAdapter.java`), chosen per game (FAForever/downlords-faf-client#3599 picks it for `fafdevelop` with our exe, with a setting, on by default, that falls back to the Java adapter). Offer such a fallback: our exe plays with the adapter too, and players on either side still connect to each other.
+- **downlords-faf-client.** Implement a second `IceAdapter` (`fa/relay/ice/IceAdapter.java`), chosen per game (FAForever/downlords-faf-client#3599 picks it whenever the exe is ours, on any featured mod, with a setting, on by default, that falls back to the Java adapter). Offer such a fallback: our exe plays with the adapter too, and players on either side still connect to each other.
   - Its `start` opens the GPGNet listener and returns its port. `LaunchCommandBuilder` already writes `/gpgnet` from that port; add `/nativenet` beside it.
   - Move the lobby subscriptions in `IceAdapterImpl.java:81-111` behind the choice, so only one implementation forwards.
   - The client has no GPGNet codec today, so one is needed. The adapter jar's `GPGNetServer` is the reference; `tools/gpgnet/codec.go` in this repository is another.
