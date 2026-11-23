@@ -6,7 +6,8 @@ package fafclient
 // the socket when the adapter accepts. FAF's Java adapter reads it before it
 // has stored the new connection as its current client, its telemetry throws,
 // the read thread dies and the socket closes: the game waits on "Connecting..."
-// for ever. An adapter must answer CreateLobby and keep the connection.
+// for ever. An adapter must answer CreateLobby, keep the connection, and tell
+// the client of the game's Idle and Lobby (onGpgNetMessageReceived).
 //
 // Integration test, skipped unless an adapter is named:
 //
@@ -30,12 +31,17 @@ package fafclient
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,9 +69,59 @@ func earlyIdleAdapter(t *testing.T) Adapter {
 	return Adapter{}
 }
 
+// earlyIdleSeen records the GameState values the adapter passes to the client.
+type earlyIdleSeen struct {
+	mu     sync.Mutex
+	states []string
+}
+
+func (s *earlyIdleSeen) note(m Message) {
+	if m.Method != "onGpgNetMessageReceived" || len(m.Params) < 2 || str(m.Params[0]) != "GameState" {
+		return
+	}
+	var args []any
+	if json.Unmarshal(m.Params[1], &args) != nil || len(args) == 0 {
+		return
+	}
+	s.mu.Lock()
+	s.states = append(s.states, fmt.Sprint(args[0]))
+	s.mu.Unlock()
+}
+
+func (s *earlyIdleSeen) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return "[" + strings.Join(s.states, " ") + "]"
+}
+
+// wait reports whether every state in want was seen within d.
+func (s *earlyIdleSeen) wait(want []string, d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		s.mu.Lock()
+		all := true
+		for _, w := range want {
+			if !slices.Contains(s.states, w) {
+				all = false
+			}
+		}
+		s.mu.Unlock()
+		if all {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // earlyIdleRound starts one adapter and plays the proxy. It returns how long
 // the proxy waited for the adapter's GPGNet port, and the failure, if any.
+// A round passes when the game gets CreateLobby, keeps its connection after
+// GameState Lobby, and the client is told of both Idle and Lobby.
 func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
+	var seen *earlyIdleSeen
 	rpcPort, err := freePort()
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +163,7 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 	// The client's side: RPC connect and setLobbyInitMode, as IceAdapterImpl,
 	// at the same time as the proxy below (the Rust client starts both together).
 	rpcReady := make(chan struct{})
+	seen = &earlyIdleSeen{}
 	go func() {
 		for attempt := 0; attempt < connectAttempts && ctx.Err() == nil; attempt++ {
 			conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(rpcPort), time.Second)
@@ -116,7 +173,7 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 			}
 			go func() { <-ctx.Done(); conn.Close() }()
 			peer := NewPeer(conn, nil)
-			go func() { _ = peer.Serve(conn, func(Message) {}) }()
+			go func() { _ = peer.Serve(conn, seen.note) }()
 			if reply, err := peer.Call("setLobbyInitMode", "normal"); err == nil {
 				select {
 				case <-reply:
@@ -187,6 +244,10 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 		_, err := gpgnet.ReadMessage(r)
 		var ne net.Error
 		if errors.As(err, &ne) && ne.Timeout() {
+			// The client is told of both states (onGpgNetMessageReceived).
+			if !seen.wait([]string{"Idle", "Lobby"}, 2*time.Second) {
+				return waited, errors.New("the client was told of game states " + seen.String() + ", not Idle and Lobby")
+			}
 			return waited, nil
 		}
 		if errors.Is(err, io.EOF) || err != nil {
@@ -218,6 +279,6 @@ func TestEarlyIdleBeforeAccept(t *testing.T) {
 		t.Fatalf("the adapter listened before the proxy's first dial in every round; the case was not exercised")
 	}
 	if failed > 0 {
-		t.Fatalf("%d of %d rounds lost the game's connection", failed, rounds)
+		t.Fatalf("%d of %d rounds failed", failed, rounds)
 	}
 }
