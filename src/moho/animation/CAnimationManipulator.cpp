@@ -884,10 +884,19 @@ namespace moho
     LuaPlus::LuaStackObject enabledArg(state, 3);
     const bool enabled = enabledArg.GetBoolean();
 
+    // 0x00641743..0x641766: the binary inverts the fourth argument. Without
+    // it the descendants are included; with it, `GetBoolean` true clears the
+    // flag (`mov [include], 0` then `jnz` past the store of 1) and false sets
+    // it. So `SetBoneEnabled(bone, value, false)` also switches the bone's
+    // descendants, and `true` switches the bone alone, against what the help
+    // text says. Taking the argument at its word slid a bone that retail
+    // leaves at rest (Random Events' Lattice units disable every bone but
+    // their unpack bones with `false`), which moved the beams fired from it:
+    // replay 28120672 desynced at beat 14450.
     bool includeDescendants = true;
     if (lua_gettop(rawState) >= 4) {
       LuaPlus::LuaStackObject includeArg(state, 4);
-      includeDescendants = includeArg.GetBoolean();
+      includeDescendants = !includeArg.GetBoolean();
     }
 
     manipulator->SetBoneEnabled(boneIndex, includeDescendants, enabled);
