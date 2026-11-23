@@ -402,7 +402,10 @@ void AoCS(uint3 id : SV_DispatchThreadID)
             const float3 seen = WorldPosition(at, SceneDepth.Load(int3(at, 0)));
             const float gap = length(q - Eye.xyz) - length(seen - Eye.xyz);
             if (gap > 0.02 && gap < Contact.y) {
-                occlusion *= 1.0 - Sun.w * sunlit;
+                // A blocker further along the ray shades less, so the shadow fades out instead of ending in a
+                // hard rim where the ray stops.
+                const float along = 1.0 - float(s - 1) / CONTACT_STEPS;
+                occlusion *= 1.0 - Sun.w * sunlit * along;
                 break;
             }
         }

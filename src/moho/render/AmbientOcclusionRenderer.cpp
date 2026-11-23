@@ -71,6 +71,17 @@ namespace moho
     "Contact shadow ray length in world units.",
     &ren_AoContactLength
   );
+  // How far behind the visible surface a ray step may lie and still count as blocked. It was the ray length (1.5)
+  // until #484: a ray passing up to 1.5 units behind a thin leg, which isn't between the ground and the sun, then
+  // counted as blocked and drew a dark half-disc or lump beside the unit. It stays above one ray step (length / 8)
+  // so a solid wall can't be stepped over.
+  float ren_AoContactThickness = 0.25f;
+  TConVar<float> gTConVar_ren_AoContactThickness(
+    "ren_AoContactThickness",
+    "Contact shadow blocker thickness in world units: how far behind the visible surface a ray step may lie and "
+    "still count as blocked.",
+    &ren_AoContactThickness
+  );
 
   // Engine addition (ren_RayAo): ambient occlusion by rays against the ray-traced scene (RayScene.h) while
   // ray-traced shadows are on.
@@ -382,7 +393,7 @@ namespace moho
       if (ren_AoContact > 0.0f) {
         constants.sun[3] = std::min(ren_AoContact, 1.0f);
         constants.contact[0] = std::max(ren_AoContactLength, 0.1f);
-        constants.contact[1] = std::max(ren_AoContactLength, 0.1f);
+        constants.contact[1] = std::max(ren_AoContactThickness, constants.contact[0] / 8.0f);
       }
       if (ren_TerrainShadows > 0.0f && shadowReach >= 0.0f && PrepareTerrainShadows(constants.sun)) {
         constants.terrainGrid[0] = static_cast<float>(mFieldWidth);
