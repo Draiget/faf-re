@@ -18,6 +18,11 @@ package fafclient
 //	FAF_EARLYIDLE_JAVAFX=<the client's javafx-* jars, path-list separated>
 //
 // FAF_EARLYIDLE_ROUNDS sets the number of adapter starts (default 10).
+// FAF_EARLYIDLE_WRITE_DELAY_MS waits that long between connecting and writing
+// Idle (a launcher-side delay, or a game's own connect-to-Idle time).
+// FAF_EARLYIDLE_AFTER_RPC=1 connects only after the adapter answered
+// setLobbyInitMode, as the Java client starts the game; with it the "case
+// not exercised" check is skipped.
 // FAF_EARLYIDLE_LOGDIR keeps each adapter's LOG_DIR and output there, one
 // folder per round. The Java adapter only throws while its telemetry debugger
 // is registered; check its log for "gameState must not change to null".
@@ -36,6 +41,16 @@ import (
 
 	"faf-main/tools/gpgnet"
 )
+
+// earlyIdleEnvMs reads a whole number of milliseconds from the environment (0
+// when unset or invalid).
+func earlyIdleEnvMs(name string) int {
+	v, err := strconv.Atoi(os.Getenv(name))
+	if err != nil || v < 0 {
+		return 0
+	}
+	return v
+}
 
 func earlyIdleAdapter(t *testing.T) Adapter {
 	if exe := os.Getenv("FAF_EARLYIDLE_EXE"); exe != "" {
@@ -91,6 +106,7 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 
 	// The client's side: RPC connect and setLobbyInitMode, as IceAdapterImpl,
 	// at the same time as the proxy below (the Rust client starts both together).
+	rpcReady := make(chan struct{})
 	go func() {
 		for attempt := 0; attempt < connectAttempts && ctx.Err() == nil; attempt++ {
 			conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(rpcPort), time.Second)
@@ -101,10 +117,26 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 			go func() { <-ctx.Done(); conn.Close() }()
 			peer := NewPeer(conn, nil)
 			go func() { _ = peer.Serve(conn, func(Message) {}) }()
-			_, _ = peer.Call("setLobbyInitMode", "normal")
+			if reply, err := peer.Call("setLobbyInitMode", "normal"); err == nil {
+				select {
+				case <-reply:
+				case <-ctx.Done():
+				}
+			}
+			close(rpcReady)
 			return
 		}
 	}()
+
+	// The Java client's order instead: the game starts once the adapter has
+	// answered over RPC, so it connects to an adapter that already listens.
+	if earlyIdleEnvMs("FAF_EARLYIDLE_AFTER_RPC") > 0 {
+		select {
+		case <-rpcReady:
+		case <-time.After(30 * time.Second):
+			return 0, errors.New("adapter never answered over RPC")
+		}
+	}
 
 	// The proxy: the game's Idle is already held; connect as soon as the
 	// adapter listens and pass it on at once.
@@ -128,6 +160,9 @@ func earlyIdleRound(t *testing.T, a Adapter) (time.Duration, error) {
 		waited = 0 // the adapter already listened: not the case under test
 	}
 	defer game.Close()
+	if d := earlyIdleEnvMs("FAF_EARLYIDLE_WRITE_DELAY_MS"); d > 0 {
+		time.Sleep(time.Duration(d) * time.Millisecond)
+	}
 	if _, err := game.Write(idle); err != nil {
 		return waited, err
 	}
@@ -179,7 +214,7 @@ func TestEarlyIdleBeforeAccept(t *testing.T) {
 			t.Logf("round %d: proxy waited %v: ok", i+1, waited.Round(time.Millisecond))
 		}
 	}
-	if waitedRounds == 0 {
+	if waitedRounds == 0 && earlyIdleEnvMs("FAF_EARLYIDLE_AFTER_RPC") == 0 {
 		t.Fatalf("the adapter listened before the proxy's first dial in every round; the case was not exercised")
 	}
 	if failed > 0 {
