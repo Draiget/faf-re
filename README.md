@@ -2,7 +2,7 @@
 
 # faf-re
 
-**The *Supreme Commander: Forged Alliance* engine, rebuilt as C++20**
+**The *Supreme Commander: Forged Alliance* engine, rebuilt as C++23**
 
 [![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
 [![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-41%25%20less%20time-blue)](docs/PERFORMANCE.md)
@@ -15,7 +15,7 @@
 
 </div>
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays in about 40 % less time.
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++23 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays in about 40 % less time.
 
 > An independent preservation and interoperability effort, inspired by and indebted to the [Forged Alliance Forever](https://faforever.com) community. Not affiliated with, endorsed by, or supported by the original publisher or developer. See [LEGAL.md](LEGAL.md).
 
