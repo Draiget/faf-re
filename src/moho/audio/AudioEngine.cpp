@@ -1238,6 +1238,48 @@ namespace moho
   static_assert(sizeof(WAVEFORMATEXTENSIBLE) == 0x28, "WAVEFORMATEXTENSIBLE size must be 0x28");
 
   /**
+   * Engine addition (issue #488): 3D sound as the original game played it, on the X3DAudio this
+   * engine loads (xaudio2_9.dll; the original imports X3DAudio1_2.dll). Two things differ there:
+   *
+   * - The subwoofer. X3DAudio1_2.dll sends every sound to an output's LFE channel at the LFE curve's
+   *   level (the engine's flat curve: full); X3DAudio 2.9 does only with X3DAUDIO_CALCULATE_REDIRECT_TO_LFE.
+   *   With that flag its matrices equal 1_2's on 5.1 and 7.1 (both DLLs called with the engine's inputs);
+   *   on an output without LFE the flag must not be passed (2.9 then writes past the matrix).
+   * - The distance fade on outputs the speaker setting doesn't describe. The original sized the 3D
+   *   settings from DirectSound's speaker setting (ResolveDstChannelCount); when the output had another
+   *   channel count (7.1 or 5.1 "surround", which it read as stereo), SetMatrixCoefficients refused
+   *   the matrix, the apply stopped before `Distance` (ApplySettingsToCue) and every 3D sound played at
+   *   full volume wherever it was; FAF's patch only logs that once ("SND: XACT3DApply failed").
+   *   This engine sizes them from the real output (ConfigureEngineForOutput), so the apply works and
+   *   the sound data's distance fade applies. With the switch on, the apply is skipped in that case,
+   *   as it failed in the original, without its write past the buffer.
+   *
+   * 0 keeps the fade on every output and no LFE send.
+   */
+  bool snd_RetailSpatial = true;
+  TConVar<bool> gTConVar_snd_RetailSpatial(
+    "snd_RetailSpatial",
+    "3D sound as the original game: subwoofer send on 5.1/7.1, and no distance fade when the output's channels "
+    "differ from the Windows speaker setting (1, the default); or the distance fade on every output (0). "
+    "/nosndretailspatial sets 0 at startup.",
+    &snd_RetailSpatial
+  );
+
+  [[nodiscard]] bool RetailSpatialOn()
+  {
+    static const bool startupOff = CFG_GetArgOption("/nosndretailspatial", 0u, nullptr);
+    return snd_RetailSpatial && !startupOff;
+  }
+
+  // X3DAudio's SPEAKER_LOW_FREQUENCY and X3DAUDIO_CALCULATE_REDIRECT_TO_LFE.
+  constexpr std::uint32_t kSpeakerLowFrequency = 0x8u;
+  constexpr std::uint32_t kX3dCalculateRedirectToLfe = 0x20000u;
+
+  // Whether the output X3DAudio was last initialized for has an LFE channel (func_AudioInitialize).
+  // Every engine of the game shares the one output.
+  std::atomic<bool> sX3dOutputHasLfe{false};
+
+  /**
    * Address: 0x004D8170 (FUN_004D8170, func_AudioInitialize)
    *
    * What it does:
@@ -1270,6 +1312,7 @@ namespace moho
       return kHresultFail;
     }
     X3DAudio().mInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
+    sX3dOutputHasLfe.store((finalMixFormat.dwChannelMask & kSpeakerLowFrequency) != 0u);
     return result;
   }
 
@@ -1616,7 +1659,10 @@ namespace moho
     if (X3DAudio().mCalculate == nullptr) {
       return kHresultFail;
     }
-    X3DAudio().mCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
+    // snd_RetailSpatial: X3DAudio1_2's LFE send (see the switch).
+    const std::uint32_t flags =
+      kX3dCalculateFlags | (RetailSpatialOn() && sX3dOutputHasLfe.load() ? kX3dCalculateRedirectToLfe : 0u);
+    X3DAudio().mCalculate(audioHandle, listener, emitter, flags, settings);
     return 0;
   }
 
@@ -1663,6 +1709,21 @@ namespace moho
       WAVEFORMATEXTENSIBLE finalMixFormat{};
       if (impl.mInstance->GetFinalMixFormat(&finalMixFormat) >= 0) {
         const std::uint32_t realDstChannels = finalMixFormat.Format.nChannels;
+        // Issue #488: which case of snd_RetailSpatial a player's output is in (once per output).
+        static std::uint32_t sLoggedChannels = 0u;
+        if (realDstChannels != sLoggedChannels) {
+          sLoggedChannels = realDstChannels;
+          const std::uint32_t settingChannels = ResolveDstChannelCount(sSoundConfiguration.get());
+          gpg::Logf(
+            "SND: output has %u channels (mask 0x%X), the speaker setting %u%s",
+            realDstChannels,
+            static_cast<unsigned>(finalMixFormat.dwChannelMask),
+            settingChannels,
+            settingChannels != realDstChannels && RetailSpatialOn()
+              ? "; 3D sound plays without the distance fade, as in the original (snd_RetailSpatial)"
+              : ""
+          );
+        }
         if (realDstChannels != 0u && realDstChannels != impl.mSettings.mDstChannelCount) {
           delete[] impl.mSettings.mDelayTimes;
           delete[] impl.mSettings.mMatrixCoefficients;
@@ -2786,7 +2847,13 @@ namespace moho
       return;
     }
 
-    const int applyResult = ApplySettingsToCue(&impl->mSettings, cue);
+    // snd_RetailSpatial: where the original's settings, sized from the speaker setting, didn't fit the
+    // output, its SetMatrixCoefficients refused them with E_INVALIDARG and nothing was applied (see the
+    // switch). The same refusal here, without passing XACT a matrix of the wrong size.
+    constexpr int kHresultInvalidArg = static_cast<int>(0x80070057u);
+    const bool retailRefuses =
+      RetailSpatialOn() && ResolveDstChannelCount(sSoundConfiguration.get()) != impl->mSettings.mDstChannelCount;
+    const int applyResult = retailRefuses ? kHresultInvalidArg : ApplySettingsToCue(&impl->mSettings, cue);
     if (applyResult < 0) {
       // FAF hot-patch (FA-Binary-Patches xact_3dapply.cpp / section/xact_3d_fix.cpp):
       // 0x004D9A60 jumps to a copy of this body at 0x01291B52 in which this warning
