@@ -189,7 +189,7 @@ namespace
     while (cursor != nullptr) {
       wchar_t decoded = 0;
       const char* const next = gpg::STR_DecodeUtf8Char(cursor, decoded);
-      clippedAdvance += font->GetCharInfo(decoded).mAdvance;
+      clippedAdvance += font->GetCharAdvance(decoded);
       const float dynamicWidth = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
       cursor = next;
       if (clippedAdvance > dynamicWidth || cursor == nullptr) {
@@ -250,7 +250,7 @@ namespace
 
         wchar_t decoded = 0;
         const char* const next = gpg::STR_DecodeUtf8Char(previous, decoded);
-        clippedAdvance += edit->mFont->GetCharInfo(decoded).mAdvance;
+        clippedAdvance += edit->mFont->GetCharAdvance(decoded);
         const float dynamicWidth = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
         if (clippedAdvance > dynamicWidth) {
           threshold = next;

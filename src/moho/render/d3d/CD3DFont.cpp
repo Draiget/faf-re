@@ -126,6 +126,13 @@ namespace moho
       float mAdvance = 0.0f;
       std::vector<std::uint64_t> mBlocks;
 
+      /// Engine addition (ren_GlyphAdvanceOnly): only the advance was measured (0 by 0, no blocks); GetCharInfo
+      /// rasterizes such a character as if it weren't cached, and its glyph then takes the entry's place.
+      [[nodiscard]] bool IsAdvanceOnly() const noexcept
+      {
+        return mBlocks.empty();
+      }
+
       [[nodiscard]] bool operator==(
         const SCachedGlyph& other
       ) const
@@ -152,6 +159,25 @@ namespace moho
         LoadLocked();
         const auto found = mGlyphs.find(key);
         return found != mGlyphs.end() ? &found->second : nullptr;
+      }
+
+      /// Engine addition (ren_GlyphAdvanceOnly): copies an entry's advance and whether it is advance-only under the
+      /// lock, as the caller measures before using them and another thread may drop the cache meanwhile.
+      [[nodiscard]] bool FindAdvance(
+        const std::uint64_t key,
+        float& outAdvance,
+        bool& outAdvanceOnly
+      )
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        LoadLocked();
+        const auto found = mGlyphs.find(key);
+        if (found == mGlyphs.end()) {
+          return false;
+        }
+        outAdvance = found->second.mAdvance;
+        outAdvanceOnly = found->second.IsAdvanceOnly();
+        return true;
       }
 
       void Add(
@@ -234,20 +260,26 @@ namespace moho
         }
       }
 
-      /// A glyph as GetCharInfo makes them: 4 to 128 pixels each way in steps of 4, two blocks per 4x4.
+      /// A glyph as GetCharInfo makes them: 4 to 128 pixels each way in steps of 4, two blocks per 4x4; or an
+      /// advance-only entry, 0 by 0 with no blocks.
       [[nodiscard]] static bool IsGlyphShape(
         const std::uint16_t width,
         const std::uint16_t height,
         const std::uint32_t count
       )
       {
+        if (width == 0u && height == 0u && count == 0u) {
+          return true;
+        }
         const auto fits = [](const std::uint16_t size) {
           return size >= 4u && size <= 128u && size % 4u == 0u;
         };
         return fits(width) && fits(height) && count == (width / 4u) * (height / 4u) * 2u;
       }
 
-      /// Adds the file's glyphs that `glyphs` does not hold yet; stops at the first damaged entry.
+      /// Adds the file's glyphs that `glyphs` does not hold yet, and those it holds only the advance of (engine
+      /// addition, ren_GlyphAdvanceOnly: another process may have built the glyph since); stops at the first
+      /// damaged entry.
       static void ReadFileLocked(
         const std::string& path,
         std::unordered_map<std::uint64_t, SCachedGlyph>& glyphs
@@ -286,7 +318,10 @@ namespace moho
             glyph.mV4 = metrics[2];
             glyph.mV5 = metrics[3];
             glyph.mAdvance = metrics[4];
-            glyphs.emplace(key, std::move(glyph));
+            const auto [held, added] = glyphs.try_emplace(key, std::move(glyph));
+            if (!added && held->second.IsAdvanceOnly() && !glyph.IsAdvanceOnly()) {
+              held->second = std::move(glyph);
+            }
           }
         }
         std::fclose(in);
@@ -307,6 +342,8 @@ namespace moho
     }
 
     std::atomic<bool> gGlyphCacheVerified{false}; // the session's first cached glyph matched its rasterization
+    // Engine addition (ren_GlyphAdvanceOnly): the session's first cached advance-only entry matched GDI's measurement.
+    std::atomic<bool> gGlyphAdvanceVerified{false};
 
     /// Each live font's identity for the glyph cache (0: not cached).
     std::mutex gFontIdentityLock;
@@ -385,6 +422,20 @@ namespace moho
       "ren_MsdfGlyphReuse",
       "MSDF text draws the glyphs its check found (1, the default), or looks each one up again while drawing (0).",
       &ren_MsdfGlyphReuse
+    );
+
+    /**
+     * Engine change: `ren_GlyphAdvanceOnly`. What needs only a character's advance (MSDF text, which draws from
+     * its atlas, and string widths for layout and the caret) asked GetCharInfo, which builds the whole GDI glyph
+     * the first time: a GDI draw, the scratch bitmap read, DXT5 blocks and a texture that MSDF text never draws.
+     * CD3DFont::GetCharAdvance measures the advance the same way and leaves the glyph to whatever draws it.
+     */
+    bool ren_GlyphAdvanceOnly = true;
+    TConVar<bool> gTConVar_ren_GlyphAdvanceOnly(
+      "ren_GlyphAdvanceOnly",
+      "Measure a character's advance without building its GDI glyph when only the advance is needed (1, the "
+      "default), or build the glyph for it as the original did (0). The same advances either way.",
+      &ren_GlyphAdvanceOnly
     );
 
     constexpr const char* kMsdfTechnique = "TMsdfText";
@@ -723,7 +774,7 @@ namespace moho
       // Draws one character; false once the clip width is reached.
       const auto drawGlyph = [&](const wchar_t character, const SMsdfGlyph* const found, const bool fromFallback) {
         // The clip width is the control's, so it counts unscaled advances: a pop doesn't change what fits.
-        const float advance = font.GetCharInfo(character).mAdvance;
+        const float advance = font.GetCharAdvance(character);
         totalAdvance += advance;
         if (std::isfinite(maxAdvance) && totalAdvance > maxAdvance) {
           return false;
@@ -1415,6 +1466,91 @@ namespace moho
       DestroyGlyphPageCache(font.mCharInfo);
       InitializeGlyphPageCache(font.mCharInfo);
     }
+
+    /**
+     * Engine addition (ren_GlyphAdvanceOnly): whether screen text in this font draws through GDI glyphs, as
+     * RenderMsdfText leaves it there: ren_MsdfText off or the size under ren_MsdfTextMinSize for a game font, a
+     * size with its own bitmaps for a mod font, or no MSDF binding at all. Its glyphs get built when drawn anyway,
+     * so measuring the advance first would measure each character twice.
+     */
+    [[nodiscard]] bool DrawsThroughGdiGlyphs(
+      const CD3DFont& font
+    )
+    {
+      const auto bound = sMsdfBindings.find(&font);
+      if (bound == sMsdfBindings.end()) {
+        return true;
+      }
+      const MsdfBinding& binding = bound->second;
+      if (binding.mIsMod) {
+        return binding.mStrike != nullptr;
+      }
+      return !ren_MsdfText || binding.mPointSize < ren_MsdfTextMinSize;
+    }
+
+    /// Engine addition (ren_GlyphCache): the glyph cache's key for one of the font's characters, 0 when the font has
+    /// no identity.
+    [[nodiscard]] std::uint64_t CachedGlyphKey(
+      const CD3DFont& font,
+      const wchar_t chText
+    )
+    {
+      std::uint64_t fontIdentity = 0;
+      {
+        const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+        const auto found = FontIdentities().find(&font);
+        if (found != FontIdentities().end()) {
+          fontIdentity = found->second;
+        }
+      }
+      return fontIdentity != 0 ? GlyphKey(fontIdentity, chText) : 0;
+    }
+
+    /**
+     * A character's advance as GetCharInfo (0x00425940) takes it: the width GDI measures for it (DrawTextW with
+     * flags 0xC20, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX, at 0x00425A7D), or, engine addition (issue #304), a
+     * bound mod font's own once its atlas is here. The caller has set the text alignment to 0x18 (TA_BASELINE,
+     * 0x004259F2) as the binary does before measuring. `outStrike` and `outStrikeGlyph` are the mod font's bitmap
+     * strike and this character's glyph in it, null for others. Engine addition (ren_GlyphAdvanceOnly): a
+     * non-zero `knownAdvance` is the advance this function gave the character earlier, kept in its entry; it is
+     * returned as is, without measuring again, and only the strike lookups run.
+     */
+    [[nodiscard]] float MeasureCharAdvance(
+      CD3DFont& font,
+      const wchar_t chText,
+      const SMsdfStrike*& outStrike,
+      const SMsdfStrikeGlyph*& outStrikeGlyph,
+      const float knownAdvance = 0.0f
+    )
+    {
+      float advance = knownAdvance;
+      if (knownAdvance == 0.0f) {
+        RECT textRect{};
+        (void)DrawTextW(font.mDeviceContext, &chText, 1, &textRect, 0xC20u);
+        advance = static_cast<float>(textRect.right - textRect.left);
+      }
+
+      outStrike = nullptr;
+      outStrikeGlyph = nullptr;
+      if (sHasModFonts) {
+        const auto bound = sMsdfBindings.find(&font);
+        if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
+          const MsdfBinding& binding = bound->second;
+          const SMsdfGlyph* const glyph =
+            binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
+          if (glyph != nullptr) {
+            advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
+          }
+          outStrike = binding.mStrike;
+          outStrikeGlyph =
+            outStrike != nullptr ? FindMsdfStrikeGlyph(*outStrike, static_cast<std::uint32_t>(chText)) : nullptr;
+          if (outStrikeGlyph != nullptr) {
+            advance = outStrikeGlyph->mAdvance;
+          }
+        }
+      }
+      return knownAdvance != 0.0f ? knownAdvance : advance;
+    }
   } // namespace
 
   bool CD3DFont::IsModFont() const
@@ -1659,17 +1795,11 @@ namespace moho
     bool verifyCached = false;
     SCachedGlyph cachedGlyph;
     if (ren_GlyphCache) {
-      std::uint64_t fontIdentity = 0;
-      {
-        const std::lock_guard<std::mutex> lock(gFontIdentityLock);
-        const auto found = FontIdentities().find(this);
-        if (found != FontIdentities().end()) {
-          fontIdentity = found->second;
-        }
-      }
-      if (fontIdentity != 0) {
-        glyphKey = GlyphKey(fontIdentity, chText);
-        if (const SCachedGlyph* const cached = GlyphCache().Find(glyphKey); cached != nullptr) {
+      glyphKey = CachedGlyphKey(*this, chText);
+      if (glyphKey != 0) {
+        // An advance-only entry (ren_GlyphAdvanceOnly) has no glyph: rasterize it, and the glyph replaces it.
+        const SCachedGlyph* const cached = GlyphCache().Find(glyphKey);
+        if (cached != nullptr && !cached->IsAdvanceOnly()) {
           if (gGlyphCacheVerified.load(std::memory_order_relaxed)) {
             charInfo.mTex = CD3DBatchTexture::FromDXT5(
               cached->mBlockWidth, cached->mBlockHeight, cached->mBlocks.data(), 16u * (cached->mBlockWidth / 4u)
@@ -1691,30 +1821,12 @@ namespace moho
     const int baselineAscent = static_cast<int>(std::ceil(mAscent + 1.0f));
     const int baselineDescent = static_cast<int>(std::ceil(mDescent));
 
-    RECT textRect{};
-    (void)DrawTextW(mDeviceContext, &chText, 1, &textRect, 0xC20u);
-    float advance = static_cast<float>(textRect.right - textRect.left);
-
     // Engine addition (issue #304): a mod's font, once its atlas is here, has its own advances and small bitmaps.
     const SMsdfStrike* modStrike = nullptr;
     const SMsdfStrikeGlyph* modStrikeGlyph = nullptr;
-    if (sHasModFonts) {
-      const auto bound = sMsdfBindings.find(this);
-      if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
-        const MsdfBinding& binding = bound->second;
-        const SMsdfGlyph* const glyph =
-          binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
-        if (glyph != nullptr) {
-          advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
-        }
-        modStrike = binding.mStrike;
-        modStrikeGlyph =
-          modStrike != nullptr ? FindMsdfStrikeGlyph(*modStrike, static_cast<std::uint32_t>(chText)) : nullptr;
-        if (modStrikeGlyph != nullptr) {
-          advance = modStrikeGlyph->mAdvance;
-        }
-      }
-    }
+    // Engine addition (ren_GlyphAdvanceOnly): an advance GetCharAdvance measured is in the entry already (the only
+    // way an entry without a texture has one, as pages start zeroed and are reset whenever advances change).
+    const float advance = MeasureCharAdvance(*this, chText, modStrike, modStrikeGlyph, charInfo.mAdvance);
 
     int glyphWidth = (static_cast<int>((mAveCharWidth * 2.0f) + advance) + 3) & ~3;
     int glyphHeight = (baselineAscent + baselineDescent + 4) & ~3;
@@ -1968,6 +2080,84 @@ namespace moho
   }
 
   /**
+   * Engine addition (ren_GlyphAdvanceOnly): the advance GetCharInfo gives a character, without building its glyph
+   * when it isn't built yet. The advance is kept in the character's entry; the glyph's texture stays empty, so the
+   * first GetCharInfo that draws it still builds it, with the same advance.
+   */
+  float CD3DFont::GetCharAdvance(
+    const wchar_t chText
+  )
+  {
+    if (!ren_GlyphAdvanceOnly) {
+      return GetCharInfo(chText).mAdvance;
+    }
+    const std::uint8_t pageIndex = static_cast<std::uint8_t>((static_cast<std::uint16_t>(chText) >> 8u) & 0xFFu);
+    SCharInfoPage& page = mCharInfo[pageIndex];
+    if (page.size() != 256u) {
+      NormalizeGlyphPageTo256ZeroFill(page);
+    }
+    SCharInfo& charInfo = page[static_cast<std::uint8_t>(chText & 0xFFu)];
+    // A zero advance can't be told from one not measured yet; such a character takes the built path below.
+    if (charInfo.mTex || mDeviceContext == nullptr || charInfo.mAdvance != 0.0f) {
+      return charInfo.mAdvance;
+    }
+    if (DrawsThroughGdiGlyphs(*this)) {
+      return GetCharInfo(chText).mAdvance;
+    }
+
+    // The glyph cache holds the advance of every character an earlier launch built or measured. A mod font's
+    // advance changes when its atlas arrives, so its characters are measured every launch and not kept.
+    std::uint64_t glyphKey = 0;
+    if (ren_GlyphCache && !IsModFont()) {
+      glyphKey = CachedGlyphKey(*this, chText);
+    }
+    float cachedAdvance = 0.0f;
+    bool cachedAdvanceOnly = false;
+    const bool isCached = glyphKey != 0 && GlyphCache().FindAdvance(glyphKey, cachedAdvance, cachedAdvanceOnly);
+    const bool checkCached = isCached && cachedAdvance != 0.0f;
+    if (checkCached) {
+      if (
+        gGlyphCacheVerified.load(std::memory_order_relaxed) || gGlyphAdvanceVerified.load(std::memory_order_relaxed)
+      ) {
+        charInfo.mAdvance = cachedAdvance;
+        return charInfo.mAdvance;
+      }
+      // The session's first cached entry is checked against GDI, as the cache does for its glyphs: a glyph by
+      // GetCharInfo, which rasterizes and compares it; an advance by measuring it below.
+      if (!cachedAdvanceOnly) {
+        return GetCharInfo(chText).mAdvance;
+      }
+    }
+
+    (void)SetTextAlign(mDeviceContext, 0x18u);
+    const SMsdfStrike* modStrike = nullptr;
+    const SMsdfStrikeGlyph* modStrikeGlyph = nullptr;
+    const float advance = MeasureCharAdvance(*this, chText, modStrike, modStrikeGlyph);
+    if (checkCached) {
+      if (advance == cachedAdvance) {
+        gGlyphAdvanceVerified = true;
+      } else {
+        gpg::Warnf(
+          "CD3DFont: a cached advance (u+%04x) differs from GDI's; glyphs are rasterized from now on",
+          static_cast<unsigned int>(chText)
+        );
+        ren_GlyphCache = false;
+        GlyphCache().Drop();
+      }
+    }
+    if (advance == 0.0f) {
+      return GetCharInfo(chText).mAdvance;
+    }
+    charInfo.mAdvance = advance;
+    if (glyphKey != 0 && !isCached && ren_GlyphCache) {
+      SCachedGlyph measured; // advance-only: 0 by 0, no blocks
+      measured.mAdvance = advance;
+      GlyphCache().Add(glyphKey, std::move(measured));
+    }
+    return advance;
+  }
+
+  /**
    * Address: 0x00426470 (FUN_00426470,
    * ?Render@CD3DFont@Moho@@QAE?AV?$Vector3@M@Wm3@@VStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV34@22IMM@Z)
    *
@@ -2058,7 +2248,7 @@ namespace moho
     wchar_t codepoint = 0;
     const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint);
     while (codepoint != 0) {
-      advance += GetCharInfo(codepoint).mAdvance;
+      advance += GetCharAdvance(codepoint); // engine change (ren_GlyphAdvanceOnly): was GetCharInfo's
       encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint);
     }
     return advance;
@@ -2081,7 +2271,7 @@ namespace moho
     wchar_t codepoint = 0;
     const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint);
     while (codepoint != 0) {
-      cumulativeAdvance += GetCharInfo(codepoint).mAdvance;
+      cumulativeAdvance += GetCharAdvance(codepoint); // engine change (ren_GlyphAdvanceOnly): was GetCharInfo's
       if (cumulativeAdvance > targetAdvance) {
         break;
       }

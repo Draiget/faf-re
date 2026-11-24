@@ -87,6 +87,9 @@ namespace moho
      */
     const SCharInfo& GetCharInfo(wchar_t chText);
 
+    /// Engine addition (ren_GlyphAdvanceOnly): GetCharInfo(chText).mAdvance without building the glyph for it.
+    [[nodiscard]] float GetCharAdvance(wchar_t chText);
+
     /**
      * Address: 0x00426470 (FUN_00426470,
      * ?Render@CD3DFont@Moho@@QAE?AV?$Vector3@M@Wm3@@VStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV34@22IMM@Z)
