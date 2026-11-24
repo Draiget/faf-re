@@ -23,6 +23,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/BlockCompression.h"
+#include "gpg/gal/backends/common/CopyRegion.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/common/ImageCodecDirectXTex.h"
 #include "gpg/gal/backends/common/RuntimeInfo.h"
@@ -999,18 +1000,25 @@ namespace gpg::gal
     UploadBuffer(mZeroBuffer, 0U, zeros, sizeof(zeros));
   }
 
-  void DeviceVulkan::CreateSwapChain(
+  bool DeviceVulkan::CreateSwapChain(
     SwapChain& swapChain,
     std::uint32_t width,
     std::uint32_t height
   )
   {
+    // A lost surface throws here; the callers let go of it, and TestCooperativeLevel takes the next one.
     VkSurfaceCapabilitiesKHR capabilities{};
     CheckVk(
       "DeviceVulkan.cpp",
       __LINE__,
       Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities)
     );
+    // A minimised window has an extent of 0 x 0, which no swap chain can have: keep what there is (if anything)
+    // until the window is back.
+    if (capabilities.currentExtent.width == 0U || capabilities.currentExtent.height == 0U) {
+      gpg::Logf("Vulkan: the window has no area (minimised); the swap chain is left as it is");
+      return false;
+    }
     std::uint32_t count = 0U;
     Vk().vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(count);
@@ -1040,19 +1048,7 @@ namespace gpg::gal
       );
       ThrowError("DeviceVulkan.cpp", __LINE__, message);
     }
-    Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, nullptr);
-    std::vector<VkPresentModeKHR> modes(count);
-    Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, modes.data());
-    // Without vsync, the modes that don't wait, in order; FIFO, which every driver has, comes last in any case.
-    std::vector<VkPresentModeKHR> tryModes;
-    if (!mDeviceContext.mVSync) {
-      for (const VkPresentModeKHR candidate : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
-        if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
-          tryModes.push_back(candidate);
-        }
-      }
-    }
-    tryModes.push_back(VK_PRESENT_MODE_FIFO_KHR);
+    const std::vector<VkPresentModeKHR> tryModes = SelectPresentModes(swapChain);
     const auto modeName = [](const VkPresentModeKHR presentMode) {
       return (presentMode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)"
         : (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox"
@@ -1084,16 +1080,30 @@ namespace gpg::gal
     // Engine addition: a driver can refuse a mode it lists. An NVIDIA TITAN RTX (driver 0x8F118000) refused the
     // vsync-off one with VK_ERROR_OUT_OF_DEVICE_MEMORY for a 1600x1000 window while FIFO worked, and the whole
     // renderer fell back to Direct3D 9. A refused mode now falls back to the next, ending with FIFO.
-    for (const VkPresentModeKHR candidate : tryModes) {
-      info.presentMode = candidate;
-      result = Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created);
-      if (result == VK_SUCCESS) {
-        mode = candidate;
-        break;
+    const auto createWithModes = [&] {
+      for (const VkPresentModeKHR candidate : tryModes) {
+        info.presentMode = candidate;
+        result = Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created);
+        if (result == VK_SUCCESS) {
+          mode = candidate;
+          break;
+        }
+        gpg::Warnf("Vulkan: the driver refused a %s swap chain (%d)", modeName(candidate), static_cast<int>(result));
+        // A failed create has already retired the old swap chain, and a retired one can't be passed again.
+        info.oldSwapchain = VK_NULL_HANDLE;
       }
-      gpg::Warnf("Vulkan: the driver refused a %s swap chain (%d)", modeName(candidate), static_cast<int>(result));
-      // A failed create has already retired the old swap chain, and a retired one can't be passed again.
-      info.oldSwapchain = VK_NULL_HANDLE;
+    };
+    createWithModes();
+    if (result != VK_SUCCESS && result != VK_ERROR_SURFACE_LOST_KHR) {
+      // Every mode failed: the old swap chain (a retired one still holds the window on some drivers) is the usual
+      // cause. Drop it and go through the modes once more. A lost surface throws below instead: the callers let go
+      // of it, and TestCooperativeLevel takes the next one (VulkanSurfaceLifecycle.h).
+      gpg::Warnf(
+        "Vulkan: creating the swap chain failed (%s); trying again without the old one", vulkan::ResultName(result)
+      );
+      Vk().vkDeviceWaitIdle(mDevice);
+      DestroySwapChain(swapChain, true);
+      createWithModes();
     }
     CheckVk("DeviceVulkan.cpp", __LINE__, result);
     if (swapChain.swapchain != VK_NULL_HANDLE) {
@@ -1126,6 +1136,41 @@ namespace gpg::gal
       (chosen.format == VK_FORMAT_B8G8R8A8_UNORM) ? "B8G8R8A8" : "R8G8B8A8",
       modeName(mode)
     );
+    return true;
+  }
+
+  std::vector<VkPresentModeKHR> DeviceVulkan::SelectPresentModes(
+    const SwapChain& swapChain
+  ) const
+  {
+    std::uint32_t count = 0U;
+    Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, nullptr);
+    std::vector<VkPresentModeKHR> modes(count);
+    Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, modes.data());
+    // Without vsync, the modes that don't wait, in order; FIFO, which every driver has, comes last in any case.
+    std::vector<VkPresentModeKHR> tryModes;
+    if (!mDeviceContext.mVSync) {
+      for (const VkPresentModeKHR candidate : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
+        if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
+          tryModes.push_back(candidate);
+        }
+      }
+    }
+    tryModes.push_back(VK_PRESENT_MODE_FIFO_KHR);
+    return tryModes;
+  }
+
+  VkExtent2D DeviceVulkan::SurfaceExtent(
+    const SwapChain& swapChain,
+    const std::uint32_t width,
+    const std::uint32_t height
+  ) const
+  {
+    VkSurfaceCapabilitiesKHR capabilities{};
+    if (Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS) {
+      return VkExtent2D{width, height};
+    }
+    return vulkan::SwapChainExtent(capabilities, width, height);
   }
 
   void DeviceVulkan::DestroySwapChain(
@@ -1183,7 +1228,13 @@ namespace gpg::gal
       SwapChain& swapChain = mSwapChains[static_cast<std::size_t>(headIndex)];
       for (;;) {
         try {
-          CreateSwapChain(swapChain, width, height);
+          if (!CreateSwapChain(swapChain, width, height)) {
+            ThrowError(
+              "DeviceVulkan.cpp",
+              __LINE__,
+              "no swap chain for a window without area (start the game with the window shown)"
+            );
+          }
           break;
         } catch (const Error&) {
           if (vulkan::WindowSurfaceIsCurrent(swapChain.window)) {
@@ -1227,7 +1278,9 @@ namespace gpg::gal
     CollectCompleted();
     const VkExtent2D before = swapChain.extent;
     try {
-      CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height);
+      if (!CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height)) {
+        return false;
+      }
     } catch (const Error& error) {
       // The surface can be going (an Android activity on its way to the back), and a failed create has retired
       // the old swap chain: the head gives that up, and TestCooperativeLevel lets go of the surface as of one
@@ -1397,6 +1450,12 @@ namespace gpg::gal
         swapChain.scaled ? ", copied to the window at present" : ""
       );
     }
+    BindDefaultOutput();
+  }
+
+  void DeviceVulkan::BindDefaultOutput()
+  {
+    // What a Reset leaves bound, as D3D9's does: head 0 and a viewport over all of it.
     if (!mHeadOutputContexts.empty()) {
       ClearTarget(&mHeadOutputContexts.front());
       D3DVIEWPORT9 viewport{};
@@ -2748,17 +2807,27 @@ namespace gpg::gal
       VkImageCopy region{};
       region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
-      std::uint32_t width = std::min(source.width, destination.width);
-      std::uint32_t height = std::min(source.height, destination.height);
+      // The box is cut to both images (a copy past one is invalid in Vulkan, as in Direct3D 12): the whole source, or
+      // the source rectangle, at the destination rectangle's corner.
+      CopyRegion area{0, 0, source.width, source.height, 0, 0};
       if (sourceRect != nullptr) {
-        region.srcOffset = {sourceRect->left, sourceRect->top, 0};
-        width = static_cast<std::uint32_t>(sourceRect->right - sourceRect->left);
-        height = static_cast<std::uint32_t>(sourceRect->bottom - sourceRect->top);
+        area.left = sourceRect->left;
+        area.top = sourceRect->top;
+        area.right = sourceRect->right;
+        area.bottom = sourceRect->bottom;
       }
       if (destinationRect != nullptr) {
-        region.dstOffset = {destinationRect->left, destinationRect->top, 0};
+        area.x = destinationRect->left;
+        area.y = destinationRect->top;
       }
-      region.extent = {width, height, 1U};
+      if (!ClampCopyRegion(area, source.width, source.height, destination.width, destination.height)) {
+        return;
+      }
+      region.srcOffset = {static_cast<std::int32_t>(area.left), static_cast<std::int32_t>(area.top), 0};
+      region.dstOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0};
+      region.extent = {
+        static_cast<std::uint32_t>(area.right - area.left), static_cast<std::uint32_t>(area.bottom - area.top), 1U
+      };
       if (vulkan::OtherChannelOrder(source.format, destination.format)) {
         // A back buffer of an R8G8B8A8 swap chain (CreateSwapChain) and a B8G8R8A8 image: vkCmdCopyImage would
         // copy the bits, a blit of the same size puts the channels in order.
@@ -2767,14 +2836,14 @@ namespace gpg::gal
         blit.dstSubresource = region.dstSubresource;
         blit.srcOffsets[0] = region.srcOffset;
         blit.srcOffsets[1] = {
-          region.srcOffset.x + static_cast<std::int32_t>(width),
-          region.srcOffset.y + static_cast<std::int32_t>(height),
+          region.srcOffset.x + static_cast<std::int32_t>(region.extent.width),
+          region.srcOffset.y + static_cast<std::int32_t>(region.extent.height),
           1
         };
         blit.dstOffsets[0] = region.dstOffset;
         blit.dstOffsets[1] = {
-          region.dstOffset.x + static_cast<std::int32_t>(width),
-          region.dstOffset.y + static_cast<std::int32_t>(height),
+          region.dstOffset.x + static_cast<std::int32_t>(region.extent.width),
+          region.dstOffset.y + static_cast<std::int32_t>(region.extent.height),
           1
         };
         Vk().vkCmdBlitImage(
@@ -3040,7 +3109,6 @@ namespace gpg::gal
       return;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    gpg::Logf("Vulkan: Reset requested");
     if (context != nullptr && context != &mDeviceContext) {
       mDeviceContext.mVSync = context->mVSync;
       const int heads = std::min(context->GetHeadCount(), mDeviceContext.GetHeadCount());
@@ -3053,9 +3121,14 @@ namespace gpg::gal
         head.framesPerSecond = requested.framesPerSecond;
       }
     }
-    ReleaseRenderTargets();
-    Vk().vkDeviceWaitIdle(mDevice);
-    CollectCompleted();
+
+    // Which swap chains differ from what is asked for: another size, or another present mode (the vsync switch;
+    // Vulkan fixes the mode when the chain is made). An option that does not concern the chain changes nothing,
+    // and nothing is rebuilt then; a minimised window (extent 0) keeps its chain. A head the engine draws at
+    // another size than the window's (scaled) is made again, as the engine's Reset has always done.
+    std::vector<VkExtent2D> sizes(mSwapChains.size());
+    std::vector<bool> rebuild(mSwapChains.size(), false);
+    bool anyChange = false;
     for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
       if (mSwapChains[headIndex].surface == VK_NULL_HANDLE) {
         continue; // TestCooperativeLevel gives it a swap chain with its next surface
@@ -3069,8 +3142,35 @@ namespace gpg::gal
         width = static_cast<std::uint32_t>(std::max<LONG>(client.right - client.left, 1));
         height = static_cast<std::uint32_t>(std::max<LONG>(client.bottom - client.top, 1));
       }
+      sizes[headIndex] = VkExtent2D{width, height};
+      const SwapChain& swapChain = mSwapChains[headIndex];
+      const VkExtent2D extent = SurfaceExtent(swapChain, width, height);
+      if (extent.width == 0U || extent.height == 0U) {
+        continue; // minimised
+      }
+      rebuild[headIndex] = swapChain.swapchain == VK_NULL_HANDLE || extent.width != swapChain.extent.width ||
+        extent.height != swapChain.extent.height || extent.width != swapChain.headWidth ||
+        extent.height != swapChain.headHeight || SelectPresentModes(swapChain).front() != swapChain.presentMode;
+      anyChange = anyChange || rebuild[headIndex];
+    }
+    if (!anyChange) {
+      gpg::Logf("Vulkan: Reset requested, swap chains unchanged: nothing to rebuild");
+      // The swap chain stays (and with it the image acquired for this frame); the state a Reset hands back does not.
+      ResetState();
+      BindDefaultOutput();
+      return;
+    }
+    gpg::Logf("Vulkan: Reset requested");
+
+    ReleaseRenderTargets();
+    Vk().vkDeviceWaitIdle(mDevice);
+    CollectCompleted();
+    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
+      if (!rebuild[headIndex]) {
+        continue;
+      }
       try {
-        CreateSwapChain(mSwapChains[headIndex], width, height);
+        static_cast<void>(CreateSwapChain(mSwapChains[headIndex], sizes[headIndex].width, sizes[headIndex].height));
       } catch (const Error& error) {
         // The surface can be going (an Android activity on its way to the back): TestCooperativeLevel takes
         // the next one, or ends the program if this one stays and keeps refusing.
@@ -3145,17 +3245,21 @@ namespace gpg::gal
       } else {
         const VkExtent2D previous = swapChain.extent;
         try {
-          CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height);
-          newSize = vulkan::SurfaceLifecycle::NewSize(
-            swapChain.scaled, previous.width, previous.height, swapChain.extent.width, swapChain.extent.height
-          );
-          if (!swapChain.scaled) {
-            // The head draws into the new images, at the size the platform gave its surface, which the engine
-            // lays out by (CD3DDevice::GetHeadWidth) once TestCooperativeLevel answers 1.
-            RebindSwapChainImages(headIndex);
-            Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
-            head.mWidth = swapChain.extent.width;
-            head.mHeight = swapChain.extent.height;
+          if (!CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height)) {
+            // The window lost its area since the query above: the head waits for it as for one minimised.
+            outcome = Attach::NoArea;
+          } else {
+            newSize = vulkan::SurfaceLifecycle::NewSize(
+              swapChain.scaled, previous.width, previous.height, swapChain.extent.width, swapChain.extent.height
+            );
+            if (!swapChain.scaled) {
+              // The head draws into the new images, at the size the platform gave its surface, which the engine
+              // lays out by (CD3DDevice::GetHeadWidth) once TestCooperativeLevel answers 1.
+              RebindSwapChainImages(headIndex);
+              Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
+              head.mWidth = swapChain.extent.width;
+              head.mHeight = swapChain.extent.height;
+            }
           }
         } catch (const Error& error) {
           // One that went again in the meantime is waited for, as one not there yet.
@@ -3341,6 +3445,7 @@ namespace gpg::gal
         swapChain.stale =
           swapChain.stale || result == VK_ERROR_OUT_OF_DATE_KHR || SuboptimalSwapChainIsStale(swapChain);
       } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        // A surface that went: TestCooperativeLevel lets go of it and takes the next.
         swapChain.surfaceLost = swapChain.surfaceLost || result == VK_ERROR_SURFACE_LOST_KHR;
         static int logged = 0;
         if (logged++ < 8) {

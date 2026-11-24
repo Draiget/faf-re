@@ -301,7 +301,11 @@ namespace gpg::gal
     void CreateRootSignature();
     void CreateSwapChains(const DeviceContext& context);
     void CreateRenderTargets();
+    void BindDefaultOutput();
     void ReleaseRenderTargets() noexcept;
+    /** Submits what is recorded and waits until the GPU has finished everything. */
+    void DrainGpu() noexcept;
+    void PresentSwapChains();
     void CheckAvailableFormats(DeviceContext* context);
     void CreateBuiltInPipelines();
     void Shutdown() noexcept;
@@ -617,6 +621,12 @@ namespace gpg::gal
     bool mTracing = false;
     std::set<int> mLoggedMessages;
     bool mRemovalReported = false;
+    // A present a head's chain keeps refusing asks the engine for a Reset
+    // (TestCooperativeLevel answers 1), which builds that head's chain again,
+    // three times in a row at most for each head.
+    bool mRecoverRequested = false;
+    std::vector<bool> mRecoverHeads;            // per head: its chain is made again by the next Reset
+    std::vector<std::uint32_t> mHeadRecoveries; // per head: Resets asked for since its last present that went through
     bool mDredEnabled = false;
     // With DRED: numbered markers around each draw, dispatch and copy, written
     // by the GPU into system memory that survives a device removal (reached
