@@ -683,16 +683,27 @@ namespace
     return InputTarget(top);
   }
 
-  void Deliver(
+  // True when a handler took the event (ran and didn't Skip it), as ProcessEvent reports it.
+  bool Deliver(
     ShellWindow* const window,
     ShellEvent& event
   )
   {
     event.SetEventObject(window);
     if (ShellEvtHandler* const handler = window->GetEventHandler(); handler != nullptr) {
-      (void)handler->ProcessEvent(event);
+      return handler->ProcessEvent(event);
     }
+    return false;
   }
+
+  // The 2.4.2 window library's m_lastKeydownProcessed (wxWindow::MSWWindowProc, 0x0096D110): WM_KEYDOWN
+  // stores whether its key-down handlers took the key (bit 0x08 of the window's flag byte at +0x110,
+  // 0x0096D530), and the next WM_CHAR, when that is set, only clears it and is not delivered
+  // (0x0096D639). So a key the game acts on at key-down types nothing: Enter opens the chat
+  // (CUIKeyHandler::OnKeyDown doesn't skip it), and its character must not then reach the chat's new,
+  // empty edit box, whose OnEnterPressed closes the window again (issue #488). Each key-down sets it
+  // anew; the character after it (DeliverCharForKey's, or SDL's text event) consumes it.
+  bool sLastKeyDownProcessed = false;
 
   // Native children follow their parent's moves (their screen origin) and, as Frame::OnSize did
   // for a frame's only child, fill its client area when it is the only child.
@@ -748,7 +759,7 @@ namespace
     Deliver(target, event);
   }
 
-  void DeliverKey(
+  bool DeliverKey(
     ShellWindow* const top,
     const ShellEventType type,
     const long keyCode,
@@ -764,7 +775,23 @@ namespace
     // WM_KEYDOWN's wParam and lParam: the virtual key, and bit 30 when the key was already down.
     event.m_rawCode = static_cast<ShellUint32>(source.virtualKey);
     event.m_rawFlags = source.repeat ? (1u << 30) : 0u;
-    Deliver(target, event);
+    return Deliver(target, event);
+  }
+
+  // A character event for a key: dropped when the key-down before it was processed (see
+  // sLastKeyDownProcessed), which it consumes.
+  void DeliverChar(
+    ShellWindow* const top,
+    const long keyCode,
+    const platform::window::Event& source,
+    const bool controlOverride
+  )
+  {
+    if (sLastKeyDownProcessed) {
+      sLastKeyDownProcessed = false;
+      return;
+    }
+    (void)DeliverKey(top, SHELL_EVT_CHAR, keyCode, source, controlOverride);
   }
 
   // The 2.4.2 window library (src/msw/window.cpp) sends a char event for a key Windows gives no WM_CHAR for, with
@@ -779,22 +806,22 @@ namespace
     const bool control = (source.modifiers & platform::window::kModifierControl) != 0;
     switch (virtualKey) {
     case VK_BACK:
-      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_BACK, source, false);
+      DeliverChar(top, SHELL_KEY_BACK, source, false);
       return;
     case VK_TAB:
-      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_TAB, source, false);
+      DeliverChar(top, SHELL_KEY_TAB, source, false);
       return;
     case VK_RETURN:
-      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_RETURN, source, false);
+      DeliverChar(top, SHELL_KEY_RETURN, source, false);
       return;
     case VK_ESCAPE:
-      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_ESCAPE, source, false);
+      DeliverChar(top, SHELL_KEY_ESCAPE, source, false);
       return;
     default:
       break;
     }
     if (control && virtualKey >= 'A' && virtualKey <= 'Z') {
-      DeliverKey(top, SHELL_EVT_CHAR, virtualKey - 'A' + 1, source, true);
+      DeliverChar(top, virtualKey - 'A' + 1, source, true);
       return;
     }
     // Keys that type nothing: arrows, function keys, navigation, modifiers.
@@ -803,7 +830,7 @@ namespace
       (virtualKey >= VK_OEM_1 && virtualKey <= VK_OEM_3) || (virtualKey >= VK_OEM_4 && virtualKey <= VK_OEM_7);
     if (!typesText) {
       if (const int code = ShellKeyFromVirtualKey(virtualKey); code != 0) {
-        DeliverKey(top, SHELL_EVT_CHAR, code, source, false);
+        DeliverChar(top, code, source, false);
       }
     }
   }
@@ -969,7 +996,7 @@ namespace
     case EventType::KeyDown: {
       // The 2.4.2 window library HandleKeyDown: the window-library code of a special key, else the virtual key itself.
       const int code = ShellKeyFromVirtualKey(source.virtualKey);
-      DeliverKey(top, SHELL_EVT_KEY_DOWN, code != 0 ? code : source.virtualKey, source, false);
+      sLastKeyDownProcessed = DeliverKey(top, SHELL_EVT_KEY_DOWN, code != 0 ? code : source.virtualKey, source, false);
       DeliverCharForKey(top, source);
       return;
     }
@@ -979,7 +1006,7 @@ namespace
       return;
     }
     case EventType::Text:
-      DeliverKey(top, SHELL_EVT_CHAR, static_cast<long>(source.codepoint), source, false);
+      DeliverChar(top, static_cast<long>(source.codepoint), source, false);
       return;
     default:
       return;
