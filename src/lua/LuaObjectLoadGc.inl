@@ -431,13 +431,38 @@ extern "C" void traversetable(
     *weaklist = valtogco(h);
   }
 
+  // Engine addition (lua_GcPrefetch): ask for the object kPrefetchAhead slots further down the walk,
+  // so its mark byte is on its way while this slot's is tested. A prefetch reads nothing and faults on
+  // nothing; the marks and the gray list come out as without it.
+  constexpr int kPrefetchAhead = 8;
+  const bool prefetch = moho::lua_GcPrefetch;
+  auto prefetchCollectable = [](const TObject& slot) {
+    if (slot.tt >= LUA_TSTRING) {
+      __builtin_prefetch(static_cast<const GCObject*>(slot.value.p));
+    }
+  };
+
   if (!weakvalue) {
     for (int index = h->sizearray; index != 0; --index) {
+      if (prefetch && index > kPrefetchAhead) {
+        prefetchCollectable(h->array[index - 1 - kPrefetchAhead]);
+      }
       markCollectable(h->array[index - 1]);
     }
   }
 
   for (int index = 1 << h->lsizenode; index != 0; --index) {
+    if (prefetch && index > kPrefetchAhead) {
+      const Node& ahead = h->node[index - 1 - kPrefetchAhead];
+      if (ahead.i_val.tt != LUA_TNIL) {
+        if (!weakkey && ahead.KeyTag() >= LUA_TSTRING) {
+          __builtin_prefetch(static_cast<const GCObject*>(ahead.KeyValue().p));
+        }
+        if (!weakvalue) {
+          prefetchCollectable(ahead.i_val);
+        }
+      }
+    }
     Node* const node = &h->node[index - 1];
     if (node->i_val.tt != LUA_TNIL) {
       condMarkCollectable(node->Key(), !weakkey);
@@ -812,7 +837,13 @@ extern "C" int sweeplist(
   GCObject* current = *currentLink;
   int reclaimedCount = 0;
 
+  const bool prefetch = moho::lua_GcPrefetch;
   while (current != tail) {
+    // Engine addition (lua_GcPrefetch): the next object's header is on its way while this one is
+    // classified and perhaps freed.
+    if (prefetch) {
+      __builtin_prefetch(current->gch.next);
+    }
     const lu_byte markByte = current->gch.marked;
     // FAF hot-patch (FA-Binary-Patches weakgcmarkerFix, #73): the stock binary
     // compared the whole byte (`mov cl, [eax+5]; movzx edx, cl; cmp edx, limit`),

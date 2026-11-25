@@ -1345,6 +1345,12 @@ namespace gpg
   RRef REF_UpcastPtr(const RRef& source, const RType* targetType);
 
   /**
+   * Engine addition: when this points at true, `REF_UpcastPtr` remembers on each thread, per source and
+   * target type, the base offset a successful walk found (moho's `lua_FastBindings` sets it).
+   */
+  extern const bool* REF_UpcastCacheEnabled;
+
+  /**
    * Address: 0x00582080 (FUN_00582080, gpg::RRef_int pack lane)
    *
    * What it does:

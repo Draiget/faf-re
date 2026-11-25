@@ -75,6 +75,20 @@ namespace moho
     &sim_BlueprintLookupFast
   );
 
+  /**
+   * Engine addition: switch for the per-thread cache in front of the unit and entity blueprint
+   * lookups by name. Live; the cache only keeps an answer the maps gave for exactly that name, and
+   * `gBlueprintMapEpoch` drops every entry once any rules object is made, freed or gains a blueprint.
+   */
+  bool sim_BlueprintLookupCache = true;
+  TConVar<bool> gTConVar_sim_BlueprintLookupCache(
+    "sim_BlueprintLookupCache",
+    "Remember unit and entity blueprint lookups by name on each thread until a blueprint map changes (same results).",
+    &sim_BlueprintLookupCache
+  );
+
+  std::atomic<std::uint32_t> gBlueprintMapEpoch{1u};
+
   bool gRuleKeepScriptBlueprints = false;
 
   /**
@@ -228,9 +242,13 @@ namespace moho
     template <typename TBlueprint>
     [[nodiscard]] TBlueprint* LookupBlueprintByResId(
       const RRuleGameRulesBlueprintMap& map,
-      const RResId& resId
+      const RResId& resId,
+      bool* const outFoundByExactName = nullptr
     ) noexcept
     {
+      if (outFoundByExactName != nullptr) {
+        *outFoundByExactName = false;
+      }
       if (resId.name.empty()) {
         return nullptr;
       }
@@ -244,6 +262,9 @@ namespace moho
         const auto found = fastLookup ? map.find(resId.name) : map.find(fa::string(resId.name.view()));
         found != map.end()
       ) {
+        if (outFoundByExactName != nullptr) {
+          *outFoundByExactName = true;
+        }
         return static_cast<TBlueprint*>(found->second);
       }
 
@@ -268,6 +289,85 @@ namespace moho
       }
 
       return static_cast<TBlueprint*>(fallbackFound->second);
+    }
+
+    /**
+     * Engine addition (sim_BlueprintLookupCache): one thread's memory of blueprint lookups by name.
+     * An entry holds only a blueprint the maps returned for exactly that name (no normalized retry),
+     * copied name and all, so a hit is the answer the maps would give again while the epoch stands:
+     * the maps only gain entries (`GetOrCreateRegisteredBlueprint`), never lose or replace one,
+     * until their rules object is freed, and both bump the epoch.
+     */
+    enum class BlueprintCacheKind : std::uint8_t
+    {
+      Unit = 1,
+      Entity = 2,
+    };
+
+    struct BlueprintCacheEntry
+    {
+      const RRuleGameRulesImpl* rules = nullptr;
+      void* blueprint = nullptr;
+      std::uint32_t epoch = 0u;
+      BlueprintCacheKind kind{};
+      std::uint8_t length = 0u;
+      char name[46]{};
+    };
+
+    constexpr std::size_t kBlueprintCacheSlots = 256u;
+    thread_local BlueprintCacheEntry tBlueprintCache[kBlueprintCacheSlots];
+
+    [[nodiscard]] std::size_t BlueprintCacheSlot(
+      const std::string_view name,
+      const BlueprintCacheKind kind
+    ) noexcept
+    {
+      std::uint32_t hash = 2166136261u ^ static_cast<std::uint32_t>(kind);
+      for (const char ch : name) {
+        hash = (hash ^ static_cast<std::uint8_t>(ch)) * 16777619u;
+      }
+      return (hash ^ (hash >> 16)) & (kBlueprintCacheSlots - 1u);
+    }
+
+    [[nodiscard]] void* FindCachedBlueprint(
+      const RRuleGameRulesImpl* const rules,
+      const BlueprintCacheKind kind,
+      const std::string_view name
+    ) noexcept
+    {
+      if (name.empty() || name.size() > sizeof(BlueprintCacheEntry::name)) {
+        return nullptr;
+      }
+      const BlueprintCacheEntry& entry = tBlueprintCache[BlueprintCacheSlot(name, kind)];
+      if (
+        entry.rules != rules || entry.kind != kind || entry.length != name.size() ||
+        entry.epoch != gBlueprintMapEpoch.load(std::memory_order_acquire) ||
+        std::memcmp(entry.name, name.data(), name.size()) != 0
+      ) {
+        return nullptr;
+      }
+      return entry.blueprint;
+    }
+
+    void RememberBlueprint(
+      const RRuleGameRulesImpl* const rules,
+      const BlueprintCacheKind kind,
+      const std::string_view name,
+      void* const blueprint,
+      const std::uint32_t epochBeforeLookup
+    ) noexcept
+    {
+      if (blueprint == nullptr || name.empty() || name.size() > sizeof(BlueprintCacheEntry::name)) {
+        return;
+      }
+      BlueprintCacheEntry& entry = tBlueprintCache[BlueprintCacheSlot(name, kind)];
+      entry.rules = rules;
+      entry.blueprint = blueprint;
+      // The epoch read before the search: a map that changed during it leaves an entry no lookup accepts.
+      entry.epoch = epochBeforeLookup;
+      entry.kind = kind;
+      entry.length = static_cast<std::uint8_t>(name.size());
+      std::memcpy(entry.name, name.data(), name.size());
     }
 
     [[nodiscard]] LuaPlus::LuaState* ResolveRootState(
@@ -813,6 +913,7 @@ namespace moho
     , mBlueprintsByOrdinal()
     , mEntityCategoryLookup(nullptr)
   {
+    gBlueprintMapEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_BlueprintLookupCache
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
     lua::NameLuaVm(mLuaState->m_state, "GameRules"); // diagnostics label only
 
@@ -940,6 +1041,7 @@ namespace moho
    */
   RRuleGameRulesImpl::~RRuleGameRulesImpl()
   {
+    gBlueprintMapEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_BlueprintLookupCache
     // Engine addition: a sim Lua state prepared for these rules that no sim took holds an export
     // binding into them; it goes first.
     SIM_DiscardPreparedLuaState(this);
@@ -1459,15 +1561,33 @@ namespace moho
     const RResId& resId
   )
   {
-    if (RUnitBlueprint* const unit = GetUnitBlueprint(resId)) {
-      return static_cast<REntityBlueprint*>(unit);
+    // Engine addition (sim_BlueprintLookupCache): the same three searches, remembered by name.
+    const bool useCache = sim_BlueprintLookupCache;
+    const std::string_view name = resId.name.view();
+    if (useCache) {
+      if (void* const cached = FindCachedBlueprint(this, BlueprintCacheKind::Entity, name)) {
+        return static_cast<REntityBlueprint*>(cached);
+      }
+    }
+    const std::uint32_t epoch = gBlueprintMapEpoch.load(std::memory_order_acquire);
+
+    bool exact = false;
+    REntityBlueprint* found = nullptr;
+    if (RUnitBlueprint* const unit = LookupBlueprintByResId<RUnitBlueprint>(mUnitBlueprints, resId, &exact)) {
+      found = static_cast<REntityBlueprint*>(unit);
+    } else if (
+      RProjectileBlueprint* const projectile =
+        LookupBlueprintByResId<RProjectileBlueprint>(mProjectileBlueprints, resId, &exact)
+    ) {
+      found = static_cast<REntityBlueprint*>(projectile);
+    } else {
+      found = static_cast<REntityBlueprint*>(LookupBlueprintByResId<RPropBlueprint>(mPropBlueprints, resId, &exact));
     }
 
-    if (RProjectileBlueprint* const projectile = GetProjectileBlueprint(resId)) {
-      return static_cast<REntityBlueprint*>(projectile);
+    if (useCache && exact) {
+      RememberBlueprint(this, BlueprintCacheKind::Entity, name, found, epoch);
     }
-
-    return static_cast<REntityBlueprint*>(GetPropBlueprint(resId));
+    return found;
   }
 
   /**
@@ -1477,7 +1597,22 @@ namespace moho
     const RResId& resId
   )
   {
-    return LookupBlueprintByResId<RUnitBlueprint>(mUnitBlueprints, resId);
+    // Engine addition (sim_BlueprintLookupCache), see GetEntityBlueprint.
+    const bool useCache = sim_BlueprintLookupCache;
+    const std::string_view name = resId.name.view();
+    if (useCache) {
+      if (void* const cached = FindCachedBlueprint(this, BlueprintCacheKind::Unit, name)) {
+        return static_cast<RUnitBlueprint*>(cached);
+      }
+    }
+    const std::uint32_t epoch = gBlueprintMapEpoch.load(std::memory_order_acquire);
+
+    bool exact = false;
+    RUnitBlueprint* const found = LookupBlueprintByResId<RUnitBlueprint>(mUnitBlueprints, resId, &exact);
+    if (useCache && exact) {
+      RememberBlueprint(this, BlueprintCacheKind::Unit, name, found, epoch);
+    }
+    return found;
   }
 
   /**

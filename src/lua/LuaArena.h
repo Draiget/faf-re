@@ -91,3 +91,17 @@ namespace lua
   [[nodiscard]] ArenaUsage ArenaReadUsage() noexcept;
 } // namespace lua
 #endif
+
+namespace lua
+{
+  /**
+   * Engine additions, inert on 32-bit builds (no range there):
+   * - `gArenaPrefetch` (lua_ArenaPrefetch): taking a small block asks for the next free block of its
+   *   size, so the next allocation finds its list link in cache. The same blocks in the same order.
+   * - `gArenaHugePages` (lua_ArenaHugePages, Linux): the range is committed in 2 MB steps and advised
+   *   for transparent huge pages, so table and string reads miss the TLB less. Addresses are unchanged.
+   *   The environment variable FAF_LUA_HUGEPAGES=0 turns it off before the first commit.
+   */
+  extern bool gArenaPrefetch;
+  extern bool gArenaHugePages;
+} // namespace lua

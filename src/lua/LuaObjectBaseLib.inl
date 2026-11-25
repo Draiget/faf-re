@@ -1641,6 +1641,30 @@ namespace moho
    */
   bool lua_ParallelSweep = true;
 
+  /**
+   * Engine addition: `lua_GcPrefetch`, see LuaIncrementalGc.h. Live.
+   */
+  bool lua_GcPrefetch = true;
+
+  TConVar<bool> gTConVar_lua_GcPrefetch(
+    "lua_GcPrefetch",
+    "Ask for the next Lua objects ahead while a collection walks a table or sweeps a list (same results).",
+    &lua_GcPrefetch
+  );
+
+  TConVar<bool> gTConVar_lua_ArenaPrefetch(
+    "lua_ArenaPrefetch",
+    "Ask for the next free Lua block of a size whenever one is taken (x64; same blocks, same order).",
+    &lua::gArenaPrefetch
+  );
+
+  TConVar<bool> gTConVar_lua_ArenaHugePages(
+    "lua_ArenaHugePages",
+    "Linux x64: commit the Lua heap in 2 MB steps advised for transparent huge pages (next commits; "
+    "FAF_LUA_HUGEPAGES=0 at start).",
+    &lua::gArenaHugePages
+  );
+
   TConVar<bool> gTConVar_lua_ParallelSweep(
     "lua_ParallelSweep",
     "Sort live from dead objects of the sim Lua heap on the sim worker threads during a sweep (same results).",

@@ -2174,6 +2174,31 @@ LuaObject LuaObject::GetByName(
 }
 
 /**
+ * Engine addition (lua_FastBindings), see the declaration: `operator[](const char*)` without the
+ * result object.
+ */
+const TObject* LuaObject::RawSlotByName(
+  const char* const name
+) const
+{
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(name != nullptr, "name");
+
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
+
+  if (m_object.tt != LUA_TTABLE) {
+    luaG_typeerror(lstate, &m_object, "index");
+  }
+
+  const TString* const internedKey = FindInternedString(lstate, name);
+  if (internedKey == nullptr) {
+    return nullptr;
+  }
+  return luaH_getstr(static_cast<Table*>(m_object.value.p), const_cast<TString*>(internedKey));
+}
+
+/**
  * Address: 0x00908F60 (FUN_00908F60, LuaPlus::LuaObject::operator[])
  *
  * What it does:

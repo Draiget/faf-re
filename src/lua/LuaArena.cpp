@@ -192,6 +192,22 @@ namespace
     }
   }
 
+  constexpr std::size_t kHugePageCommitBytes = 2u * 1024u * 1024u;
+
+  /// lua_ArenaHugePages on Linux, unless FAF_LUA_HUGEPAGES=0 (read at the first commit).
+  [[nodiscard]] bool HugePagesWanted() noexcept
+  {
+#if FAFRE_PLATFORM_LINUX // transparent huge pages are a Linux feature
+    static const bool allowed = [] {
+      const char* const value = std::getenv("FAF_LUA_HUGEPAGES");
+      return value == nullptr || std::strcmp(value, "0") != 0;
+    }();
+    return allowed && lua::gArenaHugePages;
+#else
+    return false;
+#endif
+  }
+
   [[nodiscard]] bool CommitThrough(
     const std::size_t endBytes
   ) noexcept
@@ -199,8 +215,10 @@ namespace
     if (endBytes <= gCommittedBytes) {
       return true;
     }
-    const std::size_t want =
-      (endBytes - gCommittedBytes + kCommitChunkBytes - 1u) / kCommitChunkBytes * kCommitChunkBytes;
+    // Engine addition (lua_ArenaHugePages): 2 MB steps, so every step is whole huge pages (the range
+    // starts on a 16 MB boundary).
+    const std::size_t chunk = HugePagesWanted() ? kHugePageCommitBytes : kCommitChunkBytes;
+    const std::size_t want = (endBytes - gCommittedBytes + chunk - 1u) / chunk * chunk;
     const std::size_t commit = (want > gReserveBytes - gCommittedBytes) ? gReserveBytes - gCommittedBytes : want;
     void* const start = reinterpret_cast<void*>(gBase + gCommittedBytes);
 #if FAFRE_PLATFORM_WINDOWS
@@ -211,6 +229,11 @@ namespace
     if (::mprotect(start, commit, PROT_READ | PROT_WRITE) != 0) {
       return false;
     }
+#if FAFRE_PLATFORM_LINUX // MADV_HUGEPAGE is Linux's transparent huge page advice
+    if (HugePagesWanted()) {
+      (void)::madvise(start, commit, MADV_HUGEPAGE);
+    }
+#endif
 #endif
     gCommittedBytes += commit;
     return endBytes <= gCommittedBytes;
@@ -552,6 +575,9 @@ namespace lua
       lists.count[sizeClass] = count;
     }
     lists.head[sizeClass] = block->next;
+    if (gArenaPrefetch && block->next != nullptr) {
+      __builtin_prefetch(block->next); // engine addition (lua_ArenaPrefetch)
+    }
     --lists.count[sizeClass];
     if (lists.retired) {
       ReturnAll(lists);
@@ -667,3 +693,9 @@ namespace lua
 } // namespace lua
 
 #endif
+
+namespace lua
+{
+  bool gArenaPrefetch = true;
+  bool gArenaHugePages = true;
+} // namespace lua

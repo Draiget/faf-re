@@ -2,10 +2,15 @@
 
 #include "legacy/math/X87Math.h"
 
+#include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <new>
+#include <vector>
 #include "legacy/thread/Mutex.h"
+#include "moho/console/CConCommand.h"
 
 namespace
 {
@@ -56,11 +61,182 @@ namespace
     return lhs.x0 < rhs.x1 && rhs.x0 < lhs.x1 && lhs.z0 < rhs.z1 && rhs.z0 < lhs.z1 && HasPositiveArea(lhs) &&
       HasPositiveArea(rhs);
   }
+
+  /**
+   * DepositIsInArea's test of one deposit, as the binary orders it (see that function's comment).
+   */
+  [[nodiscard]] bool DepositContainsOrIsContained(
+    const gpg::Rect2i& rect,
+    const gpg::Rect2i& area
+  ) noexcept
+  {
+    if (area.x0 <= rect.x0) {
+      if (area.x1 >= rect.x1 && rect.z0 >= area.z0 && area.z1 >= rect.z1) {
+        return true;
+      }
+      if (area.x0 < rect.x0) {
+        return false;
+      }
+    }
+    return rect.x1 >= area.x1 && area.z0 >= rect.z0 && rect.z1 >= area.z1;
+  }
+
+  /**
+   * AreaHasDeposit's test of one deposit of `type`.
+   */
+  [[nodiscard]] bool DepositOverlapsArea(
+    const moho::ResourceDeposit& deposit,
+    const moho::EDepositType type,
+    const gpg::Rect2f& area
+  ) noexcept
+  {
+    float minX = 0.0f;
+    float minZ = 0.0f;
+    float maxX = 0.0f;
+    float maxZ = 0.0f;
+    if (type == moho::kMass) {
+      minX = static_cast<float>(deposit.footprintRect.x0) - 0.5f;
+      minZ = static_cast<float>(deposit.footprintRect.z0) - 0.5f;
+      maxX = static_cast<float>(deposit.footprintRect.x1) + 0.5f;
+      maxZ = static_cast<float>(deposit.footprintRect.z1) + 0.5f;
+    } else if (type == moho::kHydrocarbon) {
+      minX = static_cast<float>(deposit.footprintRect.x0) - 1.5f;
+      minZ = static_cast<float>(deposit.footprintRect.z0) - 1.5f;
+      maxX = static_cast<float>(deposit.footprintRect.x1) + 1.5f;
+      maxZ = static_cast<float>(deposit.footprintRect.z1) + 1.5f;
+    }
+
+    const bool overlaps = maxX > area.x0 && area.x1 > minX && maxZ > area.z0 && area.z1 > minZ;
+    return overlaps && HasPositiveArea(area) && maxX > minX && minZ < maxZ;
+  }
+
+  /**
+   * Engine addition (sim_DepositIndex): each thread's index of one deposit list, the deposits of
+   * each type sorted by `x0`. Both queries only ask whether any deposit passes their test, so testing
+   * every deposit whose `x0` could pass, in any order, gives the scan's answer. Rebuilt when the
+   * list's owner, buffer or length differs, or `gDepositEpoch` moved (a deposit added, a resources
+   * object made or freed).
+   */
+  std::atomic<std::uint32_t> gDepositEpoch{1u};
+
+  struct DepositTypeIndex
+  {
+    std::vector<std::uint32_t> byX0; // indices into the list, ordered by footprintRect.x0
+    std::vector<int> x0;             // the same order's x0, for the binary search
+    std::int64_t minWidth = 0;
+    std::int64_t maxWidth = 0;
+  };
+
+  struct DepositIndex
+  {
+    const void* owner = nullptr;
+    const moho::ResourceDeposit* data = nullptr;
+    std::size_t size = 0;
+    std::uint32_t epoch = 0;
+    DepositTypeIndex types[2]; // kMass, kHydrocarbon
+  };
+
+  thread_local DepositIndex tDepositIndex;
+
+  [[nodiscard]] const DepositTypeIndex* FindDepositTypeIndex(
+    const void* const owner,
+    const fa::vector<moho::ResourceDeposit>& deposits,
+    const moho::EDepositType type
+  )
+  {
+    if (type != moho::kMass && type != moho::kHydrocarbon) {
+      return nullptr;
+    }
+    DepositIndex& index = tDepositIndex;
+    const std::uint32_t epoch = gDepositEpoch.load(std::memory_order_acquire);
+    if (
+      index.owner != owner || index.data != deposits.data() || index.size != deposits.size() || index.epoch != epoch
+    ) {
+      index.owner = owner;
+      index.data = deposits.data();
+      index.size = deposits.size();
+      index.epoch = epoch;
+      for (int slot = 0; slot < 2; ++slot) {
+        DepositTypeIndex& typeIndex = index.types[slot];
+        const moho::EDepositType slotType = slot == 0 ? moho::kMass : moho::kHydrocarbon;
+        typeIndex.byX0.clear();
+        typeIndex.x0.clear();
+        typeIndex.minWidth = 0;
+        typeIndex.maxWidth = 0;
+        bool first = true;
+        for (std::size_t i = 0; i < deposits.size(); ++i) {
+          const moho::ResourceDeposit& deposit = deposits.data()[i];
+          if (deposit.depositType != slotType) {
+            continue;
+          }
+          typeIndex.byX0.push_back(static_cast<std::uint32_t>(i));
+          const std::int64_t width =
+            static_cast<std::int64_t>(deposit.footprintRect.x1) - static_cast<std::int64_t>(deposit.footprintRect.x0);
+          typeIndex.minWidth = first ? width : (std::min)(typeIndex.minWidth, width);
+          typeIndex.maxWidth = first ? width : (std::max)(typeIndex.maxWidth, width);
+          first = false;
+        }
+        const moho::ResourceDeposit* const base = deposits.data();
+        std::stable_sort(
+          typeIndex.byX0.begin(), typeIndex.byX0.end(), [base](const std::uint32_t a, const std::uint32_t b) {
+          return base[a].footprintRect.x0 < base[b].footprintRect.x0;
+        }
+        );
+        typeIndex.x0.reserve(typeIndex.byX0.size());
+        for (const std::uint32_t i : typeIndex.byX0) {
+          typeIndex.x0.push_back(base[i].footprintRect.x0);
+        }
+      }
+    }
+    return &index.types[type == moho::kMass ? 0 : 1];
+  }
+
+  /// Calls `test(deposit)` for each indexed deposit whose x0 lies in [lo, hi]; true at the first pass.
+  template <typename Test>
+  [[nodiscard]] bool AnyIndexedDepositInX0Range(
+    const DepositTypeIndex& typeIndex,
+    const moho::ResourceDeposit* const deposits,
+    const std::int64_t lo,
+    const std::int64_t hi,
+    Test test
+  )
+  {
+    if (lo > hi) {
+      return false;
+    }
+    const auto begin =
+      std::lower_bound(typeIndex.x0.begin(), typeIndex.x0.end(), lo, [](const int value, const std::int64_t bound) {
+      return static_cast<std::int64_t>(value) < bound;
+    });
+    for (auto it = begin; it != typeIndex.x0.end() && static_cast<std::int64_t>(*it) <= hi; ++it) {
+      if (test(deposits[typeIndex.byX0[static_cast<std::size_t>(it - typeIndex.x0.begin())]])) {
+        return true;
+      }
+    }
+    return false;
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* CSimResources::sType = nullptr;
+
+  void RES_NoteDepositsChanged() noexcept
+  {
+    gDepositEpoch.fetch_add(1u, std::memory_order_acq_rel);
+  }
+
+  /**
+   * Engine addition: `DepositIsInArea` and `AreaHasDeposit` test only the deposits whose position
+   * could pass, found in a per-thread index sorted by x (see `FindDepositTypeIndex`). Live; both
+   * answer whether any deposit passes, so the answer is the full scan's.
+   */
+  bool sim_DepositIndex = true;
+  TConVar<bool> gTConVar_sim_DepositIndex(
+    "sim_DepositIndex",
+    "Find the deposits a build-site check can touch through an index instead of testing every deposit (same results).",
+    &sim_DepositIndex
+  );
 
   /**
    * Address: 0x00545DC0 (FUN_00545DC0, ??0CSimResources@Moho@@QAE@@Z)
@@ -68,7 +244,10 @@ namespace moho
    * What it does:
    * Constructs mutex/vector members for resource deposit bookkeeping.
    */
-  CSimResources::CSimResources() = default;
+  CSimResources::CSimResources()
+  {
+    gDepositEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_DepositIndex
+  }
 
   /**
    * Address: 0x00546E90 (FUN_00546E90, Moho::CSimResources::operator new)
@@ -99,7 +278,10 @@ namespace moho
    * Destructs mutex/vector members (deleting-thunk behavior is compiler
    * generated).
    */
-  CSimResources::~CSimResources() = default;
+  CSimResources::~CSimResources()
+  {
+    gDepositEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_DepositIndex
+  }
 
   /**
    * Address: 0x00545F10 (FUN_00545F10, Moho::CSimResources::AddDeposit)
@@ -118,6 +300,7 @@ namespace moho
     deposit.footprintRect = *pos;
     deposit.depositType = type;
     deposits_.push_back(deposit);
+    gDepositEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_DepositIndex
   }
 
   /**
@@ -252,22 +435,25 @@ namespace moho
   )
   {
     fa::mutex::scoped_lock lock(lock_);
+    if (sim_DepositIndex) {
+      if (const DepositTypeIndex* const index = FindDepositTypeIndex(this, deposits_, type)) {
+        // A pass needs x0 in [area.x0, area.x1 - width] (the area encloses the deposit) or
+        // [area.x1 - width, area.x0] (the deposit encloses the area), for the deposit's own width.
+        const std::int64_t ax0 = area->x0;
+        const std::int64_t ax1 = area->x1;
+        const std::int64_t lo = (std::min)(ax0, ax1 - index->maxWidth);
+        const std::int64_t hi = (std::max)(ax1 - index->minWidth, ax0);
+        const gpg::Rect2i query = *area;
+        return AnyIndexedDepositInX0Range(*index, deposits_.data(), lo, hi, [&query](const ResourceDeposit& deposit) {
+          return DepositContainsOrIsContained(deposit.footprintRect, query);
+        });
+      }
+    }
     for (const ResourceDeposit& deposit : deposits_) {
       if (deposit.depositType != type) {
         continue;
       }
-
-      const gpg::Rect2i& rect = deposit.footprintRect;
-      if (area->x0 <= rect.x0) {
-        if (area->x1 >= rect.x1 && rect.z0 >= area->z0 && area->z1 >= rect.z1) {
-          return true;
-        }
-        if (area->x0 < rect.x0) {
-          continue;
-        }
-      }
-
-      if (rect.x1 >= area->x1 && area->z0 >= rect.z0 && rect.z1 >= area->z1) {
+      if (DepositContainsOrIsContained(deposit.footprintRect, *area)) {
         return true;
       }
     }
@@ -348,29 +534,28 @@ namespace moho
   )
   {
     fa::mutex::scoped_lock lock(lock_);
+    // NaN and huge coordinates take the scan: the bounds below need them as 64-bit integers.
+    if (sim_DepositIndex && area->x0 > -1.0e9f && area->x0 < 1.0e9f && area->x1 > -1.0e9f && area->x1 < 1.0e9f) {
+      if (const DepositTypeIndex* const index = FindDepositTypeIndex(this, deposits_, type)) {
+        // A pass needs x1 + margin > area.x0 and area.x1 > x0 - margin (margin 0.5 or 1.5), so x0 lies
+        // within these bounds, widened by a cell against float rounding.
+        const double margin = type == kMass ? 0.5 : 1.5;
+        const std::int64_t lo =
+          static_cast<std::int64_t>(std::floor(static_cast<double>(area->x0) - margin)) - index->maxWidth - 1;
+        const std::int64_t hi = static_cast<std::int64_t>(std::floor(static_cast<double>(area->x1) + margin)) + 1;
+        const gpg::Rect2f query = *area;
+        return AnyIndexedDepositInX0Range(
+          *index, deposits_.data(), lo, hi, [&query, type](const ResourceDeposit& deposit) {
+          return DepositOverlapsArea(deposit, type, query);
+        }
+        );
+      }
+    }
     for (const ResourceDeposit& deposit : deposits_) {
       if (deposit.depositType != type) {
         continue;
       }
-
-      float minX = 0.0f;
-      float minZ = 0.0f;
-      float maxX = 0.0f;
-      float maxZ = 0.0f;
-      if (type == kMass) {
-        minX = static_cast<float>(deposit.footprintRect.x0) - 0.5f;
-        minZ = static_cast<float>(deposit.footprintRect.z0) - 0.5f;
-        maxX = static_cast<float>(deposit.footprintRect.x1) + 0.5f;
-        maxZ = static_cast<float>(deposit.footprintRect.z1) + 0.5f;
-      } else if (type == kHydrocarbon) {
-        minX = static_cast<float>(deposit.footprintRect.x0) - 1.5f;
-        minZ = static_cast<float>(deposit.footprintRect.z0) - 1.5f;
-        maxX = static_cast<float>(deposit.footprintRect.x1) + 1.5f;
-        maxZ = static_cast<float>(deposit.footprintRect.z1) + 1.5f;
-      }
-
-      const bool overlaps = maxX > area->x0 && area->x1 > minX && maxZ > area->z0 && area->z1 > minZ;
-      if (overlaps && HasPositiveArea(*area) && maxX > minX && minZ < maxZ) {
+      if (DepositOverlapsArea(deposit, type, *area)) {
         return true;
       }
     }

@@ -586,13 +586,13 @@ namespace gpg
   }
 
   /**
-   * Address: 0x008D9590 (FUN_008D9590, gpg::REF_UpcastPtr)
+   * The body of 0x008D9590 (`REF_UpcastPtr`, below), recursion and all.
    *
    * What it does:
    * Recursively traverses reflected base lanes to find one compatible base pointer
    * view and returns `{nullptr, targetType}` for null-object upcast lanes.
    */
-  RRef REF_UpcastPtr(
+  static RRef UpcastWalk(
     const RRef& source,
     const RType* const targetType
   )
@@ -620,13 +620,73 @@ namespace gpg
       baseRef.mObj = static_cast<std::byte*>(source.mObj) + base->mOffset;
       baseRef.mType = base->mType;
 
-      const RRef upcast = REF_UpcastPtr(baseRef, targetType);
+      const RRef upcast = UpcastWalk(baseRef, targetType);
       if (upcast.mObj) {
         return upcast;
       }
     }
 
     return {};
+  }
+
+  const bool* REF_UpcastCacheEnabled = nullptr;
+
+  namespace
+  {
+    /// Engine addition (REF_UpcastCacheEnabled): one thread's successful walks, as the offset from the
+    /// source object to its base. Base offsets are fixed per type, so a walk from the same source type to
+    /// the same target finds the same offset for any object.
+    struct UpcastCacheEntry
+    {
+      const RType* source = nullptr;
+      const RType* target = nullptr;
+      std::ptrdiff_t offset = 0;
+    };
+    constexpr std::size_t kUpcastCacheSlots = 128u;
+    thread_local UpcastCacheEntry tUpcastCache[kUpcastCacheSlots];
+
+    [[nodiscard]] std::size_t UpcastCacheSlot(
+      const RType* const source,
+      const RType* const target
+    ) noexcept
+    {
+      const auto a = reinterpret_cast<std::uintptr_t>(source);
+      const auto b = reinterpret_cast<std::uintptr_t>(target);
+      const std::uintptr_t mixed = (a >> 4) ^ (b >> 3) ^ (a >> 11);
+      return static_cast<std::size_t>(mixed) & (kUpcastCacheSlots - 1u);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x008D9590 (FUN_008D9590, gpg::REF_UpcastPtr)
+   *
+   * The binary's recursive walk is `UpcastWalk` above; this adds the per-thread memory of its answers.
+   */
+  RRef REF_UpcastPtr(
+    const RRef& source,
+    const RType* const targetType
+  )
+  {
+    if (
+      source.mType == targetType || !source.mObj || !source.mType || REF_UpcastCacheEnabled == nullptr ||
+      !*REF_UpcastCacheEnabled
+    ) {
+      return UpcastWalk(source, targetType);
+    }
+    UpcastCacheEntry& entry = tUpcastCache[UpcastCacheSlot(source.mType, targetType)];
+    if (entry.source == source.mType && entry.target == targetType) {
+      RRef out{};
+      out.mObj = static_cast<std::byte*>(source.mObj) + entry.offset;
+      out.mType = const_cast<RType*>(targetType);
+      return out;
+    }
+    const RRef upcast = UpcastWalk(source, targetType);
+    if (upcast.mObj != nullptr && upcast.mType == targetType) {
+      entry.source = source.mType;
+      entry.target = targetType;
+      entry.offset = static_cast<std::byte*>(upcast.mObj) - static_cast<std::byte*>(source.mObj);
+    }
+    return upcast;
   }
 
   /**

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -55,6 +56,10 @@ namespace moho
    * copies the rules' Lua blueprints, so `rule_ReleaseScriptBlueprints` has to leave them in place.
    */
   extern bool gRuleKeepScriptBlueprints;
+
+  /// Engine addition (sim_BlueprintLookupCache): bumped whenever a rules object is made or freed or a
+  /// blueprint map gains an entry; cached lookups from an older epoch are not used.
+  extern std::atomic<std::uint32_t> gBlueprintMapEpoch;
   struct LuaReloadRequestNode;
 
   /**

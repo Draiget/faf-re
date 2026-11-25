@@ -2746,10 +2746,65 @@ namespace
   moho::CScriptObjectSerializer gCScriptObjectSerializer;
 } // namespace
 
+namespace moho
+{
+  /**
+   * Engine addition: the Lua-to-engine object lookups (`SCR_ScriptObjectSlot`) read `_c_object`
+   * straight from the table slot, and `REF_UpcastPtr` keeps each thread's answers per pair of
+   * types. Live; the same object comes back, and nothing is allocated in Lua either way.
+   */
+  bool lua_FastBindings = true;
+  TConVar<bool> gTConVar_lua_FastBindings(
+    "lua_FastBindings",
+    "Find the engine object behind a Lua object without temporary Lua references, and remember type casts (same "
+    "results).",
+    &lua_FastBindings
+  );
+
+  struct LuaFastBindingsUpcastLink
+  {
+    LuaFastBindingsUpcastLink() noexcept
+    {
+      gpg::REF_UpcastCacheEnabled = &lua_FastBindings;
+    }
+  };
+  const LuaFastBindingsUpcastLink gLuaFastBindingsUpcastLink;
+} // namespace moho
+
 moho::CScriptObject** moho::SCR_ScriptObjectSlot(
   const LuaPlus::LuaObject& object
 )
 {
+  if (lua_FastBindings) {
+    // The steps below without their LuaObject copies: a table's `_c_object` slot by the same raw
+    // read, then the userdata's ref. Light userdata takes the steps below, which raise on it.
+    const auto* payloadValue = &object.m_object;
+    if (payloadValue->tt == LUA_TTABLE) {
+      if (object.GetActiveState() == nullptr) {
+        return nullptr;
+      }
+      payloadValue = object.RawSlotByName("_c_object");
+      if (payloadValue == nullptr) {
+        return nullptr;
+      }
+    }
+    // An unbound object's own userdata takes the steps below too (GetUserData checks the state).
+    if (payloadValue->tt == LUA_TUSERDATA && (payloadValue != &object.m_object || object.m_state != nullptr)) {
+      auto* const userdata = static_cast<Udata*>(payloadValue->value.p);
+      gpg::RRef userDataRef{};
+      userDataRef.mObj = userdata->Payload();
+      userDataRef.mType = userdata->type;
+      if (!userDataRef.mObj) {
+        return nullptr;
+      }
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CScriptObject::GetPointerType());
+      return static_cast<CScriptObject**>(upcast.mObj);
+    }
+    if (payloadValue->tt != LUA_TLIGHTUSERDATA && payloadValue->tt != LUA_TUSERDATA) {
+      return nullptr;
+    }
+  }
+
   LuaPlus::LuaObject payload(object);
   if (payload.IsTable()) {
     payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");

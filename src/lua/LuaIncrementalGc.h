@@ -15,6 +15,10 @@ namespace moho
   /// the live flag is refreshed by `CaptureIncrementalGcStartupSetting`.
   extern bool lua_IncrementalGCSetting;
 
+  /// Engine addition (`lua_GcPrefetch`): the shipped collector's table traversal and sweep ask for
+  /// the objects a few slots ahead before they reach them. The same marks, frees and order.
+  extern bool lua_GcPrefetch;
+
   /**
    * Copies the configured convar value into the live runtime flag.
    *

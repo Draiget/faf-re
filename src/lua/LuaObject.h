@@ -621,6 +621,14 @@ namespace LuaPlus
     LuaObject GetByName(const char* name) const;
 
     /**
+     * Engine addition (lua_FastBindings): the slot `GetByName` reads, without building a LuaObject
+     * (no link into the state's object list). The same interned-key search and raw table read;
+     * nullptr where `GetByName` answers nil because no such string exists. The pointer is good until
+     * the table changes or the collector runs.
+     */
+    [[nodiscard]] const TObject* RawSlotByName(const char* name) const;
+
+    /**
      * Address: 0x00908F60 (FUN_00908F60, LuaPlus::LuaObject::operator[])
      *
      * What it does:

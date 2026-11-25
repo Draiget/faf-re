@@ -32,6 +32,7 @@ namespace moho
     gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     GPG_ASSERT(vectorType != nullptr);
     archive->Read(vectorType, &deposits_, NullOwnerRef());
+    RES_NoteDepositsChanged(); // engine addition (sim_DepositIndex)
   }
 
   /**

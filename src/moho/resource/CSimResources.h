@@ -143,6 +143,10 @@ namespace moho
     fa::vector<ResourceDeposit> deposits_; // +0x0C
   };
 
+  /// Engine addition (sim_DepositIndex): a deposit list was written outside `AddDeposit` (a load), so
+  /// every thread rebuilds its deposit index.
+  void RES_NoteDepositsChanged() noexcept;
+
   static_assert(std::is_polymorphic<ISimResources>::value, "ISimResources must remain polymorphic");
   static_assert(offsetof(CSimResources, deposits_) == 0x0C, "CSimResources::deposits_ offset must be 0x0C");
   // The sim constructor (FUN_00744060) allocates this with `operator new(0x1Cu)`

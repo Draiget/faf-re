@@ -1271,6 +1271,7 @@ namespace
 
       AppendBlueprintOrdinal(*rules, blueprint);
       RegisterBlueprintInCategoryMaps(*rules, blueprint);
+      gBlueprintMapEpoch.fetch_add(1u, std::memory_order_acq_rel); // sim_BlueprintLookupCache
     }
 
     initializer(blueprintSpec, blueprint);
