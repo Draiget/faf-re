@@ -324,6 +324,14 @@ namespace gpg::gal
       }
       return VK_FALSE;
     }
+
+    /** A pipeline's build refused for want of memory, which a moment later may be there (PipelineRetries). */
+    [[nodiscard]] bool OutOfMemory(
+      const VkResult result
+    ) noexcept
+    {
+      return result == VK_ERROR_OUT_OF_HOST_MEMORY || result == VK_ERROR_OUT_OF_DEVICE_MEMORY;
+    }
   } // namespace
 
   namespace
@@ -413,6 +421,7 @@ namespace gpg::gal
         }
       }
       mPipelines.clear();
+      mPipelineRetries.Clear();
       for (auto& [key, module] : mModules) {
         Vk().vkDestroyShaderModule(mDevice, module, nullptr);
       }
@@ -4262,15 +4271,30 @@ namespace gpg::gal
         mPipelineDeferred = true;
         return VK_NULL_HANDLE;
       }
-      const VkPipeline built = TakeBuiltPipeline(pending->second);
+      PipelineBuildEnd end = PipelineBuildEnd::kRefused;
+      const VkPipeline built = TakeBuiltPipeline(pending->second, &end);
       mPendingPipelines.erase(pending);
-      mPipelines.emplace(std::move(key.Key()), built);
+      if (KeepBuilt(key.Key(), built, end)) {
+        mPipelineDeferred = defer;
+        return VK_NULL_HANDLE;
+      }
       return built;
     }
-    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
-      CollectFinishedPipelines(mPendingPipelines, mPipelines); // finished builds free their slots
+    // Engine addition: one the driver refused for want of memory waits for its next try, and its last try is made in
+    // place, so that it has an answer (PipelineRetries).
+    const PipelineRetries::Turn turn = mPipelineRetries.TurnOf(key.Key(), PipelineRetries::Clock::now());
+    if (turn == PipelineRetries::Turn::kWaiting) {
+      mPipelineDeferred = defer;
+      return VK_NULL_HANDLE;
     }
-    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
+    const bool deferBuild = defer && turn != PipelineRetries::Turn::kLast;
+    if (deferBuild && mPendingPipelines.size() >= kMaxPendingPipelines) {
+      const auto keep = [this](const std::string& done, const VkPipeline built, const PipelineBuildEnd end) {
+        (void)KeepBuilt(done, built, end);
+      };
+      SettleFinishedPipelines(mPendingPipelines, keep); // finished builds free their slots
+    }
+    if (deferBuild && mPendingPipelines.size() >= kMaxPendingPipelines) {
       mPipelineDeferred = true;
       return VK_NULL_HANDLE; // the workers are busy: asked again next frame
     }
@@ -4461,7 +4485,7 @@ namespace gpg::gal
     info.pColorBlendState = &colorBlend;
     info.pDynamicState = &dynamic;
     info.layout = EffectPipelineLayout();
-    if (defer) {
+    if (deferBuild) {
       // The job owns copies of every structure the create info points at (the shader modules are the device's and
       // outlive it: teardown collects pending jobs first). The pipeline cache synchronizes itself.
       struct Job
@@ -4539,7 +4563,7 @@ namespace gpg::gal
           gpg::Warnf(
             "Vulkan: pipeline for %s (vertex format %u) failed: %s", name.c_str(), format, vulkan::ResultName(made)
           );
-          built = VK_NULL_HANDLE; // cached as a failure when taken, as below
+          throw PipelineRefused{OutOfMemory(made)}; // kept as a failure when taken, or tried again (KeepBuilt)
         }
         return built;
       })
@@ -4549,6 +4573,7 @@ namespace gpg::gal
     }
     VkPipeline pipeline = VK_NULL_HANDLE;
     const VkResult result = Vk().vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1U, &info, nullptr, &pipeline);
+    PipelineBuildEnd end = PipelineBuildEnd::kBuilt;
     if (result != VK_SUCCESS) {
       static int logged = 0;
       if (logged++ < 16) {
@@ -4560,9 +4585,27 @@ namespace gpg::gal
         );
       }
       pipeline = VK_NULL_HANDLE;
+      end = OutOfMemory(result) ? PipelineBuildEnd::kRefusedForNow : PipelineBuildEnd::kRefused;
     }
-    mPipelines.emplace(std::move(key.Key()), pipeline);
+    if (KeepBuilt(key.Key(), pipeline, end)) {
+      mPipelineDeferred = defer;
+      return VK_NULL_HANDLE;
+    }
     return pipeline;
+  }
+
+  bool DeviceVulkan::KeepBuilt(
+    const std::string& key,
+    const VkPipeline built,
+    const PipelineBuildEnd end
+  )
+  {
+    if (end == PipelineBuildEnd::kRefusedForNow && mPipelineRetries.Refused(key, PipelineRetries::Clock::now())) {
+      return true;
+    }
+    mPipelineRetries.Forget(key);
+    mPipelines.emplace(key, built);
+    return false;
   }
 
   void DeviceVulkan::CollectPendingPipelines() noexcept
