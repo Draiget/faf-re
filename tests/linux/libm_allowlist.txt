@@ -7,6 +7,8 @@
 # for pow's zero, infinite and NaN operands (IEEE-defined results). asinf, expf and logf use the
 # engine's legacy/math/Libm.cpp (plan WPL.11) and are not listed: a host call there fails.
 acos fa::acos(double)
+# The same acos lane, inlined into acosf by the Android NDK's clang 21.
+acos fa::acosf(float)
 asin fa::asin(double)
 pow fa::pow(double, double)
 # powf: the sim driver's wall-clock pacing only (SimDriver.cpp, the beat rate from the sim rate).

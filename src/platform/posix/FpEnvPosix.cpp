@@ -16,7 +16,8 @@
 //   FPCR 0:          round to nearest, IEEE denormals, NaN propagation, no traps - what
 //                    MXCSR 0x1F80 means on x86 (platform/FpControl.h). The x87 routines are
 //                    software there and set their own precision. A new thread starts at 0 on
-//                    Linux and macOS whatever its creator runs with (tests/linux/ToolchainCheck),
+//                    macOS whatever its creator runs with, and with its creator's FPCR on Linux
+//                    (Android), which is 0 for the engine's threads (tests/linux/ToolchainCheck),
 //                    so there is no thread start to intercept (Apple's linker has no --wrap
 //                    either); the main thread is set here, and every simulation thread loads it
 //                    again in platform::SetX87PrecisionControl.
@@ -115,12 +116,13 @@ extern "C" int __wrap_pthread_create(
 }
 #endif // FAFRE_ARCH_X64
 
-#if FAFRE_PLATFORM_MACOS // the default thread stack is 512 KB (platform/PosixCompat.h redirects here)
+#if FAFRE_PLATFORM_MACOS || FAFRE_PLATFORM_ANDROID // small default stacks (PosixCompat.h redirects here)
 #undef pthread_create
 extern "C" int pthread_create(pthread_t*, const pthread_attr_t*, void* (*)(void*), void*);
 
 /// pthread_create with Linux's 8 MB stack for a thread started without attributes (std::thread,
 /// the legacy threads); attributes a caller passes are its own choice and go through unchanged.
+/// On Android x86_64 the call below is the --wrap above, which sets the thread's x87 and SSE state.
 extern "C" int faf_pthread_create(
   pthread_t* const thread,
   const pthread_attr_t* const attributes,

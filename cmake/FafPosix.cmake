@@ -8,6 +8,13 @@
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 #   cmake --preset macos-clang-arm64-release && cmake --build --preset macos-clang-arm64-release
+#
+# The Android toolchains (cmake/toolchains/android-*.cmake) build the Linux project with the NDK
+# against bionic, for arm64-v8a and x86_64: the targets their build presets name (headless,
+# faf_sim_math_tests, faf_x87_soft_tests, faf-sim-link and the toolchain check), not the
+# difffuzz dump (faf_math_dump), which reads x86's cpuid.
+#
+#   cmake --preset android-arm64-release && cmake --build --preset android-arm64-release
 
 # Engine addition (#118): a profile-guided build, for a server's speed. The linux-clang-x64-release
 # preset uses the stored profile, linux-clang-x64-release-plain none, -pgogen records one
@@ -51,14 +58,16 @@ if(FAF_ASAN)
 endif()
 
 if(NOT FAFRE_PLATFORM_POSIX)
-  message(FATAL_ERROR "cmake/FafPosix.cmake needs a Linux or macOS toolchain (cmake/toolchains/linux-clang-x64.cmake, macos-clang-arm64.cmake).")
+  message(FATAL_ERROR "cmake/FafPosix.cmake needs a Linux, macOS or Android toolchain (cmake/toolchains/linux-clang-x64.cmake, macos-clang-arm64.cmake, android-*.cmake).")
 endif()
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
   message(FATAL_ERROR "The POSIX build expects clang with the GNU driver: use a linux-clang-* or macos-clang-* preset.")
 endif()
-# The two combinations the build is made for. FAF_TARGET_ARCH comes from cmake/FafPlatform.cmake.
-if(NOT ((FAFRE_PLATFORM_LINUX AND FAFRE_ARCH_X64) OR FAFRE_PLATFORM_MACOS_ARM64))
-  message(FATAL_ERROR "The POSIX build targets Linux x86_64 and macOS arm64 (this is ${CMAKE_SYSTEM_NAME} ${FAF_TARGET_ARCH}).")
+# The combinations the build is made for. FAF_TARGET_ARCH comes from cmake/FafPlatform.cmake;
+# Android is Linux there, as in platform/PlatformDefines.h.
+if(NOT ((FAFRE_PLATFORM_LINUX AND FAFRE_ARCH_X64) OR FAFRE_PLATFORM_MACOS_ARM64 OR
+        (FAFRE_PLATFORM_ANDROID AND FAFRE_ARCH_ARM64)))
+  message(FATAL_ERROR "The POSIX build targets Linux x86_64, macOS arm64 and Android arm64 and x86_64 (this is ${CMAKE_SYSTEM_NAME} ${FAF_TARGET_ARCH}).")
 endif()
 
 # Every executable links with its whole list of undefined symbols rather than the first few (lld);
@@ -84,6 +93,17 @@ foreach(_lang C CXX ASM)
   string(REPLACE "-O3" "-O2" CMAKE_${_lang}_FLAGS_RELEASE "${CMAKE_${_lang}_FLAGS_RELEASE}")
   string(REPLACE "-O2 -DNDEBUG -O2 -DNDEBUG" "-O2 -DNDEBUG" CMAKE_${_lang}_FLAGS_RELEASE "${CMAKE_${_lang}_FLAGS_RELEASE}")
 endforeach()
+
+if(FAFRE_PLATFORM_ANDROID)
+  # Android's executables link bionic dynamically, as every program on a device does (the
+  # emulator's ARM translation runs no other kind). FAF_ANDROID_STATIC_EXECUTABLES links it
+  # statically, so the same file also runs on a Linux host of its architecture, which has
+  # no Android dynamic linker: CI runs the tests there.
+  option(FAF_ANDROID_STATIC_EXECUTABLES "Link bionic statically, to run the executables on a Linux host" OFF)
+  if(FAF_ANDROID_STATIC_EXECUTABLES)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -static")
+  endif()
+endif()
 
 # --- Locations ------------------------------------------------------------------------
 set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
@@ -206,6 +226,8 @@ target_link_libraries(faf_sim PUBLIC faf_sim_settings)
 include(FafBuildInfo)
 if(FAFRE_PLATFORM_MACOS)
   faf_build_info(faf_sim ${FAF_TARGET_ARCH}-macos)
+elseif(FAFRE_PLATFORM_ANDROID)
+  faf_build_info(faf_sim ${FAF_TARGET_ARCH}-android)
 else()
   faf_build_info(faf_sim ${FAF_TARGET_ARCH}-linux)
 endif()
@@ -230,6 +252,11 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Sh
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/SystemPosix.cpp")
 # platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
+# Android's stack walks for the diagnostics below: bionic declares backtrace(3) from API level 33
+# only (platform/posix/Backtrace.h).
+if(FAFRE_PLATFORM_ANDROID)
+  target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Backtrace.cpp")
+endif()
 # The crash diagnostics' headers on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
 # moho/misc/WinPlatform.cpp's platform services (call stacks, error text, message boxes) and
@@ -240,8 +267,9 @@ target_sources(faf_sim PRIVATE
 # Every thread's floating-point control state as on Windows x64 (plan WPL.9), the main thread's
 # from a constructor. On x86-64 every other thread's x87 control word and MXCSR from
 # pthread_create, wrapped in every program that links the sim (lld --wrap; Linux starts threads
-# at x87 precision 64). On ARM64 a new thread starts at FPCR 0, the simulation's value, on Linux
-# and macOS alike, and every simulation thread loads it again (platform/X87Precision.h).
+# at x87 precision 64). On ARM64 a new thread starts at FPCR 0, the simulation's value: macOS's
+# default, and on Linux (Android) its creator's, which is 0 for the engine's threads; every
+# simulation thread loads it again (platform/X87Precision.h).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/FpEnvPosix.cpp")
 if(FAFRE_ARCH_X64)
   target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
@@ -267,6 +295,11 @@ target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
 # every program built from faf_sim links the net channel, as Windows' server-mode faf_main does.
 if(TARGET faf_netchannel)
   target_link_libraries(faf_sim PUBLIC faf_netchannel)
+endif()
+# dlopen/dlsym (Win32Shim's LoadLibrary) and dladdr (symbol names in call stacks): part of
+# glibc's libc since 2.34 and of macOS's libSystem, libdl on bionic.
+if(FAFRE_PLATFORM_ANDROID)
+  target_link_libraries(faf_sim_settings INTERFACE ${CMAKE_DL_LIBS})
 endif()
 
 set(_faf_sim_options
@@ -308,6 +341,8 @@ target_compile_definitions(faf_sim_math_tests PRIVATE
 # The platform's recorded differences from the golden file, named as the test names the platform.
 if(FAFRE_PLATFORM_MACOS)
   set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_macos-${FAF_TARGET_ARCH}.txt")
+elseif(FAFRE_PLATFORM_ANDROID)
+  set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_android-${FAF_TARGET_ARCH}.txt")
 else()
   set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-${FAF_TARGET_ARCH}.txt")
 endif()
@@ -318,10 +353,15 @@ set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${_faf_sim_math_known}")
   list(APPEND _faf_sim_math_args --known "${_faf_sim_math_known}")
 endif()
-add_custom_command(TARGET faf_sim_math_tests POST_BUILD
-  COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
-  COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
-  VERBATIM)
+# An Android build checks after the build only with a CMAKE_CROSSCOMPILING_EMULATOR. Otherwise its
+# tests run where the target runs: a device, the emulator, or a Linux host of its architecture
+# with FAF_ANDROID_STATIC_EXECUTABLES, as CI runs them.
+if(NOT FAFRE_PLATFORM_ANDROID OR CMAKE_CROSSCOMPILING_EMULATOR)
+  add_custom_command(TARGET faf_sim_math_tests POST_BUILD
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
+    COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
+    VERBATIM)
+endif()
 add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 
 # --- faf_math_dump (plan WPR.21) --------------------------------------------------------
@@ -503,10 +543,31 @@ target_link_options(faf_udp_connector_lifetime_tests PRIVATE ${FAF_LINK_ALL_ERRO
 add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
-# tests/linux/libm_allowlist.txt; headless is not built while one does.
+# tests/linux/libm_allowlist.txt; headless is not built while one does. Linux and macOS run it with
+# python3, nm and objdump from PATH. Android runs it with the NDK's llvm-nm and llvm-objdump, which
+# read its objects (AArch64's, and a Windows host has no nm or objdump), so a failure of either
+# fails the gate (LibmGate.py), and with the Python sync_policy_gen runs; the object list goes in
+# a response file, as on a Windows host it is longer than a command line may be.
+if(FAFRE_PLATFORM_ANDROID)
+  if(NOT CMAKE_NM OR NOT CMAKE_OBJDUMP OR NOT FAF_PYTHON3)
+    message(FATAL_ERROR "The libm gate needs the NDK's llvm-nm and llvm-objdump and Python 3 (CMAKE_NM "
+                        "'${CMAKE_NM}', CMAKE_OBJDUMP '${CMAKE_OBJDUMP}', FAF_PYTHON3 '${FAF_PYTHON3}').")
+  endif()
+  # One file per configuration, for the multi-configuration generators, without the precompiled
+  # header, which TARGET_OBJECTS lists and no nm reads.
+  set(_faf_libm_gate_list "${CMAKE_BINARY_DIR}/faf_sim_objects-$<CONFIG>.rsp")
+  file(GENERATE OUTPUT "${_faf_libm_gate_list}"
+       CONTENT "$<JOIN:$<FILTER:$<TARGET_OBJECTS:faf_sim>,EXCLUDE,\\.pch$>,\n>\n")
+  set(_faf_libm_gate_command "${CMAKE_COMMAND}" -E env "FAF_NM=${CMAKE_NM}" "FAF_OBJDUMP=${CMAKE_OBJDUMP}"
+      "${FAF_PYTHON3}")
+  set(_faf_libm_gate_objects "@${_faf_libm_gate_list}")
+else()
+  set(_faf_libm_gate_command python3)
+  set(_faf_libm_gate_objects "$<TARGET_OBJECTS:faf_sim>")
+endif()
 add_custom_target(faf_sim_libm_gate
-  COMMAND python3 "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
-          "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "$<TARGET_OBJECTS:faf_sim>"
+  COMMAND ${_faf_libm_gate_command} "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
+          "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "${_faf_libm_gate_objects}"
   DEPENDS faf_sim
   COMMAND_EXPAND_LISTS
   COMMENT "Checking faf_sim's libm transcendental calls against tests/linux/libm_allowlist.txt"

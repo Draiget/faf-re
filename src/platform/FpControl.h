@@ -19,8 +19,10 @@
  *   ARM64         FPCR: rounding (RMode), flush-to-zero (FZ), default NaN (DN), alternate
  *                 handling (AH), trap enables. The simulation runs at 0: round to nearest, IEEE
  *                 denormals, NaN propagation, no traps - the arm64 counterpart of 0x1F80. A new
- *                 thread starts at 0 on Linux and macOS (the kernel's default, not the creator's
- *                 value), and nothing in the engine changes it.
+ *                 thread starts at 0 on macOS (the kernel's default, not the creator's value)
+ *                 and with its creator's value on Linux (Android), as POSIX's pthread_create
+ *                 has it, which is 0 for every thread the engine starts; nothing in the engine
+ *                 changes it.
  */
 namespace platform
 {

@@ -19,6 +19,9 @@
 #include <sys/syscall.h>
 #include <ucontext.h>
 #include <unistd.h>
+#if FAFRE_ARCH_ARM64
+#include <asm/sigcontext.h> // the signal frame's FPSIMD record
+#endif
 #endif
 
 #include <algorithm>
@@ -32,17 +35,56 @@
 // Engine addition, server mode: see ReplayFpuReport.h. Windows suspends each thread and reads
 // its context; Linux (plan WPL.9) sends each thread a real-time signal and reads the x87
 // control word and MXCSR the kernel saved in the signal frame (the handler's own registers
-// are reset, the interrupted thread's are in ucontext's fpregs); macOS suspends each thread
-// through Mach and reads its FPCR from the thread's NEON state, as Windows reads its context.
+// are reset, the interrupted thread's are in ucontext's fpregs), or on ARM64 (Android) the
+// FPCR in the frame's FPSIMD record; macOS suspends each thread through Mach and reads its FPCR
+// from the thread's NEON state, as Windows reads its context.
 
 #if FAFRE_PLATFORM_LINUX // real-time signals, tgkill, /proc/self/task
 namespace faf::headless
 {
   namespace
   {
+#if FAFRE_ARCH_ARM64
+    using SFloatingPointState = std::uint64_t; // FPCR
+#else
+    using SFloatingPointState = std::pair<unsigned, unsigned>; // (x87 control word, MXCSR)
+#endif
+
     std::atomic<int> gSampleDone{0};
-    unsigned gSampledControlWord = 0;
-    unsigned gSampledMxcsr = 0;
+    SFloatingPointState gSampledState{};
+
+    /// The interrupted thread's floating-point control state from its signal frame; false where
+    /// the frame holds none.
+    [[nodiscard]] bool ReadFrameState(
+      const ucontext_t& context,
+      SFloatingPointState& state
+    ) noexcept
+    {
+#if FAFRE_ARCH_ARM64
+      // The kernel saves FPCR in the FPSIMD record, one of the records __reserved holds, each
+      // with its magic and size, a zero magic after the last.
+      const unsigned char* record = context.uc_mcontext.__reserved;
+      const unsigned char* const end = record + sizeof(context.uc_mcontext.__reserved);
+      while (record + sizeof(_aarch64_ctx) <= end) {
+        const auto* const head = reinterpret_cast<const _aarch64_ctx*>(record);
+        if (head->magic == 0 || head->size == 0) {
+          return false;
+        }
+        if (head->magic == FPSIMD_MAGIC) {
+          state = reinterpret_cast<const fpsimd_context*>(head)->fpcr;
+          return true;
+        }
+        record += head->size;
+      }
+      return false;
+#else
+      if (context.uc_mcontext.fpregs == nullptr) {
+        return false;
+      }
+      state = {context.uc_mcontext.fpregs->cwd, context.uc_mcontext.fpregs->mxcsr};
+      return true;
+#endif
+    }
 
     void OnSampleSignal(
       int,
@@ -51,9 +93,7 @@ namespace faf::headless
     )
     {
       const auto* const context = static_cast<const ucontext_t*>(rawContext);
-      if (context != nullptr && context->uc_mcontext.fpregs != nullptr) {
-        gSampledControlWord = context->uc_mcontext.fpregs->cwd;
-        gSampledMxcsr = context->uc_mcontext.fpregs->mxcsr;
+      if (context != nullptr && ReadFrameState(*context, gSampledState)) {
         gSampleDone.store(1, std::memory_order_release);
       } else {
         gSampleDone.store(2, std::memory_order_release);
@@ -63,7 +103,7 @@ namespace faf::headless
     struct SThreadSamples
     {
       long id = 0;
-      std::map<std::pair<unsigned, unsigned>, int> values; // (x87 control word, MXCSR) -> count
+      std::map<SFloatingPointState, int> values; // sampled state -> count
       double userSeconds = 0.0;
     };
 
@@ -134,7 +174,7 @@ namespace faf::headless
         if (gSampleDone.load(std::memory_order_acquire) == 1) {
           SThreadSamples& entry = threads[id];
           entry.id = id;
-          ++entry.values[{gSampledControlWord, gSampledMxcsr}];
+          ++entry.values[gSampledState];
           entry.userSeconds = ThreadUserSeconds(id);
         }
       }
@@ -156,7 +196,11 @@ namespace faf::headless
       std::snprintf(line, sizeof(line), "thread %ld user cpu %.2fs:", entry.id, entry.userSeconds);
       text += line;
       for (const auto& [value, count] : entry.values) {
+#if FAFRE_ARCH_ARM64
+        std::snprintf(line, sizeof(line), " fpcr=0x%08llX x%d", static_cast<unsigned long long>(value), count);
+#else
         std::snprintf(line, sizeof(line), " fcw=0x%04X mxcsr=0x%04X x%d", value.first, value.second, count);
+#endif
         text += line;
       }
       text += "\n";

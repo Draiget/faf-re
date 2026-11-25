@@ -8,6 +8,8 @@
  *   #if FAFRE_PLATFORM_LINUX          Linux
  *   #if FAFRE_PLATFORM_MACOS          macOS
  *   #if FAFRE_PLATFORM_POSIX          Linux or macOS: what POSIX gives both (pthreads, dlopen, kill, fork)
+ *   #if FAFRE_PLATFORM_ANDROID        Android, which is Linux to the macros above: what its C library
+ *                                     (bionic) has or lacks
  *
  * Code only one POSIX platform has (/proc, prctl, Mach) asks for that platform, not for POSIX.
  *
@@ -27,6 +29,12 @@
 #define FAFRE_PLATFORM_LINUX 1
 #else
 #define FAFRE_PLATFORM_LINUX 0
+#endif
+
+#if defined(__ANDROID__)
+#define FAFRE_PLATFORM_ANDROID 1
+#else
+#define FAFRE_PLATFORM_ANDROID 0
 #endif
 
 #if defined(__APPLE__) && defined(__MACH__)

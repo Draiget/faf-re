@@ -1,0 +1,99 @@
+name: Android simulation
+
+# Builds the simulation for Android with the pinned NDK (the android-x64-release and
+# android-arm64-release presets, cmake/toolchains/android-*.cmake) and runs what runs without a
+# phone. A pull request gets what only this workflow can show: the arm64 build, whose toolchain
+# check, sim-math golden tests (tests/sim_math) and software x87 tests (tests/x87_soft) run on an
+# arm64 runner, where the x87 routines are the software ones (legacy/math/X87Soft.cpp). The whole
+# x86_64 build and its tests run on master pushes and manual runs; on a pull request the Linux
+# client workflow already builds and tests the simulation for x86_64. The programs are linked
+# statically (FAF_ANDROID_STATIC_EXECUTABLES), as a Linux runner has no Android dynamic linker. The
+# NDK runs on x86_64 hosts only, so the arm64 programs are built there and run on the arm64 runner.
+# A pull request's code runs here with a read-only token and no secrets, and only restores the caches.
+on:
+  pull_request:
+    paths: &paths
+      - CMakeLists.txt
+      - CMakePresets.json
+      - cmake/**
+      - src/**
+      - tests/**
+      - dependencies/patches/**
+      - .github/workflows/android-sim.yml
+  push:
+    branches: [master]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-sim-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # cmake/toolchains/android-pins.cmake
+  NDK_VERSION: "29.0.14206865"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: ${{ fromJSON(github.event_name == 'pull_request' && '["arm64"]' || '["x64", "arm64"]') }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build
+      # The pinned NDK, under $ANDROID_HOME, where android-common.cmake looks first. Nothing to do
+      # where the runner image ships that release, as ubuntu-24.04 does; else a download.
+      - name: Pinned NDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+      - uses: actions/cache/restore@v6
+        with:
+          path: dependencies/.downloads
+          key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
+      - run: cmake --preset android-${{ matrix.abi }}-release -DFAF_ANDROID_STATIC_EXECUTABLES=ON
+      # The preset's targets: headless, faf_sim_math_tests, faf_x87_soft_tests, faf-sim-link and the
+      # toolchain check.
+      - run: cmake --build --preset android-${{ matrix.abi }}-release
+      - if: matrix.abi == 'x64'
+        run: |
+          build/android-x64-release/faf-linux-toolchain-check
+          build/android-x64-release/faf_sim_math_tests tests/sim_math/golden.txt
+          build/android-x64-release/faf_x87_soft_tests
+      - if: matrix.abi == 'arm64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-arm64-tests
+          path: |
+            build/android-arm64-release/faf_sim_math_tests
+            build/android-arm64-release/faf_x87_soft_tests
+            build/android-arm64-release/faf-linux-toolchain-check
+          retention-days: 7
+
+  test-arm64:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: tests/sim_math
+      - uses: actions/download-artifact@v8
+        with:
+          name: android-arm64-tests
+          path: bin
+      - run: |
+          chmod +x bin/*
+          bin/faf-linux-toolchain-check
+          bin/faf_sim_math_tests tests/sim_math/golden.txt --known tests/sim_math/known_android-arm64.txt
+          bin/faf_x87_soft_tests

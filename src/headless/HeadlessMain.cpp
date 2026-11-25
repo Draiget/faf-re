@@ -11,8 +11,8 @@
 #include <objbase.h>
 #else
 #include <csignal>
-#include <execinfo.h>
 
+#include "platform/posix/Backtrace.h"
 #include "platform/posix/SystemPosix.h"
 #endif
 
@@ -122,7 +122,7 @@ namespace
     );
     std::fflush(stdout);
     void* frames[64];
-    ::backtrace_symbols_fd(frames, ::backtrace(frames, 64), 1);
+    platform::posix::BacktraceSymbolsFd(frames, platform::posix::Backtrace(frames, 64), 1);
     std::printf(
       "[%s] VERDICT ended=False mismatches=%d crash=True\n", gLabel.c_str(), faf::headless::ChecksumMismatchCount()
     );

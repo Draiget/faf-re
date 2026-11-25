@@ -18,6 +18,8 @@
 #include <Windows.h>
 #include <bcrypt.h>
 // clang-format on
+#elif FAFRE_PLATFORM_ANDROID // arc4random_buf; bionic declares getentropy from API level 28 only
+#include <stdlib.h>
 #else
 #include <sys/random.h>
 #include <unistd.h>
@@ -150,6 +152,9 @@ namespace faf::remote::net
     return BCryptGenRandom(
              nullptr, static_cast<PUCHAR>(out), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG
            ) == 0;
+#elif FAFRE_PLATFORM_ANDROID // bionic's arc4random_buf: a ChaCha20 stream the kernel seeds, and it cannot fail
+    ::arc4random_buf(out, size);
+    return true;
 #else
     // getentropy (Linux and macOS): the kernel's random source, at most 256 bytes a call.
     auto* cursor = static_cast<std::uint8_t*>(out);

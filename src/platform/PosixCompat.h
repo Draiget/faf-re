@@ -2,11 +2,14 @@
 
 #include "PlatformDefines.h"
 
-// Every thread this code starts goes through platform/posix/FpEnvPosix.cpp's faf_pthread_create on
-// macOS, std::thread's included (libc++ starts it with an inline call to pthread_create in our own
-// objects): macOS gives a new thread a 512 KB stack where Linux gives 8 MB and Windows 1 MB, and
-// saving the sim needs more. Apple's linker has no --wrap, which does this on Linux.
-#if FAFRE_PLATFORM_MACOS // Apple's linker has no --wrap; macOS's default thread stack is 512 KB
+// Engine addition (the macOS and Android ports): every thread this code starts goes through
+// platform/posix/FpEnvPosix.cpp's faf_pthread_create on macOS and Android, std::thread's included
+// (libc++ starts it with an inline call to pthread_create in our own objects), for Linux's 8 MB
+// stack. macOS gives a new thread 512 KB, and saving the sim needs more; bionic gives about 1 MB,
+// half the x86 binary's 2 MB and a quarter of the 4 MB the x64 build reserves for its wider frames
+// (/STACK, src/CMakeLists.txt). A macro, as Apple's linker has no --wrap; on Android x86_64 the call
+// goes on through FpEnvPosix.cpp's --wrap of pthread_create.
+#if FAFRE_PLATFORM_MACOS || FAFRE_PLATFORM_ANDROID // default thread stacks: macOS 512 KB, bionic 1 MB
 #define pthread_create faf_pthread_create
 #endif
 

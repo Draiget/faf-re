@@ -16,7 +16,9 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#if !FAFRE_PLATFORM_ANDROID // bionic has no <sys/timeb.h>, and _ftime64 is the shim's on POSIX
 #include <sys/timeb.h>
+#endif
 #include <typeinfo>
 #include <vector>
 

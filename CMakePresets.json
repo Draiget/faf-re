@@ -150,6 +150,25 @@
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
       "toolchainFile": "${sourceDir}/cmake/toolchains/macos-clang-arm64.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "android-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "android-arm64-release",
+      "displayName": "Android arm64-v8a Release (headless simulation)",
+      "inherits": "android-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/android-arm64.cmake"
+    },
+    {
+      "name": "android-x64-release",
+      "displayName": "Android x86_64 Release (headless simulation, emulator)",
+      "inherits": "android-base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/android-x64.cmake"
     }
   ],
   "buildPresets": [
@@ -171,6 +190,8 @@
     { "name": "macos-clang-arm64-debug", "configurePreset": "macos-clang-arm64-debug" },
     { "name": "linux-clang-x64-asan", "configurePreset": "linux-clang-x64-asan" },
     { "name": "clang-x64-release-coverage", "configurePreset": "clang-x64-release-coverage" },
-    { "name": "linux-clang-x64-release-coverage", "configurePreset": "linux-clang-x64-release-coverage" }
+    { "name": "linux-clang-x64-release-coverage", "configurePreset": "linux-clang-x64-release-coverage" },
+    { "name": "android-arm64-release", "configurePreset": "android-arm64-release", "targets": ["headless", "faf_sim_math_tests", "faf_x87_soft_tests", "faf-linux-toolchain-check", "faf-sim-link"] },
+    { "name": "android-x64-release", "configurePreset": "android-x64-release", "targets": ["headless", "faf_sim_math_tests", "faf_x87_soft_tests", "faf-linux-toolchain-check", "faf-sim-link"] }
   ]
 }
