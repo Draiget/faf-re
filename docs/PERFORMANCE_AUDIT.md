@@ -10,6 +10,7 @@ found and left is in section 8.
 Machine: Ryzen 7 5800X3D, Radeon RX 7900 XTX, 1600x900, vsync off, one game at a time (other sessions' CPU-only games ran
 during the audit, no other game used the GPU). Numbers are per frame of the render thread; a game's frame is mostly the sim.
 
+* **Re-measured on current master** (section 3.4, Direct3D 12): with everything off the stack is within +0.01 to +0.07 ms GPU of upstream on the lake and the river and +0.02 ms in the battle; the shipped defaults cost +0.06 ms on the lake, +0.44 ms in the battle and +0.18 to +0.25 ms on the river map.
 * **Parity.** With every render switch off the stack matches upstream on the GPU to +2 % on the lake, +4 to +8 % (0.05 to
   0.08 ms) on the river and -4 % in the strategic view; CPU is the same within the noise of the machine (-5 to +10 %, 0.05 to 0.12 ms). The one real difference is
   **+0.43 ms (+9 %) in the 80 against 80 battle**, from the particle effect, which is patched at load whatever the options say
@@ -234,6 +235,37 @@ is different (section 6.1).
 | default | vulkan | river | 952 / 1064 (+112) | 401 / 401 (+0) | 1.61 / 0.96 | 1.71 / 1.02 | 2.93 / 1.93 | 2.12 / 1.40 |
 | default | d3d11 | lake | 1165 / 1264 (+98) | 408 / 486 (+78) | 0.85 / 0.85 | 12.64 / 19.57 | 13.61 / 20.52 | 13.08 / 19.98 |
 | default | d3d11 | battle | 1128 / 1240 (+111) | 361 / 427 (+66) | 0.81 / 0.90 | 12.62 / 22.96 | 13.50 / 23.90 | 12.94 / 23.27 |
+
+### 3.4 Re-measured on master a5f2b195f (2026-11-25)
+
+The audit above was taken on an earlier base. This is the parity run again on the stack's tip against current upstream master
+(`a5f2b195f`, built in the same way): Direct3D 12 only, the three scenes, "off" and "default" as in 3.1 and 3.2, three repeats
+alternating the order, 10 s steps, medians (`tools/perf_audit/parity.py --apis d3d12 --reps 3`, then `parity_report.py`). Nothing
+else was running on the machine. `meas1` is the first view of the scene (lake, the 80 against 80 battle at the wide camera, the falls),
+`meas2` the second (close, the strategic view, wide). Differences in brackets are ours minus the baseline's.
+
+| cfg | scene | view | GPU ms base | GPU ms ours | CPU ms base | CPU ms ours |
+|---|---|---|---|---|---|---|
+| off | lake | meas1 | 1.390 | 1.400 (+0.010) | 1.224 | 1.292 (+0.069) |
+| off | lake | meas2 | 1.005 | 1.010 (+0.005) | 0.810 | 0.826 (+0.016) |
+| off | battle | meas1 | 4.660 | 4.680 (+0.020) | 2.849 | 2.825 (-0.024) |
+| off | battle | meas2 (strategic) | 2.160 | 2.040 (-0.120) | 2.031 | 1.853 (-0.178) |
+| off | river | meas1 | 1.165 | 1.200 (+0.035) | 1.107 | 1.101 (-0.006) |
+| off | river | meas2 | 0.940 | 1.010 (+0.070) | 1.067 | 1.107 (+0.040) |
+| default | lake | meas1 | 1.580 | 1.640 (+0.060) | 1.257 | 1.204 (-0.053) |
+| default | lake | meas2 | 1.210 | 1.255 (+0.045) | 0.820 | 0.868 (+0.048) |
+| default | battle | meas1 | 4.790 | 5.230 (+0.440) | 2.890 | 2.928 (+0.038) |
+| default | battle | meas2 (strategic) | 2.350 | 2.190 (-0.160) | 2.117 | 1.975 (-0.142) |
+| default | river | meas1 | 1.340 | 1.520 (+0.180) | 1.149 | 1.306 (+0.157) |
+| default | river | meas2 | 1.090 | 1.340 (+0.250) | 1.129 | 1.276 (+0.147) |
+
+Process memory (private MB), base against ours: off 1154 / 1180 (battle), 1085 / 1094 (lake), 842 / 862 (river); default 1165 / 1247,
+1090 / 1158, 846 / 1047. Video memory in use (local MB): off +10 to +15, default +64 to +70 (river +70).
+
+What it says: with everything off the stack is within +0.01 to +0.07 ms of upstream on the lake and the river and the battle is
+now level (+0.02 ms; the +0.43 ms of section 3.1 is gone, section 7.5); the strategic view is faster. The shipped defaults cost
++0.06 ms GPU on the lake, +0.44 ms in the battle and +0.18 to +0.25 ms GPU (+0.15 ms CPU) on the river map, the same as sections 3.2
+and 1. Direct3D 11 and Vulkan were not measured again; their tables above are those of the earlier base.
 
 ## 4. The user's profile
 
