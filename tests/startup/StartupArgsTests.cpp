@@ -5,13 +5,18 @@
 // CFG_GetArgOption follows retail 0x0041B560: arguments from index 1 are compared with _stricmp (0x00AA549E), only
 // positions that still have `requiredArgCount` arguments after them are tried (the loop bound is __argc minus the
 // count), and on a match the out vector is cleared (0x0041BBC0) and gets the following arguments in order.
-// CFG_GetArgs follows 0x0041B690: argv[1..] joined with single spaces.
+// CFG_GetArgs follows 0x0041B690: argv[1..] joined with single spaces. Lua's GetCommandLineArg (0x0041B810) logs the
+// option it looks up as text.
 
 #include <cstdlib>
+#include <string>
+#include <utility>
 #include <vector>
 #include <gtest/gtest.h>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
+#include "lua/LuaObject.h"
 #include "moho/misc/StartupHelpers.h"
 
 namespace
@@ -52,6 +57,36 @@ namespace
     char** mSavedArgv = nullptr;
     std::vector<const char*> mStorage;
     std::vector<char*> mPointers;
+  };
+
+  /** Registered while it lives (LogTarget(true)); keeps the messages that hold `part`. */
+  class LogCapture final : public gpg::LogTarget
+  {
+  public:
+    explicit LogCapture(
+      std::string part
+    )
+      : gpg::LogTarget(true)
+      , mPart(std::move(part))
+    {}
+
+    void OnMessage(
+      const gpg::LogSeverity,
+      const fa::string& message,
+      const fa::vector<fa::string>&,
+      const int
+    ) override
+    {
+      std::string text = message.c_str();
+      if (text.contains(mPart)) {
+        mSeen.push_back(std::move(text));
+      }
+    }
+
+    std::vector<std::string> mSeen;
+
+  private:
+    std::string mPart;
   };
 } // namespace
 
@@ -198,4 +233,24 @@ TEST_F(
   );
   const moho::CfgAliasSet empty{nullptr, 0};
   EXPECT_FALSE(moho::CFG_GetArgOptionComposedAliases(empty, moho::CFG_GetHeadOptionAliases(), 0, nullptr));
+}
+
+TEST_F(
+  ArgsFixture,
+  GetCommandLineArgLogsTheOptionAsText
+)
+{
+  // As the format, "%d" printed an argument that was never passed and "%%" one '%'.
+  SetArgs({"game.exe", "/nosound"});
+  const std::string option = "/argtest-%d-%%";
+  LogCapture log("/argtest-");
+  LuaPlus::LuaState state(LuaPlus::LuaState::LIB_BASE);
+  lua_State* const L = state.GetCState();
+  lua_pushstring(L, option.c_str());
+  lua_pushnumber(L, 0);
+
+  ASSERT_EQ(moho::cfunc_GetCommandLineArgL(&state), 1);
+  EXPECT_FALSE(lua_toboolean(L, -1)) << "the option is not on the command line";
+  ASSERT_EQ(log.mSeen.size(), 1U);
+  EXPECT_EQ(log.mSeen[0], option);
 }
