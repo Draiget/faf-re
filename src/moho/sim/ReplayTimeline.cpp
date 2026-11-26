@@ -1174,9 +1174,13 @@ namespace moho
     }
     // Or will be: a save stops the sim, which shows.
 #if !FAFRE_PLATFORM_WINDOWS
-    // Still running: waitpid reaps nothing yet.
-    if (replay_KeyframeQuietDisk && sPreparePid > 0 && ::waitpid(sPreparePid, nullptr, WNOHANG) == 0) {
-      return;
+    // Still running: waitpid reaps nothing yet. One it has reaped is forgotten: its id is free for a process started
+    // later, which StopKeyframePreparation's kill would hit. Windows' handle holds the id until it is closed.
+    if (replay_KeyframeQuietDisk && sPreparePid > 0) {
+      if (::waitpid(sPreparePid, nullptr, WNOHANG) == 0) {
+        return;
+      }
+      sPreparePid = 0;
     }
 #else
     if (
