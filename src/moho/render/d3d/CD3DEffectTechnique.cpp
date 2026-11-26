@@ -22,16 +22,27 @@
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/TextureContext.h"
-#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
+#include "moho/render/lights/LightEffectPatch.h"
+#include "moho/render/lights/LightFeeds.h"
+#include "moho/render/shadow/ShadowEffectPatch.h"
+#include "moho/render/shadow/ShadowFilter.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/particles/ParticleEffectPatch.h"
+#include "moho/particles/ParticleLowRes.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/terrain/water/TerrainWaterLevelPatch.h"
+#include "moho/terrain/water/TerrainWaterLevels.h"
+#include "moho/terrain/water/WaterEffectPatch.h"
+#include "moho/terrain/water/WaterQuality.h"
+#include "moho/terrain/water/WaterSimulation.h"
 
 namespace moho
 {
@@ -1360,9 +1371,9 @@ technique EditorMeshFill
       SDiskFileInfo sourceInfo{};
       (void)waitHandleSet->GetFileInfo(mFile.c_str(), &sourceInfo, false);
 
-      const gpg::MemBuffer<const char> effectSourceBuffer = DISK_MemoryMapFile(mFile.c_str());
+      gpg::MemBuffer<const char> effectSourceBuffer = DISK_MemoryMapFile(mFile.c_str());
       const std::size_t compatByteCount = compatStateBuffer.Size();
-      const std::size_t effectByteCount = effectSourceBuffer.Size();
+      std::size_t effectByteCount = effectSourceBuffer.Size();
       gpg::MemBuffer<char> mergedBuffer = gpg::AllocMemBuffer(compatByteCount + effectByteCount);
       if (compatByteCount > 0U) {
         // Raw effect-code blob copy into the merged buffer.
@@ -1371,6 +1382,166 @@ technique EditorMeshFill
       if (effectByteCount > 0U) {
         // Raw effect-code blob copy into the merged buffer.
         std::copy_n(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount, mergedBuffer.GetPtr(compatByteCount, 0U));
+      }
+
+      // Engine addition (TerrainWaterLevelPatch.h): terrain.fx computes the tint under the water per pixel on a map
+      // with water bodies. It is the first patch of the chain (the shadow filter and the light patch continue from its
+      // text, which keeps all their anchors), independent of both; the cache name carries a tag.
+      // FAF_NO_RENDER_ADDITIONS=1 leaves the effect alone.
+      std::string terrainLevelVariant;
+      if (std::strcmp(effectBaseName.c_str(), "terrain") == 0) {
+        water::SetTerrainWaterLevelsPatched(false);
+        if (
+          deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType) &&
+          effectByteCount > 0U && !water::TerrainWaterLevelsAdditionsDisabled() && water::TerrainWaterLevelsWanted()
+        ) {
+          std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+          const water::TerrainWaterLevelPatchResult patch = water::PatchTerrainWaterLevels(text);
+          if (patch.patched) {
+            effectSourceBuffer = gpg::CopyMemBuffer(text.data(), text.size());
+            effectByteCount = text.size();
+            mergedBuffer = gpg::AllocMemBuffer(compatByteCount + effectByteCount);
+            if (compatByteCount > 0U) {
+              std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+            }
+            std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+            terrainLevelVariant = ".wlev1";
+            water::SetTerrainWaterLevelsPatched(true);
+            gpg::Logf(
+              "Water: %s patched, the tint under water bodies is computed per pixel (%d reads)",
+              effectBaseName.c_str(),
+              patch.sites
+            );
+          } else {
+            gpg::Warnf("Water: %s not patched with the water levels: %s", effectBaseName.c_str(), patch.error.c_str());
+          }
+        }
+      }
+      // FAF addition (Shadow Filtering, docs/SHADOW_FILTERING.md): mesh.fx and terrain.fx get the filtered shadow-map
+      // lookup on the Direct3D 10 dialect backends (Direct3D 11, 12, Vulkan) while the Shadow Filtering option is not
+      // Off. It is the first patch of the chain: the light patch below continues from its text (and knows the lookups
+      // it leaves). The cache name carries a tag; a patched effect the backend compiler rejects is built again without
+      // the patch (see createEffect below). Unrecognised text compiles unpatched.
+      std::string shadowVariant;
+      std::string shadowSource; // the effect's text with the shadow patch, when it has one
+      const bool shadowEffect = deviceContext != nullptr && shadowfilter::Supported(deviceContext->mDeviceType) &&
+        effectByteCount > 0U && shadowfilter::HandlesEffect(std::string(effectBaseName.c_str()));
+      const auto assembleShadow = [&]() {
+        shadowVariant.clear();
+        shadowSource.clear();
+        if (!shadowEffect || !shadowfilter::EffectPatchWanted(deviceContext->mDeviceType)) {
+          return;
+        }
+        const std::string baseName(effectBaseName.c_str());
+        const bool terrain = baseName == "terrain";
+        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        const bool tileAware = shadowfilter::TileAware(deviceContext->mDeviceType);
+        const shadowfilter::PatchResult patch =
+          terrain ? shadowfilter::PatchTerrainEffect(text, tileAware) : shadowfilter::PatchMeshEffect(text, tileAware);
+        if (!patch.patched) {
+          gpg::Warnf("ShadowFilter: %s not patched: %s", baseName.c_str(), patch.error.c_str());
+          return;
+        }
+        gpg::Logf("ShadowFilter: %s patched, %d shadow lookups go through the filter", baseName.c_str(), patch.lookups);
+        shadowSource = std::move(text);
+        shadowVariant = tileAware ? ".shadowf1t" : ".shadowf1";
+        mergedBuffer = gpg::AllocMemBuffer(compatByteCount + shadowSource.size());
+        if (compatByteCount > 0U) {
+          std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+        }
+        std::copy_n(shadowSource.data(), shadowSource.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+      };
+      const gpg::MemBuffer<char> plainBuffer = mergedBuffer;
+      assembleShadow();
+
+      // FAF addition (Dynamic Lights, docs/DYNAMIC_LIGHTS.md): mesh.fx and terrain.fx get the light pass on the
+      // Direct3D 10 dialect backends (Direct3D 11, 12, Vulkan) while the Dynamic Lights option is not Off (or
+      // /dynlights is on the command line). The cache name carries a tag, so the lit and the shipped effect compile to
+      // files of their own. The lit text is built here, from the source as the file has it; a lit effect the backend
+      // compiler rejects is built again without the sun shadow reads of the terrain's PBR shaders, then without the
+      // light pass (see createEffect below).
+      std::string lightVariant;
+      // the terrain's PBR shadow reads sample the light field; dropped when that does not compile (sampler limit).
+      // Direct3D 11 has 16 samplers and never compiles them, so it does not try (the failed compile took 20 s at every
+      // start with lights on, and when they are switched on).
+      bool lightsSunReads = deviceContext == nullptr || deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D11;
+      gpg::MemBuffer<char> unlitBuffer = mergedBuffer; // with the shadow patch, without the light pass
+      const auto assembleLit = [&]() {
+        lightVariant.clear();
+        mergedBuffer = unlitBuffer;
+        if (
+          deviceContext == nullptr || !gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType) ||
+          effectByteCount == 0U
+        ) {
+          return;
+        }
+        const lights::PatchedEffect which = lights::EffectForName(std::string(effectBaseName.c_str()));
+        if (
+          which == lights::PatchedEffect::None ||
+          !(CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType))
+        ) {
+          return;
+        }
+        const int flood = CFG_GetArgOption("/dynlightsflood2", 0U, nullptr)
+          ? 2
+          : (CFG_GetArgOption("/dynlightsflood", 0U, nullptr) ? 1 : 0);
+        std::string text =
+          shadowSource.empty() ? std::string(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount) : shadowSource;
+        const lights::EffectPatchResult patch = which == lights::PatchedEffect::Mesh
+          ? lights::PatchMeshEffect(text, flood)
+          : lights::PatchTerrainEffect(text, flood, lightsSunReads);
+        if (!patch.patched) {
+          gpg::Warnf("DynLights: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+          return;
+        }
+        gpg::Logf(
+          "DynLights: %s patched, %d techniques have the light pass, terrain sun shadow: %d reads",
+          effectBaseName.c_str(),
+          patch.techniques,
+          patch.sunShadowSites
+        );
+        mergedBuffer = gpg::AllocMemBuffer(compatByteCount + text.size());
+        if (compatByteCount > 0U) {
+          std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+        }
+        std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+        lightVariant = ".dynlights4";
+      };
+      assembleLit();
+
+      // Engine addition (ParticleEffectPatch.h): particle.fx gets the low-resolution twins of its large-particle
+      // techniques and the soft-particle pixel shaders on the Direct3D 10 dialect backends, while the soft particles or
+      // the large-particle quality are on (particlelowres::PatchWanted; the live switch builds it again when that
+      // changes). With both off, with a viewport too small for the low-resolution path, with /noparticlelowres or
+      // FAF_NO_RENDER_ADDITIONS=1 the effect is the file's own; if the patched effect does not build, the original does
+      // (below).
+      bool patchedParticles = false;
+      const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
+      if (
+        deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType) &&
+        effectByteCount > 0U && std::strcmp(effectBaseName.c_str(), "particle") == 0 && particlelowres::PatchWanted()
+      ) {
+        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        const ParticleEffectPatchResult patch = PatchParticleEffect(text);
+        if (patch.patched) {
+          mergedBuffer = gpg::AllocMemBuffer(compatByteCount + text.size());
+          if (compatByteCount > 0U) {
+            std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+          }
+          std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+          patchedParticles = true;
+          gpg::Logf(
+            "ParticleLowRes: %s patched, %d low-resolution techniques, %d soft",
+            effectBaseName.c_str(),
+            patch.techniques,
+            patch.softened
+          );
+        } else {
+          gpg::Warnf("ParticleLowRes: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+        }
+      }
+      if (std::strcmp(effectBaseName.c_str(), "particle") == 0) {
+        SetParticleEffectPatched(patchedParticles);
       }
 
       // Builds the effect, from its compiled copy in the cache when that is at
@@ -1382,13 +1553,14 @@ technique EditorMeshFill
       gpg::MemBuffer<const char> terrainTess{};
       gpg::MemBuffer<const char> waterDetail{};
       gpg::MemBuffer<char> waterMerged{};
-      const auto createEffect = [&](
-                                  const bool boneTexture,
-                                  const bool msdfText = false,
-                                  const bool withTerrainTess = false,
-                                  const bool editorOutline = false,
-                                  const bool withWaterDetail = false
-                                ) {
+      std::string waterVariant; // the patches water2.fx got (see below), part of its cache name
+      const auto createEffectOnce = [&](
+                                      const bool boneTexture,
+                                      const bool msdfText = false,
+                                      const bool withTerrainTess = false,
+                                      const bool editorOutline = false,
+                                      const bool withWaterDetail = false
+                                    ) {
         const auto fnv1a = [](const std::string_view text) {
           std::uint32_t hash = 2166136261u;
           for (const char c : text) {
@@ -1418,7 +1590,9 @@ technique EditorMeshFill
           ? ".bonetex."
           : (msdfText ? ".msdf."
                       : (withTerrainTess ? ".tess." : ((editorOutline || withWaterDetail) ? outlineVariant : ".")));
-        const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
+        const fa::string cachePath = cacheDirectory + "/" + mName + terrainLevelVariant.c_str() +
+          shadowVariant.c_str() + lightVariant.c_str() + (patchedParticles ? ".lowres" : "") + waterVariant.c_str() +
+          variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
@@ -1441,6 +1615,100 @@ technique EditorMeshFill
           effectMacros
         );
         mEffect = gpg::gal::Effect::Create(context);
+      };
+
+      // FAF addition (Dynamic Lights): a lit effect the backend compiler rejects is built again without the sun shadow
+      // reads of the terrain's PBR shaders (each such read samples the light field: a shader model with 16 samplers
+      // cannot take them in a technique that already uses 15), and if that does not compile either, without the light
+      // pass. When the unlit build fails as well, the failure is not the lights': the lit state is put back for the
+      // caller (a variant that falls back on its own, such as the tessellated terrain), and the error goes on.
+      const auto createEffectLit = [&](
+                                     const bool boneTexture,
+                                     const bool msdfText = false,
+                                     const bool withTerrainTess = false,
+                                     const bool editorOutline = false,
+                                     const bool withWaterDetail = false
+                                   ) {
+        if (lightVariant.empty()) {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        }
+        try {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        } catch (const std::exception& exception) {
+          mEffect.reset();
+          if (lightsSunReads && std::strcmp(mName.c_str(), "terrain") == 0) {
+            gpg::Warnf(
+              "%s: %s; building it without the sun shadow reads of the PBR shaders", effectFilePath, exception.what()
+            );
+            lightsSunReads = false;
+            assembleLit();
+            if (!lightVariant.empty()) {
+              try {
+                createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+                return;
+              } catch (const std::exception&) {
+                mEffect.reset();
+              }
+            }
+          } else {
+            gpg::Warnf("%s: %s; building it without the light pass", effectFilePath, exception.what());
+          }
+        }
+        const gpg::MemBuffer<char> litBuffer = mergedBuffer;
+        const std::string litVariant = lightVariant;
+        lightVariant.clear();
+        mergedBuffer = unlitBuffer;
+        try {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+        } catch (...) {
+          lightVariant = litVariant;
+          mergedBuffer = litBuffer;
+          throw;
+        }
+      };
+
+      // FAF addition (Shadow Filtering): an effect with the shadow patch that the backend compiler rejects (with or
+      // without the light pass: createEffectLit tries that) is built again without the shadow patch, and the filter
+      // stays off (Active() needs both effects patched).
+      const auto createEffect = [&](
+                                  const bool boneTexture,
+                                  const bool msdfText = false,
+                                  const bool withTerrainTess = false,
+                                  const bool editorOutline = false,
+                                  const bool withWaterDetail = false
+                                ) {
+        if (shadowVariant.empty()) {
+          createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        }
+        try {
+          createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+        } catch (const std::exception& exception) {
+          mEffect.reset();
+          gpg::Warnf("%s: %s; building it without the shadow filter", effectFilePath, exception.what());
+          const std::string patchedVariant = shadowVariant;
+          const std::string patchedSource = shadowSource;
+          const gpg::MemBuffer<char> patchedUnlit = unlitBuffer;
+          shadowVariant.clear();
+          shadowSource.clear();
+          unlitBuffer = plainBuffer;
+          mergedBuffer = plainBuffer;
+          assembleLit();
+          try {
+            createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          } catch (...) {
+            // not the filter's failure (a variant that falls back on its own, such as the tessellated terrain): its
+            // state is put back
+            shadowVariant = patchedVariant;
+            shadowSource = patchedSource;
+            unlitBuffer = patchedUnlit;
+            mergedBuffer = patchedUnlit;
+            assembleLit();
+            throw;
+          }
+        }
       };
 
       // A bone texture variant that fails to build falls back to the plain
@@ -1551,13 +1819,89 @@ technique EditorMeshFill
           mEffect.reset();
         }
       }
+      // FAF addition: water2.fx is patched as it is read, on the Direct3D 10 dialect backends
+      // (docs/WATER_SIMULATION.md): the wave simulation (ripples that bend the normal, the projected grid, foam;
+      // WaterSimulation.cpp) and the filtered reflection / refraction lookups (Water Quality, WaterEffectPatch.cpp).
+      // The two chain, each continues from the text of the one before; a source a patch does not recognise is left
+      // without it. A patched source the backend compiler rejects falls back to the shipped effect. The cache name
+      // carries a tag per patch applied, so every combination compiles to its own cached effect.
+      if (
+        !mEffect && deviceContext != nullptr && effectByteCount > 0U && std::strcmp(mName.c_str(), "water2") == 0 &&
+        gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType)
+      ) {
+        const bool wantsSim = water::SimWanted();
+        const bool wantsFilter = water::EffectPatchWanted(deviceContext->mDeviceType);
+        // Dynamic Lights: the water is lit by the light field (glints, scatter). First of the chain: the light patch
+        // anchors on lines the other two leave alone, and their anchors are untouched by it.
+        const bool wantsLit =
+          CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType);
+        if (wantsSim || wantsFilter || wantsLit) {
+          const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
+          std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+          std::string tags;
+          if (wantsLit) {
+            std::string lit = text;
+            const lights::EffectPatchResult patch = lights::PatchWaterEffect(lit);
+            if (patch.patched) {
+              text = std::move(lit);
+              tags += ".waterl1";
+              gpg::Logf("DynLights: %s patched, the water is lit by the light field", effectBaseName.c_str());
+            } else {
+              gpg::Warnf("DynLights: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+            }
+          }
+          if (wantsSim) {
+            std::string simmed = text;
+            const water::SimPatchResult patch = water::PatchWaterSimulation(simmed);
+            if (patch.patched) {
+              text = std::move(simmed);
+              tags += ".watersim1";
+              gpg::Logf("Water: %s patched, the water follows the wave simulation", effectBaseName.c_str());
+            } else {
+              gpg::Warnf(
+                "Water: %s not patched with the wave simulation: %s", effectBaseName.c_str(), patch.error.c_str()
+              );
+            }
+          }
+          if (wantsFilter) {
+            std::string filtered = text;
+            const water::EffectPatchResult patch = water::PatchWaterEffect(filtered);
+            if (patch.patched) {
+              text = std::move(filtered);
+              tags += ".waterq1";
+              gpg::Logf(
+                "Water: %s patched with the filtered reflection and refraction lookups", effectBaseName.c_str()
+              );
+            } else {
+              gpg::Warnf("Water: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+            }
+          }
+          if (!tags.empty()) {
+            mergedBuffer = gpg::AllocMemBuffer(compatByteCount + text.size());
+            if (compatByteCount > 0U) {
+              std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+            }
+            std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+            waterVariant = tags;
+            try {
+              createEffect(false);
+            } catch (const std::exception& exception) {
+              gpg::Warnf("%s: %s; building it without the water patches", effectFilePath, exception.what());
+              mEffect.reset();
+              waterVariant.clear();
+              mergedBuffer = unpatchedBuffer;
+            }
+          }
+        }
+      }
       // Engine addition (ren_WaterDetail): water2.fx with water_hd.fx on its end, on Direct3D 12 and Vulkan, whatever
       // the switch says as the effect loads, so it can change live. FAF's high-fidelity water pass is pointed at
       // water_hd.fx's WaterHdSelectPS, which draws FAF's HighFidelityPS or the detailed water by the
       // `WaterHdEnabled` parameter (HighFidelityWater sets it from the switch on each draw). It stays FAF's own
       // technique: drawing the water through a second technique of the same effect read the refraction copy as
       // black on both Direct3D 12 and Vulkan. If anything here fails, the water is FAF's.
-      if (!mEffect && std::strcmp(mName.c_str(), "water2") == 0) {
+      // The patches above (if any) are in mergedBuffer: the routing goes on top of them.
+      if ((!mEffect || !waterVariant.empty()) && std::strcmp(mName.c_str(), "water2") == 0) {
         waterDetail = WaterDetailSource(deviceContext, waitHandleSet);
         if (waterDetail.Size() > 0U) {
           try {
@@ -1587,7 +1931,32 @@ technique EditorMeshFill
         }
       }
       if (!mEffect) {
-        createEffect(false);
+        if (patchedParticles) {
+          try {
+            createEffect(false);
+          } catch (const std::exception& exception) {
+            gpg::Warnf(
+              "%s: %s; building it without the low-resolution particle techniques", effectFilePath, exception.what()
+            );
+            mEffect.reset();
+            patchedParticles = false;
+            SetParticleEffectPatched(false);
+            mergedBuffer = unpatchedBuffer;
+            createEffect(false);
+          }
+        } else {
+          createEffect(false);
+        }
+      }
+
+      // FAF addition (Shadow Filtering): the filter learns whether the effect in use carries the patch.
+      if (shadowEffect) {
+        shadowfilter::NoteEffectPatched(std::strcmp(mName.c_str(), "terrain") == 0, !shadowVariant.empty());
+      }
+
+      // FAF addition (Dynamic Lights): the lights system learns whether the effect in use carries the light pass.
+      if (lights::EffectForName(std::string(effectBaseName.c_str())) != lights::PatchedEffect::None) {
+        lights::NoteEffectPatched(std::string(effectBaseName.c_str()), !lightVariant.empty());
       }
 
       mTechniques.clear();

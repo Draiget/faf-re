@@ -104,6 +104,36 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Post-process shaders (src/moho/render/SmaaShader.h, PostShader.h, FxaaShader.h): the real HLSL runs on a software Direct3D 11
+# device (WARP) over synthetic images whose answer is known.
+#
+#   cmake --build --preset clang-x64-release --target faf_postprocess_tests
+add_executable(faf_postprocess_tests EXCLUDE_FROM_ALL postprocess/PostProcessTests.cpp)
+target_include_directories(faf_postprocess_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_postprocess_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_postprocess_tests PRIVATE gtest_main)
+if(WIN32)
+  target_link_libraries(faf_postprocess_tests PRIVATE d3d11 d3dcompiler)
+endif()
+set_target_properties(faf_postprocess_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME post_process_shaders COMMAND faf_postprocess_tests)
+set_tests_properties(post_process_shaders PROPERTIES LABELS "Render")
+
+# Render scale (src/gpg/gal/backends/common/RenderScale.h): the arithmetic, and the upscale / sharpen shaders run on a software
+# Direct3D 11 device (WARP).
+#
+#   cmake --build --preset clang-x64-release --target faf_renderscale_tests
+add_executable(faf_renderscale_tests EXCLUDE_FROM_ALL renderscale/RenderScaleTests.cpp)
+target_include_directories(faf_renderscale_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_renderscale_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_renderscale_tests PRIVATE gtest_main)
+if(WIN32)
+  target_link_libraries(faf_renderscale_tests PRIVATE d3d11 d3dcompiler)
+endif()
+set_target_properties(faf_renderscale_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME render_scale COMMAND faf_renderscale_tests)
+set_tests_properties(render_scale PROPERTIES LABELS "Render")
+
 # Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
 add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
 target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -395,6 +425,85 @@ set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
 
 add_subdirectory(vulkan)
 
+# Water effect source patch (src/moho/terrain/water/WaterEffectPatch): pure C++, compiled on its own. FAF_STOCK_FX_DIR (the folder with FAF's
+# stock water2.fx) switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_tests
+add_executable(faf_water_tests EXCLUDE_FROM_ALL water/WaterEffectPatchTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp)
+target_include_directories(faf_water_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_water_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_effect_patch COMMAND faf_water_tests)
+
+# Dynamic light pool (src/moho/render/lights): pure C++, compiled on its own, no engine objects.
+#
+#   cmake --build --preset clang-x64-release --target faf_light_tests
+add_executable(faf_light_tests EXCLUDE_FROM_ALL lights/LightCollectorTests.cpp lights/LightGridTests.cpp lights/LightEffectPatchTests.cpp lights/LightTextureTests.cpp lights/LightMeshEmissionTests.cpp lights/LightWaterLevelTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightCollector.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightGrid.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightEffectPatch.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightTexture.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightMeshEmission.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp)
+target_include_directories(faf_light_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_light_tests PRIVATE cxx_std_20)
+
+add_test(NAME dynamic_lights COMMAND faf_light_tests)
+
+# Shadow filter effect patch (src/moho/render/shadow): pure text in, text out. With FAF_STOCK_FX_DIR set it patches FAF's stock effects.
+#
+#   cmake --build --preset clang-x64-release --target faf_shadow_tests
+add_executable(faf_shadow_tests EXCLUDE_FROM_ALL shadow/ShadowEffectPatchTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/shadow/ShadowEffectPatch.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightEffectPatch.cpp)
+target_include_directories(faf_shadow_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_shadow_tests PRIVATE cxx_std_20)
+
+add_test(NAME shadow_filter_patch COMMAND faf_shadow_tests)
+
+# Ambient occlusion (src/gpg/gal/backends/common/AmbientOcclusion.h): the arithmetic, and the shaders run on a software Direct3D 11 device (WARP).
+#
+#   cmake --build --preset clang-x64-release --target faf_ao_tests
+add_executable(faf_ao_tests EXCLUDE_FROM_ALL ao/AmbientOcclusionTests.cpp)
+target_include_directories(faf_ao_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_ao_tests PRIVATE cxx_std_20)
+if(WIN32)
+  target_link_libraries(faf_ao_tests PRIVATE d3d11 d3dcompiler)
+endif()
+
+add_test(NAME ambient_occlusion COMMAND faf_ao_tests)
+
+# The terrain's water level map and the terrain.fx patch that computes the tint under water bodies per pixel
+# (src/moho/terrain/water/WaterLevelTexel.h, TerrainWaterLevelPatch): pure C++. FAF_STOCK_FX_DIR (the folder with FAF's stock terrain.fx)
+# switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_terrain_water_tests
+add_executable(faf_terrain_water_tests EXCLUDE_FROM_ALL water/TerrainWaterLevelTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/TerrainWaterLevelPatch.cpp)
+target_include_directories(faf_terrain_water_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_terrain_water_tests PRIVATE cxx_std_20)
+
+add_test(NAME terrain_water_levels COMMAND faf_terrain_water_tests)
+
+# The body tracker of the wave simulation (src/moho/terrain/water/HullDisplacement.h): a still body is only kept.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_body_tracker_tests
+add_executable(faf_water_body_tracker_tests EXCLUDE_FROM_ALL water/WaterBodyTrackerTests.cpp)
+target_include_directories(faf_water_body_tracker_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_water_body_tracker_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_body_tracker COMMAND faf_water_body_tracker_tests)
+
+# The simulation per water of a map with water bodies, the checks that need no GPU (src/moho/terrain/water/ShoreField.h, WaterDomains.h;
+# the checks that run the compute shader are in the water lab, tools/watersimlab.py domains). Pure C++, no engine objects.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_domain_tests
+add_executable(faf_water_domain_tests EXCLUDE_FROM_ALL water/WaterDomainTests.cpp)
+target_compile_features(faf_water_domain_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_domains COMMAND faf_water_domain_tests)
+
 # Rendering-only bounded terrain splat output; no game data or renderer required.
 add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
 target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
@@ -611,6 +720,26 @@ if(FAFRE_PLATFORM_WINDOWS)
   add_test(NAME dxgi_swap_chain_policy COMMAND faf_dxgi_tests)
   set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
 endif()
+
+# Engine addition: the particle.fx source patch of the low-resolution and soft particles (src/moho/particles/ParticleEffectPatch): pure text,
+# no engine objects. FAF_STOCK_FX_DIR (a folder with FAF's particle.fx) switches on the check of the real file.
+add_executable(faf_particle_tests EXCLUDE_FROM_ALL particles/ParticleEffectPatchTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/particles/ParticleEffectPatch.cpp)
+target_include_directories(faf_particle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_particle_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_particle_tests PRIVATE gtest_main)
+set_target_properties(faf_particle_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME particle_effect_patch COMMAND faf_particle_tests)
+set_tests_properties(particle_effect_patch PROPERTIES LABELS "Render")
+
+# Engine addition: the stratum mask size rules (src/moho/terrain/StratumMaskSize.h), header-only.
+add_executable(faf_stratum_mask_tests EXCLUDE_FROM_ALL terrain/StratumMaskSizeTests.cpp)
+target_include_directories(faf_stratum_mask_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_stratum_mask_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_stratum_mask_tests PRIVATE gtest_main)
+set_target_properties(faf_stratum_mask_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME stratum_mask_size COMMAND faf_stratum_mask_tests)
+set_tests_properties(stratum_mask_size PROPERTIES LABELS "Render")
 
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest

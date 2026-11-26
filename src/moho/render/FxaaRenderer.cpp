@@ -14,8 +14,9 @@ namespace moho
 
   TConVar<int> gTConVar_ren_Fxaa(
     "ren_Fxaa",
-    "FXAA on the world views (Direct3D 12 and Vulkan, which have no multisampled back buffer): 1 (the default) on, "
-    "0 off. -1, the old automatic setting a saved option may still hold, means on.",
+    "Anti-aliasing of the world views (Direct3D 11, 12 and Vulkan, which have no multisampled back buffer): 0 off, 1 "
+    "(the default) FXAA, 2 SMAA 1x (a lightweight form, three passes). -1, the old automatic setting a saved option "
+    "may still hold, means FXAA.",
     &ren_Fxaa
   );
 
@@ -27,7 +28,7 @@ namespace moho
 
   bool FxaaRenderer::IsActive()
   {
-    if (ren_Fxaa == 0) {
+    if (ren_Fxaa == 0 || ren_Fxaa == 2) { // 2 is SMAA (SmaaRenderer)
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -39,7 +40,8 @@ namespace moho
       mDevice = device;
       gpg::gal::DeviceContext* const context = device->GetDeviceContext();
       const bool modern = context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D11 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
          context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};

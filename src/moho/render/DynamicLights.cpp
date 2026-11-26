@@ -21,6 +21,7 @@
 #include "moho/render/BoundDepthSupport.h"
 #include "moho/render/DynamicLightsShader.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/lights/LightFeeds.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/resource/CParticleTexture.h"
 
@@ -180,7 +181,9 @@ namespace moho
     const int tick
   )
   {
-    if (ren_DynamicLights <= 0) {
+    // The dynamic lights of the irradiance field (docs/DYNAMIC_LIGHTS.md) light the world from the same effects: while
+    // they are on, this screen-space version collects nothing and draws nothing, so the ground is never lit twice.
+    if (ren_DynamicLights <= 0 || lights::Enabled()) {
       mLights.clear();
       return;
     }
@@ -301,7 +304,7 @@ namespace moho
 
   bool DynamicLights::IsActive()
   {
-    if (ren_DynamicLights <= 0) {
+    if (ren_DynamicLights <= 0 || lights::Enabled()) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();

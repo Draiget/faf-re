@@ -38,6 +38,7 @@
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/RangeGpuRenderer.h"
 #include "moho/render/RangeRendererStartupRegistrations.h"
+#include "moho/render/RenderScale.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CWldMap.h"
@@ -967,16 +968,24 @@ namespace
     const moho::GeomCamera3& cameraView = camera.CameraGetView();
     const float zoomScale = camera.CameraGetTargetZoom() / camera.GetMaxZoom();
 
+    // Engine addition (render scale): the world is drawn into a smaller target, so a band that is one pixel wide at the
+    // window's size is a fraction of a texel there and the rasteriser keeps only some of its pixels (the ring turns
+    // into dots). The band's thickness grows by 1 / scale to keep its width in source texels.
+    const float worldScale = moho::REN_GetWorldDrawScale();
+    const float scaledThickness = (worldScale > 0.0f && worldScale < 0.999f) ? 1.0f / worldScale : 1.0f;
+
     const float innerThicknessOffset =
-      (((innerRingParams.thicknessScalar * moho::range_InnerThicknessCoeff) * playableMapSpan) -
+      ((((innerRingParams.thicknessScalar * moho::range_InnerThicknessCoeff) * playableMapSpan) -
+        innerRingParams.radius) *
+         zoomScale +
        innerRingParams.radius) *
-        zoomScale +
-      innerRingParams.radius;
+      scaledThickness;
     const float outerThicknessOffset =
-      (((outerRingParams.thicknessScalar * moho::range_OuterThicknessCoeff) * playableMapSpan) -
+      ((((outerRingParams.thicknessScalar * moho::range_OuterThicknessCoeff) * playableMapSpan) -
+        outerRingParams.radius) *
+         zoomScale +
        outerRingParams.radius) *
-        zoomScale +
-      outerRingParams.radius;
+      scaledThickness;
 
     RangeExtractionPayloadVector fillPayloads;
     RangeExtractionPayloadVector edgePayloads;
