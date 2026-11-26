@@ -217,8 +217,11 @@ namespace
     }
     // Engine addition (lua_ArenaHugePages): 2 MB steps, so every step is whole huge pages (the range
     // starts on a 16 MB boundary).
-    const std::size_t chunk = HugePagesWanted() ? kHugePageCommitBytes : kCommitChunkBytes;
-    const std::size_t want = (endBytes - gCommittedBytes + chunk - 1u) / chunk * chunk;
+    // Read once, so the step and the advice agree. The end is rounded to a whole step from the range's
+    // start, so 2 MB steps stay on 2 MB frames after 1 MB ones (the same end as before for 1 MB steps).
+    const bool hugePages = HugePagesWanted();
+    const std::size_t chunk = hugePages ? kHugePageCommitBytes : kCommitChunkBytes;
+    const std::size_t want = (endBytes + chunk - 1u) / chunk * chunk - gCommittedBytes;
     const std::size_t commit = (want > gReserveBytes - gCommittedBytes) ? gReserveBytes - gCommittedBytes : want;
     void* const start = reinterpret_cast<void*>(gBase + gCommittedBytes);
 #if FAFRE_PLATFORM_WINDOWS
@@ -230,7 +233,7 @@ namespace
       return false;
     }
 #if FAFRE_PLATFORM_LINUX // MADV_HUGEPAGE is Linux's transparent huge page advice
-    if (HugePagesWanted()) {
+    if (hugePages) {
       (void)::madvise(start, commit, MADV_HUGEPAGE);
     }
 #endif
