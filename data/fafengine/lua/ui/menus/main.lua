@@ -12,10 +12,16 @@
 -- scale) builds the menu again. With the menu hidden behind a lobby, the replays or the mod manager it doesn't, as
 -- that would close them. ButtonOptions, MenuShow and MenuHide are module globals each CreateUI call defines anew,
 -- so they are wrapped after it.
+--
+-- The in-game launcher (/fafengine/modules/lua/ui/launcher/launcher.lua) is what CreateUI builds: at start, after a
+-- game, and when the campaign screen or the credits come back here. FAF's main menu stays one button away on it, and
+-- appears instead when the launcher is turned off (/nolauncher, or the options key fafre_launcher = false) or fails
+-- to build. Starts that never call CreateUI (/gpgnet from FAF's client, /hostgame, /joingame, a replay from the
+-- command line) never show it.
 
 do
     local OldCreateUI = CreateUI
-    function CreateUI()
+    local function CreateFafMenu()
         OldCreateUI()
         local env = getfenv(1)
         local UiScale = import('/fafengine/modules/lua/ui/uiscale.lua')
@@ -42,5 +48,20 @@ do
             end)
         end
         UiScale.SetMainMenuVisible(true)
+    end
+
+    function CreateUI()
+        local loaded, Launcher = pcall(import, '/fafengine/modules/lua/ui/launcher/launcher.lua')
+        if loaded and Launcher.Wanted() then
+            local ok, err = pcall(Launcher.CreateUI, CreateFafMenu)
+            if ok then
+                return
+            end
+            WARN("LAUNCHER: failed to build, FAF's main menu instead: " .. tostring(err))
+            pcall(Launcher.Cleanup)
+        elseif not loaded then
+            WARN("LAUNCHER: failed to load, FAF's main menu instead: " .. tostring(Launcher))
+        end
+        CreateFafMenu()
     end
 end

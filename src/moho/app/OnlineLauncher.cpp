@@ -9,9 +9,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -192,8 +194,10 @@ namespace
     bool endedFromLobby = false;
     std::string fixedToken; ///< FAF_ONLINE_ACCESS_TOKEN_FILE's, a test hook
 
-    // FAF_ONLINE_AUTOTEST (a test hook): host on <map>, leave after <seconds> in the lobby or the game, quit after.
-    std::string autotestMap;
+    // FAF_ONLINE_AUTOTEST (a test hook): host on <map> (host:<map>:<seconds>[:game]), or join the first open game the
+    // launcher lists through its Join (join:<seconds>); leave after <seconds> in the lobby or the game, quit after.
+    std::string autotestMap; ///< the map to host; "join" for the join test
+    bool autotestJoin = false;
     int autotestSeconds = 0;
     bool autotestGame = false; ///< launch the game from FAF's lobby, leave that
     /// 0: host once in the lobby; 1: wait for the match; 2: in FAF's lobby; 5: launched, waiting for the session;
@@ -227,6 +231,12 @@ namespace
         autotestGame = test.ends_with(":game");
         LogLine(("autotest: host on " + autotestMap + ", leave the " + (autotestGame ? "game" : "lobby") + " after " +
                  std::to_string(autotestSeconds) + " s")
+                  .c_str());
+      } else if (test.starts_with("join:")) {
+        autotestMap = "join";
+        autotestJoin = true;
+        autotestSeconds = std::atoi(test.c_str() + 5);
+        LogLine(("autotest: join the first open game, leave the lobby after " + std::to_string(autotestSeconds) + " s")
                   .c_str());
       }
       if (fixedToken.empty()) {
@@ -525,6 +535,68 @@ namespace
     return out;
   }
 
+  std::optional<double> TableNumber(
+    lua_State* const L,
+    const int table,
+    const char* const key
+  )
+  {
+    lua_pushstring(L, key);
+    lua_gettable(L, table);
+    std::optional<double> out;
+    if (lua_isnumber(L, -1)) {
+      out = static_cast<double>(lua_tonumber(L, -1));
+    }
+    lua_pop(L, 1);
+    return out;
+  }
+
+  bool TableBool(
+    lua_State* const L,
+    const int table,
+    const char* const key
+  )
+  {
+    lua_pushstring(L, key);
+    lua_gettable(L, table);
+    const bool out = lua_toboolean(L, -1) != 0;
+    lua_pop(L, 1);
+    return out;
+  }
+
+  /** The featured mod whose files this process has mounted (`/init init_<mod>.lua`); empty when it wasn't started on
+   * one of FAF's init files. */
+  std::string LoadedFeaturedMod(
+    const Service& s
+  )
+  {
+    const std::string name = Lower(std::filesystem::path(s.realInit).filename().string());
+    if (!name.starts_with("init_") || !name.ends_with(".lua") || name.size() <= 9) {
+      return {};
+    }
+    return name.substr(5, name.size() - 9);
+  }
+
+  /** Host and join only on the featured mod already loaded: another one needs the game's files swapped (WP8), and
+   * until then a game on it would start on the wrong files. */
+  std::expected<void, std::string> CheckFeaturedMod(
+    const Service& s,
+    const std::string& featuredMod
+  )
+  {
+    const std::string loaded = LoadedFeaturedMod(s);
+    if (loaded.empty()) {
+      return std::unexpected(std::string("this game wasn't started on FAF's game files (/init init_faf.lua)"));
+    }
+    if (!featuredMod.empty() && Lower(featuredMod) != loaded) {
+      return std::unexpected(
+        "this needs FAF's " + featuredMod + " files; the game runs " + loaded + ". Start it with /init init_" +
+        Lower(featuredMod) + ".lua"
+      );
+    }
+    return {};
+  }
+
   const char* AuthStateName(
     const FafAuth::State state
   )
@@ -578,6 +650,7 @@ namespace
     SetField(L, "notice", s.notice);
     SetField(L, "match", MatchStateName(s.match));
     SetField(L, "matchMessage", s.matchMessage);
+    SetField(L, "loadedMod", LoadedFeaturedMod(s));
     return 1;
   }
 
@@ -643,9 +716,12 @@ namespace
       SetField(L, "state", game.state);
       SetField(L, "visibility", game.visibility);
       SetField(L, "ratingType", game.ratingType);
+      SetField(L, "gameType", game.gameType);
       SetField(L, "players", static_cast<double>(game.numPlayers));
       SetField(L, "maxPlayers", static_cast<double>(game.maxPlayers));
+      SetField(L, "simMods", static_cast<double>(game.simMods.size()));
       SetBool(L, "password", game.passwordProtected);
+      SetBool(L, "enforceRating", game.enforceRatingRange);
       if (game.ratingMin) {
         SetField(L, "ratingMin", *game.ratingMin);
       }
@@ -682,8 +758,20 @@ namespace
       PushResult(L, std::unexpected(std::string("FafOnline_Join needs the game's uid")));
     } else if (s.lobby.GetState() != FafLobby::State::SignedIn) {
       PushResult(L, std::unexpected(std::string("not in FAF's lobby")));
+    } else if (s.match != MatchState::Idle && s.match != MatchState::Failed) {
+      PushResult(L, std::unexpected(std::string("a match is already starting or running")));
     } else {
-      PushResult(L, s.lobby.JoinGame(uid, password != nullptr ? password : ""));
+      std::string featuredMod;
+      for (const FafGame& game : s.lobby.Games()) {
+        if (game.uid == uid) {
+          featuredMod = game.featuredMod;
+        }
+      }
+      if (const auto usable = CheckFeaturedMod(s, featuredMod); !usable) {
+        PushResult(L, usable);
+      } else {
+        PushResult(L, s.lobby.JoinGame(uid, password != nullptr ? password : ""));
+      }
     }
     return 2;
   }
@@ -708,10 +796,17 @@ namespace
       request.visibility = visibility;
     }
     request.password = TableString(L, 1, "password");
+    request.ratingMin = TableNumber(L, 1, "ratingMin");
+    request.ratingMax = TableNumber(L, 1, "ratingMax");
+    request.enforceRatingRange = TableBool(L, 1, "enforceRating");
     if (request.mapname.empty()) {
       PushResult(L, std::unexpected(std::string("no map")));
     } else if (s.lobby.GetState() != FafLobby::State::SignedIn) {
       PushResult(L, std::unexpected(std::string("not in FAF's lobby")));
+    } else if (s.match != MatchState::Idle && s.match != MatchState::Failed) {
+      PushResult(L, std::unexpected(std::string("a match is already starting or running")));
+    } else if (const auto usable = CheckFeaturedMod(s, request.featuredMod); !usable) {
+      PushResult(L, usable);
     } else {
       PushResult(L, s.lobby.HostGame(request));
     }
@@ -793,7 +888,8 @@ namespace
       &Binding<&HostBody>,
       nullptr,
       "<global>",
-      "bool, string FafOnline_Host{title, map, mod, password, visibility} - hosts a P2P game on FAF."
+      "bool, string FafOnline_Host{title, map, mod, password, visibility, ratingMin, ratingMax, enforceRating} - hosts "
+      "a P2P game on FAF."
     );
   }
 
@@ -810,9 +906,26 @@ namespace
 
 void moho::ONLINE_Frame()
 {
+  // FAF_ONLINE_AUTOTEST=screens (a test hook): the launcher walks through every screen it opens and back, then quits
+  // (launcher.lua TestWalk, which runs once per Lua state).
+  static const bool screensTest = TestSetting("FAF_ONLINE_AUTOTEST") == "screens";
+  if (screensTest && moho::WLD_GetActiveSession() == nullptr) {
+    static auto nextTry = std::chrono::steady_clock::now();
+    if (const auto now = std::chrono::steady_clock::now(); now >= nextTry) {
+      nextTry = now + std::chrono::seconds(2);
+      if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
+        (void)moho::SCR_LuaDoString(
+          "local launcher = __modules and __modules['/fafengine/modules/lua/ui/launcher/launcher.lua'] "
+          "if launcher and launcher.TestWalk then launcher.TestWalk() end",
+          state
+        );
+      }
+    }
+  }
   if (!gService) {
     // An autotest (a test hook) starts the service on its own, as the launcher's screen would.
-    static const bool autotest = !TestSetting("FAF_ONLINE_AUTOTEST").empty();
+    static const bool autotest = TestSetting("FAF_ONLINE_AUTOTEST").starts_with("host:") ||
+      TestSetting("FAF_ONLINE_AUTOTEST").starts_with("join:");
     if (!autotest || moho::USER_GetLuaState() == nullptr) {
       return;
     }
@@ -862,7 +975,21 @@ void moho::ONLINE_Frame()
   }
   if (!s.autotestMap.empty()) {
     const auto now = std::chrono::steady_clock::now();
-    if (s.autotestStep == 0 && s.lobby.GetState() == FafLobby::State::SignedIn) {
+    if (s.autotestStep == 0 && s.autotestJoin) {
+      // The launcher's own Join on the first open game it lists (launcher.lua TestJoin), tried every 2 s.
+      if (s.match != MatchState::Idle) {
+        s.autotestStep = 1;
+      } else if (now - s.autotestSince > std::chrono::seconds(2)) {
+        s.autotestSince = now;
+        if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
+          (void)moho::SCR_LuaDoString(
+            "local launcher = __modules and __modules['/fafengine/modules/lua/ui/launcher/launcher.lua'] "
+            "if launcher and launcher.TestJoin then launcher.TestJoin() end",
+            state
+          );
+        }
+      }
+    } else if (s.autotestStep == 0 && s.lobby.GetState() == FafLobby::State::SignedIn) {
       FafHostRequest request;
       request.title = "faf-re in-game launcher test";
       request.mapname = s.autotestMap;
