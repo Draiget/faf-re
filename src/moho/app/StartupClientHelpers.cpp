@@ -435,7 +435,9 @@ int moho::cfunc_GetCommandLineArgL(
 
   LuaPlus::LuaStackObject optionArg(state, 1);
   const char* const optionText = optionArg.GetString();
-  gpg::Logf(optionText != nullptr ? optionText : "");
+  // Engine fix: the binary logs the option's text as the format. The text is Lua's, a mod's among it: a '%' in it read
+  // arguments that were never passed. "%n" wrote through one on POSIX; the Windows CRT refuses it (an empty line).
+  gpg::Logf("%s", optionText != nullptr ? optionText : "");
 
   LuaPlus::LuaStackObject requestedCountArg(state, 2);
   const int requestedArgCount = requestedCountArg.GetInteger();

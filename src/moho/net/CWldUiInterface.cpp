@@ -49,7 +49,7 @@ namespace
   )
   {
     const fa::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
-    moho::CON_Printf(message.c_str(), nickname.c_str());
+    moho::CON_Printf("%s", moho::LocFormat(message.c_str(), {nickname.c_str()}).c_str());
   }
 
   /**

@@ -851,7 +851,7 @@ void CLobby::OnJoin(
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const fa::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
-  Msgf(locMsg.c_str(), player->playerName.c_str());
+  Msg(LocFormat(locMsg.c_str(), {player->playerName.c_str()}).c_str());
 
   if (peerConnection == nullptr && mHasNAT) {
     for (SPeer* it : peers.owners()) {
@@ -955,7 +955,7 @@ void CLobby::OnWelcome(
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const fa::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
-  Msgf(locMsg.c_str(), peer->playerName.c_str());
+  Msg(LocFormat(locMsg.c_str(), {peer->playerName.c_str()}).c_str());
 }
 
 /**
@@ -1286,7 +1286,7 @@ void CLobby::Reconnect(
 
       LuaPlus::LuaState* l = mLuaObj.GetActiveState();
       const fa::string locMsg = Loc(l, "<LOC Engine0003>Lost connection to %s.");
-      Msgf(locMsg.c_str(), peer->playerName.c_str());
+      Msg(LocFormat(locMsg.c_str(), {peer->playerName.c_str()}).c_str());
 
       INetConnection* newConn;
       if (peer->uid < localUid && peerConnection != nullptr) {
@@ -1305,7 +1305,7 @@ void CLobby::Reconnect(
 
       LuaPlus::LuaState* l = mLuaObj.GetActiveState();
       const fa::string locMsg = Loc(l, "<LOC Engine0002>%s disconnected.");
-      Msgf(locMsg.c_str(), peer->playerName.c_str());
+      Msg(LocFormat(locMsg.c_str(), {peer->playerName.c_str()}).c_str());
 
       peer->state = ENetworkPlayerState::kDisconnected;
       peersDirty = true;
@@ -2968,7 +2968,7 @@ void CLobby::ConnectToPeer(
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const fa::string locMsg = Loc(l, "<LOC Engine0005>Connecting to %s...");
-  Msgf(locMsg.c_str(), peer->playerName.c_str());
+  Msg(LocFormat(locMsg.c_str(), {peer->playerName.c_str()}).c_str());
 }
 
 /**

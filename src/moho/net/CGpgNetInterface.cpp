@@ -1763,7 +1763,7 @@ void CGpgNetInterface::EjectPlayer(
 
     const fa::string localizedMessage =
       Loc(USER_GetLuaState(), "<LOC Engine0016>You have been ejected due to connectivity issues.");
-    CON_Printf(localizedMessage.c_str());
+    CON_Printf("%s", localizedMessage.c_str());
     return;
   }
 
@@ -1771,7 +1771,7 @@ void CGpgNetInterface::EjectPlayer(
 
   const fa::string localizedMessage =
     Loc(USER_GetLuaState(), "<LOC Engine0017>%s has been ejected due to connectivity issues.");
-  CON_Printf(localizedMessage.c_str(), targetClient->GetNickname().c_str());
+  CON_Printf("%s", LocFormat(localizedMessage.c_str(), {targetClient->GetNickname().c_str()}).c_str());
 }
 
 /**
