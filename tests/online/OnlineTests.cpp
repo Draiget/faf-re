@@ -27,6 +27,7 @@
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
 #include "online/FafLobby.h"
+#include "online/GameLink.h"
 #include "online/Json.h"
 #include "online/Url.h"
 #include "platform/Http.h"
@@ -982,4 +983,180 @@ TEST(
   EXPECT_EQ(result->String("ref"), "eu-1/r1");
   EXPECT_TRUE(server.RequestHead().starts_with("POST /api/v1/requests ")) << server.RequestHead();
   EXPECT_TRUE(server.RequestHead().contains("Content-Type: application/json"));
+}
+
+// --- WP4: the launcher's GPGNet side of a match ----------------------------------------------------------------------
+
+namespace
+{
+  /** A fake game: connects to the link's port and speaks GPGNet. */
+  class FakeGame
+  {
+  public:
+    explicit FakeGame(
+      std::uint16_t port
+    )
+    {
+      WSADATA data{};
+      (void)::WSAStartup(MAKEWORD(2, 2), &data);
+      mSocket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      DWORD timeout = 5000;
+      (void)::setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+      sockaddr_in address{};
+      address.sin_family = AF_INET;
+      address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      address.sin_port = htons(port);
+      connected = ::connect(mSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0;
+    }
+
+    ~FakeGame()
+    {
+      ::closesocket(mSocket);
+      ::WSACleanup();
+    }
+
+    void Send(
+      const faf::netbridge::GpgMessage& message
+    )
+    {
+      const std::string bytes = faf::netbridge::EncodeGpg(message);
+      (void)::send(mSocket, bytes.data(), static_cast<int>(bytes.size()), 0);
+    }
+
+    /** The next message from the link; an empty command after 5 s without one. */
+    faf::netbridge::GpgMessage Next()
+    {
+      for (;;) {
+        bool bad = false;
+        if (auto message = mDecoder.Next(&bad)) {
+          return *message;
+        }
+        char buffer[4096];
+        const int got = ::recv(mSocket, buffer, sizeof(buffer), 0);
+        if (got <= 0 || bad) {
+          return {};
+        }
+        mDecoder.Feed(buffer, static_cast<std::size_t>(got));
+      }
+    }
+
+    bool connected = false;
+
+  private:
+    SOCKET mSocket = INVALID_SOCKET;
+    faf::netbridge::GpgDecoder mDecoder;
+  };
+} // namespace
+
+TEST(
+  OnlineGameLink,
+  CreatesTheLobbyOnIdleAndHoldsLobbyMessagesUntilTheGameIsInItsLobby
+)
+{
+  using faf::netbridge::GpgArg;
+  faf::online::GameLink link;
+  const auto port = link.Listen();
+  ASSERT_TRUE(port) << port.error();
+  std::mutex lock;
+  std::vector<std::string> toLobby;
+  faf::online::GameLinkSettings settings;
+  settings.login = "Tester";
+  settings.playerId = 346886;
+  settings.iceServersJson = R"({"id":"s1","forceRelay":false,"servers":[]})";
+  link.Start(settings, [&](const faf::online::JsonNode& message) {
+    std::lock_guard<std::mutex> guard(lock);
+    toLobby.push_back(faf::online::ToJson(message));
+  });
+  // The lobby's HostGame before the game is in its lobby: held.
+  link.FromLobby(*faf::online::ParseJson(R"({"command":"HostGame","target":"game","args":["scmp_009"]})"));
+
+  FakeGame game(*port);
+  ASSERT_TRUE(game.connected);
+  game.Send({"GameState", {GpgArg::Str("Idle")}});
+  const auto ice = game.Next();
+  EXPECT_EQ(ice.command, "IceServers");
+  ASSERT_EQ(ice.args.size(), 1u);
+  EXPECT_EQ(ice.args[0].text, settings.iceServersJson);
+  const auto create = game.Next();
+  EXPECT_EQ(create.command, "CreateLobby");
+  ASSERT_EQ(create.args.size(), 5u);
+  EXPECT_EQ(create.args[0].number, 0);
+  EXPECT_EQ(create.args[2].text, "Tester");
+  EXPECT_EQ(create.args[3].number, 346886);
+  EXPECT_EQ(create.args[4].number, 1);
+
+  game.Send({"GameState", {GpgArg::Str("Lobby")}});
+  const auto host = game.Next();
+  EXPECT_EQ(host.command, "HostGame");
+  ASSERT_EQ(host.args.size(), 1u);
+  EXPECT_EQ(host.args[0].text, "scmp_009");
+
+  // In the lobby: sent at once, the lobby's numbers as GPGNet ints.
+  link.FromLobby(*faf::online::ParseJson(R"({"command":"ConnectToPeer","target":"game","args":["Bo",42,1]})"));
+  const auto peer = game.Next();
+  EXPECT_EQ(peer.command, "ConnectToPeer");
+  ASSERT_EQ(peer.args.size(), 3u);
+  EXPECT_EQ(peer.args[1].kind, GpgArg::Kind::Int);
+  EXPECT_EQ(peer.args[1].number, 42);
+
+  game.Send({"GameOption", {GpgArg::Str("Title"), GpgArg::Str("a/tb")}});
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  for (;;) {
+    {
+      std::lock_guard<std::mutex> guard(lock);
+      if (toLobby.size() >= 3u || std::chrono::steady_clock::now() > until) {
+        break;
+      }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  link.Stop();
+  std::lock_guard<std::mutex> guard(lock);
+  ASSERT_EQ(toLobby.size(), 3u);
+  EXPECT_EQ(toLobby[0], R"({"command":"GameState","target":"game","args":["Idle"]})");
+  EXPECT_EQ(toLobby[1], R"({"command":"GameState","target":"game","args":["Lobby"]})");
+  EXPECT_EQ(toLobby[2], R"({"command":"GameOption","target":"game","args":["Title","a\tb"]})");
+}
+
+TEST(
+  OnlineFafLobby,
+  MessagesForTheGameGoToTheGameHandler
+)
+{
+  EchoServer server(false, [](const std::string& received) -> std::vector<std::string> {
+    const auto message = faf::online::ParseJson(received.substr(0, received.find('\n')));
+    if (!message) {
+      return {};
+    }
+    if (message->String("command") == "ask_session") {
+      return {"{\"command\":\"session\",\"session\":1}\n"};
+    }
+    if (message->String("command") == "auth") {
+      return {"{\"command\":\"welcome\",\"me\":{\"id\":2,\"login\":\"Dostya\"}}\n"
+              "{\"command\":\"HostGame\",\"target\":\"game\",\"args\":[\"scmp_009\"]}\n"};
+    }
+    return {};
+  });
+  faf::online::FafLobbySettings settings;
+  settings.webSocketUrl = server.Url();
+  settings.testUniqueId = "test-uid";
+  faf::online::FafLobby lobby(settings);
+  std::mutex lock;
+  std::vector<std::string> forGame;
+  lobby.SetGameHandler([&](const faf::online::JsonNode& message) {
+    std::lock_guard<std::mutex> guard(lock);
+    forGame.push_back(message.String("command"));
+  });
+  lobby.Connect([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  ASSERT_TRUE(WaitUntil([&] {
+    std::lock_guard<std::mutex> guard(lock);
+    return !forGame.empty();
+  }));
+  lobby.Disconnect();
+  EXPECT_EQ(forGame.front(), "HostGame");
+  for (const auto& message : lobby.TakeMessages()) {
+    EXPECT_NE(message.String("command"), "HostGame");
+  }
 }

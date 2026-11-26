@@ -7,7 +7,9 @@ add_library(faf_online STATIC
   ControlService.cpp
   FafAuth.cpp
   FafLobby.cpp
+  GameLink.cpp
   Json.cpp
+  "${PROJECT_SOURCE_DIR}/src/netbridge/GpgNet.cpp"
   Url.cpp)
 target_include_directories(faf_online PUBLIC "${PROJECT_SOURCE_DIR}/src")
 if(FAFRE_PLATFORM_WINDOWS)
@@ -15,7 +17,7 @@ if(FAFRE_PLATFORM_WINDOWS)
     "${PROJECT_SOURCE_DIR}/src/platform/windows/HttpWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/ProcessWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/SecretStoreWindows.cpp")
-  target_link_libraries(faf_online PUBLIC winhttp crypt32)
+  target_link_libraries(faf_online PUBLIC winhttp crypt32 ws2_32)
 endif()
 target_link_libraries(faf_online PRIVATE faf_codegen)
 set_target_properties(faf_online PROPERTIES FOLDER "net")

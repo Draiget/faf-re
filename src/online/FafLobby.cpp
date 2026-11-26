@@ -91,6 +91,14 @@ namespace faf::online
     mLog = std::move(log);
   }
 
+  void FafLobby::SetGameHandler(
+    std::function<void(const JsonNode& message)> handler
+  )
+  {
+    std::lock_guard<std::mutex> lock(mGameHandlerLock);
+    mGameHandler = std::move(handler);
+  }
+
   void FafLobby::Log(
     const std::string& line
   ) const
@@ -335,6 +343,13 @@ namespace faf::online
     {
       std::lock_guard<std::mutex> lock(mLock);
       ++mCounts[command];
+    }
+    if (message.String("target") == "game") {
+      std::lock_guard<std::mutex> lock(mGameHandlerLock);
+      if (mGameHandler) {
+        mGameHandler(message);
+        return;
+      }
     }
     if (command == "session") {
       if (mAuthSent) {

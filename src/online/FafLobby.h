@@ -93,6 +93,11 @@ namespace faf::online
 
     /** Where lines for a log go ("lobby: ..."); never a token or unique_id. */
     void SetLog(std::function<void(const char*)> log);
+    /**
+     * Where the lobby's messages for the game go ("target": "game": HostGame, JoinGame, ConnectToPeer, IceMsg...),
+     * on the lobby's thread, instead of TakeMessages. Set before Connect, or while no match runs.
+     */
+    void SetGameHandler(std::function<void(const JsonNode& message)> handler);
     /** Signs in on a thread of its own; GetState says how it goes. */
     void Connect(TokenSource tokens);
     void Disconnect();
@@ -128,6 +133,8 @@ namespace faf::online
 
     FafLobbySettings mSettings;
     std::function<void(const char*)> mLog;
+    std::mutex mGameHandlerLock;
+    std::function<void(const JsonNode&)> mGameHandler;
     platform::http::WebSocket mSocket;
     std::thread mThread;
     std::atomic<State> mState{State::Disconnected};
