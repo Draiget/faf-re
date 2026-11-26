@@ -958,6 +958,7 @@ set(FAF_ENGINE_SOURCES
   moho/ui/CMauiBitmap.cpp
   moho/ui/UiArt.cpp
   moho/ui/UiArtLua.cpp
+  moho/ui/NetLinksLua.cpp
   moho/ui/CMauiBorder.cpp
   moho/ui/CMauiScrollbar.cpp
   moho/ui/CMauiMeshLua.cpp

@@ -157,3 +157,192 @@ function FafReTestPressLaunch()
     GUI.launchGameButton.OnClick(GUI.launchGameButton)
     return true
 end
+
+--- Engine addition (in-game launcher, WP5b): faf-re's lobby screen (/fafengine/modules/lua/ui/lobby/lobbyview.lua)
+--- draws over this lobby. FafReLobbyApi is all it touches: reads of this file's state and the calls FAF's own
+--- controls make, so the lobby's logic, network and host rules stay FAF's. Built after CreateUI; any error leaves
+--- FAF's screen showing. Chat lines go to both screens.
+do
+    local api = {}
+    api.GameInfo = function() return gameInfo end
+    api.IsHost = function() return lobbyComm and lobbyComm:IsHost() or false end
+    api.HostID = function() return hostID end
+    api.LocalPlayerID = function() return localPlayerID end
+    api.LocalSlot = function() return localPlayerID and FindSlotForID(localPlayerID) or nil end
+    api.IsSinglePlayer = function() return singlePlayer end
+    api.GameName = function() return gameName or '' end
+    api.NumSlots = function() return numOpenSlots end
+    api.GUI = function() return GUI end
+    api.IsColorFree = function(index, slot) return IsColorFree(index, slot) end
+    api.ShowMapPositions = function(control, scenario) ShowMapPositions(control, scenario) end
+    api.ConfigureMapListeners = function(control, scenario) ConfigureMapListeners(control, scenario) end
+
+    --- The slot's menu as FAF's name control has it (SetSlotInfo, ClearSlotInfo): nothing on your own slot.
+    api.SlotMenu = function(slot)
+        local hostKey = lobbyComm:IsHost() and 'host' or 'client'
+        local player = gameInfo.PlayerOptions[slot]
+        if player then
+            if player.Human and IsLocallyOwned(slot) then
+                return nil
+            end
+            return GetSlotMenuTables(player.Human and 'player' or 'ai', hostKey, slot)
+        end
+        local state = 'open'
+        if gameInfo.ClosedSlots[slot] and gameInfo.SpawnMex[slot] and gameInfo.AdaptiveMap then
+            state = 'closed_spawn_mex'
+        elseif gameInfo.ClosedSlots[slot] then
+            state = 'closed'
+        end
+        return GetSlotMenuTables(state, hostKey)
+    end
+    api.SlotAction = function(slot, key, text) DoSlotBehavior(slot, key, text) end
+
+    --- A new map, as the map dialog's selectBehavior does it for the host (no other option changed).
+    api.SetMap = function(scenarioFile)
+        if not lobbyComm:IsHost() then
+            return
+        end
+        local options = {}
+        if gameInfo.GameOptions.ScenarioFile and string.lower(scenarioFile) ~= string.lower(gameInfo.GameOptions.ScenarioFile) then
+            local scenario = MapUtil.LoadScenario(gameInfo.GameOptions.ScenarioFile)
+            if scenario and scenario.options then
+                for _, value in scenario.options do
+                    gameInfo.GameOptions[value.key] = nil
+                end
+            end
+        end
+        options['ScenarioFile'] = scenarioFile
+        ClearBadMapFlags()
+        HostUtils.UpdateMods()
+        SetGameOptions(options)
+    end
+    api.SetOption = function(key, value)
+        if not lobbyComm:IsHost() then
+            return
+        end
+        SetGameOption(key, value)
+        if key == 'AutoTeams' then
+            AssignAutoTeams()
+        end
+    end
+    api.Launch = function()
+        if GUI.launchGameButton then
+            GUI.launchGameButton.OnClick(GUI.launchGameButton)
+        end
+    end
+    api.ToggleReady = function()
+        local slot = localPlayerID and FindSlotForID(localPlayerID)
+        local row = slot and GUI.slots[slot]
+        if row and row.ready then
+            row.ready:SetCheck(not gameInfo.PlayerOptions[slot].Ready)
+        end
+    end
+    --- What FAF's chat field does with a line (commands such as /whisper included).
+    api.Chat = function(text)
+        if GUI.chatEdit and GUI.chatEdit.OnEnterPressed then
+            GUI.chatEdit:SetText(text)
+            GUI.chatEdit.OnEnterPressed(GUI.chatEdit, text)
+            GUI.chatEdit:SetText('')
+        end
+    end
+    --- A player's CPU benchmark (CPU_Benchmarks, the score FAF's slot bar shows; lower is faster), or nil.
+    api.Cpu = function(name) return name and CPU_Benchmarks[name] or nil end
+    --- The ping to a peer in milliseconds (lobbyComm's peers), or nil.
+    api.Ping = function(id)
+        if not lobbyComm or not id then
+            return nil
+        end
+        for _, peer in lobbyComm:GetPeers() do
+            if peer.id == id and peer.ping then
+                return math.floor(peer.ping)
+            end
+        end
+        return nil
+    end
+    --- A peer as the lobby sees it (lobbyComm:GetPeers: id, name, status 'Established' once linked, ping,
+    --- establishedPeers), or nil.
+    api.Peer = function(id)
+        if not lobbyComm or not id then
+            return nil
+        end
+        for _, peer in lobbyComm:GetPeers() do
+            if peer.id == id then
+                return peer
+            end
+        end
+        return nil
+    end
+    --- The sim mods of the game, each a mod table (name, uid...).
+    api.GameMods = function() return Mods.GetGameMods(gameInfo.GameMods) or {} end
+    --- The mod manager as FAF opens it: the host picks the game's mods, everyone else sees them and picks UI mods.
+    api.OpenMods = function()
+        if lobbyComm:IsHost() then
+            import('/lua/ui/lobby/modsmanager.lua').CreateDialog(GUI, true, availableMods, OnModsChanged)
+        elseif GUI.gameoptionsButton then
+            GUI.gameoptionsButton.OnClick(GUI.gameoptionsButton)
+        end
+    end
+    --- FAF's unit manager: the host changes the restrictions as the map dialog's Unit Manager does (they go out with
+    --- SetGameOptions); everyone else sees them, as FAF's client button shows them.
+    api.OpenRestrictions = function()
+        local unitsManager = import('/lua/ui/lobby/unitsmanager.lua')
+        if lobbyComm:IsHost() then
+            unitsManager.CreateDialog(GUI, gameInfo.GameOptions.RestrictedCategories, function(restricted)
+                SetGameOptions({ RestrictedCategories = restricted })
+            end, function() end, true)
+        else
+            unitsManager.CreateDialog(GUI, gameInfo.GameOptions.RestrictedCategories, function() end, function() end, false)
+        end
+    end
+    --- FAF's presets dialog (host only).
+    api.OpenPresets = function()
+        if lobbyComm:IsHost() and not singlePlayer then
+            import('/lua/ui/lobby/presets.lua').CreateUI(GUI)
+        end
+    end
+    --- FAF's own map and options dialog (the host's): every option page, presets and more.
+    api.OpenAdvanced = function()
+        if lobbyComm:IsHost() and GUI.gameoptionsButton then
+            GUI.gameoptionsButton.OnClick(GUI.gameoptionsButton)
+        end
+    end
+    FafReLobbyApi = api
+
+    local wrapped, problem = pcall(function()
+        local createUI = CreateUI
+        if type(createUI) ~= 'function' then
+            error('CreateUI is not a function here')
+        end
+        CreateUI = function(maxPlayers)
+            createUI(maxPlayers)
+            local ok, why = pcall(function()
+                local view = import('/fafengine/modules/lua/ui/lobby/lobbyview.lua')
+                if view.Wanted() then
+                    view.Create(api)
+                end
+            end)
+            if not ok then
+                WARN('faf-re lobby: our screen failed to build, FAF\'s shows: ' .. tostring(why))
+            end
+        end
+        local addChatText = AddChatText
+        if type(addChatText) == 'function' then
+            AddChatText = function(text, playerID, scrollToBottom)
+                addChatText(text, playerID, scrollToBottom)
+                pcall(function()
+                    local name = playerID and FindNameForID(playerID) or nil
+                    local color = nil
+                    for _, player in gameInfo.PlayerOptions:pairs() do
+                        if player.OwnerID == playerID and player.Human then
+                            color = gameColors.PlayerColors[player.PlayerColor]
+                        end
+                    end
+                    import('/fafengine/modules/lua/ui/lobby/lobbyview.lua').OnChat(text, name, color)
+                end)
+            end
+        end
+    end)
+    if not wrapped then
+        WARN('faf-re lobby: not installed: ' .. tostring(problem))
+    end
+end

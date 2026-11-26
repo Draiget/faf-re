@@ -713,6 +713,8 @@ namespace
     SetField(L, "lobbyMessage", s.lobby.Message());
     SetField(L, "notice", s.notice);
     SetField(L, "match", MatchStateName(s.match));
+    // The FAF game the match is (its uid in FafOnline_Games), for the lobby screen's title and rules.
+    SetField(L, "matchGame", s.match == MatchState::Idle ? std::string() : s.launch.uid);
     SetField(L, "matchMessage", s.matchMessage);
     SetField(L, "loadedMod", LoadedFeaturedMod(s));
     // Our control services: how many, and the worst state among them (off, connecting, failed, live).

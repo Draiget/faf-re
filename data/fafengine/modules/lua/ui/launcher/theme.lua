@@ -162,6 +162,16 @@ local function Picture(bitmap, path, px, fallback)
     bitmap.Height:Set(px)
 end
 
+--- An icon of the launcher's set as a texture path (drawn for `size` units at the current scale), or nil when this
+--- build can't draw it.
+function IconTexture(name, size, color, stroke)
+    local svg = Icons[name]
+    if not svg or not rawget(_G, 'FafUi_Icon') then
+        return nil
+    end
+    return FafUi_Icon(svg, Scale(size), color or Colors.text, stroke or 1.8)
+end
+
 --- An icon of the launcher's set, `size` units square, in `color`. :SetIcon(name, color) changes it.
 function Icon(parent, name, size, color, stroke)
     local px = Scale(size)
@@ -178,6 +188,31 @@ function Icon(parent, name, size, color, stroke)
     end
     icon:SetIcon(name, color or Colors.text)
     return icon
+end
+
+-- FAF's logo, as the FAF Rust client ships it (ui/public/assets/faflogo.svg, a 703 x 374 drawing), filled.
+local kFafLogo = '<polygon fill="currentColor" stroke="none" points="561.3 187.18 653.75 347.29 594.8 347.29 473.49 136.23 659.6 136.23 689 187.16 561.32 187.16 561.3 187.18"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="410.52 26.71 596.34 26.71 628.74 82.81 442.76 82.81 410.52 26.71"/>' ..
+    '<path fill="currentColor" stroke="none" d="M354.05,26.71h-1.49L167.47,347.29h56.78l44-76.23H435.89l44,76.23h58.43ZM305.57,207.25l46.52-80.56,46.51,80.56Z"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="74.26 82.81 106.66 26.71 295.93 26.71 263.53 82.81 74.26 82.81"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="110.82 347.29 49.23 347.29 141.68 187.18 14 187.18 43.4 136.25 232.67 136.25 110.82 347.29"/>'
+
+--- FAF's logo, `width` units wide, in `color`. The picture is square (the drawing's 703 units on both sides) with the
+--- logo in its top 53 %: lay out under it from :LogoBottom().
+function Logo(parent, width, color)
+    local px = Scale(width)
+    local logo = Bitmap(parent)
+    logo:DisableHitTest()
+    local path = rawget(_G, 'FafUi_Icon') and FafUi_Icon(kFafLogo, px, color or Colors.accent, 1, 703) or nil
+    Picture(logo, path, px)
+    logo.LogoBottom = function(self)
+        return self.Top() + math.floor(px * 374 / 703)
+    end
+    if not path then
+        local text = Title(parent, 'FAF', 30, color or Colors.accent)
+        LayoutHelpers.AtLeftTopIn(text, logo, 0, 0)
+    end
+    return logo
 end
 
 --- A filled circle, `size` units across. :SetDotColor(color) changes it.
@@ -475,7 +510,8 @@ function Checkbox(parent, label, onToggle)
     LayoutHelpers.AtVerticalCenterIn(text, row)
     text.Left:Set(function() return box.Right() + Scale(8) end)
     LayoutHelpers.SetHeight(row, 34)
-    row.Width:Set(function() return text.Right() - row.Left() + Scale(4) end)
+    -- Box, gap and label: not from Left, so a caller may place the checkbox by its right edge.
+    row.Width:Set(function() return Scale(28) + text.Width() end)
     row.on = false
     row.Paint = function(self, over)
         box:SetColors(self.on and Colors.accent or Colors.field, (self.on or over) and Colors.accent or Colors.lineStrong)

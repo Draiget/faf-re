@@ -139,300 +139,16 @@ local function WhyNotJoinable(game, status)
     return nil
 end
 
--- Maps on this computer: the scenario of a map folder, or false.
-local scenarios = {}
-local function LocalScenario(map)
-    if not map or map == '' then
-        return false
-    end
-    local key = string.lower(map)
-    if scenarios[key] == nil then
-        local path = '/maps/' .. key .. '/' .. key .. '_scenario.lua'
-        local found = false
-        if DiskGetFileInfo(path) then
-            local ok, scenario = pcall(import('/lua/ui/maputil.lua').LoadScenario, path)
-            found = ok and scenario or false
-        end
-        scenarios[key] = found
-    end
-    return scenarios[key]
-end
-
-local function MapTitle(map)
-    local scenario = LocalScenario(map)
-    if scenario and scenario.name then
-        return LOC(scenario.name)
-    end
-    return map or ''
-end
-
---- A map's picture in `frame` (a panel): the map's own preview when it's on this computer, else a map icon.
-local function MapPicture(frame)
-    local MapPreview = import('/lua/ui/controls/mappreview.lua').MapPreview
-    local picture = MapPreview(frame)
-    LayoutHelpers.FillParentFixedBorder(picture, frame, 1)
-    picture:DisableHitTest()
-    picture.Depth:Set(function() return frame.Depth() + 1 end)
-    local placeholder = Theme.Icon(frame, 'maps', 28, C.subtle, 1.5)
-    LayoutHelpers.AtCenterIn(placeholder, frame)
-    placeholder.Depth:Set(function() return frame.Depth() + 1 end)
-    -- The texture loads when the map changes; which of the two shows is set every time, as a Show on an ancestor
-    -- shows both.
-    frame.SetMap = function(self, map)
-        if self.map ~= map then
-            self.map = map
-            local scenario = LocalScenario(map)
-            local shown = false
-            if scenario then
-                shown = (scenario.preview and scenario.preview ~= '' and picture:SetTexture(scenario.preview)) or false
-                if not shown and scenario.map then
-                    shown = picture:SetTextureFromMap(scenario.map) or false
-                end
-            end
-            self.shown = shown and true or false
-        end
-        Theme.SetVisible(picture, self.shown)
-        Theme.SetVisible(placeholder, not self.shown)
-    end
-    return picture
-end
-
---- A dimmed cover over the whole screen that takes every click, with a bracketed panel in its middle.
-local function Modal(root, width, height)
-    local cover = Theme.Rect(root, 'e0020508')
-    LayoutHelpers.FillParent(cover, root)
-    Theme.SizeFromEdges(cover)
-    cover.Depth:Set(function() return root.Depth() + 500 end)
-    cover.HandleEvent = function(self, event)
-        return true
-    end
-    local panel = Theme.Panel(cover, 'ff0b161e', C.lineStrong)
-    LayoutHelpers.SetDimensions(panel, width, height)
-    LayoutHelpers.AtCenterIn(panel, root)
-    panel.Depth:Set(function() return cover.Depth() + 1 end)
-    Theme.Brackets(panel, C.accent, true)
-    cover.panel = panel
-    return cover
-end
-
-local function Message(root, title, text)
-    local cover = Modal(root, 520, 190)
-    local panel = cover.panel
-    local head = Theme.Title(panel, title, 16, C.text)
-    LayoutHelpers.AtLeftTopIn(head, panel, 24, 20)
-    local body = Theme.Cell(panel, 13, C.muted)
-    LayoutHelpers.AtLeftTopIn(body, panel, 24, 60)
-    LayoutHelpers.AtRightIn(body, panel, 24)
-    body:SetText(text)
-    local ok = Theme.Button(panel, 'OK', function() cover:Destroy() end, 'primary', { width = 120 })
-    LayoutHelpers.AtRightIn(ok, panel, 24)
-    LayoutHelpers.AtBottomIn(ok, panel, 20)
-    return cover
-end
-
---- The size of the screen in layout units (pixels over the UI scale).
-local function FrameUnits()
-    local frame = GetFrame(0)
-    return LayoutHelpers.InvScaleNumber(frame.Width()), LayoutHelpers.InvScaleNumber(frame.Height())
-end
-
---- A thin scrollbar along `area`'s right edge for a list with `Scrolled()` -> first, shown, total.
-local function ScrollMark(area, list)
-    local track = Theme.Rect(area, C.line)
-    track.Right:Set(area.Right)
-    track.Top:Set(area.Top)
-    track.Bottom:Set(area.Bottom)
-    track.Width:Set(Scale(3))
-    track:DisableHitTest()
-    local thumb = Theme.Rect(area, C.accent)
-    thumb.Right:Set(area.Right)
-    thumb.Width:Set(Scale(3))
-    thumb:DisableHitTest()
-    thumb.Depth:Set(function() return track.Depth() + 1 end)
-    local mark = {}
-    mark.Update = function(self)
-        local first, shown, total = list:Scrolled()
-        local visible = total > shown
-        Theme.SetVisible(track, visible)
-        Theme.SetVisible(thumb, visible)
-        if visible then
-            local height = track.Height()
-            local size = math.max(Scale(16), math.floor(height * shown / total))
-            local top = math.floor((height - size) * (first - 1) / math.max(1, total - shown))
-            thumb.Top:Set(function() return track.Top() + top end)
-            thumb.Height:Set(size)
-        end
-    end
-    return mark
-end
-
---- A list that has controls only for the rows on screen. columns: { {title, share, text(item), color}, ... };
---- onPick(item, double).
-local function VirtualList(parent, columns, onPick)
-    local list = Group(parent, 'launcher list')
-    list.items = {}
-    list.top = 1
-    list.rows = {}
-    list.selectedKey = false
-    list.hoverRow = false
-    local rowHeight = 28
-
-    local header = Group(list)
-    LayoutHelpers.AtLeftTopIn(header, list, 0, 0)
-    header.Right:Set(list.Right)
-    LayoutHelpers.SetHeight(header, 22)
-    local body = Group(list)
-    body.Left:Set(list.Left)
-    body.Right:Set(function() return list.Right() - Scale(10) end)
-    body.Top:Set(function() return header.Bottom() + Scale(4) end)
-    body.Bottom:Set(list.Bottom)
-    list.body = body
-
-    local function Edge(index, of, last)
-        local share = 0
-        for i = 1, (last and index or index - 1) do
-            share = share + columns[i][2]
-        end
-        if last then
-            return function() return of.Left() + math.floor(share * of.Width()) - Scale(6) end
-        end
-        return function() return of.Left() + math.floor(share * of.Width()) + Scale(10) end
-    end
-    for index, column in columns do
-        local title = Theme.Cell(header, 10, C.subtle, true)
-        title.Left:Set(Edge(index, body, false))
-        title.Right:Set(Edge(index, body, true))
-        LayoutHelpers.AtVerticalCenterIn(title, header)
-        title:SetText(string.upper(column[1]))
-    end
-    local line = Theme.Rect(list, C.line)
-    line.Left:Set(list.Left)
-    line.Right:Set(list.Right)
-    line.Top:Set(header.Bottom)
-    line.Height:Set(1)
-
-    local function VisibleCount()
-        return math.max(1, math.floor(body.Height() / Scale(rowHeight)))
-    end
-
-    local function MakeRow(index)
-        local row = Theme.Rect(body, C.clear)
-        row.Left:Set(body.Left)
-        row.Right:Set(body.Right)
-        row.Top:Set(function() return body.Top() + (index - 1) * Scale(rowHeight) end)
-        LayoutHelpers.SetHeight(row, rowHeight)
-        row.Width:Set(function() return row.Right() - row.Left() end)
-        row.cells = {}
-        for c, column in columns do
-            local cell = Theme.Cell(row, 13, column[4] or C.text)
-            cell.Left:Set(Edge(c, body, false))
-            cell.Right:Set(Edge(c, body, true))
-            LayoutHelpers.AtVerticalCenterIn(cell, row)
-            cell.Depth:Set(function() return row.Depth() + 1 end)
-            row.cells[c] = cell
-        end
-        row.HandleEvent = function(self, event)
-            if event.Type == 'WheelRotation' then
-                list:ScrollLines(nil, event.WheelRotation > 0 and -3 or 3)
-                return true
-            end
-            if not self.item then
-                return false
-            end
-            if event.Type == 'MouseEnter' then
-                list.hoverRow = self
-                list:Paint()
-            elseif event.Type == 'MouseExit' then
-                if list.hoverRow == self then
-                    list.hoverRow = false
-                end
-                list:Paint()
-            elseif (event.Type == 'ButtonPress' or event.Type == 'ButtonDClick') and event.Modifiers.Left then
-                list.selectedKey = self.item.key
-                list:Paint()
-                onPick(self.item, event.Type == 'ButtonDClick')
-                return true
-            end
-            return false
-        end
-        return row
-    end
-
-    function list:EnsureRows()
-        local wanted = VisibleCount()
-        if table.getn(self.rows) == wanted then
-            return
-        end
-        for _, row in self.rows do
-            row:Destroy()
-        end
-        self.rows = {}
-        self.hoverRow = false
-        for i = 1, wanted do
-            self.rows[i] = MakeRow(i)
-        end
-    end
-
-    function list:SetItems(items)
-        self.items = items
-        self.top = math.min(self.top, math.max(1, table.getn(items) - VisibleCount() + 1))
-        self:Paint()
-    end
-
-    function list:Selected()
-        for _, item in self.items do
-            if item.key == self.selectedKey then
-                return item
-            end
-        end
-        return nil
-    end
-
-    function list:Scrolled()
-        return self.top, VisibleCount(), table.getn(self.items)
-    end
-
-    function list:Paint()
-        self:EnsureRows()
-        for i, row in self.rows do
-            local item = self.items[self.top + i - 1]
-            row.item = item
-            if item then
-                local selected = item.key == self.selectedKey
-                for c, column in columns do
-                    Theme.SetText(row.cells[c], column[3](item) or '')
-                    Theme.SetColor(row.cells[c], selected and C.accent or (item.color or column[4] or C.text))
-                end
-                row:SetSolidColor(selected and C.selected or (self.hoverRow == row and C.raised or C.clear))
-            else
-                for c = 1, table.getn(columns) do
-                    Theme.SetText(row.cells[c], '')
-                end
-                row:SetSolidColor(C.clear)
-            end
-        end
-        if self.mark then
-            self.mark:Update()
-        end
-    end
-
-    function list:ScrollLines(axis, delta)
-        self:ScrollSetTop(axis, self.top + math.floor(delta))
-    end
-
-    function list:ScrollSetTop(axis, top)
-        local maxTop = math.max(1, table.getn(self.items) - VisibleCount() + 1)
-        top = math.max(1, math.min(math.floor(top), maxTop))
-        if top ~= self.top then
-            self.top = top
-            self:Paint()
-        end
-    end
-
-    list.mark = ScrollMark(body, list)
-    return list
-end
-
+-- The shared pieces (widgets.lua).
+local Widgets = import('/fafengine/modules/lua/ui/launcher/widgets.lua')
+local LocalScenario = Widgets.LocalScenario
+local MapTitle = Widgets.MapTitle
+local MapPicture = Widgets.MapPicture
+local Modal = Widgets.Modal
+local Message = Widgets.Message
+local FrameUnits = Widgets.FrameUnits
+local ScrollMark = Widgets.ScrollMark
+local VirtualList = Widgets.VirtualList
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- The games: tiles in a grid, or rows in a list, with controls only for what is on screen.
@@ -906,7 +622,9 @@ local function DetailsPanel(parent, launcher)
             Theme.SetText(teamCount, table.getn(rated) .. ' teams')
             local x = 0
             local width = bar.Width()
-            for i, segment in segments do
+            for i, loopSegment in segments do
+                -- Lua 5.0 keeps one loop variable for every pass: the closures below need their own copy.
+                local segment = loopSegment
                 local team = rated[i]
                 Theme.SetVisible(segment, team ~= nil)
                 Theme.SetVisible(segment.label, team ~= nil)
@@ -2050,13 +1768,15 @@ local function BuildRail(launcher, body)
     edge.Height:Set(function() return edge.Bottom() - edge.Top() end)
     edge:DisableHitTest()
 
-    local brand = Theme.Title(rail, 'FAF', 30, C.accent)
-    LayoutHelpers.AtLeftTopIn(brand, rail, 24, 22)
+    local brand = Theme.Logo(rail, 92, C.accent)
+    LayoutHelpers.AtLeftTopIn(brand, rail, 22, 20)
     local subtitle = Theme.Text(rail, 'Forged Alliance Forever', 12, C.muted)
-    LayoutHelpers.AtLeftTopIn(subtitle, rail, 24, 62)
+    subtitle.Left:Set(function() return rail.Left() + Scale(24) end)
+    subtitle.Top:Set(function() return brand:LogoBottom() + Scale(8) end)
     local versionOk, version = pcall(function() return import('/lua/version.lua').GetVersion() end)
     local versionText = Theme.Text(rail, 'Game version ' .. (versionOk and tostring(version) or '?'), 11, C.subtle)
-    LayoutHelpers.AtLeftTopIn(versionText, rail, 24, 79)
+    versionText.Left:Set(subtitle.Left)
+    versionText.Top:Set(function() return subtitle.Bottom() + Scale(2) end)
 
     local entries = {
         'Online',
@@ -2337,6 +2057,19 @@ function TestWalk()
                 Replays = launcher.Replays, Mods = launcher.Mods, Options = launcher.Options })[screen]
             open(launcher)
             Wait(4)
+            if screen == 'Skirmish' then
+                -- faf-re's lobby screen: what its clicks call, each checked against FAF's lobby state.
+                local made, steps = pcall(import('/fafengine/modules/lua/ui/lobby/lobbyview.lua').TestSteps, Step)
+                for _, testStep in (made and steps or {}) do
+                    local done, why = pcall(testStep)
+                    if not done then
+                        Step('lobby: step failed: ' .. tostring(why))
+                    end
+                    Wait(1.5)
+                end
+                Step('lobby: end state on screen')
+                Wait(8)
+            end
             Step(screen .. (launcher.screenName == screen and ' open' or ' did not open'))
             if screen == 'Skirmish' then
                 -- FAF's own way out of the skirmish lobby (lobby.lua ReturnToMenu, as its Exit button).
