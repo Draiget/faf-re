@@ -1253,7 +1253,7 @@ void moho::CON_CreateProp(
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
     const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
-    CON_Printf(noSessionText.c_str());
+    CON_Printf("%s", noSessionText.c_str());
     return;
   }
 
@@ -1877,7 +1877,7 @@ void moho::CON_TeleportSelectedUnits(
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
     const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
-    CON_Printf(noSessionText.c_str());
+    CON_Printf("%s", noSessionText.c_str());
     return;
   }
 

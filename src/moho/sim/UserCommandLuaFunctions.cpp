@@ -590,7 +590,7 @@ namespace
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
       const fa::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
-      moho::CON_Printf(noSessionText.c_str());
+      moho::CON_Printf("%s", noSessionText.c_str());
       return;
     }
 
@@ -625,7 +625,7 @@ namespace
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
       const fa::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
-      moho::CON_Printf(noSessionText.c_str());
+      moho::CON_Printf("%s", noSessionText.c_str());
       return;
     }
 
@@ -2038,7 +2038,7 @@ namespace moho
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
       const fa::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
-      CON_Printf(noSessionText.c_str());
+      CON_Printf("%s", noSessionText.c_str());
       return 0;
     }
 
