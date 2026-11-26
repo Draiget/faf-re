@@ -13,6 +13,19 @@
 
 namespace faf::online
 {
+  namespace
+  {
+    /** When a token answer's access token runs out: `expires_in` seconds from now, an hour when it doesn't say. */
+    std::chrono::steady_clock::time_point AccessExpiry(
+      const JsonNode& answer
+    )
+    {
+      const double seconds = answer.Number("expires_in", 3600.0);
+      const double clamped = seconds > 0.0 && seconds < 7.0 * 24 * 3600 ? seconds : 3600.0;
+      return std::chrono::steady_clock::now() + std::chrono::seconds(static_cast<long long>(clamped));
+    }
+  } // namespace
+
   FafAuth::FafAuth(
     FafEndpoints endpoints
   )
@@ -234,10 +247,51 @@ namespace faf::online
 
   std::expected<void, std::string> FafAuth::RefreshAccess()
   {
+    std::lock_guard<std::mutex> refreshing(mRefreshLock);
+    return RefreshAccessLocked();
+  }
+
+  std::expected<std::string, std::string> FafAuth::FreshAccessToken()
+  {
+    std::lock_guard<std::mutex> refreshing(mRefreshLock);
+    const auto now = std::chrono::steady_clock::now();
+    std::string token;
+    std::chrono::steady_clock::time_point expires;
+    bool canRefresh = false;
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      token = mAccessToken;
+      expires = mAccessExpires;
+      canRefresh = !mRefreshToken.empty();
+    }
+    // Another caller may have refreshed while this one waited for the lock; then the token is fresh already.
+    if (!token.empty() && now + std::chrono::minutes(5) < expires) {
+      return token;
+    }
+    if (canRefresh) {
+      const auto refreshed = RefreshAccessLocked();
+      if (refreshed) {
+        return AccessToken();
+      }
+      if (!token.empty() && now < expires) {
+        return token; // the refresh failed, but the old token still works for a few minutes
+      }
+      return std::unexpected(refreshed.error());
+    }
+    if (!token.empty() && now < expires) {
+      return token;
+    }
+    return std::unexpected(token.empty() ? "not signed in" : "the FAF sign-in ran out; sign in again");
+  }
+
+  std::expected<void, std::string> FafAuth::RefreshAccessLocked()
+  {
     std::string refresh;
+    std::uint64_t generation = 0;
     {
       std::lock_guard<std::mutex> lock(mLock);
       refresh = mRefreshToken;
+      generation = mSignInGeneration;
     }
     if (refresh.empty()) {
       return std::unexpected("not logged in");
@@ -256,13 +310,38 @@ namespace faf::online
       return std::unexpected(std::move(posted.error()));
     }
     if (status != 200 || answer.String("access_token").empty()) {
-      std::lock_guard<std::mutex> lock(mLock);
-      mRefreshToken.clear();
+      // OAuth 2.0 (RFC 6749 5.2) refuses a spent or revoked refresh token with 400 (invalid_grant), or 401 for the
+      // client. Anything else - a 5xx, a 429 from a proxy - says nothing about the login, so it is kept for later.
+      if (status != 200 && status != 400 && status != 401) {
+        return std::unexpected(
+          "FAF's login didn't renew the sign-in (answer " + std::to_string(status) + "); try again later"
+        );
+      }
+      bool same = false;
+      {
+        std::lock_guard<std::mutex> lock(mLock);
+        same = generation == mSignInGeneration;
+        if (same) {
+          mRefreshToken.clear();
+          mAccessToken.clear();
+          mAccessExpires = {};
+        }
+      }
+      if (same) {
+        // Signed out, wherever the refresh ran: the state says so and the spent token leaves the file.
+        mState = State::LoggedOut;
+        SaveRefreshToken();
+      }
       return std::unexpected("FAF's login refused the kept login (" + answer.String("error") + "); log in again");
     }
     {
       std::lock_guard<std::mutex> lock(mLock);
+      if (generation != mSignInGeneration) {
+        // Logged out (or in again) while the answer was on its way: what it brought must not bring the old login back.
+        return std::unexpected(std::string("signed out meanwhile"));
+      }
       mAccessToken = answer.String("access_token");
+      mAccessExpires = AccessExpiry(answer);
       if (!answer.String("refresh_token").empty()) {
         mRefreshToken = answer.String("refresh_token"); // Hydra hands out a new one each time
       }
@@ -362,7 +441,9 @@ namespace faf::online
         if (status == 200 && !token.String("access_token").empty()) {
           {
             std::lock_guard<std::mutex> lock(mLock);
+            ++mSignInGeneration;
             mAccessToken = token.String("access_token");
+            mAccessExpires = AccessExpiry(token);
             mRefreshToken = token.String("refresh_token");
           }
           SaveRefreshToken();
@@ -394,7 +475,9 @@ namespace faf::online
   {
     {
       std::lock_guard<std::mutex> lock(mLock);
+      ++mSignInGeneration;
       mAccessToken.clear();
+      mAccessExpires = {};
       mRefreshToken.clear();
       mUserName.clear();
     }

@@ -3,15 +3,58 @@
 
 #include "online/Json.h"
 
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <locale>
+#include <sstream>
 
 namespace faf::online
 {
   namespace
   {
+    /** A finite double as JSON writes it: an integer below 1e15 as its digits, else the shortest exact form. */
+    std::string NumberText(
+      const double n
+    )
+    {
+      char number[40];
+      if (std::floor(n) == n && std::fabs(n) < 1e15) {
+        (void)std::snprintf(number, sizeof(number), "%lld", static_cast<long long>(n));
+        return number;
+      }
+      // to_chars ignores the process's locale, where "%.17g" would write "2,5" under a comma locale.
+      const auto written = std::to_chars(number, number + sizeof(number), n);
+      return std::string(number, written.ptr);
+    }
+
+    /**
+     * The value of a number's digits, in the "C" locale whatever the process's is: strtod would read "2.5" as 2
+     * under a comma locale. Past a double's range: infinity for a large one, 0 for a tiny one (1e-400), as strtod
+     * gives; the C++ libraries differ on what the stream itself stores then.
+     */
+    double NumberValue(
+      const std::string& digits
+    )
+    {
+      std::istringstream in(digits);
+      in.imbue(std::locale::classic());
+      double value = 0.0;
+      in >> value;
+      if (!in.fail()) {
+        return value;
+      }
+      const bool negative = !digits.empty() && digits.front() == '-';
+      const std::size_t e = digits.find_first_of("eE");
+      const bool tiny = e != std::string::npos && e + 1 < digits.size() && digits[e + 1] == '-';
+      if (tiny) {
+        return negative ? -0.0 : 0.0;
+      }
+      return negative ? -HUGE_VAL : HUGE_VAL;
+    }
+
     struct JsonReader
     {
       const std::string& text;
@@ -47,6 +90,53 @@ namespace faf::online
         }
       }
 
+      /** The length of the RFC 8259 number at `from` (`-? int frac? exp?`), or 0 if none starts there. */
+      [[nodiscard]] std::size_t NumberLength(
+        const std::size_t from
+      ) const
+      {
+        const auto digit = [this](const std::size_t i) {
+          return i < text.size() && text[i] >= '0' && text[i] <= '9';
+        };
+        std::size_t i = from;
+        if (i < text.size() && text[i] == '-') {
+          ++i;
+        }
+        if (!digit(i)) {
+          return 0;
+        }
+        if (text[i] == '0') {
+          ++i;
+        } else {
+          while (digit(i)) {
+            ++i;
+          }
+        }
+        if (i < text.size() && text[i] == '.') {
+          if (!digit(i + 1)) {
+            return 0;
+          }
+          ++i;
+          while (digit(i)) {
+            ++i;
+          }
+        }
+        if (i < text.size() && (text[i] == 'e' || text[i] == 'E')) {
+          std::size_t e = i + 1;
+          if (e < text.size() && (text[e] == '+' || text[e] == '-')) {
+            ++e;
+          }
+          if (!digit(e)) {
+            return 0;
+          }
+          i = e;
+          while (digit(i)) {
+            ++i;
+          }
+        }
+        return i - from;
+      }
+
       bool Hex4(
         std::uint32_t& code
       )
@@ -54,7 +144,21 @@ namespace faf::online
         if (at + 4 > text.size()) {
           return false;
         }
-        code = static_cast<std::uint32_t>(std::strtoul(text.substr(at, 4).c_str(), nullptr, 16));
+        code = 0;
+        for (std::size_t i = 0; i < 4; ++i) {
+          const char c = text[at + i];
+          std::uint32_t digit = 0;
+          if (c >= '0' && c <= '9') {
+            digit = static_cast<std::uint32_t>(c - '0');
+          } else if (c >= 'a' && c <= 'f') {
+            digit = static_cast<std::uint32_t>(c - 'a' + 10);
+          } else if (c >= 'A' && c <= 'F') {
+            digit = static_cast<std::uint32_t>(c - 'A' + 10);
+          } else {
+            return false; // RFC 8259 7: exactly four hex digits
+          }
+          code = (code << 4) | digit;
+        }
         at += 4;
         return true;
       }
@@ -99,13 +203,24 @@ namespace faf::online
               error = "a broken \\u escape";
               return false;
             }
-            // A surrogate pair.
-            if (code >= 0xD800u && code < 0xDC00u && at + 6 <= text.size() && text[at] == '\\' && text[at + 1] == 'u') {
-              at += 2;
+            // A surrogate pair. A high half not followed by a low one, or a low half alone, becomes U+FFFD, and an
+            // escape after it that isn't the low half is read as its own.
+            if (code >= 0xD800u && code < 0xDC00u) {
               std::uint32_t low = 0;
-              if (Hex4(low) && low >= 0xDC00u && low < 0xE000u) {
-                code = 0x10000u + ((code - 0xD800u) << 10) + (low - 0xDC00u);
+              const std::size_t pairAt = at;
+              if (at + 6 <= text.size() && text[at] == '\\' && text[at + 1] == 'u') {
+                at += 2;
+                if (Hex4(low) && low >= 0xDC00u && low < 0xE000u) {
+                  code = 0x10000u + ((code - 0xD800u) << 10) + (low - 0xDC00u);
+                } else {
+                  at = pairAt;
+                  code = 0xFFFDu;
+                }
+              } else {
+                code = 0xFFFDu;
               }
+            } else if (code >= 0xDC00u && code < 0xE000u) {
+              code = 0xFFFDu;
             }
             PutUtf8(out, code);
             break;
@@ -217,15 +332,15 @@ namespace faf::online
           at += 4;
           return true;
         }
-        char* end = nullptr;
-        node.number = std::strtod(text.c_str() + at, &end);
-        if (end == text.c_str() + at) {
+        const std::size_t length = NumberLength(at);
+        if (length == 0) {
           error = std::string("unexpected '") + c + "'";
           return false;
         }
         node.kind = JsonNode::Kind::Number;
-        node.text.assign(text, at, static_cast<std::size_t>(end - (text.c_str() + at))); // the digits as written
-        at = static_cast<std::size_t>(end - text.c_str());
+        node.text.assign(text, at, length); // the digits as written
+        node.number = NumberValue(node.text);
+        at += length;
         return true;
       }
     };
@@ -253,7 +368,14 @@ namespace faf::online
     }
     if (value->kind == Kind::Number) {
       const double n = value->number;
-      return std::floor(n) == n ? std::to_string(static_cast<long long>(n)) : std::to_string(n);
+      // An integer a long long holds, as before; past that the cast is undefined, so the digits as written.
+      if (std::floor(n) == n && std::fabs(n) < 9.0e18) {
+        return std::to_string(static_cast<long long>(n));
+      }
+      if (!value->text.empty()) {
+        return value->text;
+      }
+      return NumberText(n);
     }
     return value->kind == Kind::String ? value->text : std::string();
   }
@@ -317,7 +439,7 @@ namespace faf::online
   {
     JsonNode node;
     node.kind = JsonNode::Kind::Number;
-    node.number = std::strtod(digits.c_str(), nullptr);
+    node.number = NumberValue(digits);
     node.text = std::move(digits);
     return node;
   }
@@ -430,14 +552,7 @@ namespace faf::online
         } else if (!std::isfinite(node.number)) {
           out += "null";
         } else {
-          char number[40];
-          const double n = node.number;
-          if (std::floor(n) == n && std::fabs(n) < 1e15) {
-            (void)std::snprintf(number, sizeof(number), "%lld", static_cast<long long>(n));
-          } else {
-            (void)std::snprintf(number, sizeof(number), "%.17g", n);
-          }
-          out += number;
+          out += NumberText(node.number);
         }
         break;
       }

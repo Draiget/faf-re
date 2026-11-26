@@ -18,12 +18,22 @@
 #include <vector>
 
 #include <cctype>
+#include <clocale>
+#include <cmath>
+#include <condition_variable>
 #include <random>
 #include <string_view>
 
 #include "mbedtls/sha1.h"
 #include "netbridge/Socket.h"
 #include "platform/PlatformDefines.h"
+
+#if FAFRE_PLATFORM_POSIX
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
@@ -146,9 +156,11 @@ namespace
   public:
     explicit EchoServer(
       bool refuse = false,
-      Reply reply = {}
+      Reply reply = {},
+      std::string raw = {}
     )
-      : mRefuse(refuse)
+      : rawAfterUpgrade(std::move(raw))
+      , mRefuse(refuse)
       , mReply(std::move(reply))
     {
       (void)net::SocketsInit();
@@ -173,6 +185,7 @@ namespace
     }
 
     std::string requestHead;
+    const std::string rawAfterUpgrade; ///< bytes sent as they are right after the 101, before any echo
 
   private:
     void Serve()
@@ -208,6 +221,9 @@ namespace
                                  "Sec-WebSocket-Accept: " +
         AcceptKey(key) + "\r\n\r\n";
       (void)net::SendAll(client, answer.data(), answer.size());
+      if (!rawAfterUpgrade.empty()) {
+        (void)net::SendAll(client, rawAfterUpgrade.data(), rawAfterUpgrade.size());
+      }
       for (;;) {
         unsigned char header[2];
         if (!ReadExactly(client, reinterpret_cast<char*>(header), 2)) {
@@ -312,6 +328,9 @@ namespace
     std::string refreshAnswerToken = "A2";
     std::string refreshAnswerRefresh = "R2";
     bool refuseRefresh = false;
+    long refreshStatus = 0;       ///< not 0: the refresh answers this status and an error body
+    std::string refreshExpiresIn; ///< not empty: the refresh answer's expires_in
+    int refreshCalls = 0;
 
     std::expected<void, std::string> operator()(
       const platform::http::Call& call,
@@ -340,13 +359,17 @@ namespace
           body = R"({"access_token":"A1","refresh_token":"R1","scope":"openid offline public_profile lobby"})";
         }
       } else if (path == "/oauth2/token") {
-        if (refuseRefresh) {
+        ++refreshCalls;
+        if (refreshStatus != 0) {
+          status = refreshStatus;
+          body = R"({"error":"temporarily_unavailable"})";
+        } else if (refuseRefresh) {
           status = 400;
           body = R"({"error":"invalid_grant"})";
         } else {
           status = 200;
-          body =
-            R"({"access_token":")" + refreshAnswerToken + R"(","refresh_token":")" + refreshAnswerRefresh + R"("})";
+          body = R"({"access_token":")" + refreshAnswerToken + R"(","refresh_token":")" + refreshAnswerRefresh +
+            R"(")" + (refreshExpiresIn.empty() ? "" : R"(,"expires_in":)" + refreshExpiresIn) + "}";
         }
       } else if (path == "/me") {
         status = 200;
@@ -415,6 +438,71 @@ TEST(
   EXPECT_EQ(parsed->Get("a")->items[2].text, "x\xC3\xA9");
   EXPECT_TRUE(parsed->Get("b")->Bool("c"));
   EXPECT_FALSE(faf::online::ParseJson("{\"a\": 1} trailing"));
+}
+
+TEST(
+  OnlineJson,
+  ReadsUnicodeEscapesAsRfc8259Says
+)
+{
+  const auto text = [](const std::string& json) {
+    const auto parsed = faf::online::ParseJson(json);
+    return parsed ? parsed->text : std::string("error: ") + parsed.error();
+  };
+  EXPECT_EQ(text(R"("\u00e9")"), "\xC3\xA9");
+  EXPECT_EQ(text(R"("\uD83D\uDE00")"), "\xF0\x9F\x98\x80"); // a surrogate pair: U+1F600
+  // A high half without its low half: U+FFFD, and the escape after it is its own character.
+  EXPECT_EQ(text(R"("\uD83DA")"), std::string("\xEF\xBF\xBD") + "A");
+  EXPECT_EQ(text(R"("\uD83D\u0041")"), std::string("\xEF\xBF\xBD") + "A");
+  EXPECT_EQ(text(R"("\uDE00")"), "\xEF\xBF\xBD"); // a low half alone
+  // Exactly four hex digits: a short escape doesn't swallow the closing quote.
+  EXPECT_FALSE(faf::online::ParseJson(R"({"a":"\u12"})"));
+  EXPECT_FALSE(faf::online::ParseJson(R"("\uZZZZ")"));
+}
+
+TEST(
+  OnlineJson,
+  ReadsAndWritesNumbersAsRfc8259Says
+)
+{
+  const auto parsed = faf::online::ParseJson(R"({"a": -12.5e2, "b": 0, "c": 1e20, "d": 7})");
+  ASSERT_TRUE(parsed) << parsed.error();
+  EXPECT_EQ(parsed->Number("a", 0.0), -1250.0);
+  EXPECT_EQ(parsed->String("d"), "7");
+  EXPECT_EQ(parsed->String("c"), "1e20"); // past a long long: the digits as written
+  // Past a double's range, as strtod reads them on every C++ library: a tiny number is 0, a huge one infinite.
+  const auto range = faf::online::ParseJson("[1e-400, -1e-400, 1e400, -1e400]");
+  ASSERT_TRUE(range) << range.error();
+  EXPECT_EQ(range->items[0].number, 0.0);
+  EXPECT_EQ(range->items[1].number, 0.0);
+  EXPECT_TRUE(std::isinf(range->items[2].number) && range->items[2].number > 0.0);
+  EXPECT_TRUE(std::isinf(range->items[3].number) && range->items[3].number < 0.0);
+  for (const char* bad : {"01", "-", "1.", ".5", "1e", "+1", "0x10", "inf", "nan", "1.5.5"}) {
+    const auto number = faf::online::ParseJson(std::string("[") + bad + "]");
+    EXPECT_FALSE(number) << bad;
+  }
+  // Whatever the process's locale: Lua's os.setlocale can change it.
+  const char* const before = std::setlocale(LC_NUMERIC, nullptr);
+  const std::string saved = before != nullptr ? before : "C";
+  bool comma = false;
+  for (const char* name : {"de_DE.UTF-8", "de_DE.utf8", "German_Germany.1252", "de-DE"}) {
+    if (std::setlocale(LC_NUMERIC, name) != nullptr) {
+      comma = true;
+      break;
+    }
+  }
+  if (comma) {
+    const auto local = faf::online::ParseJson(R"({"x": 2.5})");
+    const std::string written = faf::online::ToJson(faf::online::JsonNumber(0.25));
+    const double digits = faf::online::JsonDigits("2.5").number;
+    std::setlocale(LC_NUMERIC, saved.c_str());
+    ASSERT_TRUE(local) << local.error();
+    EXPECT_EQ(local->Number("x", 0.0), 2.5);
+    EXPECT_EQ(written, "0.25");
+    EXPECT_EQ(digits, 2.5);
+  } else {
+    std::setlocale(LC_NUMERIC, saved.c_str());
+  }
 }
 
 TEST(
@@ -573,6 +661,196 @@ TEST(
   EXPECT_TRUE(auth.Message().contains("refused the kept login (invalid_grant)")) << auth.Message();
   EXPECT_TRUE(auth.AccessToken().empty());
   EXPECT_TRUE(ReadAll(tokenFile).empty());
+  std::error_code ignored;
+  std::filesystem::remove(tokenFile, ignored);
+}
+
+TEST(
+  OnlineFafAuth,
+  AServerErrorKeepsTheKeptLogin
+)
+{
+  for (const long status : {500L, 503L, 429L}) {
+    const auto tokenFile = TempFile("kept.token");
+    {
+      const auto sealed = platform::secret::Seal("R-kept", "faf_online test");
+      ASSERT_TRUE(sealed);
+      std::ofstream(tokenFile, std::ios::binary) << *sealed;
+    }
+    FakeFaf faf;
+    faf.refreshStatus = status;
+    FafAuth auth(TestEndpoints());
+    auth.SetTransport(std::ref(faf));
+    auth.SetTokenFile(tokenFile);
+    auth.Resume();
+    auth.Wait();
+    EXPECT_EQ(auth.GetState(), FafAuth::State::LoggedOut) << status;
+    EXPECT_TRUE(auth.Message().contains("try again later")) << auth.Message();
+    // Not signed out: the next start tries the same login again.
+    const auto reopened = platform::secret::Open(ReadAll(tokenFile));
+    ASSERT_TRUE(reopened) << status;
+    EXPECT_EQ(*reopened, "R-kept") << status;
+    std::error_code ignored;
+    std::filesystem::remove(tokenFile, ignored);
+  }
+}
+
+TEST(
+  OnlineFafAuth,
+  AFreshTokenIsRefreshedOnceNearItsEnd
+)
+{
+  const auto tokenFile = TempFile("fresh.token");
+  {
+    const auto sealed = platform::secret::Seal("R1", "faf_online test");
+    ASSERT_TRUE(sealed);
+    std::ofstream(tokenFile, std::ios::binary) << *sealed;
+  }
+  FakeFaf faf;
+  faf.refreshExpiresIn = "3600";
+  FafAuth auth(TestEndpoints());
+  auth.SetTransport(std::ref(faf));
+  auth.SetTokenFile(tokenFile);
+  auth.Resume();
+  ASSERT_TRUE(WaitFor(auth, FafAuth::State::LoggedIn)) << auth.Message();
+  auth.Wait();
+  const auto callsAfter = [&faf] {
+    std::lock_guard<std::mutex> guard(faf.lock);
+    return faf.refreshCalls;
+  };
+  const int afterSignIn = callsAfter();
+
+  // An hour left: handed out as it is.
+  const auto fresh = auth.FreshAccessToken();
+  ASSERT_TRUE(fresh) << fresh.error();
+  EXPECT_EQ(*fresh, "A2");
+  EXPECT_EQ(callsAfter(), afterSignIn);
+
+  // A minute left: refreshed, and by one of four callers only, as each refresh spends the refresh token.
+  {
+    std::lock_guard<std::mutex> guard(faf.lock);
+    faf.refreshExpiresIn = "60";
+  }
+  ASSERT_TRUE(auth.RefreshAccess());
+  {
+    std::lock_guard<std::mutex> guard(faf.lock);
+    faf.refreshExpiresIn = "3600";
+    faf.refreshAnswerToken = "A3";
+    faf.refreshAnswerRefresh = "R3";
+  }
+  const int beforeRace = callsAfter();
+  std::vector<std::string> got(4);
+  std::vector<std::thread> callers;
+  for (std::size_t i = 0; i < got.size(); ++i) {
+    callers.emplace_back([&auth, &got, i] {
+      const auto token = auth.FreshAccessToken();
+      got[i] = token ? *token : "error: " + token.error();
+    });
+  }
+  for (std::thread& caller : callers) {
+    caller.join();
+  }
+  for (const std::string& token : got) {
+    EXPECT_EQ(token, "A3");
+  }
+  EXPECT_EQ(callsAfter(), beforeRace + 1);
+  std::error_code ignored;
+  std::filesystem::remove(tokenFile, ignored);
+}
+
+TEST(
+  OnlineFafAuth,
+  ARefusalOnAWorkerSignsOutAndEmptiesTheFile
+)
+{
+  const auto tokenFile = TempFile("worker.token");
+  {
+    const auto sealed = platform::secret::Seal("R1", "faf_online test");
+    ASSERT_TRUE(sealed);
+    std::ofstream(tokenFile, std::ios::binary) << *sealed;
+  }
+  FakeFaf faf;
+  faf.refreshExpiresIn = "60"; // under 5 minutes: the next FreshAccessToken refreshes
+  FafAuth auth(TestEndpoints());
+  auth.SetTransport(std::ref(faf));
+  auth.SetTokenFile(tokenFile);
+  auth.Resume();
+  ASSERT_TRUE(WaitFor(auth, FafAuth::State::LoggedIn)) << auth.Message();
+  auth.Wait();
+  {
+    std::lock_guard<std::mutex> guard(faf.lock);
+    faf.refuseRefresh = true;
+  }
+  std::expected<std::string, std::string> fresh;
+  std::thread worker([&] {
+    fresh = auth.FreshAccessToken();
+  });
+  worker.join();
+  // The old token had a minute left, so the caller still gets it; the login itself is gone.
+  ASSERT_TRUE(fresh) << fresh.error();
+  EXPECT_EQ(*fresh, "A2");
+  EXPECT_EQ(auth.GetState(), FafAuth::State::LoggedOut);
+  EXPECT_TRUE(ReadAll(tokenFile).empty());
+  std::error_code ignored;
+  std::filesystem::remove(tokenFile, ignored);
+}
+
+TEST(
+  OnlineFafAuth,
+  ALogoutDuringARefreshStaysLoggedOut
+)
+{
+  const auto tokenFile = TempFile("logout.token");
+  {
+    const auto sealed = platform::secret::Seal("R1", "faf_online test");
+    ASSERT_TRUE(sealed);
+    std::ofstream(tokenFile, std::ios::binary) << *sealed;
+  }
+  FakeFaf faf;
+  std::mutex gate;
+  std::condition_variable opened;
+  bool refreshing = false;
+  bool release = true; // the sign-in's own refresh goes straight through
+  FafAuth auth(TestEndpoints());
+  auth.SetTransport([&](const platform::http::Call& call, long& status, std::string& body) {
+    if (call.url.ends_with("/oauth2/token")) {
+      std::unique_lock<std::mutex> lock(gate);
+      refreshing = true;
+      opened.notify_all();
+      opened.wait(lock, [&] {
+        return release;
+      });
+    }
+    return faf(call, status, body);
+  });
+  auth.SetTokenFile(tokenFile);
+  auth.Resume();
+  ASSERT_TRUE(WaitFor(auth, FafAuth::State::LoggedIn)) << auth.Message();
+  auth.Wait();
+  {
+    std::lock_guard<std::mutex> lock(gate);
+    refreshing = false;
+    release = false;
+  }
+  std::thread worker([&] {
+    (void)auth.RefreshAccess();
+  });
+  {
+    std::unique_lock<std::mutex> lock(gate);
+    opened.wait(lock, [&] {
+      return refreshing;
+    });
+  }
+  auth.Logout(); // while the refresh's answer is on its way
+  {
+    std::lock_guard<std::mutex> lock(gate);
+    release = true;
+  }
+  opened.notify_all();
+  worker.join();
+  EXPECT_TRUE(auth.AccessToken().empty());
+  EXPECT_EQ(auth.GetState(), FafAuth::State::LoggedOut);
+  EXPECT_TRUE(ReadAll(tokenFile).empty()); // the answer's new refresh token wasn't saved
   std::error_code ignored;
   std::filesystem::remove(tokenFile, ignored);
 }
@@ -1514,3 +1792,162 @@ TEST(
   });
   EXPECT_EQ(refused, 1);
 }
+
+// --- platform::http: answers a server can get wrong ---------------------------------------------------------------
+
+TEST(
+  OnlineHttp,
+  ReadsAChunkedAnswer
+)
+{
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+    {"5\r\nhello\r\n", "7;name=value\r\n, world\r\n", "0\r\n\r\n"},
+    std::chrono::milliseconds(20),
+    std::chrono::milliseconds(0)
+  );
+  platform::http::Call call;
+  call.url = server.Url();
+  long status = 0;
+  std::string body;
+  const auto sent = platform::http::Request(call, status, body);
+  ASSERT_TRUE(sent) << sent.error();
+  EXPECT_EQ(status, 200);
+  EXPECT_EQ(body, "hello, world");
+}
+
+#if FAFRE_PLATFORM_POSIX // our own HTTP/1.1 and WebSocket code; on Windows WinHTTP reads these
+
+TEST(
+  OnlineHttp,
+  RefusesABrokenChunkSize
+)
+{
+  // An empty size line used to read as the last chunk, a sign as a size near 2^64: both handed back a body as whole.
+  for (const char* size : {"\r\n", "zz\r\n", "-5\r\n", "fffffffffffffffffff\r\n", "5 junk\r\n"}) {
+    PlainHttpServer server(
+      "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+      {std::string("3\r\nabc\r\n") + size + "hello\r\n0\r\n\r\n"},
+      std::chrono::milliseconds(0),
+      std::chrono::milliseconds(0)
+    );
+    platform::http::Call call;
+    call.url = server.Url();
+    long status = 0;
+    std::string body;
+    const auto sent = platform::http::Request(call, status, body);
+    EXPECT_FALSE(sent) << "size line '" << size << "' gave body '" << body << "'";
+  }
+}
+
+TEST(
+  OnlineHttp,
+  ReachesAnIpv6AddressWithAPort
+)
+{
+  const int listener = ::socket(AF_INET6, SOCK_STREAM, 0);
+  sockaddr_in6 address{};
+  address.sin6_family = AF_INET6;
+  address.sin6_addr = in6addr_loopback;
+  if (
+    listener < 0 || ::bind(listener, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
+    ::listen(listener, 1) != 0
+  ) {
+    if (listener >= 0) {
+      ::close(listener);
+    }
+    GTEST_SKIP() << "no IPv6 loopback here";
+  }
+  socklen_t length = sizeof(address);
+  (void)::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &length);
+  const int port = ntohs(address.sin6_port);
+  std::string requestHead;
+  std::thread serve([listener, &requestHead] {
+    const int client = ::accept(listener, nullptr, nullptr);
+    if (client < 0) {
+      return;
+    }
+    char c = 0;
+    while (requestHead.find("\r\n\r\n") == std::string::npos && ::recv(client, &c, 1, 0) == 1) {
+      requestHead += c;
+    }
+    const std::string answer = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok";
+    (void)::send(client, answer.data(), answer.size(), 0);
+    ::close(client);
+  });
+  platform::http::Call call;
+  call.url = "http://[::1]:" + std::to_string(port) + "/x";
+  long status = 0;
+  std::string body;
+  const auto sent = platform::http::Request(call, status, body);
+  ::shutdown(listener, SHUT_RDWR);
+  serve.join();
+  ::close(listener);
+  ASSERT_TRUE(sent) << sent.error();
+  EXPECT_EQ(body, "ok");
+  EXPECT_TRUE(requestHead.contains("Host: [::1]:" + std::to_string(port) + "\r\n")) << requestHead;
+}
+
+TEST(
+  OnlineHttpStream,
+  CloseEndsAConnectThatGetsNoAnswer
+)
+{
+  // An address in a range that drops packets: connect() waited for the system's timeout (about 2 minutes on Linux),
+  // and Close from another thread couldn't end it. An unreachable network that refuses at once passes too.
+  platform::http::Stream stream;
+  platform::http::Call call;
+  call.url = "http://192.0.2.1:81/api/v1/events";
+  const auto started = std::chrono::steady_clock::now();
+  std::thread opener([&stream, &call] {
+    (void)stream.Open(call);
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  stream.Close();
+  opener.join();
+  EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(3));
+}
+
+TEST(
+  OnlineWebSocket,
+  CloseEndsAConnectThatGetsNoAnswer
+)
+{
+  // The lobby's Disconnect during its WebSocket's connect: the socket wasn't known to Close until it had opened.
+  platform::http::WebSocket socket;
+  const auto started = std::chrono::steady_clock::now();
+  std::expected<void, std::string> opened;
+  std::thread opener([&] {
+    opened = socket.Open("ws://192.0.2.1:81/lobby", "", "faf-re-client/test");
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  socket.Close();
+  opener.join();
+  EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(3));
+  EXPECT_FALSE(opened);
+  EXPECT_FALSE(socket.IsOpen());
+}
+
+TEST(
+  OnlineWebSocket,
+  RefusesAFrameLongerThanAMessageMayBe
+)
+{
+  // A final text frame with a 64-bit length of 2^64 - 10: the sum of header and length wrapped to 0, and Receive
+  // handed back the same empty message forever without reading again.
+  const std::string wrapping("\x81\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xF6", 10);
+  // 1 GB, under 2^63: the buffer grew toward it until memory ran out.
+  const std::string huge("\x81\x7F\x00\x00\x00\x00\x40\x00\x00\x00", 10);
+  for (const std::string& frame : {wrapping, huge}) {
+    EchoServer server(false, {}, frame);
+    platform::http::WebSocket socket;
+    const auto opened = socket.Open(server.Url(), "", "faf-re-client/test");
+    ASSERT_TRUE(opened) << opened.error();
+    std::string message;
+    const auto received = socket.Receive(message);
+    EXPECT_FALSE(received);
+    socket.Close();
+  }
+}
+
+#endif

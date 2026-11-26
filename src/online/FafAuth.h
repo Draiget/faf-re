@@ -5,6 +5,8 @@
 // texts; what differs between programs (server addresses, client id, scopes, names) is in FafEndpoints.
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
@@ -73,10 +75,19 @@ namespace faf::online
     /** Stops waiting for the browser's approval. */
     void CancelLogin();
 
-    /** A new access token from the refresh token (it lasts an hour); a refused one signs out. */
+    /**
+     * A new access token from the refresh token (it lasts an hour). A refused one (400 or 401) signs out; a server
+     * error or no answer keeps the sign-in for a later try.
+     */
     [[nodiscard]] std::expected<void, std::string> RefreshAccess();
     /** The current access token, empty when signed out. */
     [[nodiscard]] std::string AccessToken() const;
+    /**
+     * The access token, refreshed first when it has under 5 minutes left. Refreshes run one at a time: FAF's login
+     * hands out a new refresh token with each, and the old one is spent. May block on the network; never call it
+     * from the game's main thread.
+     */
+    [[nodiscard]] std::expected<std::string, std::string> FreshAccessToken();
     /** For a caller that found the sign-in gone (a refresh refused during its own request). */
     void MarkLoggedOut() noexcept
     {
@@ -115,6 +126,7 @@ namespace faf::online
     );
     void SaveRefreshToken() const;
     void FetchUserName();
+    [[nodiscard]] std::expected<void, std::string> RefreshAccessLocked(); ///< with mRefreshLock held
 
     FafEndpoints mEndpoints;
     std::function<void(const char*)> mLog;
@@ -131,7 +143,10 @@ namespace faf::online
     std::string mUserCode;
     std::string mVerifyUrl;
     std::string mAccessToken;
+    std::chrono::steady_clock::time_point mAccessExpires{}; ///< from the token answer's expires_in
     std::string mRefreshToken;
+    std::mutex mRefreshLock;             ///< one refresh at a time
+    std::uint64_t mSignInGeneration = 0; ///< under mLock; a sign-in or a logout moves it on
     std::vector<std::thread> mThreads;
   };
 } // namespace faf::online

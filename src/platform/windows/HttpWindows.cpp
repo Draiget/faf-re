@@ -2,6 +2,7 @@
 
 #include "platform/Http.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <iterator>
 #include <mutex>
@@ -166,7 +167,9 @@ namespace platform::http
       ) {
         length = _wcstoui64(lengthText, nullptr, 10);
         *total = length;
-        body.reserve(static_cast<std::size_t>(length));
+        // Only a hint: a server's Content-Length can say anything, and a reserve past memory throws on this thread.
+        constexpr DWORD64 kMaxReserve = 64ull << 20;
+        body.reserve(static_cast<std::size_t>((std::min<DWORD64>)(length, kMaxReserve)));
       }
     }
     if (!ok) {
@@ -521,6 +524,11 @@ namespace platform::http
       }
       if (type == WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE) {
         return Received::Closed;
+      }
+      // As on POSIX: a message of endless fragments would grow without end. FAF's lobby sends far less.
+      constexpr std::size_t kMaxMessageBytes = 64u << 20;
+      if (message.size() + read > kMaxMessageBytes) {
+        return std::unexpected("a WebSocket message over " + std::to_string(kMaxMessageBytes >> 20) + " MB");
       }
       message.append(buffer, read);
       if (

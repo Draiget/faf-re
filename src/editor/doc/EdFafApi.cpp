@@ -600,8 +600,8 @@ namespace faf::editor
         if (status == 401 && attempt == 0) {
           // The access token lasts an hour: a new one from the refresh token, then the search again.
           if (const auto refreshed = mAuth.RefreshAccess(); !refreshed) {
+            // A refused login signs out inside RefreshAccess; a server error keeps it for the next search.
             error = refreshed.error();
-            mAuth.MarkLoggedOut();
             break;
           }
           continue;

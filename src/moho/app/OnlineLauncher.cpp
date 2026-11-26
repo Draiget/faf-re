@@ -322,12 +322,17 @@ namespace
       }
     }
 
+    /**
+     * The access token for a request on a worker thread: refreshed when it is near its end, as the lobby, the
+     * control services and the replay relay reconnect long after the sign-in (a token lasts an hour).
+     */
     FafLobby::TokenSource Tokens()
     {
-      return [this] {
-        const std::string token = CurrentToken();
-        return token.empty() ? std::expected<std::string, std::string>(std::unexpected("not signed in"))
-                             : std::expected<std::string, std::string>(token);
+      return [this]() -> std::expected<std::string, std::string> {
+        if (!fixedToken.empty()) {
+          return fixedToken;
+        }
+        return auth.FreshAccessToken();
       };
     }
   };
@@ -414,14 +419,15 @@ namespace
     if (s.iceThread.joinable()) {
       s.iceThread.join();
     }
+    // Each match asks for its own session; a failed ask must not hand over the last match's TURN servers.
+    s.iceJson = "[]";
+    s.forceRelay = false;
     s.iceThread = std::thread([&s, uid = s.launch.uid] {
       // A fresh access token for the API (it lasts an hour), then the game's ICE session (CoturnService.java).
-      if (s.fixedToken.empty()) {
-        (void)s.auth.RefreshAccess();
-      }
+      const auto token = s.Tokens()();
       platform::http::Call call;
       call.url = s.auth.Endpoints().apiUrl + "/ice/session/game/" + uid;
-      call.headers = "Accept: application/json\r\nAuthorization: Bearer " + s.CurrentToken() + "\r\n";
+      call.headers = "Accept: application/json\r\nAuthorization: Bearer " + (token ? *token : std::string()) + "\r\n";
       long status = 0;
       std::string body;
       if (const auto sent = platform::http::Request(call, status, body); sent && status == 200) {

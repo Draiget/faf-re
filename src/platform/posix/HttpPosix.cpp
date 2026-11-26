@@ -13,8 +13,10 @@
 #include <cctype>
 #include <cerrno>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <random>
+#include <string_view>
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -95,6 +97,7 @@ namespace platform::http
       std::string port;
       std::string object; ///< path and query
       bool secure = false;
+      bool bracketed = false; ///< an IPv6 address, written in brackets in the link and in the Host header
     };
 
     bool Crack(
@@ -123,15 +126,28 @@ namespace platform::http
       if (out.object.front() == '?') {
         out.object.insert(0, "/");
       }
-      const std::size_t colon = authority.rfind(':');
-      if (colon != std::string::npos && authority.find(']') == std::string::npos) {
+      out.port = out.secure ? "443" : "80";
+      if (!authority.empty() && authority.front() == '[') {
+        // An IPv6 address: "[::1]" or "[::1]:8080" (RFC 3986 3.2.2). getaddrinfo takes it without the brackets.
+        const std::size_t close = authority.find(']');
+        if (close == std::string::npos) {
+          return false;
+        }
+        out.host = authority.substr(1, close - 1);
+        out.bracketed = true;
+        if (close + 1 < authority.size()) {
+          if (authority[close + 1] != ':') {
+            return false;
+          }
+          out.port = authority.substr(close + 2);
+        }
+      } else if (const std::size_t colon = authority.rfind(':'); colon != std::string::npos) {
         out.host = authority.substr(0, colon);
         out.port = authority.substr(colon + 1);
       } else {
         out.host = authority;
-        out.port = out.secure ? "443" : "80";
       }
-      return !out.host.empty();
+      return !out.host.empty() && !out.port.empty();
     }
 
     // --- One connection: TCP, with TLS over it for https and wss -----------------------------------------------------
@@ -142,6 +158,9 @@ namespace platform::http
       ~Connection()
       {
         Close();
+        if (mFd >= 0) {
+          ::close(mFd); // only here: until the last owner lets go, no other socket can take its number
+        }
         if (mTls) {
           mbedtls_ssl_free(&mSsl);
           mbedtls_ssl_config_free(&mConfig);
@@ -161,20 +180,19 @@ namespace platform::http
         if (const int failed = ::getaddrinfo(target.host.c_str(), target.port.c_str(), &hints, &found); failed != 0) {
           return std::unexpected("can't find " + target.host + " (" + ::gai_strerror(failed) + ")");
         }
-        for (addrinfo* at = found; at != nullptr; at = at->ai_next) {
-          const int fd = ::socket(at->ai_family, at->ai_socktype, at->ai_protocol);
-          if (fd < 0) {
-            continue;
+        std::string why = "no address";
+        bool connected = false;
+        for (addrinfo* at = found; at != nullptr && !connected; at = at->ai_next) {
+          const auto tried = Connect(*at);
+          if (tried) {
+            connected = true;
+          } else {
+            why = tried.error();
           }
-          if (::connect(fd, at->ai_addr, at->ai_addrlen) == 0) {
-            mFd = fd;
-            break;
-          }
-          ::close(fd);
         }
         ::freeaddrinfo(found);
-        if (mFd < 0) {
-          return std::unexpected("no answer from " + target.host + " (" + std::strerror(errno) + ")");
+        if (!connected) {
+          return std::unexpected("no answer from " + target.host + " (" + why + ")");
         }
 #if FAFRE_PLATFORM_MACOS // SO_NOSIGPIPE, the socket option only macOS has
         // A write to a closed socket is an error, not a signal (Linux uses MSG_NOSIGNAL below).
@@ -183,8 +201,6 @@ namespace platform::http
 #endif
         int noDelay = 1;
         (void)::setsockopt(mFd, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay));
-        // From here on every read and write waits in poll(), never in the socket.
-        (void)::fcntl(mFd, F_SETFL, ::fcntl(mFd, F_GETFL, 0) | O_NONBLOCK);
         if (!target.secure) {
           return {};
         }
@@ -192,30 +208,45 @@ namespace platform::http
         if (roots.loaded == 0) {
           return std::unexpected("no CA certificates found on this system");
         }
-        mTls = true;
-        mbedtls_ssl_init(&mSsl);
-        mbedtls_ssl_config_init(&mConfig);
-        mbedtls_ctr_drbg_init(&mDrbg);
-        mbedtls_entropy_init(&mEntropy);
-        if (
-          mbedtls_ctr_drbg_seed(&mDrbg, mbedtls_entropy_func, &mEntropy, nullptr, 0) != 0 ||
-          mbedtls_ssl_config_defaults(
-            &mConfig, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT
-          ) != 0
-        ) {
-          return std::unexpected("TLS setup failed");
+        {
+          std::lock_guard<std::mutex> lock(mLock);
+          if (mClosed) {
+            return std::unexpected("closed");
+          }
+          mTls = true;
+          mbedtls_ssl_init(&mSsl);
+          mbedtls_ssl_config_init(&mConfig);
+          mbedtls_ctr_drbg_init(&mDrbg);
+          mbedtls_entropy_init(&mEntropy);
+          if (
+            mbedtls_ctr_drbg_seed(&mDrbg, mbedtls_entropy_func, &mEntropy, nullptr, 0) != 0 ||
+            mbedtls_ssl_config_defaults(
+              &mConfig, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT
+            ) != 0
+          ) {
+            return std::unexpected("TLS setup failed");
+          }
+          mbedtls_ssl_conf_authmode(&mConfig, MBEDTLS_SSL_VERIFY_REQUIRED);
+          mbedtls_ssl_conf_ca_chain(&mConfig, &roots.chain, nullptr);
+          mbedtls_ssl_conf_rng(&mConfig, mbedtls_ctr_drbg_random, &mDrbg);
+          if (mbedtls_ssl_setup(&mSsl, &mConfig) != 0 || mbedtls_ssl_set_hostname(&mSsl, target.host.c_str()) != 0) {
+            return std::unexpected("TLS setup failed");
+          }
+          mbedtls_ssl_set_bio(&mSsl, this, &Connection::BioSend, &Connection::BioRecv, nullptr);
         }
-        mbedtls_ssl_conf_authmode(&mConfig, MBEDTLS_SSL_VERIFY_REQUIRED);
-        mbedtls_ssl_conf_ca_chain(&mConfig, &roots.chain, nullptr);
-        mbedtls_ssl_conf_rng(&mConfig, mbedtls_ctr_drbg_random, &mDrbg);
-        if (mbedtls_ssl_setup(&mSsl, &mConfig) != 0 || mbedtls_ssl_set_hostname(&mSsl, target.host.c_str()) != 0) {
-          return std::unexpected("TLS setup failed");
-        }
-        mbedtls_ssl_set_bio(&mSsl, this, &Connection::BioSend, &Connection::BioRecv, nullptr);
         for (;;) {
-          const int step = mbedtls_ssl_handshake(&mSsl);
-          if (step == 0) {
-            break;
+          // Each step under the lock: Close from another thread uses the same TLS state.
+          int step = 0;
+          {
+            std::lock_guard<std::mutex> lock(mLock);
+            if (mClosed) {
+              return std::unexpected("closed");
+            }
+            step = mbedtls_ssl_handshake(&mSsl);
+            if (step == 0) {
+              mHandshakeDone = true;
+              break;
+            }
           }
           if (step != MBEDTLS_ERR_SSL_WANT_READ && step != MBEDTLS_ERR_SSL_WANT_WRITE) {
             const std::uint32_t flags = mbedtls_ssl_get_verify_result(&mSsl);
@@ -231,17 +262,19 @@ namespace platform::http
         return {};
       }
 
-      /** Writes all of `data`; waits up to 30 s for room. */
+      /** Writes all of `data`; waits up to 30 s for room. One caller at a time, so frames never interleave. */
       bool WriteAll(
         const char* data,
         std::size_t size
       )
       {
+        // A TLS write that waits for room must be repeated with the same bytes, so no other write may come between.
+        std::lock_guard<std::mutex> writer(mWriteLock);
         while (size > 0) {
           std::ptrdiff_t wrote = 0;
           {
             std::lock_guard<std::mutex> lock(mLock);
-            if (mFd < 0) {
+            if (mClosed || mFd < 0) {
               return false;
             }
             if (mTls) {
@@ -283,7 +316,7 @@ namespace platform::http
           bool again = false;
           {
             std::lock_guard<std::mutex> lock(mLock);
-            if (mFd < 0) {
+            if (mClosed || mFd < 0) {
               return false;
             }
             if (mTls) {
@@ -323,27 +356,90 @@ namespace platform::http
         }
       }
 
-      /** Ends the connection; a wait in another thread returns. */
+      /**
+       * Ends the connection; a wait in another thread returns. The descriptor stays allocated until the destructor,
+       * so a thread still polling it can't end up on a socket that reused its number.
+       */
       void Close()
       {
         std::lock_guard<std::mutex> lock(mLock);
+        if (mClosed) {
+          return;
+        }
+        mClosed = true;
         if (mFd >= 0) {
-          if (mTls) {
+          if (mTls && mHandshakeDone) {
             (void)mbedtls_ssl_close_notify(&mSsl);
           }
           ::shutdown(mFd, SHUT_RDWR);
-          ::close(mFd);
-          mFd = -1;
         }
       }
 
       [[nodiscard]] bool IsOpen()
       {
         std::lock_guard<std::mutex> lock(mLock);
-        return mFd >= 0;
+        return !mClosed && mFd >= 0;
       }
 
     private:
+      /** Connects to one address without blocking, giving up after 10 s or when Close is called. */
+      std::expected<void, std::string> Connect(
+        const addrinfo& address
+      )
+      {
+        const int fd = ::socket(address.ai_family, address.ai_socktype, address.ai_protocol);
+        if (fd < 0) {
+          return std::unexpected(std::string(std::strerror(errno)));
+        }
+        // Non-blocking from the start: every connect, read and write waits in poll(), never in the socket.
+        (void)::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+        {
+          std::lock_guard<std::mutex> lock(mLock);
+          if (mClosed) {
+            ::close(fd);
+            return std::unexpected(std::string("closed"));
+          }
+          mFd = fd; // published before connecting, so Close can end the wait below
+        }
+        const auto failed = [this, fd](std::string why) {
+          std::lock_guard<std::mutex> lock(mLock);
+          mFd = -1;
+          ::close(fd);
+          return std::unexpected(std::move(why));
+        };
+        if (::connect(fd, address.ai_addr, address.ai_addrlen) == 0) {
+          return {};
+        }
+        if (errno != EINPROGRESS && errno != EINTR) {
+          return failed(std::strerror(errno));
+        }
+        pollfd entry{fd, POLLOUT, 0};
+        for (int waited = 0;; waited += 200) {
+          if (!IsOpen()) {
+            return failed("closed");
+          }
+          if (waited >= kConnectTimeoutMs) {
+            return failed("timed out");
+          }
+          const int ready = ::poll(&entry, 1, 200);
+          if (ready < 0 && errno != EINTR) {
+            return failed(std::strerror(errno));
+          }
+          if (ready > 0) {
+            break;
+          }
+        }
+        int error = 0;
+        socklen_t length = sizeof(error);
+        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length) != 0) {
+          error = errno;
+        }
+        if (error != 0) {
+          return failed(std::strerror(error));
+        }
+        return {};
+      }
+
       bool Wait(
         short events,
         int timeoutMs
@@ -352,13 +448,16 @@ namespace platform::http
         int fd = -1;
         {
           std::lock_guard<std::mutex> lock(mLock);
+          if (mClosed) {
+            return false;
+          }
           fd = mFd;
         }
         if (fd < 0) {
           return false;
         }
         pollfd entry{fd, events, 0};
-        // In slices, so a Close from another thread (which closes the descriptor) is seen soon.
+        // In slices, so a Close from another thread (which shuts the socket down) is seen soon.
         for (int waited = 0; timeoutMs < 0 || waited < timeoutMs; waited += 200) {
           const int ready = ::poll(&entry, 1, 200);
           if (ready > 0) {
@@ -374,6 +473,7 @@ namespace platform::http
         return false;
       }
 
+      // Mbed TLS calls these only from inside a call made under mLock.
       static int BioSend(
         void* self,
         const unsigned char* data,
@@ -404,9 +504,14 @@ namespace platform::http
         return static_cast<int>(n);
       }
 
-      std::mutex mLock;
+      static constexpr int kConnectTimeoutMs = 10000;
+
+      std::mutex mLock;      ///< the descriptor and the TLS state
+      std::mutex mWriteLock; ///< one WriteAll at a time
       int mFd = -1;
+      bool mClosed = false;
       bool mTls = false;
+      bool mHandshakeDone = false;
       mbedtls_ssl_context mSsl{};
       mbedtls_ssl_config mConfig{};
       mbedtls_ctr_drbg_context mDrbg{};
@@ -440,7 +545,8 @@ namespace platform::http
       const std::string& upgradeHeaders
     )
     {
-      std::string text = call.method + " " + target.object + " HTTP/1.1\r\nHost: " + target.host;
+      std::string text = call.method + " " + target.object +
+        " HTTP/1.1\r\nHost: " + (target.bracketed ? "[" + target.host + "]" : target.host);
       const bool defaultPort = (target.secure && target.port == "443") || (!target.secure && target.port == "80");
       if (!defaultPort) {
         text += ":" + target.port;
@@ -517,7 +623,44 @@ namespace platform::http
       std::string raw;
       Step step = Step::Size;
       long long left = 0;
+      bool bad = false; ///< a size line that isn't one (RFC 9112 7.1): the body can't be trusted
 
+      /** The chunk size at the start of `line`: hex digits, then nothing or `;` extensions. -1 if it isn't one. */
+      static long long ParseSize(
+        const std::string_view line
+      )
+      {
+        long long size = 0;
+        std::size_t digits = 0;
+        for (; digits < line.size(); ++digits) {
+          const char c = line[digits];
+          int value = -1;
+          if (c >= '0' && c <= '9') {
+            value = c - '0';
+          } else if (c >= 'a' && c <= 'f') {
+            value = c - 'a' + 10;
+          } else if (c >= 'A' && c <= 'F') {
+            value = c - 'A' + 10;
+          } else {
+            break;
+          }
+          if (size > (std::numeric_limits<long long>::max() >> 4)) {
+            return -1;
+          }
+          size = (size << 4) | value;
+        }
+        if (digits == 0) {
+          return -1;
+        }
+        const std::string_view rest = line.substr(digits);
+        const std::size_t extension = rest.find_first_not_of(" \t");
+        if (extension != std::string_view::npos && rest[extension] != ';') {
+          return -1;
+        }
+        return size;
+      }
+
+      /** True once the last chunk was seen, or when the encoding is broken (`bad`). */
       bool Take(
         std::string& out
       )
@@ -529,7 +672,12 @@ namespace platform::http
             if (lineEnd == std::string::npos) {
               return false;
             }
-            left = std::strtoll(raw.c_str(), nullptr, 16);
+            left = ParseSize(std::string_view(raw).substr(0, lineEnd));
+            if (left < 0) {
+              bad = true;
+              step = Step::Done;
+              return true;
+            }
             raw.erase(0, lineEnd + 2);
             step = left == 0 ? Step::Done : Step::Data;
             break;
@@ -606,6 +754,9 @@ namespace platform::http
         chunks.raw += raw;
         raw.clear();
         if (chunks.Take(body)) {
+          if (chunks.bad) {
+            return std::unexpected("a broken chunked answer from " + target.host);
+          }
           break;
         }
       } else {
@@ -720,6 +871,9 @@ namespace platform::http
       if (mState->head.chunked) {
         mState->chunks.raw += raw;
         const bool done = mState->chunks.Take(out);
+        if (mState->chunks.bad) {
+          return std::unexpected("a broken chunked answer");
+        }
         if (!out.empty() || done) {
           return out;
         }
@@ -751,11 +905,18 @@ namespace platform::http
   // --- WebSocket
   // ------------------------------------------------------------------------------------------------------
 
+  namespace
+  {
+    /// The largest message Receive takes; FAF's lobby sends far less, even its whole game list.
+    constexpr std::uint64_t kMaxMessageBytes = 64ull << 20;
+  } // namespace
+
   struct WebSocket::State
   {
     std::mutex lock;
     std::shared_ptr<Connection> connection;
-    std::string buffer; ///< received bytes not yet made into frames; the reader's own
+    std::shared_ptr<Connection> opening; ///< while Open runs, so Close can end it
+    std::string buffer;                  ///< received bytes not yet made into frames; the reader's own
     std::mt19937 masks{std::random_device{}()};
     std::mutex maskLock;
   };
@@ -787,6 +948,24 @@ namespace platform::http
       return std::unexpected("not a link: " + url);
     }
     auto connection = std::make_shared<Connection>();
+    {
+      // Known before it connects, so Close from another thread can end the connect, the handshake or the upgrade.
+      std::lock_guard<std::mutex> lock(mState->lock);
+      mState->opening = connection;
+    }
+    // On every way out that didn't publish it, the opening connection is forgotten.
+    struct Forget
+    {
+      State& state;
+      const std::shared_ptr<Connection>& connection;
+      ~Forget()
+      {
+        std::lock_guard<std::mutex> lock(state.lock);
+        if (state.opening == connection) {
+          state.opening.reset();
+        }
+      }
+    } forget{*mState, connection};
     if (auto opened = connection->Open(target); !opened) {
       return std::unexpected(opened.error());
     }
@@ -837,6 +1016,10 @@ namespace platform::http
       return std::unexpected("the server's WebSocket answer doesn't match our key");
     }
     std::lock_guard<std::mutex> lock(mState->lock);
+    if (mState->opening != connection) {
+      return std::unexpected(std::string("closed")); // Close ran while this opened
+    }
+    mState->opening.reset();
     mState->connection = connection;
     mState->buffer = std::move(head->extra);
     return {};
@@ -940,6 +1123,11 @@ namespace platform::http
         } else if (length >= 126) {
           at = 0; // its length isn't all here yet
         }
+        // RFC 6455 5.2: the 64-bit length's top bit is 0. A frame, or a message of fragments, over the limit ends the
+        // connection: a length near 2^64 would wrap the sum below, and any length makes the buffer grow to it.
+        if (at != 0 && (length > kMaxMessageBytes || message.size() + length > kMaxMessageBytes)) {
+          return std::unexpected("a WebSocket message over " + std::to_string(kMaxMessageBytes >> 20) + " MB");
+        }
         if (at != 0 && buffer.size() >= at + (masked ? 4 : 0) + length) {
           std::string payload = buffer.substr(at + (masked ? 4 : 0), static_cast<std::size_t>(length));
           if (masked) {
@@ -983,9 +1171,14 @@ namespace platform::http
   void WebSocket::Close()
   {
     std::shared_ptr<Connection> connection;
+    std::shared_ptr<Connection> opening;
     {
       std::lock_guard<std::mutex> lock(mState->lock);
       connection.swap(mState->connection);
+      opening.swap(mState->opening);
+    }
+    if (opening) {
+      opening->Close(); // a connect or upgrade still under way: no WebSocket to say goodbye on yet
     }
     if (connection) {
       static constexpr char kClose[] = {
