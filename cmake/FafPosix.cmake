@@ -139,7 +139,8 @@ option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at co
 if(FAF_FETCH_DEPENDENCIES)
   # Wild Magic and zlib with their patches (a Linux tree synced from elsewhere has them already;
   # a fresh checkout, as on a Mac, needs them applied here).
-  set(FAF_DEPENDENCIES_ONLY WildMagic3p8 zlib-1.2.3 monocypher zstd googletest)
+  # Mbed TLS for faf_online (below), which every Linux / macOS build adds, not only the client.
+  set(FAF_DEPENDENCIES_ONLY WildMagic3p8 zlib-1.2.3 monocypher zstd googletest mbedtls)
   include(FafDependencies)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
@@ -300,13 +301,20 @@ endif()
 # --- faf_online (in-game launcher plan) ------------------------------------------------------
 # FAF's sign-in and lobby, HTTPS and WebSocket on Mbed TLS (src/online, src/platform/posix): in every Linux / macOS
 # build, built only for what asks for it (faf_online_tests, faf_online_probe, and the client once it links them).
-if(NOT TARGET faf_mbedtls)
-  add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/mbedtls" "${CMAKE_BINARY_DIR}/deps/mbedtls" EXCLUDE_FROM_ALL)
+# Without the Mbed TLS download (FAF_FETCH_DEPENDENCIES=OFF, or no network) a build without the client leaves them out,
+# as the net channel above; the client links faf_online, so there cmake/deps/mbedtls stops with what to fetch.
+if(TARGET faf_mbedtls OR EXISTS "${FAF_DEPENDENCIES_DIR}/mbedtls/library/ssl_tls.c" OR FAF_POSIX_CLIENT
+   OR FAF_LINUX_CLIENT)
+  if(NOT TARGET faf_mbedtls)
+    add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/mbedtls" "${CMAKE_BINARY_DIR}/deps/mbedtls" EXCLUDE_FROM_ALL)
+  endif()
+  add_subdirectory("${PROJECT_SOURCE_DIR}/src/online" "${CMAKE_BINARY_DIR}/online" EXCLUDE_FROM_ALL)
+  add_executable(faf_online_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/online/OnlineTests.cpp")
+  target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
+  add_test(NAME online COMMAND faf_online_tests)
+else()
+  message(STATUS "faf_online: left out, no Mbed TLS in ${FAF_DEPENDENCIES_DIR}/mbedtls (cmake -P cmake/FafDependencies.cmake)")
 endif()
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/online" "${CMAKE_BINARY_DIR}/online" EXCLUDE_FROM_ALL)
-add_executable(faf_online_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/online/OnlineTests.cpp")
-target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
-add_test(NAME online COMMAND faf_online_tests)
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
