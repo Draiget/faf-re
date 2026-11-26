@@ -992,6 +992,37 @@ TEST(
   EXPECT_TRUE(server.RequestHead().contains("Authorization: Bearer ACCESS"));
 }
 
+// A real service keeps the event stream open: the snapshot has to arrive while it stays open, not when it closes.
+TEST(
+  OnlineControlService,
+  SeesTheSnapshotWhileTheStreamStaysOpen
+)
+{
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+    {
+      "event: snapshot\ndata: {\"hosts\":[],\"lobbies\":[{\"key\":\"eu-1/l1\",\"host\":\"eu-1\",\"name\":\"Open\","
+      "\"state\":\"lobby\",\"seats\":[]}]}\n\n",
+    },
+    std::chrono::milliseconds(10),
+    std::chrono::milliseconds(4000)
+  );
+  const std::string base = server.Url().substr(0, server.Url().find("/api/"));
+  faf::online::ControlServiceClient client(base, "faf-re-client/test");
+  client.SetTokens([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  client.Start();
+  const auto start = std::chrono::steady_clock::now();
+  while (client.Lobbies().empty() && std::chrono::steady_clock::now() - start < std::chrono::milliseconds(1500)) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  const auto lobbies = client.Lobbies();
+  client.Stop();
+  ASSERT_EQ(lobbies.size(), 1u) << "no snapshot within 1.5 s while the stream stayed open: " << client.Message();
+  EXPECT_EQ(lobbies[0].key, "eu-1/l1");
+}
+
 TEST(
   OnlineControlService,
   ReadsALobbysSeatsAndTheViewersJoinLine

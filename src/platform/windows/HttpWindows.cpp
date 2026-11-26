@@ -318,9 +318,18 @@ namespace platform::http
     if (request == nullptr) {
       return std::unexpected("not open");
     }
+    // What has arrived, as soon as anything has: a synchronous WinHttpReadData for a whole buffer can wait for more on
+    // an answer without a length that stays open (an event stream), keeping events that came long ago.
+    DWORD available = 0;
+    if (!::WinHttpQueryDataAvailable(request, &available)) {
+      return std::unexpected("the answer broke off (error " + std::to_string(::GetLastError()) + ")");
+    }
+    if (available == 0) {
+      return std::string(); // the server closed: the body ended
+    }
     char buffer[16384];
     DWORD read = 0;
-    if (!::WinHttpReadData(request, buffer, sizeof(buffer), &read)) {
+    if (!::WinHttpReadData(request, buffer, std::min<DWORD>(available, sizeof(buffer)), &read)) {
       return std::unexpected("the answer broke off (error " + std::to_string(::GetLastError()) + ")");
     }
     return std::string(buffer, read);
