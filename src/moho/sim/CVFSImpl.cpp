@@ -871,6 +871,53 @@ namespace moho
     AddSearchPath(point, fa::string(directory.string().c_str()), true);
   }
 
+  void CVFSImpl::SetFileReplacements(
+    SFileWaitHandle* const archive,
+    std::vector<SFileReplacement> replacements
+  )
+  {
+#if FAF_RETAIL_LAYOUT
+    // The retail layout has no room for the table: nothing is replaced.
+    (void)replacements;
+    ReleaseMountedZipHandle(archive);
+#else
+    // The order only serves FindReplacement's binary search (paths are unique, the caller keeps one
+    // entry per path), so nothing observable depends on how the host sorts.
+    std::sort(replacements.begin(), replacements.end(), [](const SFileReplacement& a, const SFileReplacement& b) {
+      return a.mMountedPath.view() < b.mMountedPath.view();
+    });
+    mReplacements = std::move(replacements);
+    if (mReplacementArchive.mZipHandle != archive) {
+      ReleaseMountedZipHandle(mReplacementArchive.mZipHandle);
+      mReplacementArchive.mZipHandle = archive;
+    }
+    MountedFileLookups().Invalidate();
+#endif
+  }
+
+  const CVFSImpl::SFileReplacement* CVFSImpl::FindReplacement(
+    const fa::string& loweredMountedPath
+  ) const
+  {
+#if FAF_RETAIL_LAYOUT
+    (void)loweredMountedPath;
+    return nullptr;
+#else
+    if (mReplacements.empty()) {
+      return nullptr;
+    }
+    const auto found = std::lower_bound(
+      mReplacements.begin(),
+      mReplacements.end(),
+      loweredMountedPath.view(),
+      [](const SFileReplacement& entry, const std::string_view path) {
+      return entry.mMountedPath.view() < path;
+    }
+    );
+    return found != mReplacements.end() && found->mMountedPath.view() == loweredMountedPath.view() ? &*found : nullptr;
+#endif
+  }
+
   /**
    * Address: 0x004666A0 (FUN_004666A0, Moho::CVFSImpl::AddSearchPath)
    *
@@ -942,6 +989,14 @@ namespace moho
       outPath->clear();
       return outPath;
     }
+    // Engine addition (SetFileReplacements): a replaced file comes from its archive, before any mount.
+    if (const SFileReplacement* const replacement = FindReplacement(loweredPath)) {
+      FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+      if (waitHandleSet != nullptr && waitHandleSet->GetFileInfo(replacement->mDiskPath.c_str(), outInfo, true)) {
+        outPath->assign_owned(replacement->mDiskPath.view());
+        return outPath;
+      }
+    }
     // Engine addition (res_CacheFileLookups): a lookup that wants no file attributes is answered
     // from MountedFileLookupCache when it can be, and its answer stored there when it cannot.
     const bool useLookupCache = res_CacheFileLookups && outInfo == nullptr;
@@ -1004,6 +1059,15 @@ namespace moho
     }
 
     const fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+#if !FAF_RETAIL_LAYOUT
+    // Engine addition (SetFileReplacements): a replaced file's archive path maps back to its game path.
+    for (const SFileReplacement& replacement : mReplacements) {
+      if (replacement.mDiskPath.view() == loweredPath.view()) {
+        outPath->assign_owned(replacement.mMountedPath.view());
+        return outPath;
+      }
+    }
+#endif
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       if (!gpg::STR_StartsWith(loweredPath.c_str(), mountpoint.mDir.c_str())) {
         continue;
@@ -1044,6 +1108,13 @@ namespace moho
     fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
     if (!ConfineMountedPath(loweredPath)) {
       return false;
+    }
+    // Engine addition (SetFileReplacements): a replaced file's size and time are the archive's.
+    if (const SFileReplacement* const replacement = FindReplacement(loweredPath)) {
+      FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+      if (waitHandleSet != nullptr && waitHandleSet->GetFileInfo(replacement->mDiskPath.c_str(), outInfo, true)) {
+        return true;
+      }
     }
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       if (!gpg::STR_StartsWith(loweredPath.c_str(), mountpoint.mMountpoint.c_str())) {

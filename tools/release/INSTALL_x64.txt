@@ -7,6 +7,8 @@ What is in this package
   dxcompiler.dll, dxil.dll  shader compiler for Direct3D 12 and Vulkan
   fafengine\lua\...         the engine's own Lua hook files; must sit in a folder named fafengine
                             next to the exe (the engine mounts it at /fafengine)
+  faf-re-lua.nx2            fixes to FAF's interface Lua that FAF hasn't released yet; the engine
+                            uses each file only while FAF's own file is the one it was made for
 
 Install
   1. Create C:\ProgramData\FAForever\bin_x64 (it must be next to FAF's bin folder:

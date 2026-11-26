@@ -25,6 +25,7 @@ mkdir -p "$stage" "$out"
 install -m 0755 "$build/faf_client" "$stage/ForgedAlliance"
 install -m 0755 "$root/dependencies/dxc-linux/lib/libdxcompiler.so" "$root/dependencies/dxc-linux/lib/libdxil.so" "$stage/"
 cp -r "$root/data/fafengine" "$stage/"
+install -m 0644 "$build/faf-re-lua.nx2" "$stage/"
 install -m 0755 "$here/faf-launch" "$stage/faf-launch"
 { echo "FAF engine $tag (Linux x64), built $(date +%F)"; echo; cat "$root/tools/release/INSTALL_linux-x64.txt"; } > "$stage/INSTALL.txt"
 

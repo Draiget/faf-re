@@ -11,7 +11,8 @@
     <OutDir>\<version>\SHA256SUMS.txt                   checksums of every archive
 
   A package holds the exe (main_x64.exe / main.exe), its .pdb, the DXC runtime
-  (dxcompiler.dll, dxil.dll), the fafengine\ hook folder and an INSTALL.txt for that
+  (dxcompiler.dll, dxil.dll), the fafengine\ hook folder, faf-re-lua.nx2 (FAF UI Lua faf-re
+  ships until FAF releases it) and an INSTALL.txt for that
   architecture. FFmpeg is linked into the exe, so no FFmpeg DLLs ship.
 
   The version defaults to `git describe --tags --always --dirty` (e.g. v1.1.1-43-ge4cc5d8b0).
@@ -96,6 +97,8 @@ function Get-InstallText([string]$a, [hashtable]$t) {
     '  dxcompiler.dll, dxil.dll  shader compiler for Direct3D 12 and Vulkan',
     '  fafengine\lua\...         the engine''s own Lua hook files; must sit in a folder named fafengine',
     '                            next to the exe (the engine mounts it at /fafengine)',
+    '  faf-re-lua.nx2            fixes to FAF''s interface Lua that FAF hasn''t released yet; the engine',
+    '                            uses each file only while FAF''s own file is the one it was made for',
     '',
     'Install'
   )
@@ -184,7 +187,7 @@ foreach ($a in $archs) {
   $pdb = Join-Path $buildDir "$($t.Exe).pdb"
   if (-not (Test-Path $pdb)) { throw "$pdb not found." }
   Copy-Item $exe, $pdb $stage
-  foreach ($dll in 'dxcompiler.dll', 'dxil.dll') {
+  foreach ($dll in 'dxcompiler.dll', 'dxil.dll', 'faf-re-lua.nx2') {
     $path = Join-Path $buildDir $dll
     if (-not (Test-Path $path)) { throw "$path not found; the build stages it next to the exe." }
     Copy-Item $path $stage

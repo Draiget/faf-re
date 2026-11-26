@@ -1,0 +1,15 @@
+# Written by tools/fa-lua/refresh.py; don't edit by hand.
+# <SHA-256 of FAF's file> <game path> <replacement in this archive> <pull requests> <FAF branches>
+d9426e68a1b49a40e24ecc4a61893443c7ea2da366a8b24c7ff0c1ffa08362e1 /lua/keymap/hotbuild.lua files/d9426e68a1b4/lua/keymap/hotbuild.lua FAForever/fa#7415 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+73f1e6bd3283d165d54b82ad19dbef23a3e2c9fdaac951f16ab220b98c366c0e /lua/ui/controls/specialgrid.lua files/73f1e6bd3283/lua/ui/controls/specialgrid.lua FAForever/fa#7414 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+bb4dd7672a4181c9afc4ae70e5d49a53bd42da6d76f8642e47d513e7b3ac0819 /lua/ui/controls/worldview.lua files/bb4dd7672a41/lua/ui/controls/worldview.lua FAForever/fa#7417 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+495417a37861def16a3f1a78341dcdf95892160e5158ad4e4ea323d24414ec29 /lua/ui/game/OffScreenIndicator.lua files/495417a37861/lua/ui/game/OffScreenIndicator.lua FAForever/fa#7416 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+2d999b6d02ac11f5304865f05b75166cab2674556cf23f03c834c2dafb19d76c /lua/ui/game/construction.lua files/2d999b6d02ac/lua/ui/game/construction.lua FAForever/fa#7414 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+feeb418dfed2395be3f4d9933ec07bc83c9319d974622b31df508d770e9846ad /lua/ui/game/cursor/depth.lua files/feeb418dfed2/lua/ui/game/cursor/depth.lua FAForever/fa#7417 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+b9f529e2dcfc07c01451841d10aa81bef605b4006e0715d31ecd188334b0d7ec /lua/ui/game/layouts/unitview_left.lua files/b9f529e2dcfc/lua/ui/game/layouts/unitview_left.lua FAForever/fa#7417 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+677a04fa0b5dc6351c215e909b5de2d1726917b9c27f1aebd0a96afa69779bc0 /lua/ui/game/layouts/unitview_mini.lua files/677a04fa0b5d/lua/ui/game/layouts/unitview_mini.lua FAForever/fa#7417 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+d754662518c5ff6d1a5d58b3c7b2b42cdb50d86a73a8232417943f7814249c8f /lua/ui/game/layouts/unitview_right.lua files/d754662518c5/lua/ui/game/layouts/unitview_right.lua FAForever/fa#7417 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+ec56b36a288ea414f9852d4c68ed87840f6e4fcd767f17e08a603c8afe098226 /lua/ui/game/reclaim.lua files/ec56b36a288e/lua/ui/game/reclaim.lua FAForever/fa#7415 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+46ce5856b0406b8572e0493f495ca67147f58cf50411503831e47d2f0db3f21e /lua/ui/game/selection.lua files/46ce5856b040/lua/ui/game/selection.lua FAForever/fa#7415 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+d0b20f7480f786f580b09e33cb9d5a8f819cece510d1b85fb50ff10977456e8b /lua/ui/game/unitview.lua files/d0b20f7480f7/lua/ui/game/unitview.lua FAForever/fa#7418 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop
+737ed9e1a174577985eaa0d0bdbcef2b7c67a7854237cddbcb1504d82853df54 /lua/ui/uimain.lua files/737ed9e1a174/lua/ui/uimain.lua FAForever/fa#7401 deploy/faf,deploy/fafbeta,deploy/fafdevelop,develop

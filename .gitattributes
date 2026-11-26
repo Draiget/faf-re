@@ -10,3 +10,6 @@ tools/pgo/*.sh text eol=lf
 # Stored call hashes (tests/replay_sets): binary, and the list keeps its LF.
 tests/replay_sets/*.sets binary
 tests/replay_sets/*.tsv text eol=lf
+
+# FAF Lua that faf-re ships (tools/fa-lua/refresh.py): kept byte for byte as FAF has it (LF).
+data/fa-lua/** -text

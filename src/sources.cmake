@@ -195,6 +195,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/TimeBar.cpp
   moho/misc/TimeBarRender.cpp
   moho/misc/StartupHelpers.cpp
+  moho/misc/FafLuaOverrides.cpp
   moho/app/StartupClientHelpers.cpp
   moho/misc/IConOutputHandler.cpp
   moho/misc/MiscellaneousExtractor.cpp

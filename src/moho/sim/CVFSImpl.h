@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <vector>
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -184,7 +185,38 @@ namespace moho
      */
     void MountDirectoryLate(const std::filesystem::path& directory, gpg::StrArg mountpoint);
 
+    /**
+     * Engine addition (faf-re-lua.nx2, moho/misc/FafLuaOverrides.cpp): one mounted file served
+     * from another place. Both paths are lowercase; `mDiskPath` is a path inside a zip archive,
+     * in the form FindFile gives (`<archive>\lua\ui\uimain.lua`).
+     */
+    struct SFileReplacement
+    {
+      fa::string mMountedPath;
+      fa::string mDiskPath;
+    };
+
+    /**
+     * Engine addition: FindFile and GetFileInfo answer each `replacements` entry's mounted path
+     * with its disk path, before any mount point, and ToMountedPath maps the disk path back.
+     * `archive` is the mounted zip handle the disk paths are in, as DISK_MountZipFile returned
+     * it; the file system keeps that reference until it is destroyed or this is called again.
+     * Call it only while no other thread reads this file system (before DISK_ExchangeVFS).
+     * Listings are unchanged: a replacement only ever stands in for a file that is there.
+     */
+    void SetFileReplacements(SFileWaitHandle* archive, std::vector<SFileReplacement> replacements);
+
+    /** Engine addition: the replacement for one lowercase mounted path, or nullptr. */
+    [[nodiscard]] const SFileReplacement* FindReplacement(const fa::string& loweredMountedPath) const;
+
     fa::vector<SVFSMountPoint> mMountpoints; // +0x04
+
+#if !FAF_RETAIL_LAYOUT
+    // Engine additions after the binary's fields (SetFileReplacements): sorted by mMountedPath.
+    // The retail layout (the layout check's build) has neither, and no replacements.
+    std::vector<SFileReplacement> mReplacements;
+    SVFSMountPoint mReplacementArchive; // owns the archive's zip handle
+#endif
   };
 
   /**

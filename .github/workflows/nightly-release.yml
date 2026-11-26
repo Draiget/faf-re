@@ -182,7 +182,7 @@ jobs:
           $src = "build/clang-${{ matrix.arch }}-release/src"
           $pkg = "pkg"
           New-Item -ItemType Directory -Force $pkg | Out-Null
-          foreach ($f in "${{ matrix.exe }}.exe", "${{ matrix.exe }}.pdb", "dxcompiler.dll", "dxil.dll") { Copy-Item "$src/$f" $pkg -ErrorAction Stop }
+          foreach ($f in "${{ matrix.exe }}.exe", "${{ matrix.exe }}.pdb", "dxcompiler.dll", "dxil.dll", "faf-re-lua.nx2") { Copy-Item "$src/$f" $pkg -ErrorAction Stop }
           Copy-Item "$src/fafengine" $pkg -Recurse -ErrorAction Stop
           $head = "FAF engine $env:TAG (${{ matrix.arch }}), built $(Get-Date -Format yyyy-MM-dd)"
           ($head, "", (Get-Content "tools/release/INSTALL_${{ matrix.arch }}.txt" -Raw)) -join "`r`n" | Set-Content "$pkg/INSTALL.txt" -NoNewline

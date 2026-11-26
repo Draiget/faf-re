@@ -246,6 +246,19 @@ set_target_properties(faf_zip_offset_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME zip_offset COMMAND faf_zip_offset_tests)
 set_tests_properties(zip_offset PROPERTIES LABELS "Existing")
 
+# Engine addition: faf-re-lua.nx2, FAF UI Lua that faf-re ships, is used only for the FAF files it
+# was made from (moho/misc/FafLuaOverrides.h).
+add_executable(faf_fa_lua_tests EXCLUDE_FROM_ALL zip/FafLuaOverridesTests.cpp)
+target_link_libraries(faf_fa_lua_tests PRIVATE faf_engine gtest_main)
+# The archive the build ships, which the engine's zip reader must be able to read whole.
+include("${PROJECT_SOURCE_DIR}/cmake/FafLuaArchive.cmake")
+add_dependencies(faf_fa_lua_tests faf_fa_lua_archive)
+target_compile_definitions(faf_fa_lua_tests PRIVATE
+  "FAF_FA_LUA_ARCHIVE=\"${FAF_FA_LUA_ARCHIVE}\"" "FAF_FA_LUA_SOURCE=\"${PROJECT_SOURCE_DIR}/data/fa-lua\"")
+set_target_properties(faf_fa_lua_tests PROPERTIES FOLDER "Tests/Zip")
+add_test(NAME fa_lua_overrides COMMAND faf_fa_lua_tests)
+set_tests_properties(fa_lua_overrides PROPERTIES LABELS "Zip")
+
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
 add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)

@@ -265,6 +265,14 @@ Smoothness on our clients over the first 300 s of the lag games:
 
 None of the 24 games played desynced or crashed. Four no-lag retail games aren't in the tables: retail stalled in them, on both clocks, for a reason not found. The tests didn't cover separate machines, more than 2 players or our x86 build, and the choppiness wasn't judged on screen. The mean clock doesn't change what the sim computes, and in these games it didn't take a game above its set speed.
 
+## FAF Lua fixes (faf-re-lua.nx2)
+
+Our changes to FAF's interface Lua that FAF hasn't released yet (the pull requests in `data/fa-lua/sources.txt`) ship as `faf-re-lua.nx2` next to the executable; the build puts it there and every release package has it. At startup the engine mounts it and, for each file in its `manifest.txt`, reads the FAF file the init file mounted at that path and compares its SHA-256 with the one the replacement was made from. Equal: the game loads our file instead (the log says `FAF Lua: <path> replaced ...`). Different, because FAF released a newer file or our change: FAF's file is used (`... kept as FAF has it ...`). Only UI Lua under `/lua/ui/` and `/lua/keymap/` can be replaced, never a file the simulation loads, so a player with the archive and one without play the same game. FAF's hook files (`fafengine/`, mods) are still appended to the file that is loaded. `tools/fa-lua/refresh.py --fa <clone of FAForever/fa>` regenerates `data/fa-lua` from the listed pull requests and FAF's deploy branches.
+
+| Switch | Default | At startup | Applies | What it does |
+|---|---|---|---|---|
+| `/nofaflua` | off | command line | startup only | Leaves `faf-re-lua.nx2` unused: every file is FAF's own |
+
 ## FAF game version
 
 FAF ships its engine fixes ([FA-Binary-Patches](https://github.com/FAForever/FA-Binary-Patches)) as a new exe with a game release, and the FAF client stamps the game version into that exe, so one game version means one set of engine patches. This engine carries those patches up to game version 3841 and applies them per session: a replay plays with the patches of the version in its header (`Supreme Commander v1.50.<version>`, accepted from 3835 to 3841), and every other session with those of the game data in use, `Version` in `/lua/version.lua` (FAF's `GetVersion()`). The FAF client gives every player of a game the same game data, with the exe of that version, so a game with players on the FAF exe needs no setting; data without that file counts as 3835. The replay a session records names the version it ran as. The log says `FAF game version <n> (replay|game data|sim_FafGameVersion), sim fixes 0x..` when a session begins. `GetEngineVersion` reports 1.5.3841, the newest version whose patches the engine carries.

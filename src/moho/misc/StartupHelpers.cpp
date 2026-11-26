@@ -41,6 +41,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/FafLuaOverrides.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
 #include "moho/misc/XFileError.h"
@@ -727,16 +728,43 @@ namespace
    * does this itself rather than through the init file because the init
    * files belong to the FAF client. Nothing happens when the folder is absent.
    */
-  void AppendEngineHookFolder(
-    fa::vector<moho::SVFSMountPoint>& mountPoints
-  )
+  /** Engine addition: the folder holding the running executable, or empty when it can't be read. */
+  [[nodiscard]] std::filesystem::path EngineExecutableDirectory()
   {
     std::array<wchar_t, MAX_PATH> modulePath{};
     const DWORD length = ::GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
     if (length == 0U || length >= modulePath.size()) {
+      return {};
+    }
+    return std::filesystem::path(modulePath.data()).parent_path();
+  }
+
+  /**
+   * Engine addition: builds the file system over `mountPoints` and puts in the FAF UI Lua that
+   * faf-re ships (faf-re-lua.nx2 next to the executable, moho/misc/FafLuaOverrides.h).
+   */
+  [[nodiscard]] moho::CVirtualFileSystem* CreateEngineFileSystem(
+    const fa::vector<moho::SVFSMountPoint>& mountPoints,
+    const std::filesystem::path& launchDirectory
+  )
+  {
+    // VFS_Create makes a CVFSImpl (0x00467F90).
+    auto* const vfs = static_cast<moho::CVFSImpl*>(moho::VFS_Create(mountPoints, launchDirectory));
+    if (const std::filesystem::path executableDirectory = EngineExecutableDirectory(); !executableDirectory.empty()) {
+      moho::FAFLUA_Apply(*vfs, executableDirectory);
+    }
+    return vfs;
+  }
+
+  void AppendEngineHookFolder(
+    fa::vector<moho::SVFSMountPoint>& mountPoints
+  )
+  {
+    const std::filesystem::path executableDirectory = EngineExecutableDirectory();
+    if (executableDirectory.empty()) {
       return;
     }
-    const std::filesystem::path folder = std::filesystem::path(modulePath.data()).parent_path() / L"fafengine";
+    const std::filesystem::path folder = executableDirectory / L"fafengine";
     std::error_code error;
     if (!std::filesystem::is_directory(folder, error)) {
       return;
@@ -3918,7 +3946,7 @@ bool moho::DISK_SetupDataAndSearchPaths(
   // it, and destroy whatever was mounted before.
   if (
     moho::CVirtualFileSystem* const previous =
-      moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, absoluteLaunchDirectory));
+      moho::DISK_ExchangeVFS(CreateEngineFileSystem(mountPoints, absoluteLaunchDirectory));
     previous != nullptr
   ) {
     delete previous;
@@ -3953,7 +3981,8 @@ bool moho::DISK_MountDirectoriesNow(
     mountPoints = gMountedPoints;
     launchDirectory = gLaunchDirectory;
   }
-  moho::CVirtualFileSystem* const previous = moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, launchDirectory));
+  moho::CVirtualFileSystem* const previous =
+    moho::DISK_ExchangeVFS(CreateEngineFileSystem(mountPoints, launchDirectory));
   if (previous != nullptr) {
     std::lock_guard<std::mutex> lock(gDiskPathStateLock);
     gRetiredFileSystems.push_back(previous);

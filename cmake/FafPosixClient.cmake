@@ -345,6 +345,9 @@ add_custom_command(TARGET faf_client POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
           "$<TARGET_FILE_DIR:faf_client>/fafengine"
   VERBATIM)
+# faf-re-lua.nx2, FAF UI Lua that faf-re ships until FAF releases it (cmake/FafLuaArchive.cmake).
+include("${PROJECT_SOURCE_DIR}/cmake/FafLuaArchive.cmake")
+faf_stage_fa_lua_archive(faf_client "${CMAKE_CURRENT_BINARY_DIR}")
 if(FAFRE_PLATFORM_MACOS) # MoltenVK and a source-built DXC: neither ships for macOS
   # The shader compiler: DXC v1.9.2609 (cmake/FafDependencies.cmake, dxc-source) built with DXC's own
   # settings (cmake/caches/PredefinedParams.cmake: SPIR-V on, no LLVM targets), the dxcompiler library

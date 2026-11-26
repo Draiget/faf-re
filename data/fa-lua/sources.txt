@@ -1,0 +1,11 @@
+# FAForever/fa pull requests whose UI Lua faf-re ships in faf-re-lua.nx2 until FAF releases them.
+# One number per line. After changing this list, or when a pull request or FAF's branches move, run
+#   python tools/fa-lua/refresh.py --fa <clone of FAForever/fa>
+# and commit data/fa-lua. Remove a pull request once FAF has released it: its files then step aside
+# on their own anyway, because FAF's file no longer matches the hash in manifest.txt.
+7401 # rejoin screen status above IN TRANSIT
+7414 # build menu fills its buttons once per selection change
+7415 # UI errors on a profile that never saved its options
+7416 # off-screen marker arrow layout loop when it points east
+7417 # map ping markers, unit view and cursor depth thread stop redoing work every frame
+7418 # unit view sets textures, texts and shown states only when they change

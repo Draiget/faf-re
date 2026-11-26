@@ -11,6 +11,8 @@ What is in this package
   libfaf-glibc-compat.so         a few C library functions the shader compiler needs on glibc 2.34-2.37
   fafengine/lua/...              the engine's own Lua hook files; must sit in a folder named fafengine
                                  next to ForgedAlliance (the engine mounts it at /fafengine)
+  faf-re-lua.nx2                 fixes to FAF's interface Lua that FAF hasn't released yet; the engine
+                                 uses each file only while FAF's own file is the one it was made for
 
 Install
   Extract this package into a folder of its own, keeping fafengine as is:

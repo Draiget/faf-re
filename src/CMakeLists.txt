@@ -304,6 +304,9 @@ add_custom_command(TARGET faf_main POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
           "${_faf_dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:faf_main>"
   VERBATIM)
+# faf-re-lua.nx2, FAF UI Lua that faf-re ships until FAF releases it (cmake/FafLuaArchive.cmake).
+include("${PROJECT_SOURCE_DIR}/cmake/FafLuaArchive.cmake")
+faf_stage_fa_lua_archive(faf_main "${CMAKE_CURRENT_BINARY_DIR}")
 
 # --- faf_sim: the simulation ------------------------------------------------------------
 # faf_sim (plan WPR.11) is the simulation as programs without the client link it

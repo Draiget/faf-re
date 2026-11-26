@@ -218,6 +218,14 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
     Copy-Item $hooks $destDir -Recurse -Force
   }
 
+  # faf-re-lua.nx2: FAF UI Lua that faf-re ships until FAF releases it (cmake/FafLuaArchive.cmake).
+  # A running game keeps it open; the one there stays then.
+  $luaArchive = Join-Path $src 'faf-re-lua.nx2'
+  if (Test-Path $luaArchive) {
+    try { Copy-Item $luaArchive $destDir -Force -ErrorAction Stop }
+    catch { Write-Warning "$(Join-Path $destDir 'faf-re-lua.nx2') not replaced (in use by a running game)." }
+  }
+
   # headless (the console replay player, docs/SWITCHES.md) beside it: <name>_headless with
   # -Name, headless_x64 / headless otherwise (_profile for a Profile build).
   $headless = Join-Path $src "$($t.Headless).exe"
