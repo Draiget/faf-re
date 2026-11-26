@@ -1,50 +1,35 @@
 -- The in-game launcher: the screen the game opens on instead of FAF's main menu (main.lua's CreateUI, hooked in
--- /fafengine/lua/ui/menus/main.lua). FAF's games online on one side; skirmish, campaign, LAN, replays, mods and
--- options open FAF's own screens as FAF's main menu does (FAF main.lua ButtonSkirmish ... ButtonOptions) and come
--- back here; FAF's own main menu is one button away.
+-- /fafengine/lua/ui/menus/main.lua). Games online (FAF's and our servers') on its main page; skirmish, campaign,
+-- LAN, replays, mods and options open FAF's own screens as FAF's main menu does (main.lua ButtonSkirmish ...
+-- ButtonOptions) and come back here; FAF's own main menu is one button away.
 --
--- Built from basic controls only (solid rectangles, text, edits), so a new FAF release can't break its look. Every
--- call into FAF's screens is protected: if one fails to open, the launcher says which and stays. If the launcher
--- itself fails to build, the hook shows FAF's main menu instead.
+-- Its look is its own (theme.lua): a command console inside the game. Every call into FAF's screens is protected: if
+-- one fails to open, the launcher says which and stays. If the launcher itself fails to build, the hook shows FAF's
+-- main menu instead.
 --
 -- The online part talks to the engine through the FafOnline_* functions (src/moho/app/OnlineLauncher.cpp), which
--- only client builds with the online library have. No sign-in data ever reaches Lua.
+-- only client builds with the online library have. No sign-in data, join line or token ever reaches Lua.
 
 local UIUtil = import('/lua/ui/uiutil.lua')
 local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
 local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
 local Group = import('/lua/maui/group.lua').Group
-local Edit = import('/lua/maui/edit.lua').Edit
 local Movie = import('/lua/maui/movie.lua').Movie
 local Prefs = import('/lua/user/prefs.lua')
-local FlatPanel = import('/fafengine/modules/lua/ui/controls/flat_panel.lua')
+local Theme = import('/fafengine/modules/lua/ui/launcher/theme.lua')
+local C = Theme.Colors
+local Scale = Theme.Scale
 
 -- The featured mods a host can pick, as the Rust client offers them (FAForeverRustClient, HostGameModal.tsx).
 FeaturedMods = {
-    { id = 'faf', name = 'FAF', text = 'Standard game balance' },
-    { id = 'fafbeta', name = 'FAF Beta', text = 'Upcoming balance changes' },
-    { id = 'fafdevelop', name = 'FAF Develop', text = 'Bleeding-edge development' },
-    { id = 'nomads', name = 'Nomads', text = 'Adds the 5th Nomads faction' },
+    { id = 'faf', name = 'FAF', short = 'FAF', text = 'Standard game balance' },
+    { id = 'fafbeta', name = 'FAF Beta', short = 'Beta', text = 'Upcoming balance changes' },
+    { id = 'fafdevelop', name = 'FAF Develop', short = 'Develop', text = 'Bleeding-edge development' },
+    { id = 'nomads', name = 'Nomads', short = 'Nomads', text = 'Adds the 5th Nomads faction' },
 }
 
-local Colors = {
-    text = 'ffd8e0e6',
-    dim = 'ff7f909b',
-    accent = 'ff63c7f0',
-    good = 'ff7fd67f',
-    warn = 'fff0c060',
-    bad = 'fff07070',
-    row = '00000000',
-    rowOver = 'ff1c2c36',
-    rowSelected = 'ff1d4a66',
-    button = 'ff1b2a33',
-    buttonOver = 'ff27404d',
-    primary = 'ff1d5f86',
-    primaryOver = 'ff2a7fb0',
-    editBack = 'ff0d151b',
-}
-
-local kRowHeight = 26
+local kRailWidth = 214
+local kStatusHeight = 28
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -73,175 +58,216 @@ local function Online()
     return rawget(_G, 'FafOnline_Status') ~= nil
 end
 
-local function Label(parent, text, size, color, font)
-    local label = UIUtil.CreateText(parent, text or '', size or 14, font or UIUtil.bodyFont)
-    label:SetColor(color or Colors.text)
-    label:DisableHitTest()
-    return label
-end
-
---- A label cut at a width: its left and right are set by the caller.
-local function Cell(parent, size, color)
-    local cell = Label(parent, '', size or 13, color)
-    cell:SetClipToWidth(true)
-    return cell
-end
-
-local function SetTextIfChanged(label, text)
-    if label.shownText ~= text then
-        label.shownText = text
-        label:SetText(text)
-    end
-end
-
-local function Rect(parent, color)
-    local rect = Bitmap(parent)
-    rect:SetSolidColor(color)
-    return rect
-end
-
---- A rectangle placed by its edges also reports the size between them: a Bitmap's Width and Height otherwise stay
---- its texture's (maui/bitmap.lua ResetLayout), which a solid colour doesn't have, so they read 0.
-local function SizeFromEdges(rect)
-    rect.Width:Set(function() return rect.Right() - rect.Left() end)
-    rect.Height:Set(function() return rect.Bottom() - rect.Top() end)
-end
-
-local function ClickSound()
-    PlaySound(Sound({ Cue = 'UI_Menu_MouseDown_Sml', Bank = 'Interface' }))
-end
-
---- A flat button: a filled rectangle with its label, lighter under the mouse, grey when off.
-local function FlatButton(parent, text, width, onClick, primary)
-    local fill = primary and Colors.primary or Colors.button
-    local over = primary and Colors.primaryOver or Colors.buttonOver
-    local button = Rect(parent, fill)
-    button.label = Label(button, text, 14, Colors.text)
-    LayoutHelpers.AtCenterIn(button.label, button)
-    button.label.Depth:Set(function() return button.Depth() + 2 end)
-    LayoutHelpers.SetDimensions(button, width, 30)
-    button.enabled = true
-    button.SetEnabled = function(self, enabled)
-        if self.enabled ~= enabled then
-            self.enabled = enabled
-            self.label:SetColor(enabled and Colors.text or Colors.dim)
-            self:SetSolidColor(enabled and fill or Colors.button)
+local function ModName(id)
+    for _, mod in FeaturedMods do
+        if mod.id == id then
+            return mod.name
         end
     end
-    button.SetLabel = function(self, label)
-        SetTextIfChanged(self.label, label)
+    return id or ''
+end
+
+local function ModShort(id)
+    for _, mod in FeaturedMods do
+        if mod.id == id then
+            return mod.short
+        end
     end
-    button.HandleEvent = function(self, event)
-        if not self.enabled then
-            return false
+    return id or ''
+end
+
+local function RatingText(game)
+    if not game.ratingMin and not game.ratingMax then
+        return nil
+    end
+    local low = game.ratingMin and tostring(math.floor(game.ratingMin)) or 'any'
+    local high = game.ratingMax and tostring(math.floor(game.ratingMax)) or 'any'
+    return low .. ' - ' .. high
+end
+
+--- Team "1" is FA's "no team" (free for all); "2" is the lobby's Team 1.
+local function TeamName(team)
+    local number = tonumber(team) or 0
+    if number <= 1 then
+        return 'No team'
+    end
+    return 'Team ' .. (number - 1)
+end
+
+--- Each team's players with ratings, their sums and the game's average (nil without ratings).
+local function TeamFigures(game)
+    local teams = {}
+    local sum, count = 0, 0
+    for _, team in game.teams or {} do
+        local entry = { team = team.team, players = team.players, total = 0, rated = 0 }
+        for _, player in team.players do
+            if player.rating then
+                entry.total = entry.total + player.rating
+                entry.rated = entry.rated + 1
+                sum = sum + player.rating
+                count = count + 1
+            end
         end
-        if event.Type == 'MouseEnter' then
-            self:SetSolidColor(over)
-        elseif event.Type == 'MouseExit' then
-            self:SetSolidColor(fill)
-        elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
-            ClickSound()
-            onClick(self)
-            return true
+        table.insert(teams, entry)
+    end
+    table.sort(teams, function(a, b) return (tonumber(a.team) or 0) < (tonumber(b.team) or 0) end)
+    return teams, count > 0 and math.floor(sum / count + 0.5) or nil
+end
+
+--- Why this build can't play a game right now, or nil.
+local function WhyNotJoinable(game, status)
+    if game.source == 'server' then
+        if game.joinable then
+            return nil
         end
+        return game.why ~= '' and game.why or 'This game can\'t be joined from here.'
+    end
+    if game.state ~= 'open' then
+        return 'The game has started.'
+    end
+    if status.loadedMod == '' then
+        return 'This game was not started on FAF\'s game files (/init init_faf.lua).'
+    end
+    if game.featuredMod ~= '' and game.featuredMod ~= status.loadedMod then
+        return 'It runs ' .. ModName(game.featuredMod) .. '; this game has ' .. ModName(status.loadedMod) ..
+            ' loaded. Start the game with /init init_' .. game.featuredMod .. '.lua to join it (switching inside ' ..
+            'the game comes later).'
+    end
+    if game.players >= game.maxPlayers and game.maxPlayers > 0 then
+        return 'The game is full.'
+    end
+    return nil
+end
+
+-- Maps on this computer: the scenario of a map folder, or false.
+local scenarios = {}
+local function LocalScenario(map)
+    if not map or map == '' then
         return false
     end
-    return button
+    local key = string.lower(map)
+    if scenarios[key] == nil then
+        local path = '/maps/' .. key .. '/' .. key .. '_scenario.lua'
+        local found = false
+        if DiskGetFileInfo(path) then
+            local ok, scenario = pcall(import('/lua/ui/maputil.lua').LoadScenario, path)
+            found = ok and scenario or false
+        end
+        scenarios[key] = found
+    end
+    return scenarios[key]
 end
 
---- A one-line text edit on a dark field.
-local function TextEdit(parent, width, maxChars, text)
-    local back = Rect(parent, Colors.editBack)
-    LayoutHelpers.SetDimensions(back, width, 26)
-    LayoutHelpers.AtLeftTopIn(back, parent, 0, 0) -- the caller places it; until then the edit needs some place
-    local edit = Edit(back)
-    LayoutHelpers.AtLeftIn(edit, back, 6)
-    LayoutHelpers.AtRightIn(edit, back, 6)
-    LayoutHelpers.AtVerticalCenterIn(edit, back)
-    edit.Height:Set(function() return edit:GetFontHeight() end)
-    UIUtil.SetupEditStd(edit, Colors.text, '00000000', Colors.text, 'ff3c6f90', UIUtil.bodyFont, 14, maxChars)
-    edit:SetText(text or '')
-    back.edit = edit
-    back.HandleEvent = function(self, event)
-        if event.Type == 'ButtonPress' then
-            edit:AcquireFocus()
-            return true
-        end
-        return false
+local function MapTitle(map)
+    local scenario = LocalScenario(map)
+    if scenario and scenario.name then
+        return LOC(scenario.name)
     end
-    return back
+    return map or ''
 end
 
---- A choice that stays pressed: `group` keeps one of its buttons selected.
-local function ChoiceButton(parent, text, width, onPick)
-    local button = Rect(parent, Colors.button)
-    button.label = Label(button, text, 13, Colors.text)
-    LayoutHelpers.AtCenterIn(button.label, button)
-    button.label.Depth:Set(function() return button.Depth() + 2 end)
-    LayoutHelpers.SetDimensions(button, width, 28)
-    button.selected = false
-    button.enabled = true
-    button.Paint = function(self, over)
-        local color = Colors.button
-        if self.selected then
-            color = Colors.rowSelected
-        elseif over and self.enabled then
-            color = Colors.buttonOver
+--- A map's picture in `frame` (a panel): the map's own preview when it's on this computer, else a map icon.
+local function MapPicture(frame)
+    local MapPreview = import('/lua/ui/controls/mappreview.lua').MapPreview
+    local picture = MapPreview(frame)
+    LayoutHelpers.FillParentFixedBorder(picture, frame, 1)
+    picture:DisableHitTest()
+    picture.Depth:Set(function() return frame.Depth() + 1 end)
+    local placeholder = Theme.Icon(frame, 'maps', 28, C.subtle, 1.5)
+    LayoutHelpers.AtCenterIn(placeholder, frame)
+    placeholder.Depth:Set(function() return frame.Depth() + 1 end)
+    -- The texture loads when the map changes; which of the two shows is set every time, as a Show on an ancestor
+    -- shows both.
+    frame.SetMap = function(self, map)
+        if self.map ~= map then
+            self.map = map
+            local scenario = LocalScenario(map)
+            local shown = false
+            if scenario then
+                shown = (scenario.preview and scenario.preview ~= '' and picture:SetTexture(scenario.preview)) or false
+                if not shown and scenario.map then
+                    shown = picture:SetTextureFromMap(scenario.map) or false
+                end
+            end
+            self.shown = shown and true or false
         end
-        self:SetSolidColor(color)
-        self.label:SetColor(self.enabled and (self.selected and Colors.accent or Colors.text) or Colors.dim)
+        Theme.SetVisible(picture, self.shown)
+        Theme.SetVisible(placeholder, not self.shown)
     end
-    button.HandleEvent = function(self, event)
-        if event.Type == 'MouseEnter' then
-            self:Paint(true)
-        elseif event.Type == 'MouseExit' then
-            self:Paint(false)
-        elseif event.Type == 'ButtonPress' and event.Modifiers.Left and self.enabled then
-            ClickSound()
-            onPick(self)
-            return true
-        end
-        return false
-    end
-    return button
+    return picture
 end
 
---- A dimmed cover over the whole screen that takes every click, with a panel in its middle.
+--- A dimmed cover over the whole screen that takes every click, with a bracketed panel in its middle.
 local function Modal(root, width, height)
-    local cover = Rect(root, 'e8000000') -- dark enough that the launcher behind doesn't show through the panel
+    local cover = Theme.Rect(root, 'e0020508')
     LayoutHelpers.FillParent(cover, root)
-    SizeFromEdges(cover)
+    Theme.SizeFromEdges(cover)
     cover.Depth:Set(function() return root.Depth() + 500 end)
     cover.HandleEvent = function(self, event)
         return true
     end
-    local panel = FlatPanel.FlatPanel(cover, 'launcher dialog')
+    local panel = Theme.Panel(cover, 'ff0b161e', C.lineStrong)
     LayoutHelpers.SetDimensions(panel, width, height)
-    LayoutHelpers.AtCenterIn(panel, cover)
+    LayoutHelpers.AtCenterIn(panel, root)
     panel.Depth:Set(function() return cover.Depth() + 1 end)
+    Theme.Brackets(panel, C.accent, true)
     cover.panel = panel
     return cover
 end
 
 local function Message(root, title, text)
-    local cover = Modal(root, 520, 200)
+    local cover = Modal(root, 520, 190)
     local panel = cover.panel
-    local head = Label(panel, title, 18, Colors.accent, UIUtil.titleFont)
-    LayoutHelpers.AtLeftTopIn(head, panel, 20, 16)
-    local body = Label(panel, text, 14, Colors.text)
-    LayoutHelpers.AtLeftTopIn(body, panel, 20, 56)
-    body:SetClipToWidth(true)
-    LayoutHelpers.AtRightIn(body, panel, 20)
-    local ok = FlatButton(panel, 'OK', 120, function() cover:Destroy() end, true)
-    LayoutHelpers.AtRightIn(ok, panel, 20)
-    LayoutHelpers.AtBottomIn(ok, panel, 16)
+    local head = Theme.Title(panel, title, 16, C.text)
+    LayoutHelpers.AtLeftTopIn(head, panel, 24, 20)
+    local body = Theme.Cell(panel, 13, C.muted)
+    LayoutHelpers.AtLeftTopIn(body, panel, 24, 60)
+    LayoutHelpers.AtRightIn(body, panel, 24)
+    body:SetText(text)
+    local ok = Theme.Button(panel, 'OK', function() cover:Destroy() end, 'primary', { width = 120 })
+    LayoutHelpers.AtRightIn(ok, panel, 24)
+    LayoutHelpers.AtBottomIn(ok, panel, 20)
     return cover
 end
 
--- ---------------------------------------------------------------------------------------------------------------
--- A list that only has controls for the rows on screen, so 200 games cost what 20 do.
+--- The size of the screen in layout units (pixels over the UI scale).
+local function FrameUnits()
+    local frame = GetFrame(0)
+    return LayoutHelpers.InvScaleNumber(frame.Width()), LayoutHelpers.InvScaleNumber(frame.Height())
+end
 
---- `columns`: { {title, width share, field function(item) -> text, color}, ... }. `onPick(item, double)`.
+--- A thin scrollbar along `area`'s right edge for a list with `Scrolled()` -> first, shown, total.
+local function ScrollMark(area, list)
+    local track = Theme.Rect(area, C.line)
+    track.Right:Set(area.Right)
+    track.Top:Set(area.Top)
+    track.Bottom:Set(area.Bottom)
+    track.Width:Set(Scale(3))
+    track:DisableHitTest()
+    local thumb = Theme.Rect(area, C.accent)
+    thumb.Right:Set(area.Right)
+    thumb.Width:Set(Scale(3))
+    thumb:DisableHitTest()
+    thumb.Depth:Set(function() return track.Depth() + 1 end)
+    local mark = {}
+    mark.Update = function(self)
+        local first, shown, total = list:Scrolled()
+        local visible = total > shown
+        Theme.SetVisible(track, visible)
+        Theme.SetVisible(thumb, visible)
+        if visible then
+            local height = track.Height()
+            local size = math.max(Scale(16), math.floor(height * shown / total))
+            local top = math.floor((height - size) * (first - 1) / math.max(1, total - shown))
+            thumb.Top:Set(function() return track.Top() + top end)
+            thumb.Height:Set(size)
+        end
+    end
+    return mark
+end
+
+--- A list that has controls only for the rows on screen. columns: { {title, share, text(item), color}, ... };
+--- onPick(item, double).
 local function VirtualList(parent, columns, onPick)
     local list = Group(parent, 'launcher list')
     list.items = {}
@@ -249,62 +275,58 @@ local function VirtualList(parent, columns, onPick)
     list.rows = {}
     list.selectedKey = false
     list.hoverRow = false
+    local rowHeight = 28
 
     local header = Group(list)
     LayoutHelpers.AtLeftTopIn(header, list, 0, 0)
     header.Right:Set(list.Right)
-    LayoutHelpers.SetHeight(header, 24)
+    LayoutHelpers.SetHeight(header, 22)
     local body = Group(list)
     body.Left:Set(list.Left)
-    body.Right:Set(function() return list.Right() - LayoutHelpers.ScaleNumber(14) end)
-    body.Top:Set(function() return header.Bottom() + LayoutHelpers.ScaleNumber(2) end)
+    body.Right:Set(function() return list.Right() - Scale(10) end)
+    body.Top:Set(function() return header.Bottom() + Scale(4) end)
     body.Bottom:Set(list.Bottom)
     list.body = body
 
-    local function ColumnLeft(index, of)
+    local function Edge(index, of, last)
         local share = 0
-        for i = 1, index - 1 do
+        for i = 1, (last and index or index - 1) do
             share = share + columns[i][2]
         end
-        return function() return of.Left() + math.floor(share * of.Width()) + LayoutHelpers.ScaleNumber(8) end
-    end
-    local function ColumnRight(index, of)
-        local share = 0
-        for i = 1, index do
-            share = share + columns[i][2]
+        if last then
+            return function() return of.Left() + math.floor(share * of.Width()) - Scale(6) end
         end
-        return function() return of.Left() + math.floor(share * of.Width()) - LayoutHelpers.ScaleNumber(4) end
+        return function() return of.Left() + math.floor(share * of.Width()) + Scale(10) end
     end
-
     for index, column in columns do
-        local title = Cell(header, 12, Colors.dim)
-        title.Left:Set(ColumnLeft(index, body))
-        title.Right:Set(ColumnRight(index, body))
+        local title = Theme.Cell(header, 10, C.subtle, true)
+        title.Left:Set(Edge(index, body, false))
+        title.Right:Set(Edge(index, body, true))
         LayoutHelpers.AtVerticalCenterIn(title, header)
-        title:SetText(column[1])
+        title:SetText(string.upper(column[1]))
     end
-    local line = Rect(list, FlatPanel.Border)
+    local line = Theme.Rect(list, C.line)
     line.Left:Set(list.Left)
     line.Right:Set(list.Right)
     line.Top:Set(header.Bottom)
     line.Height:Set(1)
 
     local function VisibleCount()
-        return math.max(1, math.floor(body.Height() / LayoutHelpers.ScaleNumber(kRowHeight)))
+        return math.max(1, math.floor(body.Height() / Scale(rowHeight)))
     end
 
     local function MakeRow(index)
-        local row = Rect(body, Colors.row)
+        local row = Theme.Rect(body, C.clear)
         row.Left:Set(body.Left)
         row.Right:Set(body.Right)
-        row.Top:Set(function() return body.Top() + (index - 1) * LayoutHelpers.ScaleNumber(kRowHeight) end)
-        LayoutHelpers.SetHeight(row, kRowHeight)
+        row.Top:Set(function() return body.Top() + (index - 1) * Scale(rowHeight) end)
+        LayoutHelpers.SetHeight(row, rowHeight)
         row.Width:Set(function() return row.Right() - row.Left() end)
         row.cells = {}
         for c, column in columns do
-            local cell = Cell(row, 13, column[4] or Colors.text)
-            cell.Left:Set(ColumnLeft(c, body))
-            cell.Right:Set(ColumnRight(c, body))
+            local cell = Theme.Cell(row, 13, column[4] or C.text)
+            cell.Left:Set(Edge(c, body, false))
+            cell.Right:Set(Edge(c, body, true))
             LayoutHelpers.AtVerticalCenterIn(cell, row)
             cell.Depth:Set(function() return row.Depth() + 1 end)
             row.cells[c] = cell
@@ -325,15 +347,10 @@ local function VirtualList(parent, columns, onPick)
                     list.hoverRow = false
                 end
                 list:Paint()
-            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+            elseif (event.Type == 'ButtonPress' or event.Type == 'ButtonDClick') and event.Modifiers.Left then
                 list.selectedKey = self.item.key
                 list:Paint()
-                onPick(self.item, false)
-                return true
-            elseif event.Type == 'ButtonDClick' and event.Modifiers.Left then
-                list.selectedKey = self.item.key
-                list:Paint()
-                onPick(self.item, true)
+                onPick(self.item, event.Type == 'ButtonDClick')
                 return true
             end
             return false
@@ -358,8 +375,7 @@ local function VirtualList(parent, columns, onPick)
 
     function list:SetItems(items)
         self.items = items
-        local maxTop = math.max(1, table.getn(items) - VisibleCount() + 1)
-        self.top = math.min(self.top, maxTop)
+        self.top = math.min(self.top, math.max(1, table.getn(items) - VisibleCount() + 1))
         self:Paint()
     end
 
@@ -372,51 +388,36 @@ local function VirtualList(parent, columns, onPick)
         return nil
     end
 
+    function list:Scrolled()
+        return self.top, VisibleCount(), table.getn(self.items)
+    end
+
     function list:Paint()
         self:EnsureRows()
         for i, row in self.rows do
             local item = self.items[self.top + i - 1]
             row.item = item
             if item then
+                local selected = item.key == self.selectedKey
                 for c, column in columns do
-                    SetTextIfChanged(row.cells[c], column[3](item) or '')
-                    local color = item.color or column[4] or Colors.text
-                    if row.cells[c].shownColor ~= color then
-                        row.cells[c].shownColor = color
-                        row.cells[c]:SetColor(color)
-                    end
+                    Theme.SetText(row.cells[c], column[3](item) or '')
+                    Theme.SetColor(row.cells[c], selected and C.accent or (item.color or column[4] or C.text))
                 end
-                local fill = Colors.row
-                if item.key == self.selectedKey then
-                    fill = Colors.rowSelected
-                elseif self.hoverRow == row then
-                    fill = Colors.rowOver
-                end
-                row:SetSolidColor(fill)
+                row:SetSolidColor(selected and C.selected or (self.hoverRow == row and C.raised or C.clear))
             else
                 for c = 1, table.getn(columns) do
-                    SetTextIfChanged(row.cells[c], '')
+                    Theme.SetText(row.cells[c], '')
                 end
-                row:SetSolidColor(Colors.row)
+                row:SetSolidColor(C.clear)
             end
         end
-        if self.OnScrolled then
-            self:OnScrolled()
+        if self.mark then
+            self.mark:Update()
         end
-    end
-
-    -- What maui's Scrollbar asks of the control it scrolls.
-    function list:GetScrollValues(axis)
-        local count = table.getn(self.items)
-        return 1, math.max(count, 1), self.top, math.min(self.top + VisibleCount() - 1, math.max(count, 1))
     end
 
     function list:ScrollLines(axis, delta)
         self:ScrollSetTop(axis, self.top + math.floor(delta))
-    end
-
-    function list:ScrollPages(axis, delta)
-        self:ScrollSetTop(axis, self.top + math.floor(delta) * VisibleCount())
     end
 
     function list:ScrollSetTop(axis, top)
@@ -428,185 +429,563 @@ local function VirtualList(parent, columns, onPick)
         end
     end
 
-    function list:IsScrollable(axis)
-        return true
-    end
-
-    -- Placed along the rows' right edge; it scrolls the list, which holds the scroll calls.
-    local scrollbar = UIUtil.CreateLobbyVertScrollbar(body, 0, 0, 0)
-    scrollbar:SetScrollable(list)
+    list.mark = ScrollMark(body, list)
     return list
 end
 
+
 -- ---------------------------------------------------------------------------------------------------------------
--- The online page: FAF's games.
+-- The games: tiles in a grid, or rows in a list, with controls only for what is on screen.
 
-local function RatingText(game)
-    if not game.ratingMin and not game.ratingMax then
-        return ''
-    end
-    local low = game.ratingMin and tostring(math.floor(game.ratingMin)) or 'any'
-    local high = game.ratingMax and tostring(math.floor(game.ratingMax)) or 'any'
-    return low .. ' - ' .. high
+local function StatBlock(parent, caption)
+    local block = Group(parent)
+    block:DisableHitTest()
+    block.value = Theme.Text(block, '', 17, C.text, true)
+    LayoutHelpers.AtLeftTopIn(block.value, block, 0, 0)
+    block.caption = Theme.Caption(block, caption)
+    LayoutHelpers.AtLeftTopIn(block.caption, block, 0, 21)
+    LayoutHelpers.SetDimensions(block, 84, 34)
+    return block
 end
 
-local function ModName(id)
-    for _, mod in FeaturedMods do
-        if mod.id == id then
-            return mod.name
+--- Tags that sit in a row, each after the last; :SetTags({ {text, color}, ... }) shows the first few.
+local function TagRow(parent, count)
+    local row = Group(parent)
+    row:DisableHitTest()
+    LayoutHelpers.SetHeight(row, 18)
+    row.tags = {}
+    for i = 1, count do
+        local tag = Theme.Tag(row, '', C.muted)
+        LayoutHelpers.AtTopIn(tag, row, 0)
+        if i == 1 then
+            tag.Left:Set(row.Left)
+        else
+            local before = row.tags[i - 1]
+            tag.Left:Set(function() return before.Right() + Scale(6) end)
+        end
+        row.tags[i] = tag
+    end
+    row.SetTags = function(self, tags)
+        for i, tag in self.tags do
+            local want = tags[i]
+            -- Past the row's right edge a tag is left out rather than cut.
+            Theme.SetVisible(tag, want ~= nil)
+            if want then
+                tag:SetTag(want[1], want[2])
+            end
         end
     end
-    return id or ''
+    return row
 end
 
---- Why this build can't play a game right now, or nil.
-local function WhyNotJoinable(game, status)
+local function GameTags(game, status)
+    local tags = {}
     if game.source == 'server' then
-        if game.joinable then
-            return nil
-        end
-        return game.why ~= '' and game.why or 'This game can\'t be joined from here.'
+        table.insert(tags, { 'Our server', C.accent })
+    elseif game.featuredMod ~= '' and game.featuredMod ~= 'faf' then
+        table.insert(tags, { ModShort(game.featuredMod), C.violet })
     end
     if game.state ~= 'open' then
-        return 'The game has started.'
+        table.insert(tags, { 'Started', C.subtle })
     end
-    if status.loadedMod == '' then
-        return 'This game was not started on FAF\'s game files (/init init_faf.lua).'
+    local range = RatingText(game)
+    if range then
+        table.insert(tags, { range, game.enforceRating and C.warn or C.muted })
     end
-    if game.featuredMod ~= '' and game.featuredMod ~= status.loadedMod then
-        return 'It runs ' .. ModName(game.featuredMod) .. '; this game has ' .. ModName(status.loadedMod) ..
-            ' loaded. Switching inside the game comes later; start the game with /init init_' .. game.featuredMod ..
-            '.lua for now.'
+    if game.simMods and game.simMods > 0 then
+        table.insert(tags, { game.simMods == 1 and '1 sim mod' or (game.simMods .. ' sim mods'), C.warn })
     end
-    if game.players >= game.maxPlayers and game.maxPlayers > 0 then
-        return 'The game is full.'
+    if game.password then
+        table.insert(tags, { 'Password', C.bad })
     end
-    return nil
+    if game.visibility == 'friends' then
+        table.insert(tags, { 'Friends', C.good })
+    end
+    return tags
 end
 
-local function BuildOnlinePage(launcher, page)
-    local view = {}
-    launcher.online = view
+--- One game as a tile: its map, title, players, average rating, tags and host.
+local function MakeTile(grid, launcher)
+    local tile = Theme.Panel(grid, C.panel, C.line)
+    local frame = Theme.Panel(tile, C.field, C.line)
+    LayoutHelpers.AtLeftTopIn(frame, tile, 10, 10)
+    frame.Bottom:Set(function() return tile.Bottom() - Scale(10) end)
+    frame.Width:Set(function() return frame.Bottom() - frame.Top() end)
+    MapPicture(frame)
+    local strip = Theme.Rect(frame, 'c0000000')
+    strip.Left:Set(function() return frame.Left() + 1 end)
+    strip.Right:Set(function() return frame.Right() - 1 end)
+    strip.Bottom:Set(function() return frame.Bottom() - 1 end)
+    strip.Height:Set(Scale(20))
+    strip.Width:Set(function() return strip.Right() - strip.Left() end)
+    strip:DisableHitTest()
+    strip.Depth:Set(function() return frame.Depth() + 3 end)
+    tile.mapName = Theme.Cell(frame, 11, C.text)
+    tile.mapName.Left:Set(function() return frame.Left() + Scale(6) end)
+    tile.mapName.Right:Set(function() return frame.Right() - Scale(4) end)
+    LayoutHelpers.AtVerticalCenterIn(tile.mapName, strip)
+    tile.mapName.Depth:Set(function() return strip.Depth() + 1 end)
+    tile.lock = Theme.Icon(frame, 'lock', 14, C.text)
+    LayoutHelpers.AtRightTopIn(tile.lock, frame, 6, 6)
+    tile.lock.Depth:Set(function() return frame.Depth() + 4 end)
 
-    local title = Label(page, 'ONLINE GAMES', 22, Colors.text, UIUtil.titleFont)
-    LayoutHelpers.AtLeftTopIn(title, page, 20, 14)
-    view.status = Cell(page, 13, Colors.dim)
-    LayoutHelpers.AtLeftTopIn(view.status, page, 20, 46)
-    LayoutHelpers.AtRightIn(view.status, page, 340)
+    local left = function() return frame.Right() + Scale(14) end
+    tile.title = Theme.Cell(tile, 15, C.text, true)
+    tile.title.Left:Set(left)
+    tile.title.Right:Set(function() return tile.Right() - Scale(12) end)
+    LayoutHelpers.AtTopIn(tile.title, tile, 10)
+    tile.players = StatBlock(tile, 'Players')
+    tile.players.Left:Set(left)
+    LayoutHelpers.AtTopIn(tile.players, tile, 34)
+    tile.rating = StatBlock(tile, 'Avg. rating')
+    tile.rating.Left:Set(function() return tile.players.Left() + Scale(86) end)
+    LayoutHelpers.AtTopIn(tile.rating, tile, 34)
+    tile.tags = TagRow(tile, 3)
+    tile.tags.Left:Set(left)
+    tile.tags.Right:Set(function() return tile.Right() - Scale(12) end)
+    LayoutHelpers.AtTopIn(tile.tags, tile, 76)
+    tile.host = Theme.Cell(tile, 12, C.muted)
+    tile.host.Left:Set(left)
+    tile.host.Right:Set(function() return tile.Right() - Scale(12) end)
+    tile.host.Bottom:Set(function() return tile.Bottom() - Scale(10) end)
+    tile.brackets = Theme.Brackets(tile, C.accent, false, 10)
 
-    view.signButton = FlatButton(page, 'Sign in', 120, function()
-        local status = FafOnline_Status()
-        if status.signIn == 'signedin' then
-            FafOnline_SignOut()
-        elseif status.signIn == 'waiting' or status.signIn == 'working' then
-            FafOnline_CancelSignIn()
-        else
-            FafOnline_SignIn()
+    tile.Bind = function(self, item, selected, hover)
+        self.item = item
+        Theme.SetVisible(self, item ~= nil)
+        if not item then
+            return
         end
-        launcher:Refresh()
-    end)
-    LayoutHelpers.AtRightTopIn(view.signButton, page, 20, 18)
-    view.hostButton = FlatButton(page, 'Host game', 140, function()
-        launcher:OpenHostDialog()
-    end, true)
-    LayoutHelpers.LeftOf(view.hostButton, view.signButton, 10)
+        local status = launcher.lastStatus or {}
+        local dim = item.color ~= nil
+        frame:SetMap(item.map)
+        Theme.SetText(self.mapName, MapTitle(item.map))
+        Theme.SetVisible(self.lock, item.password and true or false)
+        Theme.SetText(self.title, item.title)
+        Theme.SetColor(self.title, selected and C.accent or (dim and C.muted or C.text))
+        Theme.SetText(self.players.value, string.format('%d / %d', item.players, item.maxPlayers))
+        local _, average = TeamFigures(item)
+        Theme.SetText(self.rating.value, average and tostring(average) or '-')
+        Theme.SetColor(self.rating.value, average and C.gold or C.subtle)
+        self.tags:SetTags(GameTags(item, status))
+        Theme.SetText(self.host, (item.source == 'server' and 'Server: ' or 'Host: ') .. (item.host or ''))
+        self:SetColors(selected and C.selected or (hover and C.raised or C.panel),
+            selected and C.accent or (hover and C.lineStrong or C.line))
+        for _, bracket in self.brackets do
+            Theme.SetVisible(bracket, selected)
+        end
+    end
+    return tile
+end
 
-    if not Online() then
-        local text = Label(page, 'Online play is not part of this build of the game.', 16, Colors.dim)
-        LayoutHelpers.AtCenterIn(text, page)
-        view.signButton:Hide()
-        view.hostButton:Hide()
-        view.unavailable = true
-        return
+--- One game as a row of the list.
+local function MakeRow(grid, launcher)
+    local row = Theme.Panel(grid, C.panel, C.line)
+    local function Column(from, to, size, color, bold)
+        local cell = Theme.Cell(row, size, color, bold)
+        cell.Left:Set(function() return row.Left() + math.floor(row.Width() * from) + Scale(10) end)
+        cell.Right:Set(function() return row.Left() + math.floor(row.Width() * to) - Scale(4) end)
+        LayoutHelpers.AtVerticalCenterIn(cell, row)
+        return cell
+    end
+    row.source = Column(0, 0.08, 10, C.subtle, true)
+    row.title = Column(0.08, 0.40, 13, C.text, true)
+    row.map = Column(0.40, 0.60, 12, C.muted)
+    row.players = Column(0.60, 0.69, 13, C.text, true)
+    row.rating = Column(0.69, 0.78, 13, C.gold)
+    row.info = Column(0.78, 0.88, 11, C.muted)
+    row.host = Column(0.88, 1.0, 12, C.muted)
+    row.Bind = function(self, item, selected, hover)
+        self.item = item
+        Theme.SetVisible(self, item ~= nil)
+        if not item then
+            return
+        end
+        local _, average = TeamFigures(item)
+        Theme.SetText(self.source, item.source == 'server' and 'SERVER' or 'FAF')
+        Theme.SetColor(self.source, item.source == 'server' and C.accent or C.subtle)
+        Theme.SetText(self.title, (item.password and '[locked] ' or '') .. item.title)
+        Theme.SetColor(self.title, selected and C.accent or (item.color and C.muted or C.text))
+        Theme.SetText(self.map, MapTitle(item.map))
+        Theme.SetText(self.players, string.format('%d / %d', item.players, item.maxPlayers))
+        Theme.SetText(self.rating, average and tostring(average) or '-')
+        Theme.SetText(self.info, RatingText(item) or (item.source == 'server' and '' or ModShort(item.featuredMod)))
+        Theme.SetText(self.host, item.host or '')
+        self:SetColors(selected and C.selected or (hover and C.raised or C.panel),
+            selected and C.accent or (hover and C.lineStrong or C.line))
+    end
+    return row
+end
+
+local function GameGrid(parent, launcher)
+    local grid = Group(parent, 'launcher games')
+    grid.items = {}
+    grid.top = 1
+    grid.cells = {}
+    grid.mode = Prefs.GetFromCurrentProfile('fafre_launcher_view') or 'grid'
+    grid.selectedKey = false
+    grid.hoverKey = false
+
+    function grid:Geometry()
+        if self.mode == 'list' then
+            return 1, Scale(38), Scale(4)
+        end
+        local gap = Scale(12)
+        local cols = math.max(1, math.floor((self.Width() + gap) / (Scale(300) + gap)))
+        return cols, Scale(132), gap
     end
 
-    -- Signed out or signing in: one box in the middle.
-    local signIn = Group(page, 'sign in')
-    LayoutHelpers.SetDimensions(signIn, 600, 220)
-    LayoutHelpers.AtCenterIn(signIn, page)
-    view.signIn = signIn
-    view.signHead = Label(signIn, 'Sign in to FAF to see and join its games.', 18, Colors.text)
-    LayoutHelpers.AtHorizontalCenterIn(view.signHead, signIn)
-    LayoutHelpers.AtTopIn(view.signHead, signIn, 0)
-    view.signText = Label(signIn, '', 14, Colors.dim)
-    LayoutHelpers.AtHorizontalCenterIn(view.signText, signIn)
-    LayoutHelpers.AtTopIn(view.signText, signIn, 36)
-    view.signCode = Label(signIn, '', 34, Colors.accent, UIUtil.titleFont)
-    LayoutHelpers.AtHorizontalCenterIn(view.signCode, signIn)
-    LayoutHelpers.AtTopIn(view.signCode, signIn, 70)
-    view.signUrl = Label(signIn, '', 13, Colors.dim)
-    LayoutHelpers.AtHorizontalCenterIn(view.signUrl, signIn)
-    LayoutHelpers.AtTopIn(view.signUrl, signIn, 124)
-    view.openPage = FlatButton(signIn, 'Open the page again', 200, function()
-        local status = FafOnline_Status()
-        if status.url ~= '' then
-            OpenURL(status.url)
+    function grid:Rebuild()
+        for _, cell in self.cells do
+            cell:Destroy()
         end
-    end)
-    LayoutHelpers.AtHorizontalCenterIn(view.openPage, signIn)
-    LayoutHelpers.AtTopIn(view.openPage, signIn, 160)
-
-    -- Signed in: filters, the list, the selected game and Join.
-    local games = Group(page, 'games')
-    games.Left:Set(page.Left)
-    games.Right:Set(page.Right)
-    games.Top:Set(function() return page.Top() + LayoutHelpers.ScaleNumber(72) end)
-    games.Bottom:Set(page.Bottom)
-    view.games = games
-
-    view.search = TextEdit(games, 280, 40, '')
-    LayoutHelpers.AtLeftTopIn(view.search, games, 20, 0)
-    view.search.edit.OnTextChanged = function(self, newText, oldText)
-        launcher:Refresh()
+        self.cells = {}
+        local cols, cellHeight, gap = self:Geometry()
+        local rows = math.max(1, math.floor((self.Height() + gap) / (cellHeight + gap)))
+        local cellWidth = math.floor((self.Width() - Scale(10) - (cols - 1) * gap) / cols)
+        for r = 1, rows do
+            for c = 1, cols do
+                local cell = (self.mode == 'list' and MakeRow or MakeTile)(grid, launcher)
+                local x = (c - 1) * (cellWidth + gap)
+                local y = (r - 1) * (cellHeight + gap)
+                cell.Left:Set(function() return grid.Left() + x end)
+                cell.Top:Set(function() return grid.Top() + y end)
+                cell.Width:Set(cellWidth)
+                cell.Height:Set(cellHeight)
+                Theme.HitArea(cell, function(self, event)
+                    if event.Type == 'WheelRotation' then
+                        grid:Scroll(event.WheelRotation > 0 and -1 or 1)
+                        return true
+                    end
+                    local item = cell.item
+                    if not item then
+                        return false
+                    end
+                    if event.Type == 'MouseEnter' then
+                        grid.hoverKey = item.key
+                        grid:Paint()
+                    elseif event.Type == 'MouseExit' then
+                        if grid.hoverKey == item.key then
+                            grid.hoverKey = false
+                        end
+                        grid:Paint()
+                    elseif (event.Type == 'ButtonPress' or event.Type == 'ButtonDClick') and event.Modifiers.Left then
+                        Theme.ClickSound()
+                        launcher:SelectGame(item.key)
+                        if event.Type == 'ButtonDClick' then
+                            launcher:JoinSelected()
+                        end
+                        return true
+                    end
+                    return false
+                end)
+                table.insert(self.cells, cell)
+            end
+        end
+        self.cols = cols
+        self.rows = rows
+        self.shape = self.mode .. ':' .. cols .. 'x' .. rows .. ':' .. self.Width() .. 'x' .. self.Height()
     end
-    view.searchHint = Label(view.search, 'Search title, map or host', 13, Colors.dim)
-    LayoutHelpers.AtLeftIn(view.searchHint, view.search, 8)
-    LayoutHelpers.AtVerticalCenterIn(view.searchHint, view.search)
-    view.searchHint.Depth:Set(function() return view.search.Depth() + 3 end)
 
-    view.showRunning = false
-    view.runningButton = ChoiceButton(games, 'Show started games', 170, function(self)
-        view.showRunning = not view.showRunning
-        self.selected = view.showRunning
-        self:Paint(true)
-        launcher:Refresh()
-    end)
-    LayoutHelpers.RightOf(view.runningButton, view.search, 10)
-    view.runningButton:Paint(false)
+    function grid:Scrolled()
+        local total = math.ceil(table.getn(self.items) / math.max(1, self.cols or 1))
+        return self.top, self.rows or 1, total
+    end
 
-    view.list = VirtualList(games, {
-        { 'ON', 0.08, function(g) return g.source == 'server' and 'Server' or 'FAF' end },
-        { 'GAME', 0.28, function(g) return (g.password and '[locked] ' or '') .. g.title end },
-        { 'MAP', 0.17, function(g) return g.map end },
-        { 'PLAYERS', 0.09, function(g) return string.format('%d / %d', g.players, g.maxPlayers) end },
-        { 'MOD', 0.11, function(g) return g.source == 'server' and '' or ModName(g.featuredMod) end },
-        { 'RATING', 0.11, function(g) return RatingText(g) end },
-        { 'HOST', 0.16, function(g) return g.host end },
-    }, function(item, double)
-        launcher:Refresh()
-        if double then
-            launcher:JoinSelected()
+    function grid:Scroll(rows)
+        local _, shown, total = self:Scrolled()
+        local top = math.max(1, math.min(self.top + rows, math.max(1, total - shown + 1)))
+        if top ~= self.top then
+            self.top = top
+            self:Paint()
         end
-    end)
-    view.list.Left:Set(function() return games.Left() + LayoutHelpers.ScaleNumber(20) end)
-    view.list.Right:Set(function() return games.Right() - LayoutHelpers.ScaleNumber(20) end)
-    view.list.Top:Set(function() return view.search.Bottom() + LayoutHelpers.ScaleNumber(12) end)
-    view.list.Bottom:Set(function() return games.Bottom() - LayoutHelpers.ScaleNumber(62) end)
+    end
 
-    view.footer = Cell(games, 13, Colors.dim)
-    view.footer.Left:Set(function() return games.Left() + LayoutHelpers.ScaleNumber(20) end)
-    view.footer.Right:Set(function() return games.Right() - LayoutHelpers.ScaleNumber(200) end)
-    view.footer.Bottom:Set(function() return games.Bottom() - LayoutHelpers.ScaleNumber(26) end)
-    view.joinButton = FlatButton(games, 'Join', 160, function()
+    function grid:SetItems(items)
+        self.items = items
+        self:Paint()
+    end
+
+    function grid:SetMode(mode)
+        self.mode = mode
+        Prefs.SetToCurrentProfile('fafre_launcher_view', mode)
+        self.shape = false
+        self.top = 1
+        self:Paint()
+    end
+
+    function grid:Paint()
+        local cols, cellHeight, gap = self:Geometry()
+        local rows = math.max(1, math.floor((self.Height() + gap) / (cellHeight + gap)))
+        if self.shape ~= self.mode .. ':' .. cols .. 'x' .. rows .. ':' .. self.Width() .. 'x' .. self.Height() then
+            self:Rebuild()
+        end
+        local _, shown, total = self:Scrolled()
+        self.top = math.max(1, math.min(self.top, math.max(1, total - shown + 1)))
+        for i, cell in self.cells do
+            local item = self.items[(self.top - 1) * self.cols + i]
+            cell:Bind(item, item ~= nil and item.key == self.selectedKey, item ~= nil and item.key == self.hoverKey)
+        end
+        if self.mark then
+            self.mark:Update()
+        end
+    end
+
+    grid.mark = ScrollMark(grid, grid)
+    return grid
+end
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- The selected game: its map, its teams with their share of the rating, and Join.
+
+local function DetailsPanel(parent, launcher)
+    local panel = Theme.Panel(parent, C.panel, C.line)
+    Theme.Brackets(panel, C.accent)
+    local caption = Theme.Caption(panel, 'Game details', C.accent)
+    LayoutHelpers.AtLeftTopIn(caption, panel, 18, 16)
+    local sourceTag = Theme.Tag(panel, 'FAF', C.subtle)
+    LayoutHelpers.AtRightTopIn(sourceTag, panel, 18, 13)
+
+    local content = Group(panel)
+    LayoutHelpers.AtLeftTopIn(content, panel, 18, 40)
+    content.Right:Set(function() return panel.Right() - Scale(18) end)
+    content.Bottom:Set(function() return panel.Bottom() - Scale(96) end)
+    content:DisableHitTest()
+
+    local title = Theme.Cell(content, 18, C.text, true)
+    title.Left:Set(content.Left)
+    title.Right:Set(content.Right)
+    LayoutHelpers.AtTopIn(title, content, 0)
+    local meta = Theme.Cell(content, 12, C.muted)
+    meta.Left:Set(content.Left)
+    meta.Right:Set(content.Right)
+    LayoutHelpers.AtTopIn(meta, content, 26)
+
+    local frame = Theme.Panel(content, C.field, C.line)
+    frame.Left:Set(content.Left)
+    frame.Right:Set(content.Right)
+    LayoutHelpers.AtTopIn(frame, content, 50)
+    frame.Height:Set(function() return math.min(frame.Width(), Scale(150)) end)
+    frame.Width:Set(function() return frame.Right() - frame.Left() end)
+    MapPicture(frame)
+    local mapLine = Theme.Cell(content, 12, C.muted)
+    mapLine.Left:Set(content.Left)
+    mapLine.Right:Set(content.Right)
+    mapLine.Top:Set(function() return frame.Bottom() + Scale(6) end)
+
+    -- The share of the rating each team brings, as one bar.
+    local balanceCaption = Theme.Caption(content, 'Share of team rating')
+    balanceCaption.Left:Set(content.Left)
+    balanceCaption.Top:Set(function() return mapLine.Bottom() + Scale(14) end)
+    local teamCount = Theme.Text(content, '', 11, C.subtle)
+    teamCount.Right:Set(content.Right)
+    teamCount.Top:Set(balanceCaption.Top)
+    local bar = Group(content)
+    bar:DisableHitTest()
+    bar.Left:Set(content.Left)
+    bar.Right:Set(content.Right)
+    bar.Top:Set(function() return balanceCaption.Bottom() + Scale(6) end)
+    bar.Height:Set(Scale(20))
+    bar.Width:Set(function() return bar.Right() - bar.Left() end)
+    local segments = {}
+    for i = 1, 8 do
+        local segment = Theme.Rect(bar, C.clear)
+        segment:DisableHitTest()
+        segment.Top:Set(bar.Top)
+        segment.Bottom:Set(bar.Bottom)
+        segment.Height:Set(function() return segment.Bottom() - segment.Top() end)
+        segment.label = Theme.Text(bar, '', 11, C.page, true)
+        LayoutHelpers.AtVerticalCenterIn(segment.label, segment)
+        segment.label.Depth:Set(function() return segment.Depth() + 1 end)
+        segments[i] = segment
+    end
+
+    -- The players, team by team, in rows of one height.
+    local roster = Group(content)
+    roster:DisableHitTest()
+    roster.Left:Set(content.Left)
+    roster.Right:Set(content.Right)
+    -- Under the bar when it shows, else straight under the map's line.
+    roster.Top:Set(function()
+        return (panel.barShown and bar.Bottom() or mapLine.Bottom()) + Scale(14)
+    end)
+    roster.Bottom:Set(content.Bottom)
+    local rosterRows = {}
+
+    local empty = Theme.Text(panel, 'Pick a game to see its players.', 13, C.subtle)
+    LayoutHelpers.AtCenterIn(empty, panel)
+
+    local join = Theme.Button(panel, 'Join game', function()
         launcher:JoinSelected()
-    end, true)
-    LayoutHelpers.AtRightIn(view.joinButton, games, 20)
-    LayoutHelpers.AtBottomIn(view.joinButton, games, 16)
+    end, 'primary', { height = 44 })
+    join.Left:Set(function() return panel.Left() + Scale(18) end)
+    join.Right:Set(function() return panel.Right() - Scale(18) end)
+    join.Width:Set(function() return join.Right() - join.Left() end)
+    LayoutHelpers.AtBottomIn(join, panel, 40)
+    local note = Theme.Cell(panel, 12, C.subtle)
+    note.Left:Set(join.Left)
+    note.Right:Set(join.Right)
+    LayoutHelpers.AtBottomIn(note, panel, 16)
+    panel.join = join
+
+    local function RosterRow(i)
+        local row = rosterRows[i]
+        if not row then
+            row = Group(roster)
+            row:DisableHitTest()
+            row.Left:Set(roster.Left)
+            row.Right:Set(roster.Right)
+            row.Top:Set(function() return roster.Top() + (i - 1) * Scale(22) end)
+            row.Height:Set(Scale(22))
+            row.Width:Set(function() return row.Right() - row.Left() end)
+            row.left = Theme.Cell(row, 13, C.text)
+            row.left.Left:Set(row.Left)
+            row.left.Right:Set(function() return row.Right() - Scale(70) end)
+            LayoutHelpers.AtVerticalCenterIn(row.left, row)
+            row.right = Theme.Text(row, '', 12, C.muted)
+            row.right.Right:Set(row.Right)
+            LayoutHelpers.AtVerticalCenterIn(row.right, row)
+            rosterRows[i] = row
+        end
+        return row
+    end
+
+    panel.Show = function(self, game, status)
+        local hasGame = game ~= nil
+        Theme.SetVisible(content, hasGame)
+        Theme.SetVisible(sourceTag, hasGame)
+        Theme.SetVisible(empty, not hasGame)
+        if not hasGame then
+            join:SetEnabled(false)
+            Theme.SetText(note, 'Double-click a game to join it directly.')
+            return
+        end
+        sourceTag:SetTag(game.source == 'server' and 'Our server' or 'FAF', game.source == 'server' and C.accent or C.subtle)
+        Theme.SetText(title, game.title)
+        local metaText
+        if game.source == 'server' then
+            metaText = (game.state == 'open' and 'Waiting for players' or 'In game') .. ' on ' .. (game.host or '')
+        else
+            metaText = ModName(game.featuredMod) .. ' - hosted by ' .. (game.host or '')
+            if RatingText(game) then
+                metaText = metaText .. ' - rating ' .. RatingText(game)
+            end
+        end
+        Theme.SetText(meta, metaText)
+        frame:SetMap(game.map)
+        local scenario = LocalScenario(game.map)
+        local mapText = MapTitle(game.map)
+        if scenario and scenario.size then
+            mapText = mapText .. string.format('  -  %d x %d km', math.floor(scenario.size[1] / 51.2 + 0.5),
+                math.floor(scenario.size[2] / 51.2 + 0.5))
+        elseif not scenario then
+            mapText = mapText .. '  -  not on this computer'
+        end
+        Theme.SetText(mapLine, mapText)
+
+        local teams = TeamFigures(game)
+        local rated = {}
+        local total = 0
+        for _, team in teams do
+            if team.total > 0 and (tonumber(team.team) or 0) > 1 then
+                table.insert(rated, team)
+                total = total + team.total
+            end
+        end
+        local showBar = table.getn(rated) >= 2
+        if panel.barShown ~= showBar then
+            panel.barShown = showBar
+            roster.Top:Set(function()
+                return (panel.barShown and bar.Bottom() or mapLine.Bottom()) + Scale(14)
+            end)
+        end
+        Theme.SetVisible(balanceCaption, showBar)
+        Theme.SetVisible(teamCount, showBar)
+        Theme.SetVisible(bar, showBar)
+        if showBar then
+            Theme.SetText(teamCount, table.getn(rated) .. ' teams')
+            local x = 0
+            local width = bar.Width()
+            for i, segment in segments do
+                local team = rated[i]
+                Theme.SetVisible(segment, team ~= nil)
+                Theme.SetVisible(segment.label, team ~= nil)
+                if team then
+                    local share = team.total / total
+                    local from, to = x, (i == table.getn(rated)) and width or math.floor(x + width * share)
+                    segment.Left:Set(function() return bar.Left() + from end)
+                    segment.Right:Set(function() return bar.Left() + to - (team ~= rated[table.getn(rated)] and Scale(2) or 0) end)
+                    segment.Width:Set(function() return segment.Right() - segment.Left() end)
+                    local color = Theme.TeamColors[math.mod((tonumber(team.team) or 2) - 2, 8) + 1]
+                    segment:SetSolidColor(color)
+                    Theme.SetText(segment.label, string.format('%d%%', math.floor(share * 100 + 0.5)))
+                    segment.label.Left:Set(function() return segment.Left() + Scale(6) end)
+                    x = to
+                end
+            end
+        end
+
+        -- Rows: a header per team, then its players; open seats at the end.
+        local lines = {}
+        if game.source == 'server' then
+            table.insert(lines, { 'Seats taken', string.format('%d of %d', game.players, game.maxPlayers), C.text })
+            table.insert(lines, { 'Server', game.host or '', C.muted })
+        else
+            for _, team in teams do
+                local number = tonumber(team.team) or 0
+                local color = number > 1 and Theme.TeamColors[math.mod(number - 2, 8) + 1] or C.muted
+                local average = team.rated > 0 and math.floor(team.total / team.rated + 0.5) or nil
+                table.insert(lines, { string.upper(TeamName(team.team)),
+                    average and ('avg ' .. average .. '  total ' .. math.floor(team.total + 0.5)) or '', color, true })
+                for _, player in team.players do
+                    table.insert(lines, { player.login .. (player.clan and player.clan ~= '' and (' [' .. player.clan .. ']') or ''),
+                        player.rating and tostring(math.floor(player.rating + 0.5)) or '', C.text })
+                end
+            end
+            local open = math.max(0, game.maxPlayers - game.players)
+            if open > 0 then
+                table.insert(lines, { open == 1 and '1 open slot' or (open .. ' open slots'), '', C.subtle })
+            end
+        end
+        local fit = math.max(0, math.floor(roster.Height() / Scale(22)))
+        for i = 1, math.max(fit, table.getn(rosterRows)) do
+            local line = lines[i]
+            if i <= fit then
+                local row = RosterRow(i)
+                Theme.SetVisible(row, line ~= nil)
+                if line then
+                    if i == fit and table.getn(lines) > fit then
+                        line = { '+ ' .. (table.getn(lines) - fit + 1) .. ' more', '', C.subtle }
+                    end
+                    Theme.SetText(row.left, line[1])
+                    Theme.SetColor(row.left, line[3])
+                    Theme.SetText(row.right, line[2])
+                    Theme.SetColor(row.right, line[4] and line[3] or C.muted)
+                end
+            elseif rosterRows[i] then
+                Theme.SetVisible(rosterRows[i], false)
+            end
+        end
+
+        local why = WhyNotJoinable(game, status)
+        local busy = status.match == 'preparing' or status.match == 'running'
+        join:SetEnabled(why == nil and not busy)
+        Theme.SetText(note, why or (busy and 'A game is starting.' or 'Or double-click its card.'))
+        Theme.SetColor(note, why and C.warn or C.subtle)
+    end
+    return panel
 end
+
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- The multiplayer page.
 
 local function SortGames(a, b)
     if (a.state == 'open') ~= (b.state == 'open') then
         return a.state == 'open'
+    end
+    if (a.color == nil) ~= (b.color == nil) then
+        return a.color == nil
     end
     if a.players ~= b.players then
         return a.players > b.players
@@ -618,7 +997,7 @@ local function Matches(game, filter)
     if filter == '' then
         return true
     end
-    for _, text in { game.title, game.map, game.host } do
+    for _, text in { game.title, game.map, game.host, MapTitle(game.map) } do
         if string.find(string.lower(text or ''), filter, 1, true) then
             return true
         end
@@ -626,13 +1005,265 @@ local function Matches(game, filter)
     return false
 end
 
+--- Tabs: labels with a count each, the chosen one in cyan and underlined.
+local function Tabs(parent, entries, onPick)
+    local tabs = Group(parent)
+    tabs:DisableHitTest()
+    LayoutHelpers.SetHeight(tabs, 40)
+    tabs.items = {}
+    for i, entry in entries do
+        local key = entry[1]
+        local tab = Group(tabs)
+        tab.label = Theme.Text(tab, string.upper(entry[2]), 13, C.muted, true)
+        tab.count = Theme.Text(tab, '', 11, C.subtle, true)
+        LayoutHelpers.AtLeftIn(tab.label, tab, 0)
+        LayoutHelpers.AtVerticalCenterIn(tab.label, tab)
+        tab.count.Left:Set(function() return tab.label.Right() + Scale(8) end)
+        LayoutHelpers.AtVerticalCenterIn(tab.count, tab)
+        tab.Width:Set(function() return tab.count.Right() - tab.Left() end)
+        tab.Top:Set(tabs.Top)
+        tab.Bottom:Set(tabs.Bottom)
+        tab.Height:Set(function() return tab.Bottom() - tab.Top() end)
+        if i == 1 then
+            tab.Left:Set(tabs.Left)
+        else
+            local before = tabs.items[i - 1]
+            tab.Left:Set(function() return before.Right() + Scale(28) end)
+        end
+        tab.underline = Theme.Rect(tab, C.accent)
+        tab.underline.Left:Set(tab.Left)
+        tab.underline.Right:Set(tab.Right)
+        tab.underline.Bottom:Set(tab.Bottom)
+        tab.underline.Height:Set(Scale(2))
+        tab.underline.Width:Set(function() return tab.underline.Right() - tab.underline.Left() end)
+        tab.underline:DisableHitTest()
+        tab.key = key
+        Theme.HitArea(tab, function(self, event)
+            if event.Type == 'MouseEnter' then
+                tab.over = true
+                tabs:Paint()
+            elseif event.Type == 'MouseExit' then
+                tab.over = false
+                tabs:Paint()
+            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+                Theme.ClickSound()
+                onPick(key)
+                return true
+            end
+            return false
+        end)
+        tabs.items[i] = tab
+    end
+    tabs.Paint = function(self)
+        for _, tab in self.items do
+            local chosen = tab.key == self.chosen
+            Theme.SetColor(tab.label, chosen and C.accent or (tab.over and C.text or C.muted))
+            Theme.SetVisible(tab.underline, chosen)
+        end
+    end
+    tabs.Set = function(self, chosen, counts)
+        self.chosen = chosen
+        for _, tab in self.items do
+            Theme.SetText(tab.count, counts[tab.key] and tostring(counts[tab.key]) or '')
+        end
+        self:Paint()
+    end
+    return tabs
+end
+
+local function BuildOnlinePage(launcher, page)
+    local view = {}
+    launcher.online = view
+    view.tab = Prefs.GetFromCurrentProfile('fafre_launcher_tab') or 'faf'
+
+    local title = Theme.Title(page, 'Multiplayer', 24)
+    LayoutHelpers.AtLeftTopIn(title, page, 0, 6)
+    view.tabs = Tabs(page, { { 'faf', 'FAF games' }, { 'server', 'Our servers' } }, function(key)
+        view.tab = key
+        Prefs.SetToCurrentProfile('fafre_launcher_tab', key)
+        view.grid.top = 1
+        launcher:Refresh()
+    end)
+    view.tabs.Left:Set(function() return title.Right() + Scale(40) end)
+    LayoutHelpers.AtTopIn(view.tabs, page, 0)
+    view.tabs.Right:Set(function() return page.Right() - Scale(300) end)
+
+    -- Who is signed in, at the header's right.
+    local account = Group(page)
+    account:DisableHitTest()
+    LayoutHelpers.SetHeight(account, 40)
+    account.Right:Set(page.Right)
+    LayoutHelpers.AtTopIn(account, page, 0)
+    account.Width:Set(Scale(300))
+    view.avatar = Theme.Avatar(account, '', 28)
+    view.avatar.Right:Set(account.Right)
+    LayoutHelpers.AtVerticalCenterIn(view.avatar, account)
+    view.who = Theme.Text(account, '', 14, C.text, true)
+    view.who.Right:Set(function() return view.avatar.Left() - Scale(10) end)
+    LayoutHelpers.AtTopIn(view.who, account, 3)
+    view.whoNote = Theme.Text(account, '', 11, C.muted)
+    view.whoNote.Right:Set(view.who.Right)
+    LayoutHelpers.AtTopIn(view.whoNote, account, 22)
+
+    local divider = Theme.Rect(page, C.line)
+    divider.Left:Set(page.Left)
+    divider.Right:Set(page.Right)
+    divider.Top:Set(function() return view.tabs.Bottom() end)
+    divider.Height:Set(1)
+    divider.Width:Set(function() return divider.Right() - divider.Left() end)
+    divider:DisableHitTest()
+
+    if not Online() then
+        local card = Theme.Panel(page, C.panel, C.line)
+        LayoutHelpers.SetDimensions(card, 520, 140)
+        LayoutHelpers.AtCenterIn(card, page)
+        Theme.Brackets(card, C.accent)
+        local text = Theme.Text(card, 'Online play is not part of this build of the game.', 15, C.muted)
+        LayoutHelpers.AtCenterIn(text, card)
+        view.unavailable = true
+        return
+    end
+
+    -- Signed out or signing in: one card in the middle.
+    local signIn = Theme.Panel(page, C.panel, C.line)
+    LayoutHelpers.SetDimensions(signIn, 560, 290)
+    LayoutHelpers.AtCenterIn(signIn, page, 20)
+    Theme.Brackets(signIn, C.accent, true)
+    view.signIn = signIn
+    local signIcon = Theme.Icon(signIn, 'user', 30, C.accent, 1.6)
+    LayoutHelpers.AtHorizontalCenterIn(signIcon, signIn)
+    LayoutHelpers.AtTopIn(signIcon, signIn, 26)
+    view.signHead = Theme.Title(signIn, 'Sign in to FAF', 18)
+    LayoutHelpers.AtHorizontalCenterIn(view.signHead, signIn)
+    LayoutHelpers.AtTopIn(view.signHead, signIn, 70)
+    view.signText = Theme.Text(signIn, '', 13, C.muted)
+    LayoutHelpers.AtHorizontalCenterIn(view.signText, signIn)
+    LayoutHelpers.AtTopIn(view.signText, signIn, 106)
+    view.signCode = Theme.Title(signIn, '', 30, C.accent)
+    LayoutHelpers.AtHorizontalCenterIn(view.signCode, signIn)
+    LayoutHelpers.AtTopIn(view.signCode, signIn, 134)
+    view.signUrl = Theme.Text(signIn, '', 12, C.subtle)
+    LayoutHelpers.AtHorizontalCenterIn(view.signUrl, signIn)
+    LayoutHelpers.AtTopIn(view.signUrl, signIn, 184)
+    view.signButton = Theme.Button(signIn, 'Sign in with FAF', function()
+        local status = FafOnline_Status()
+        if status.signIn == 'waiting' or status.signIn == 'working' then
+            FafOnline_CancelSignIn()
+        else
+            FafOnline_SignIn()
+        end
+        launcher:Refresh()
+    end, 'primary', { width = 220, icon = 'external' })
+    LayoutHelpers.AtHorizontalCenterIn(view.signButton, signIn)
+    LayoutHelpers.AtBottomIn(view.signButton, signIn, 26)
+    view.openPage = Theme.Button(signIn, 'Open the page again', function()
+        local status = FafOnline_Status()
+        if status.url ~= '' then
+            OpenURL(status.url)
+        end
+    end, 'ghost', { width = 200 })
+    LayoutHelpers.AtHorizontalCenterIn(view.openPage, signIn)
+    LayoutHelpers.AtBottomIn(view.openPage, signIn, 70)
+
+    -- Signed in: the toolbar, the games, the details.
+    local games = Group(page, 'online games')
+    games.Left:Set(page.Left)
+    games.Right:Set(page.Right)
+    games.Top:Set(function() return divider.Bottom() + Scale(16) end)
+    games.Bottom:Set(page.Bottom)
+    view.games = games
+
+    view.hostButton = Theme.Button(games, 'Create game', function()
+        launcher:OpenHostDialog()
+    end, 'primary', { icon = 'plus' })
+    LayoutHelpers.AtLeftTopIn(view.hostButton, games, 0, 0)
+
+    view.search = Theme.TextField(games, 260, 'Search games, maps, hosts', 'search', 40)
+    view.search.Left:Set(function() return view.hostButton.Right() + Scale(12) end)
+    LayoutHelpers.AtTopIn(view.search, games, 0)
+    view.search:OnChange(function()
+        view.grid.top = 1
+        launcher:Refresh()
+    end)
+
+    view.filters = {}
+    local lastFilter = view.search
+    for _, entry in { { 'hidePrivate', 'Hide private' }, { 'hideModded', 'Hide sim mods' }, { 'showStarted', 'Show started' } } do
+        local key = entry[1]
+        local box = Theme.Checkbox(games, entry[2], function(self)
+            Prefs.SetToCurrentProfile('fafre_launcher_' .. key, self.on)
+            view.grid.top = 1
+            launcher:Refresh()
+        end)
+        box:SetOn(Prefs.GetFromCurrentProfile('fafre_launcher_' .. key) and true or false)
+        local after = lastFilter
+        box.Left:Set(function() return after.Right() + Scale(18) end)
+        LayoutHelpers.AtTopIn(box, games, 0)
+        view.filters[key] = box
+        lastFilter = box
+    end
+
+    -- Grid or list.
+    view.listButton = Theme.Button(games, '', function()
+        view.grid:SetMode('list')
+        launcher:Refresh()
+    end, 'ghost', { icon = 'list', width = 34 })
+    view.gridButton = Theme.Button(games, '', function()
+        view.grid:SetMode('grid')
+        launcher:Refresh()
+    end, 'ghost', { icon = 'grid', width = 34 })
+    LayoutHelpers.AtTopIn(view.listButton, games, 0)
+    LayoutHelpers.AtTopIn(view.gridButton, games, 0)
+
+    -- The details panel when there is room for it beside two tiles; else Join goes into the footer.
+    local listArea = Group(games)
+    listArea.Left:Set(games.Left)
+    listArea.Top:Set(function() return view.hostButton.Bottom() + Scale(16) end)
+    listArea.Bottom:Set(function() return games.Bottom() - Scale(30) end)
+    local wide = function() return LayoutHelpers.InvScaleNumber(games.Width()) >= 940 end
+    view.details = DetailsPanel(games, launcher)
+    view.details.Right:Set(games.Right)
+    view.details.Top:Set(listArea.Top)
+    view.details.Bottom:Set(games.Bottom)
+    view.details.Width:Set(Scale(320))
+    view.details.Left:Set(function() return view.details.Right() - view.details.Width() end)
+    listArea.Right:Set(function()
+        return wide() and view.details.Left() - Scale(16) or games.Right()
+    end)
+    view.gridButton.Right:Set(games.Right)
+    view.listButton.Right:Set(function() return view.gridButton.Left() - Scale(4) end)
+    view.wide = wide
+
+    view.grid = GameGrid(listArea, launcher)
+    LayoutHelpers.FillParent(view.grid, listArea)
+    view.grid.Width:Set(function() return view.grid.Right() - view.grid.Left() end)
+    view.grid.Height:Set(function() return view.grid.Bottom() - view.grid.Top() end)
+
+    view.empty = Theme.Text(listArea, '', 14, C.subtle)
+    LayoutHelpers.AtCenterIn(view.empty, listArea)
+
+    view.footer = Theme.Cell(games, 12, C.subtle)
+    view.footer.Left:Set(games.Left)
+    view.footer.Right:Set(function() return listArea.Right() - Scale(150) end)
+    view.footer.Bottom:Set(function() return games.Bottom() - Scale(6) end)
+    view.footerJoin = Theme.Button(games, 'Join', function()
+        launcher:JoinSelected()
+    end, 'primary', { width = 120, height = 26 })
+    view.footerJoin.Right:Set(listArea.Right)
+    view.footerJoin.Bottom:Set(games.Bottom)
+end
+
 local function RefreshOnline(launcher)
     local view = launcher.online
-    if not view or view.unavailable then
+    if not view then
+        return
+    end
+    if view.unavailable then
+        Theme.SetText(view.who, 'Offline')
         return
     end
     local status = FafOnline_Status()
-    view.lastStatus = status
+    launcher.lastStatus = status
     local page = FafOnline_TakePageToOpen()
     if page then
         OpenURL(page)
@@ -640,66 +1271,46 @@ local function RefreshOnline(launcher)
 
     local signedIn = status.signIn == 'signedin'
     local waiting = status.signIn == 'waiting' or status.signIn == 'working'
-    FlatPanel.SetVisible(view.signIn, not signedIn)
-    FlatPanel.SetVisible(view.games, signedIn)
-    view.signButton:SetLabel(signedIn and 'Sign out' or (waiting and 'Cancel' or 'Sign in'))
-    view.hostButton:SetEnabled(signedIn and status.lobby == 'signedin' and status.match ~= 'preparing' and
-        status.match ~= 'running')
-
-    local line
-    if signedIn then
-        local lobby = ({ off = 'not connected', connecting = 'connecting to FAF', signedin = 'in FAF\'s lobby',
-            failed = 'FAF\'s lobby failed' })[status.lobby] or status.lobby
-        line = 'Signed in as ' .. status.login .. ' - ' .. lobby
-        if status.lobby == 'failed' and status.lobbyMessage ~= '' then
-            line = line .. ': ' .. status.lobbyMessage
-        end
-        if status.loadedMod ~= '' then
-            line = line .. ' - game files: ' .. ModName(status.loadedMod)
-        end
-        if status.serverCount and status.serverCount > 0 then
-            local servers = ({ live = 'our servers live', connecting = 'connecting to our servers',
-                failed = 'our servers failed', off = 'our servers off' })[status.servers] or status.servers
-            line = line .. ' - ' .. servers
-            if status.servers == 'failed' and status.serversMessage ~= '' then
-                line = line .. ' (' .. status.serversMessage .. ')'
-            end
-        end
-    elseif waiting then
-        line = 'Signing in'
-    else
-        line = 'Not signed in'
-    end
-    SetTextIfChanged(view.status, line)
+    Theme.SetVisible(view.signIn, not signedIn)
+    Theme.SetVisible(view.games, signedIn)
+    view.avatar:SetLogin(signedIn and status.login or '')
+    Theme.SetText(view.who, signedIn and status.login or 'Not signed in')
+    local lobbyText = ({ off = 'not connected', connecting = 'connecting', signedin = 'FAF lobby connected',
+        failed = 'FAF lobby failed' })[status.lobby] or status.lobby
+    Theme.SetText(view.whoNote, signedIn and lobbyText or 'Sign in to play online')
+    Theme.SetColor(view.whoNote, status.lobby == 'failed' and C.bad or C.muted)
 
     if not signedIn then
+        Theme.SetVisible(view.openPage, waiting and status.code ~= '')
         if waiting and status.code ~= '' then
-            SetTextIfChanged(view.signHead, 'Approve the sign-in in your browser')
-            SetTextIfChanged(view.signText, 'The page should have opened. Check that it shows this code:')
-            SetTextIfChanged(view.signCode, status.code)
-            SetTextIfChanged(view.signUrl, string.format('%s   (%d s left)', status.url, status.secondsLeft))
-            FlatPanel.SetVisible(view.openPage, true)
+            Theme.SetText(view.signHead, '')
+            Theme.SetText(view.signText, 'Approve the sign-in in your browser. It shows this code:')
+            Theme.SetText(view.signCode, status.code)
+            Theme.SetText(view.signUrl, string.format('%s  (%d s left)', status.url, status.secondsLeft))
+            view.signButton:SetLabel('Cancel')
         else
-            SetTextIfChanged(view.signHead, waiting and 'Asking FAF for a sign-in code' or
-                'Sign in to FAF to see and join its games.')
-            SetTextIfChanged(view.signText, status.message ~= '' and status.message or
-                'Your browser opens FAF\'s page; nothing else is needed.')
-            SetTextIfChanged(view.signCode, '')
-            SetTextIfChanged(view.signUrl, '')
-            FlatPanel.SetVisible(view.openPage, false)
+            Theme.SetText(view.signHead, waiting and 'Asking FAF' or 'Sign in to FAF')
+            Theme.SetText(view.signText, status.message ~= '' and status.message or
+                'Your browser opens FAF\'s page; the game signs in once you approve.')
+            Theme.SetText(view.signCode, '')
+            Theme.SetText(view.signUrl, '')
+            view.signButton:SetLabel(waiting and 'Cancel' or 'Sign in with FAF')
         end
+        view.tabs:Set(view.tab, {})
         return
     end
 
-    FlatPanel.SetVisible(view.searchHint, view.search.edit:GetText() == '')
+    view.hostButton:SetEnabled(status.lobby == 'signedin' and status.match ~= 'preparing' and status.match ~= 'running')
     local filter = string.lower(view.search.edit:GetText())
-    local items = {}
-    local open = 0
+    view.search:Refresh()
+    local hidePrivate = view.filters.hidePrivate.on
+    local hideModded = view.filters.hideModded.on
+    local showStarted = view.filters.showStarted.on
+
     local all = FafOnline_Games()
     for _, game in all do
         game.source = 'faf'
     end
-    -- Our servers' lobbies: open while starting or in the lobby, started in game; ended ones are left out.
     if rawget(_G, 'FafOnline_ServerGames') then
         for _, lobby in FafOnline_ServerGames() do
             local state = nil
@@ -717,49 +1328,84 @@ local function RefreshOnline(launcher)
             end
         end
     end
+    local counts = { faf = 0, server = 0 }
+    local items = {}
+    local shownTotal = 0
     for _, game in all do
         if game.state == 'open' then
-            open = open + 1
+            counts[game.source] = counts[game.source] + 1
         end
-        if (view.showRunning or game.state == 'open') and Matches(game, filter) then
-            game.key = game.source .. ':' .. game.uid
-            if WhyNotJoinable(game, status) then
-                game.color = Colors.dim
+        if game.source == view.tab then
+            local visible = (showStarted or game.state == 'open') and Matches(game, filter) and
+                not (hidePrivate and (game.password or game.visibility == 'friends')) and
+                not (hideModded and game.simMods and game.simMods > 0)
+            if game.state == 'open' or showStarted then
+                shownTotal = shownTotal + 1
             end
-            table.insert(items, game)
+            if visible then
+                game.key = game.source .. ':' .. game.uid
+                game.color = WhyNotJoinable(game, status) and C.muted or nil
+                table.insert(items, game)
+            end
         end
     end
     table.sort(items, SortGames)
-    view.list:SetItems(items)
+    view.tabs:Set(view.tab, counts)
+    view.grid:SetItems(items)
 
-    local selected = view.list:Selected()
+    local selected = nil
+    for _, item in items do
+        if item.key == view.grid.selectedKey then
+            selected = item
+        end
+    end
+    view.selected = selected
+    local wide = view.wide()
+    Theme.SetVisible(view.details, wide)
+    if wide then
+        view.details:Show(selected, status)
+    end
+
+    local empty = ''
+    if table.getn(items) == 0 then
+        if view.tab == 'server' and (status.serverCount or 0) == 0 then
+            empty = 'No servers set up: add a control service\'s address to control-services.txt in the game\'s online folder.'
+        elseif filter ~= '' or hidePrivate or hideModded then
+            empty = 'No game matches the search and filters.'
+        else
+            empty = 'No open games right now. Create one.'
+        end
+    end
+    Theme.SetText(view.empty, empty)
+
     local footer
-    local footerColor = Colors.dim
+    local footerColor = C.subtle
     if status.match == 'preparing' or status.match == 'running' then
         footer = status.matchMessage ~= '' and status.matchMessage or 'Starting the game'
-        footerColor = Colors.accent
+        footerColor = C.accent
     elseif status.match == 'failed' and status.matchMessage ~= '' then
         footer = status.matchMessage
-        footerColor = Colors.bad
+        footerColor = C.bad
     elseif launcher.lastError then
         footer = launcher.lastError
-        footerColor = Colors.bad
-    elseif selected then
+        footerColor = C.bad
+    elseif selected and not wide then
         local why = WhyNotJoinable(selected, status)
-        footer = why or (selected.title .. ' on ' .. selected.map .. ', hosted by ' .. selected.host)
-        footerColor = why and Colors.warn or Colors.text
+        footer = why or (selected.title .. ' on ' .. MapTitle(selected.map) .. ', hosted by ' .. selected.host)
+        footerColor = why and C.warn or C.text
     else
-        footer = string.format('%d open %s, %d shown. Double-click a game to join it.', open,
-            open == 1 and 'game' or 'games', table.getn(items))
+        footer = string.format('Showing %d of %d games. Click a game for details, double-click to join.',
+            table.getn(items), shownTotal)
     end
-    SetTextIfChanged(view.footer, footer)
-    if view.footer.shownColor ~= footerColor then
-        view.footer.shownColor = footerColor
-        view.footer:SetColor(footerColor)
-    end
-    view.joinButton:SetEnabled(selected ~= nil and WhyNotJoinable(selected, status) == nil and
+    Theme.SetText(view.footer, footer)
+    Theme.SetColor(view.footer, footerColor)
+    Theme.SetVisible(view.footerJoin, not wide)
+    view.footerJoin:SetEnabled(selected ~= nil and WhyNotJoinable(selected, status) == nil and
         status.match ~= 'preparing' and status.match ~= 'running')
+    view.listButton.icon:SetIcon('list', view.grid.mode == 'list' and C.accent or C.muted)
+    view.gridButton.icon:SetIcon('grid', view.grid.mode == 'grid' and C.accent or C.muted)
 end
+
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- The host dialog.
@@ -769,179 +1415,208 @@ local function MapFolder(scenarioPath)
     return folder and string.lower(folder) or nil
 end
 
-local mapNames = {}
-local function MapName(path)
-    if mapNames[path] == nil then
-        local ok, scenario = pcall(import('/lua/ui/maputil.lua').LoadScenario, path)
-        mapNames[path] = ok and scenario and scenario.name and LOC(scenario.name) or false
-    end
-    return mapNames[path] or MapFolder(path) or path
-end
-
---- The frame's size in layout units (pixels over the UI scale).
-local function FrameUnits()
-    local frame = GetFrame(0)
-    return LayoutHelpers.InvScaleNumber(frame.Width()), LayoutHelpers.InvScaleNumber(frame.Height())
-end
-
 local function OpenHostDialog(launcher)
     local status = FafOnline_Status()
     local frameWidth, frameHeight = FrameUnits()
-    local cover = Modal(launcher.root, math.min(760, frameWidth - 24), math.max(440, math.min(560, frameHeight - 24)))
+    local cover = Modal(launcher.root, math.min(820, frameWidth - 24), math.max(452, math.min(580, frameHeight - 24)))
     local panel = cover.panel
     launcher.hostDialog = cover
 
-    local head = Label(panel, 'HOST A GAME ON FAF', 20, Colors.text, UIUtil.titleFont)
-    LayoutHelpers.AtLeftTopIn(head, panel, 24, 18)
-    local note = Label(panel, 'Players on FAF\'s own client see it and can join.', 13, Colors.dim)
-    LayoutHelpers.AtLeftTopIn(note, panel, 24, 44)
+    local head = Theme.Title(panel, 'Create game', 20)
+    LayoutHelpers.AtLeftTopIn(head, panel, 26, 22)
+    local note = Theme.Text(panel, 'Hosted on FAF: players on FAF\'s own client see it and can join.', 12, C.muted)
+    LayoutHelpers.AtLeftTopIn(note, panel, 26, 52)
 
-    local function Caption(text, top)
-        local caption = Label(panel, text, 13, Colors.dim)
-        LayoutHelpers.AtLeftTopIn(caption, panel, 24, top)
+    local function Label(text, top)
+        local caption = Theme.Caption(panel, text)
+        LayoutHelpers.AtLeftTopIn(caption, panel, 26, top)
         return caption
     end
 
-    Caption('Title', 72)
-    local titleEdit = TextEdit(panel, 330, 60, Prefs.GetFromCurrentProfile('fafre_host_title') or
+    Label('Title', 84)
+    local titleField = Theme.TextField(panel, 340, 'The game\'s name', nil, 60)
+    titleField.edit:SetText(Prefs.GetFromCurrentProfile('fafre_host_title') or
         ((status.login ~= '' and status.login or 'My') .. '\'s game'))
-    LayoutHelpers.AtLeftTopIn(titleEdit, panel, 24, 90)
+    titleField:Refresh()
+    LayoutHelpers.AtLeftTopIn(titleField, panel, 26, 100)
 
-    Caption('Password (empty: none)', 122)
-    local passwordEdit = TextEdit(panel, 330, 40, '')
-    LayoutHelpers.AtLeftTopIn(passwordEdit, panel, 24, 140)
+    Label('Password', 144)
+    local passwordField = Theme.TextField(panel, 340, 'None: anyone can join', 'lock', 40)
+    LayoutHelpers.AtLeftTopIn(passwordField, panel, 26, 160)
 
-    Caption('Featured mod', 172)
-    local modButtons = {}
+    Label('Featured mod', 204)
+    local modChoices = {}
     local chosenMod = status.loadedMod ~= '' and status.loadedMod or 'faf'
-    local modNote = Label(panel, '', 12, Colors.dim)
     for i, mod in FeaturedMods do
         local id = mod.id
-        local button = ChoiceButton(panel, mod.name, 160, function(self)
+        local choice = Theme.Choice(panel, mod.name, 166, function(self)
             chosenMod = id
-            for _, other in modButtons do
+            for _, other in modChoices do
                 other.selected = other.id == id
                 other:Paint(false)
             end
         end)
-        button.id = id
-        button.enabled = id == status.loadedMod
-        button.selected = id == chosenMod
-        LayoutHelpers.AtLeftTopIn(button, panel, 24 + math.mod(i - 1, 2) * 168, 190 + math.floor((i - 1) / 2) * 32)
-        button:Paint(false)
-        modButtons[i] = button
+        choice.id = id
+        choice.enabled = id == status.loadedMod
+        choice.selected = id == chosenMod
+        choice:Paint(false)
+        LayoutHelpers.AtLeftTopIn(choice, panel, 26 + math.mod(i - 1, 2) * 174, 220 + math.floor((i - 1) / 2) * 38)
+        modChoices[i] = choice
     end
-    modNote:SetClipToWidth(true)
-    LayoutHelpers.AtLeftTopIn(modNote, panel, 24, 256)
-    modNote.Right:Set(function() return panel.Left() + LayoutHelpers.ScaleNumber(360) end)
-    modNote:SetText('Others: start the game on their files for now.')
+    local modNote = Theme.Text(panel, 'The others need the game started on their files for now.', 11, C.subtle)
+    LayoutHelpers.AtLeftTopIn(modNote, panel, 26, 296)
 
-    Caption('Who sees it', 278)
+    Label('Who sees it', 322)
     local visibility = 'public'
-    local visButtons = {}
-    for i, choice in { { 'public', 'Everyone' }, { 'friends', 'Friends only' } } do
-        local value = choice[1]
-        local button = ChoiceButton(panel, choice[2], 160, function(self)
+    local visChoices = {}
+    for i, entry in { { 'public', 'Everyone' }, { 'friends', 'Friends only' } } do
+        local value = entry[1]
+        local choice = Theme.Choice(panel, entry[2], 166, function(self)
             visibility = value
-            for _, other in visButtons do
+            for _, other in visChoices do
                 other.selected = other.value == value
                 other:Paint(false)
             end
         end)
-        button.value = value
-        button.selected = value == visibility
-        LayoutHelpers.AtLeftTopIn(button, panel, 24 + (i - 1) * 168, 296)
-        button:Paint(false)
-        visButtons[i] = button
+        choice.value = value
+        choice.selected = value == visibility
+        choice:Paint(false)
+        LayoutHelpers.AtLeftTopIn(choice, panel, 26 + (i - 1) * 174, 338)
+        visChoices[i] = choice
     end
 
-    Caption('Rating range (empty: any)', 332)
-    local minEdit = TextEdit(panel, 100, 5, '')
-    LayoutHelpers.AtLeftTopIn(minEdit, panel, 24, 350)
-    local dash = Label(panel, '-', 14, Colors.dim)
-    LayoutHelpers.RightOf(dash, minEdit, 8)
-    local maxEdit = TextEdit(panel, 100, 5, '')
-    LayoutHelpers.RightOf(maxEdit, dash, 8)
-    local enforce = false
-    local enforceButton = ChoiceButton(panel, 'Enforce', 90, function(self)
-        enforce = not enforce
-        self.selected = enforce
-        self:Paint(true)
-    end)
-    LayoutHelpers.RightOf(enforceButton, maxEdit, 10)
-    enforceButton:Paint(false)
+    Label('Rating range', 382)
+    local minField = Theme.TextField(panel, 100, 'Any', nil, 5)
+    LayoutHelpers.AtLeftTopIn(minField, panel, 26, 398)
+    local dash = Theme.Text(panel, '-', 14, C.subtle)
+    LayoutHelpers.AtLeftTopIn(dash, panel, 134, 405)
+    local maxField = Theme.TextField(panel, 100, 'Any', nil, 5)
+    LayoutHelpers.AtLeftTopIn(maxField, panel, 148, 398)
+    local enforce = Theme.Checkbox(panel, 'Enforce', function() end)
+    LayoutHelpers.AtLeftTopIn(enforce, panel, 262, 398)
 
-    -- Maps on this computer, by folder; their names are read only for the rows shown.
-    Caption('Map', 72).Left:Set(function() return panel.Left() + LayoutHelpers.ScaleNumber(380) end)
-    local mapSearch = TextEdit(panel, 356, 40, '')
-    LayoutHelpers.AtLeftTopIn(mapSearch, panel, 380, 90)
-    local scenarios = {}
+    -- The map: its picture, a search and the maps on this computer, by name.
+    local right = function() return panel.Right() - Scale(26) end
+    local mapLeft = function() return panel.Left() + Scale(400) end
+    local mapCaption = Theme.Caption(panel, 'Map')
+    mapCaption.Left:Set(mapLeft)
+    LayoutHelpers.AtTopIn(mapCaption, panel, 84)
+    local frame = Theme.Panel(panel, C.field, C.line)
+    frame.Left:Set(mapLeft)
+    LayoutHelpers.AtTopIn(frame, panel, 100)
+    frame.Height:Set(Scale(124))
+    frame.Width:Set(Scale(124))
+    MapPicture(frame)
+    local mapTitle = Theme.Cell(panel, 15, C.text, true)
+    mapTitle.Left:Set(function() return frame.Right() + Scale(14) end)
+    mapTitle.Right:Set(right)
+    mapTitle.Top:Set(frame.Top)
+    local mapInfo = Theme.Cell(panel, 12, C.muted)
+    mapInfo.Left:Set(mapTitle.Left)
+    mapInfo.Right:Set(right)
+    mapInfo.Top:Set(function() return mapTitle.Bottom() + Scale(4) end)
+    local mapSearch = Theme.TextField(panel, 300, 'Search maps', 'search', 40)
+    mapSearch.Left:Set(mapLeft)
+    mapSearch.Right:Set(right)
+    mapSearch.Width:Set(function() return mapSearch.Right() - mapSearch.Left() end)
+    mapSearch.Top:Set(function() return frame.Bottom() + Scale(12) end)
+
+    local paths = {}
     for _, path in DiskFindFiles('/maps', '*_scenario.lua') do
-        table.insert(scenarios, path)
+        table.insert(paths, path)
     end
-    table.sort(scenarios)
+    table.sort(paths)
     local last = Prefs.GetFromCurrentProfile('fafre_host_map') or Prefs.GetFromCurrentProfile('LastScenario') or
         UIUtil.defaultScenario
+    local names = {}
+    local function NameOf(path)
+        if names[path] == nil then
+            local ok, scenario = pcall(import('/lua/ui/maputil.lua').LoadScenario, path)
+            names[path] = ok and scenario and scenario.name and LOC(scenario.name) or false
+        end
+        return names[path] or MapFolder(path) or path
+    end
+    local function ShowMap(item)
+        if not item then
+            return
+        end
+        frame:SetMap(item.folder)
+        Theme.SetText(mapTitle, NameOf(item.path))
+        local scenario = LocalScenario(item.folder)
+        local info = item.folder
+        if scenario and scenario.size then
+            info = info .. string.format('  -  %d x %d km', math.floor(scenario.size[1] / 51.2 + 0.5),
+                math.floor(scenario.size[2] / 51.2 + 0.5))
+        end
+        if scenario and scenario.Configurations and scenario.Configurations.standard and
+            scenario.Configurations.standard.teams and scenario.Configurations.standard.teams[1] then
+            info = info .. '  -  ' .. table.getn(scenario.Configurations.standard.teams[1].armies or {}) .. ' players'
+        end
+        Theme.SetText(mapInfo, info)
+    end
     local mapList = VirtualList(panel, {
-        { 'MAP', 0.62, function(item) return MapName(item.path) end },
-        { 'FOLDER', 0.38, function(item) return item.folder end, Colors.dim },
-    }, function(item, double) end)
-    mapList.Left:Set(function() return panel.Left() + LayoutHelpers.ScaleNumber(380) end)
-    mapList.Right:Set(function() return panel.Right() - LayoutHelpers.ScaleNumber(24) end)
-    mapList.Top:Set(function() return mapSearch.Bottom() + LayoutHelpers.ScaleNumber(8) end)
-    mapList.Bottom:Set(function() return panel.Bottom() - LayoutHelpers.ScaleNumber(70) end)
+        { 'Map', 0.64, function(item) return NameOf(item.path) end },
+        { 'Folder', 0.36, function(item) return item.folder end, C.subtle },
+    }, function(item, double)
+        ShowMap(item)
+    end)
+    mapList.Left:Set(mapLeft)
+    mapList.Right:Set(right)
+    mapList.Top:Set(function() return mapSearch.Bottom() + Scale(10) end)
+    mapList.Bottom:Set(function() return panel.Bottom() - Scale(76) end)
     mapList.selectedKey = last
     local function FillMaps()
         local filter = string.lower(mapSearch.edit:GetText())
         local items = {}
-        for _, path in scenarios do
+        for _, path in paths do
             local folder = MapFolder(path)
-            if folder and (filter == '' or string.find(folder, filter, 1, true)) then
+            if folder and (filter == '' or string.find(folder, filter, 1, true) or
+                string.find(string.lower(names[path] or ''), filter, 1, true)) then
                 table.insert(items, { key = path, path = path, folder = folder })
             end
         end
         mapList:SetItems(items)
     end
-    mapSearch.Right:Set(function() return panel.Right() - LayoutHelpers.ScaleNumber(24) end)
-    mapSearch.Width:Set(function() return mapSearch.Right() - mapSearch.Left() end)
-    mapSearch.edit.OnTextChanged = function(self, newText, oldText)
+    mapSearch:OnChange(function()
         mapList.top = 1
         FillMaps()
-    end
+    end)
     FillMaps()
     for index, item in mapList.items do
         if item.key == last then
             mapList:ScrollSetTop(nil, index - 3)
+            ShowMap(item)
         end
     end
 
-    local errorText = Cell(panel, 13, Colors.bad)
-    errorText.Left:Set(function() return panel.Left() + LayoutHelpers.ScaleNumber(24) end)
-    errorText.Right:Set(function() return panel.Right() - LayoutHelpers.ScaleNumber(300) end)
-    errorText.Bottom:Set(function() return panel.Bottom() - LayoutHelpers.ScaleNumber(24) end)
+    local errorText = Theme.Cell(panel, 12, C.bad)
+    errorText.Left:Set(function() return panel.Left() + Scale(26) end)
+    errorText.Right:Set(function() return panel.Right() - Scale(330) end)
+    errorText.Bottom:Set(function() return panel.Bottom() - Scale(30) end)
 
     local function Close()
         launcher.hostDialog = false
         cover:Destroy()
+        launcher:SetHomeEscape()
     end
-    local cancel = FlatButton(panel, 'Cancel', 120, Close)
-    LayoutHelpers.AtRightIn(cancel, panel, 24)
-    LayoutHelpers.AtBottomIn(cancel, panel, 18)
-    local host = FlatButton(panel, 'Host', 140, function()
+    local cancel = Theme.Button(panel, 'Cancel', Close, 'secondary', { width = 120 })
+    LayoutHelpers.AtRightIn(cancel, panel, 26)
+    LayoutHelpers.AtBottomIn(cancel, panel, 22)
+    local host = Theme.Button(panel, 'Create game', function()
         local map = mapList:Selected()
         if not map then
             errorText:SetText('Pick a map.')
             return
         end
         local request = {
-            title = titleEdit.edit:GetText(),
+            title = titleField.edit:GetText(),
             map = map.folder,
             mod = chosenMod,
             visibility = visibility,
-            password = passwordEdit.edit:GetText(),
-            ratingMin = tonumber(minEdit.edit:GetText()),
-            ratingMax = tonumber(maxEdit.edit:GetText()),
-            enforceRating = enforce,
+            password = passwordField.edit:GetText(),
+            ratingMin = tonumber(minField.edit:GetText()),
+            ratingMax = tonumber(maxField.edit:GetText()),
+            enforceRating = enforce.on,
         }
         if request.title == '' then
             errorText:SetText('The game needs a title.')
@@ -957,42 +1632,41 @@ local function OpenHostDialog(launcher)
         LOG('LAUNCHER: hosting ' .. request.map .. ' on ' .. request.mod)
         Close()
         launcher:Refresh()
-    end, true)
-    LayoutHelpers.LeftOf(host, cancel, 10)
+    end, 'primary', { width = 170 })
+    host.Right:Set(function() return cancel.Left() - Scale(12) end)
+    LayoutHelpers.AtBottomIn(host, panel, 22)
 
-    import('/lua/ui/uimain.lua').SetEscapeHandler(function()
-        Close()
-        launcher:SetHomeEscape()
-    end)
+    import('/lua/ui/uimain.lua').SetEscapeHandler(Close)
     return cover
 end
 
 local function AskPassword(launcher, game)
-    local cover = Modal(launcher.root, 460, 190)
+    local cover = Modal(launcher.root, 460, 210)
     local panel = cover.panel
-    local head = Label(panel, 'PASSWORD', 18, Colors.text, UIUtil.titleFont)
-    LayoutHelpers.AtLeftTopIn(head, panel, 20, 16)
-    local text = Cell(panel, 13, Colors.dim)
-    LayoutHelpers.AtLeftTopIn(text, panel, 20, 48)
-    LayoutHelpers.AtRightIn(text, panel, 20)
+    local head = Theme.Title(panel, 'Password', 16)
+    LayoutHelpers.AtLeftTopIn(head, panel, 24, 20)
+    local text = Theme.Cell(panel, 13, C.muted)
+    LayoutHelpers.AtLeftTopIn(text, panel, 24, 54)
+    LayoutHelpers.AtRightIn(text, panel, 24)
     text:SetText(game.title .. ' needs a password.')
-    local edit = TextEdit(panel, 420, 40, '')
-    LayoutHelpers.AtLeftTopIn(edit, panel, 20, 80)
-    edit.edit:AcquireFocus()
+    local field = Theme.TextField(panel, 412, 'Password', 'lock', 40)
+    LayoutHelpers.AtLeftTopIn(field, panel, 24, 84)
+    field.edit:AcquireFocus()
     local function Join()
-        local password = edit.edit:GetText()
+        local password = field.edit:GetText()
         cover:Destroy()
         launcher:Join(game, password)
     end
-    edit.edit.OnEnterPressed = function(self, value)
+    field.edit.OnEnterPressed = function(self, value)
         Join()
         return true
     end
-    local cancel = FlatButton(panel, 'Cancel', 110, function() cover:Destroy() end)
-    LayoutHelpers.AtRightIn(cancel, panel, 20)
-    LayoutHelpers.AtBottomIn(cancel, panel, 16)
-    local join = FlatButton(panel, 'Join', 110, Join, true)
-    LayoutHelpers.LeftOf(join, cancel, 10)
+    local cancel = Theme.Button(panel, 'Cancel', function() cover:Destroy() end, 'secondary', { width = 110 })
+    LayoutHelpers.AtRightIn(cancel, panel, 24)
+    LayoutHelpers.AtBottomIn(cancel, panel, 20)
+    local join = Theme.Button(panel, 'Join', Join, 'primary', { width = 110 })
+    join.Right:Set(function() return cancel.Left() - Scale(10) end)
+    LayoutHelpers.AtBottomIn(join, panel, 20)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -1007,12 +1681,21 @@ function Launcher:SetHomeEscape()
 end
 
 function Launcher:Refresh()
-    if self.page == 'online' then
-        local ok, err = pcall(RefreshOnline, self)
-        if not ok and not self.refreshFailed then
-            self.refreshFailed = true
-            WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
-        end
+    local ok, err = pcall(RefreshOnline, self)
+    if not ok and not self.refreshFailed then
+        self.refreshFailed = true
+        WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
+    end
+    if self.status then
+        self.status:Update()
+    end
+end
+
+function Launcher:SelectGame(key)
+    if self.online and self.online.grid then
+        self.online.grid.selectedKey = key
+        self.lastError = false
+        self:Refresh()
     end
 end
 
@@ -1028,7 +1711,7 @@ function Launcher:OpenHostDialog()
             self.hostDialog:Destroy()
             self.hostDialog = false
         end
-        Message(self.root, 'Host game', 'The host dialog failed to open: ' .. tostring(err))
+        Message(self.root, 'Create game', 'The dialog failed to open: ' .. tostring(err))
     end
 end
 
@@ -1050,11 +1733,11 @@ end
 
 function Launcher:JoinSelected()
     local view = self.online
-    if not view or not view.list then
+    if not view or not view.selected then
         return
     end
-    local game = view.list:Selected()
-    if not game or WhyNotJoinable(game, view.lastStatus or FafOnline_Status()) then
+    local game = view.selected
+    if WhyNotJoinable(game, self.lastStatus or FafOnline_Status()) then
         return
     end
     if game.password then
@@ -1063,6 +1746,7 @@ function Launcher:JoinSelected()
         self:Join(game, nil)
     end
 end
+
 
 --- Hides the launcher while one of FAF's screens is open over it; `back` shows it again.
 function Launcher:OpenScreen(name, open, stopMusic)
@@ -1102,10 +1786,12 @@ function Launcher:ShowHome()
     end
     self.body:Show()
     for name, page in self.pages do
-        FlatPanel.SetVisible(page, name == self.page)
+        Theme.SetVisible(page, name == self.page)
     end
-    for _, button in self.navButtons do
-        button:Paint(false)
+    -- Show on the body showed every piece a control keeps hidden (check marks, brackets): each paints itself again.
+    Theme.RepaintAll()
+    for _, item in self.navItems do
+        item:Paint(false)
     end
     self:StartSounds()
     self:SetHomeEscape()
@@ -1202,6 +1888,9 @@ function Launcher:Lan()
 end
 
 function Launcher:Replays()
+    -- Replays of any FAF game version play, with the engine patches of the nearest version this engine models
+    -- (rep_PlayAnyVersion, as /noversioncheck); their own game files at runtime come later.
+    ConExecute('rep_PlayAnyVersion true')
     self:OpenScreen('Replays', function(host, back)
         import('/lua/ui/dialogs/replay.lua').CreateDialog(host, true, back)
     end)
@@ -1266,7 +1955,8 @@ function Launcher:FafMenu()
             captured:Destroy()
             import('/lua/ui/menus/main.lua').CreateUI()
         end
-        local back = FlatButton(captured, '< Launcher', 130, function() fafMenuBack() end)
+        local back = Theme.Button(captured, 'Launcher', function() fafMenuBack() end, 'primary',
+            { icon = 'arrowLeft', width = 150 })
         LayoutHelpers.AtLeftTopIn(back, captured, 20, 20)
         back.Depth:Set(function() return captured.Depth() + 1000 end)
     end
@@ -1290,52 +1980,175 @@ end
 
 function Launcher:ShowPage(name)
     self.page = name
-    Prefs.SetToCurrentProfile('fafre_launcher_page', name)
     for pageName, page in self.pages do
-        FlatPanel.SetVisible(page, pageName == name)
+        Theme.SetVisible(page, pageName == name)
     end
-    for _, button in self.navButtons do
-        button:Paint(false)
+    for _, item in self.navItems do
+        item:Paint(false)
     end
     self:Refresh()
 end
 
-local kNavStep = 36
-local kNavSeparator = 14
+-- ---------------------------------------------------------------------------------------------------------------
+-- The rail on the left: where everything starts.
 
-local function NavButton(launcher, parent, text, action, page)
-    local button = Rect(parent, '00000000')
-    LayoutHelpers.SetHeight(button, kNavStep - 2)
-    button.label = Label(button, text, 16, Colors.text, UIUtil.bodyFont)
-    LayoutHelpers.AtLeftIn(button.label, button, 22)
-    LayoutHelpers.AtVerticalCenterIn(button.label, button)
-    button.label.Depth:Set(function() return button.Depth() + 2 end)
-    button.bar = Rect(button, Colors.accent)
-    LayoutHelpers.AtLeftTopIn(button.bar, button, 0, 5)
-    LayoutHelpers.SetDimensions(button.bar, 3, kNavStep - 12)
-    button.bar.Depth:Set(function() return button.Depth() + 1 end)
-    button.bar:DisableHitTest()
-    button.Paint = function(self, over)
-        local selected = page ~= nil and launcher.page == page -- a boolean: SetVisible compares it with IsHidden()
-        self:SetSolidColor(selected and 'ff163242' or (over and 'ff142229' or '00000000'))
-        self.label:SetColor(selected and Colors.accent or (over and 'ffffffff' or Colors.text))
-        FlatPanel.SetVisible(self.bar, selected)
+local function NavItem(launcher, rail, iconName, label, action, page)
+    local item = Group(rail)
+    LayoutHelpers.SetHeight(item, 38)
+    local back = Theme.Fill(item, C.clear)
+    back.Depth:Set(function() return item.Depth() end)
+    local bar = Theme.Rect(item, C.accent)
+    bar.Left:Set(item.Left)
+    bar.Top:Set(item.Top)
+    bar.Bottom:Set(item.Bottom)
+    bar.Width:Set(Scale(3))
+    bar.Height:Set(function() return bar.Bottom() - bar.Top() end)
+    bar:DisableHitTest()
+    local icon = Theme.Icon(item, iconName, 18, C.muted)
+    LayoutHelpers.AtLeftIn(icon, item, 22)
+    LayoutHelpers.AtVerticalCenterIn(icon, item)
+    local text = Theme.Text(item, string.upper(label), 12, C.muted, true)
+    text.Left:Set(function() return icon.Right() + Scale(14) end)
+    LayoutHelpers.AtVerticalCenterIn(text, item)
+    item.Paint = function(self, over)
+        local chosen = page ~= nil and launcher.page == page
+        back:SetSolidColor(chosen and Theme.WithAlpha(C.accent, 0.12) or (over and C.raised or C.clear))
+        Theme.SetVisible(bar, chosen)
+        local color = chosen and C.accent or (over and C.text or C.muted)
+        Theme.SetColor(text, color)
+        icon:SetIcon(iconName, color)
     end
-    button.HandleEvent = function(self, event)
+    Theme.HitArea(item, function(self, event)
         if event.Type == 'MouseEnter' then
-            PlaySound(Sound({ Cue = 'UI_Menu_Rollover_Sml', Bank = 'Interface' }))
-            self:Paint(true)
+            Theme.HoverSound()
+            item:Paint(true)
         elseif event.Type == 'MouseExit' then
-            self:Paint(false)
+            item:Paint(false)
         elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
-            ClickSound()
+            Theme.ClickSound()
             action()
             return true
         end
         return false
+    end)
+    return item
+end
+
+local function BuildRail(launcher, body)
+    local rail = Theme.Rect(body, C.rail)
+    rail.Left:Set(body.Left)
+    rail.Top:Set(body.Top)
+    rail.Bottom:Set(function() return body.Bottom() - Scale(kStatusHeight) end)
+    rail.Width:Set(Scale(kRailWidth))
+    rail.Height:Set(function() return rail.Bottom() - rail.Top() end)
+    rail:DisableHitTest()
+    local edge = Theme.Rect(body, C.line)
+    edge.Left:Set(rail.Right)
+    edge.Top:Set(rail.Top)
+    edge.Bottom:Set(rail.Bottom)
+    edge.Width:Set(1)
+    edge.Height:Set(function() return edge.Bottom() - edge.Top() end)
+    edge:DisableHitTest()
+
+    local brand = Theme.Title(rail, 'FAF', 30, C.accent)
+    LayoutHelpers.AtLeftTopIn(brand, rail, 24, 22)
+    local subtitle = Theme.Text(rail, 'Forged Alliance Forever', 12, C.muted)
+    LayoutHelpers.AtLeftTopIn(subtitle, rail, 24, 62)
+    local versionOk, version = pcall(function() return import('/lua/version.lua').GetVersion() end)
+    local versionText = Theme.Text(rail, 'Game version ' .. (versionOk and tostring(version) or '?'), 11, C.subtle)
+    LayoutHelpers.AtLeftTopIn(versionText, rail, 24, 79)
+
+    local entries = {
+        'Online',
+        { 'play', 'Multiplayer', function() launcher:ShowPage('online') end, 'online' },
+        'Offline',
+        { 'flag', 'Skirmish', function() launcher:Skirmish() end },
+        { 'book', 'Campaign', function() launcher:Campaign() end },
+        { 'users', 'LAN', function() launcher:Lan() end },
+        'Library',
+        { 'replays', 'Replays', function() launcher:Replays() end },
+        { 'mods', 'Mods', function() launcher:Mods() end },
+        'Game',
+        { 'settings', 'Options', function() launcher:Options() end },
+        { 'home', 'FAF main menu', function() launcher:FafMenu() end },
+        { 'logout', 'Exit', function() launcher:Exit() end },
+    }
+    launcher.navItems = {}
+    local top = 112
+    for _, entry in entries do
+        if type(entry) == 'string' then
+            local caption = Theme.Caption(rail, entry)
+            LayoutHelpers.AtLeftTopIn(caption, rail, 24, top + 8)
+            top = top + 28
+        else
+            local item = NavItem(launcher, rail, entry[1], entry[2], entry[3], entry[4])
+            LayoutHelpers.AtLeftTopIn(item, rail, 0, top)
+            item.Right:Set(rail.Right)
+            item.Width:Set(function() return item.Right() - item.Left() end)
+            table.insert(launcher.navItems, item)
+            top = top + 38
+        end
     end
-    button.page = page
-    return button
+    return rail
+end
+
+--- The line along the bottom: what this game is, and whether FAF and our servers are reached.
+local function BuildStatusBar(launcher, body)
+    local bar = Theme.Rect(body, C.rail)
+    bar.Left:Set(body.Left)
+    bar.Right:Set(body.Right)
+    bar.Bottom:Set(body.Bottom)
+    bar.Height:Set(Scale(kStatusHeight))
+    bar.Width:Set(function() return bar.Right() - bar.Left() end)
+    bar:DisableHitTest()
+    local line = Theme.Rect(body, C.line)
+    line.Left:Set(bar.Left)
+    line.Right:Set(bar.Right)
+    line.Top:Set(bar.Top)
+    line.Height:Set(1)
+    line.Width:Set(function() return line.Right() - line.Left() end)
+    line:DisableHitTest()
+    local left = Theme.Text(bar, 'faf-re in-game launcher', 11, C.subtle)
+    LayoutHelpers.AtLeftIn(left, bar, 16)
+    LayoutHelpers.AtVerticalCenterIn(left, bar)
+    local function Indicator(after)
+        local text = Theme.Text(bar, '', 11, C.muted)
+        LayoutHelpers.AtVerticalCenterIn(text, bar)
+        if after then
+            text.Right:Set(function() return after.Left() - Scale(18) end)
+        else
+            text.Right:Set(function() return bar.Right() - Scale(16) end)
+        end
+        local dot = Theme.Dot(bar, 8, C.subtle)
+        dot.Right:Set(function() return text.Left() - Scale(6) end)
+        LayoutHelpers.AtVerticalCenterIn(dot, bar)
+        return { text = text, dot = dot }
+    end
+    local servers = Indicator(nil)
+    local faf = Indicator(servers.dot)
+    local status = {}
+    status.Update = function(self)
+        local s = Online() and launcher.lastStatus or nil
+        local mod = s and s.loadedMod ~= '' and ModName(s.loadedMod) or nil
+        Theme.SetText(left, 'faf-re in-game launcher' .. (mod and ('  -  game files: ' .. mod) or ''))
+        if not s then
+            Theme.SetText(faf.text, Online() and 'FAF' or 'FAF: not in this build')
+            faf.dot:SetDotColor(C.subtle)
+            Theme.SetText(servers.text, '')
+            Theme.SetVisible(servers.dot, false)
+            return
+        end
+        local fafState = s.signIn ~= 'signedin' and 'signed out' or (({ off = 'offline', connecting = 'connecting',
+            signedin = 'connected', failed = 'failed' })[s.lobby] or s.lobby)
+        Theme.SetText(faf.text, 'FAF ' .. fafState)
+        faf.dot:SetDotColor(s.lobby == 'signedin' and C.good or (s.lobby == 'failed' and C.bad or
+            (s.lobby == 'connecting' and C.warn or C.subtle)))
+        local count = s.serverCount or 0
+        Theme.SetVisible(servers.dot, count > 0)
+        Theme.SetText(servers.text, count > 0 and ('Our servers ' .. (s.servers == 'live' and 'live' or s.servers)) or '')
+        servers.dot:SetDotColor(s.servers == 'live' and C.good or (s.servers == 'failed' and C.bad or C.warn))
+    end
+    return status
 end
 
 local function Build(launcher)
@@ -1345,9 +2158,7 @@ local function Build(launcher)
         launcher:StopSounds()
     end
 
-    local back = Rect(root, 'ff05090c')
-    LayoutHelpers.FillParent(back, root)
-    SizeFromEdges(back)
+    Theme.Fill(root, C.page)
     if Prefs.GetOption('mainmenu_bgmovie') then
         local movie = Movie(root)
         movie:Set('/movies/main_menu.sfd')
@@ -1356,13 +2167,11 @@ local function Build(launcher)
         movie:Play()
         movie.Height:Set(root.Height)
         movie.Width:Set(function() return 1824 * root.Height() / 1024 end)
-        movie.Depth:Set(function() return back.Depth() + 1 end)
+        movie:DisableHitTest()
         launcher.movie = movie
-        local dim = Rect(root, '90000000')
-        LayoutHelpers.FillParent(dim, root)
-        SizeFromEdges(dim)
+        -- The game's own space behind the panels, dimmed so the panels read.
+        local dim = Theme.Fill(root, 'b8060b10')
         dim.Depth:Set(function() return movie.Depth() + 1 end)
-        dim:DisableHitTest()
     end
 
     local body = Group(root, 'launcher body')
@@ -1370,64 +2179,23 @@ local function Build(launcher)
     body.Depth:Set(function() return root.Depth() + 10 end)
     launcher.body = body
 
-    local title = Label(body, 'FORGED ALLIANCE', 26, Colors.text, UIUtil.titleFont)
-    LayoutHelpers.AtLeftTopIn(title, body, 26, 12)
-    local versionOk, version = pcall(function() return import('/lua/version.lua').GetVersion() end)
-    local sub = Label(body, 'Forged Alliance Forever' .. (versionOk and version and (' ' .. tostring(version)) or ''),
-        13, Colors.dim)
-    LayoutHelpers.Below(sub, title, 2)
-
-    local nav = FlatPanel.FlatPanel(body, 'launcher nav')
-    LayoutHelpers.AtLeftTopIn(nav, body, 20, 72)
-    LayoutHelpers.SetWidth(nav, 220)
-    nav.Bottom:Set(function() return body.Bottom() - LayoutHelpers.ScaleNumber(16) end)
+    local rail = BuildRail(launcher, body)
+    launcher.status = BuildStatusBar(launcher, body)
 
     local content = Group(body, 'launcher content')
-    content.Left:Set(function() return nav.Right() + LayoutHelpers.ScaleNumber(16) end)
-    content.Right:Set(function() return body.Right() - LayoutHelpers.ScaleNumber(20) end)
-    content.Top:Set(nav.Top)
-    content.Bottom:Set(nav.Bottom)
+    content.Left:Set(function() return rail.Right() + Scale(28) end)
+    content.Right:Set(function() return body.Right() - Scale(28) end)
+    content.Top:Set(function() return body.Top() + Scale(22) end)
+    content.Bottom:Set(function() return body.Bottom() - Scale(kStatusHeight + 18) end)
 
-    local onlinePage = FlatPanel.FlatPanel(content, 'launcher online')
+    local onlinePage = Group(content, 'launcher online')
     LayoutHelpers.FillParent(onlinePage, content)
+    onlinePage.Width:Set(function() return onlinePage.Right() - onlinePage.Left() end)
+    onlinePage.Height:Set(function() return onlinePage.Bottom() - onlinePage.Top() end)
     launcher.pages = { online = onlinePage }
     BuildOnlinePage(launcher, onlinePage)
 
-    local entries = {
-        { 'Online games', function() launcher:ShowPage('online') end, 'online' },
-        false,
-        { 'Skirmish', function() launcher:Skirmish() end },
-        { 'Campaign', function() launcher:Campaign() end },
-        { 'Multiplayer LAN', function() launcher:Lan() end },
-        { 'Replays', function() launcher:Replays() end },
-        { 'Mods', function() launcher:Mods() end },
-        { 'Options', function() launcher:Options() end },
-        false,
-        { 'FAF main menu', function() launcher:FafMenu() end },
-        { 'Exit', function() launcher:Exit() end },
-    }
-    launcher.navButtons = {}
-    local top = 10
-    for _, entry in entries do
-        if entry then
-            local button = NavButton(launcher, nav, entry[1], entry[2], entry[3])
-            LayoutHelpers.AtLeftTopIn(button, nav, 1, top)
-            button.Right:Set(function() return nav.Right() - 1 end)
-            button.Width:Set(function() return button.Right() - button.Left() end)
-            button.Depth:Set(function() return nav.Depth() + 5 end)
-            table.insert(launcher.navButtons, button)
-            top = top + kNavStep
-        else
-            local line = Rect(nav, FlatPanel.Border)
-            LayoutHelpers.AtLeftTopIn(line, nav, 16, top + kNavSeparator / 2 - 1)
-            line.Right:Set(function() return nav.Right() - LayoutHelpers.ScaleNumber(16) end)
-            line.Height:Set(1)
-            line.Depth:Set(function() return nav.Depth() + 5 end)
-            top = top + kNavSeparator
-        end
-    end
-
-    -- Updates the online page while the launcher shows.
+    -- Updates the page while the launcher shows.
     local ticker = Group(body, 'launcher ticker')
     LayoutHelpers.AtLeftTopIn(ticker, body, 0, 0)
     LayoutHelpers.SetDimensions(ticker, 1, 1)
@@ -1475,23 +2243,26 @@ end
 local testJoinDone = false
 local testJoinSeen = false
 function TestJoin()
-    if testJoinDone or not current or current.page ~= 'online' or not current.online or not current.online.list then
+    if testJoinDone or not current or current.page ~= 'online' or not current.online or not current.online.grid then
         return
     end
     local view = current.online
-    for _, item in view.list.items do
+    for _, item in view.grid.items do
         if not item.color then
-            -- Listed for 6 s first, so the list can be seen (and photographed) as a player sees it.
+            -- Listed for 14 s first, so the list can be seen (and photographed) as a player sees it; selected after
+            -- 2 s, so its details show too.
             if not testJoinSeen then
                 testJoinSeen = GetSystemTimeSeconds()
                 LOG('LAUNCHER TEST: listed ' .. item.title .. ' (' .. item.uid .. ')')
                 return
-            elseif GetSystemTimeSeconds() - testJoinSeen < 6 then
+            elseif GetSystemTimeSeconds() - testJoinSeen < 14 then
+                if GetSystemTimeSeconds() - testJoinSeen >= 2 then
+                    current:SelectGame(item.key)
+                end
                 return
             end
             testJoinDone = true
-            view.list.selectedKey = item.key
-            view.list:Paint()
+            current:SelectGame(item.key)
             LOG('LAUNCHER TEST: joining ' .. item.title .. ' (' .. item.uid .. ') hosted by ' .. item.host)
             current:JoinSelected()
             return
@@ -1517,6 +2288,20 @@ function TestWalk()
         Prefs.SetToCurrentProfile('MenuTutorialPrompt', true)
         Step('home')
         Wait(4)
+        -- /launcherreplaytest <file>: a replay of a game version this engine doesn't model is refused with the
+        -- switch off and starts with it on (rep_PlayAnyVersion, which the launcher's Replays turns on).
+        local replayTest = GetCommandLineArg('/launcherreplaytest', 1)
+        if replayTest and replayTest[1] then
+            ConExecute('rep_PlayAnyVersion false')
+            Step('replay with the switch off: ' .. tostring(LaunchReplaySession(replayTest[1])))
+            Wait(1)
+            ConExecute('rep_PlayAnyVersion true')
+            Step('replay with the switch on: ' .. tostring(LaunchReplaySession(replayTest[1])))
+            Wait(6)
+            Step('done')
+            ExitApplication()
+            return
+        end
         if Online() and FafOnline_Status().signIn == 'signedin' then
             for i = 1, 20 do
                 if FafOnline_Status().lobby == 'signedin' then

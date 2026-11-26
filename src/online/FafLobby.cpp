@@ -69,6 +69,19 @@ namespace faf::online
           game.simMods.emplace_back(uid, name.text);
         }
       }
+      if (const JsonNode* const teams = node.Get("teams"); teams != nullptr && teams->kind == JsonNode::Kind::Object) {
+        for (const auto& [team, players] : teams->members) {
+          std::vector<std::string> logins;
+          if (players.kind == JsonNode::Kind::Array) {
+            for (const JsonNode& player : players.items) {
+              if (player.kind == JsonNode::Kind::String) {
+                logins.push_back(player.text);
+              }
+            }
+          }
+          game.teams.emplace_back(team, std::move(logins));
+        }
+      }
       return game;
     }
   } // namespace

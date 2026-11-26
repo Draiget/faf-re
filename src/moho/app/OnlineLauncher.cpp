@@ -12,6 +12,7 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -225,6 +226,8 @@ namespace
     bool lobbyStarted = false;
     LaunchPlayer me;
     bool haveMe = false;
+    /// Every player the lobby told us about (player_info), by login: ratings, country and clan for the game list.
+    std::map<std::string, LaunchPlayer> players;
     std::string notice;
     std::string realInit; ///< the command line's /init: the game files this process has mounted
 
@@ -790,6 +793,35 @@ namespace
       SetField(L, "simMods", static_cast<double>(game.simMods.size()));
       SetBool(L, "password", game.passwordProtected);
       SetBool(L, "enforceRating", game.enforceRatingRange);
+      // teams = { {team = "2", players = { {login, rating, country, clan}, ... }}, ... }; rating is what FAF shows
+      // (mean - 3 deviations) for the game's rating type, or nil when the lobby didn't say.
+      lua_pushstring(L, "teams");
+      lua_newtable(L);
+      int teamIndex = 1;
+      for (const auto& [team, logins] : game.teams) {
+        lua_newtable(L);
+        SetField(L, "team", team);
+        lua_pushstring(L, "players");
+        lua_newtable(L);
+        int playerIndex = 1;
+        for (const std::string& login : logins) {
+          lua_newtable(L);
+          SetField(L, "login", login);
+          if (const auto player = TheService().players.find(login); player != TheService().players.end()) {
+            SetField(L, "country", player->second.country);
+            SetField(L, "clan", player->second.clan);
+            const auto rating = player->second.ratings.find(game.ratingType.empty() ? "global" : game.ratingType);
+            if (rating != player->second.ratings.end()) {
+              SetField(L, "rating", rating->second.mean - 3.0 * rating->second.deviation);
+              SetField(L, "games", static_cast<double>(rating->second.games));
+            }
+          }
+          lua_rawseti(L, -2, playerIndex++);
+        }
+        lua_rawset(L, -3);
+        lua_rawseti(L, -2, teamIndex++);
+      }
+      lua_rawset(L, -3);
       if (game.ratingMin) {
         SetField(L, "ratingMin", *game.ratingMin);
       }
@@ -1137,14 +1169,18 @@ void moho::ONLINE_Frame()
         s.me = ReadLaunchPlayer(*me);
         s.haveMe = true;
       }
-    } else if (command == "player_info" && s.haveMe) {
+    } else if (command == "player_info") {
       if (
         const JsonNode* const players = message.Get("players");
         players != nullptr && players->kind == JsonNode::Kind::Array
       ) {
         for (const JsonNode& player : players->items) {
-          if (player.String("login") == s.me.login) {
-            s.me = ReadLaunchPlayer(player); // the ratings after a game
+          LaunchPlayer record = ReadLaunchPlayer(player);
+          if (record.login == s.me.login) {
+            s.me = record; // the ratings after a game
+          }
+          if (!record.login.empty()) {
+            s.players[record.login] = std::move(record);
           }
         }
       }

@@ -57,6 +57,8 @@ namespace faf::online
     std::optional<double> ratingMin;
     std::optional<double> ratingMax;
     std::vector<std::pair<std::string, std::string>> simMods; ///< uid, name
+    /// Each team's number and its players' logins, as game_info's "teams" has them (team 1 is "no team" in FFA).
+    std::vector<std::pair<std::string, std::vector<std::string>>> teams;
   };
 
   /** What `game_host` takes (lobbyconnection.py command_game_host). */
