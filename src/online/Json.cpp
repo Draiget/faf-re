@@ -1,9 +1,11 @@
-// Engine addition (in-game launcher plan, WP1): moved from src/editor/doc/EdFafApi.cpp unchanged.
+// Engine addition (in-game launcher plan, WP1): the reader, moved from src/editor/doc/EdFafApi.cpp unchanged but for
+// keeping a number's digits (WP2). The builders and the writer are WP2's.
 
 #include "online/Json.h"
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 
 namespace faf::online
@@ -222,6 +224,7 @@ namespace faf::online
           return false;
         }
         node.kind = JsonNode::Kind::Number;
+        node.text.assign(text, at, static_cast<std::size_t>(end - (text.c_str() + at))); // the digits as written
         at = static_cast<std::size_t>(end - text.c_str());
         return true;
       }
@@ -285,6 +288,194 @@ namespace faf::online
     if (reader.at != text.size()) {
       return std::unexpected("text after the value");
     }
+    return out;
+  }
+
+  JsonNode JsonString(
+    std::string text
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::String;
+    node.text = std::move(text);
+    return node;
+  }
+
+  JsonNode JsonNumber(
+    const double number
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::Number;
+    node.number = number;
+    return node;
+  }
+
+  JsonNode JsonDigits(
+    std::string digits
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::Number;
+    node.number = std::strtod(digits.c_str(), nullptr);
+    node.text = std::move(digits);
+    return node;
+  }
+
+  JsonNode JsonBool(
+    const bool value
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::Bool;
+    node.boolean = value;
+    return node;
+  }
+
+  JsonNode JsonObject(
+    std::vector<std::pair<std::string, JsonNode>> members
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::Object;
+    node.members = std::move(members);
+    return node;
+  }
+
+  JsonNode JsonArray(
+    std::vector<JsonNode> items
+  )
+  {
+    JsonNode node;
+    node.kind = JsonNode::Kind::Array;
+    node.items = std::move(items);
+    return node;
+  }
+
+  namespace
+  {
+    void WriteString(
+      std::string& out,
+      const std::string& text
+    )
+    {
+      out += '"';
+      for (const char c : text) {
+        switch (c) {
+        case '"':
+          out += "\\\"";
+          break;
+        case '\\':
+          out += "\\\\";
+          break;
+        case '\n':
+          out += "\\n";
+          break;
+        case '\r':
+          out += "\\r";
+          break;
+        case '\t':
+          out += "\\t";
+          break;
+        case '\b':
+          out += "\\b";
+          break;
+        case '\f':
+          out += "\\f";
+          break;
+        default:
+          if (static_cast<unsigned char>(c) < 0x20u) {
+            char escaped[8];
+            (void)std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned>(c));
+            out += escaped;
+          } else {
+            out += c;
+          }
+        }
+      }
+      out += '"';
+    }
+
+    /** Digits a number may be written with as they are: an optional '-', digits, '.', exponent. */
+    bool LooksLikeNumber(
+      const std::string& digits
+    )
+    {
+      if (digits.empty()) {
+        return false;
+      }
+      for (const char c : digits) {
+        if ((c < '0' || c > '9') && c != '-' && c != '+' && c != '.' && c != 'e' && c != 'E') {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    void Write(
+      std::string& out,
+      const JsonNode& node
+    )
+    {
+      switch (node.kind) {
+      case JsonNode::Kind::Null:
+        out += "null";
+        break;
+      case JsonNode::Kind::Bool:
+        out += node.boolean ? "true" : "false";
+        break;
+      case JsonNode::Kind::Number: {
+        if (LooksLikeNumber(node.text)) {
+          out += node.text;
+        } else if (!std::isfinite(node.number)) {
+          out += "null";
+        } else {
+          char number[40];
+          const double n = node.number;
+          if (std::floor(n) == n && std::fabs(n) < 1e15) {
+            (void)std::snprintf(number, sizeof(number), "%lld", static_cast<long long>(n));
+          } else {
+            (void)std::snprintf(number, sizeof(number), "%.17g", n);
+          }
+          out += number;
+        }
+        break;
+      }
+      case JsonNode::Kind::String:
+        WriteString(out, node.text);
+        break;
+      case JsonNode::Kind::Array:
+        out += '[';
+        for (std::size_t i = 0; i < node.items.size(); ++i) {
+          if (i != 0) {
+            out += ',';
+          }
+          Write(out, node.items[i]);
+        }
+        out += ']';
+        break;
+      case JsonNode::Kind::Object:
+        out += '{';
+        for (std::size_t i = 0; i < node.members.size(); ++i) {
+          if (i != 0) {
+            out += ',';
+          }
+          WriteString(out, node.members[i].first);
+          out += ':';
+          Write(out, node.members[i].second);
+        }
+        out += '}';
+        break;
+      }
+    }
+  } // namespace
+
+  std::string ToJson(
+    const JsonNode& node
+  )
+  {
+    std::string out;
+    Write(out, node);
     return out;
   }
 } // namespace faf::online

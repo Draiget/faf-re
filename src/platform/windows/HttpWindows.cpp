@@ -211,6 +211,127 @@ namespace platform::http
     return {};
   }
 
+  struct Stream::State
+  {
+    std::mutex lock;
+    HINTERNET session = nullptr;
+    HINTERNET connection = nullptr;
+    HINTERNET request = nullptr;
+
+    void Drop()
+    {
+      for (HINTERNET* handle : {&request, &connection, &session}) {
+        if (*handle != nullptr) {
+          ::WinHttpCloseHandle(*handle);
+          *handle = nullptr;
+        }
+      }
+    }
+  };
+
+  Stream::Stream()
+    : mState(std::make_unique<State>())
+  {}
+
+  Stream::~Stream()
+  {
+    Close();
+  }
+
+  std::expected<long, std::string> Stream::Open(
+    const Call& call
+  )
+  {
+    Close();
+    Target target;
+    if (!Crack(call.url, target)) {
+      return std::unexpected("not a link: " + call.url);
+    }
+    HINTERNET session = ::WinHttpOpen(
+      Agent(call.userAgent).c_str(),
+      WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+      WINHTTP_NO_PROXY_NAME,
+      WINHTTP_NO_PROXY_BYPASS,
+      0
+    );
+    HINTERNET connection = session != nullptr ? ::WinHttpConnect(session, target.host, target.port, 0) : nullptr;
+    HINTERNET request = connection != nullptr ? ::WinHttpOpenRequest(
+                                                  connection,
+                                                  Widen(call.method).c_str(),
+                                                  target.object.c_str(),
+                                                  nullptr,
+                                                  WINHTTP_NO_REFERER,
+                                                  WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                  target.secure ? WINHTTP_FLAG_SECURE : 0
+                                                )
+                                              : nullptr;
+    {
+      // Published before the request goes out, so Close from another thread can end a slow answer too.
+      std::lock_guard<std::mutex> lock(mState->lock);
+      mState->session = session;
+      mState->connection = connection;
+      mState->request = request;
+    }
+    if (request != nullptr) {
+      // An event stream stays quiet between events: no receive timeout (Close ends a wait).
+      (void)::WinHttpSetTimeouts(request, 0, 60000, 30000, 0);
+    }
+    const std::wstring headers = Widen(call.headers);
+    const bool ok = request != nullptr &&
+      ::WinHttpSendRequest(
+                      request,
+                      headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
+                      headers.empty() ? 0 : static_cast<DWORD>(-1L),
+                      call.body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(call.body.data()),
+                      static_cast<DWORD>(call.body.size()),
+                      static_cast<DWORD>(call.body.size()),
+                      0
+      ) &&
+      ::WinHttpReceiveResponse(request, nullptr);
+    if (!ok) {
+      const DWORD error = ::GetLastError();
+      Close();
+      return std::unexpected(
+        "no answer from " + call.url.substr(0, call.url.find('/', 8)) + " (error " + std::to_string(error) + ")"
+      );
+    }
+    DWORD code = 0;
+    DWORD size = sizeof(code);
+    (void)::WinHttpQueryHeaders(
+      request,
+      WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+      WINHTTP_HEADER_NAME_BY_INDEX,
+      &code,
+      &size,
+      WINHTTP_NO_HEADER_INDEX
+    );
+    return static_cast<long>(code);
+  }
+
+  std::expected<std::string, std::string> Stream::Read()
+  {
+    HINTERNET request = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(mState->lock);
+      request = mState->request;
+    }
+    if (request == nullptr) {
+      return std::unexpected("not open");
+    }
+    char buffer[16384];
+    DWORD read = 0;
+    if (!::WinHttpReadData(request, buffer, sizeof(buffer), &read)) {
+      return std::unexpected("the answer broke off (error " + std::to_string(::GetLastError()) + ")");
+    }
+    return std::string(buffer, read);
+  }
+
+  void Stream::Close()
+  {
+    std::lock_guard<std::mutex> lock(mState->lock);
+    mState->Drop();
+  }
+
   struct WebSocket::State
   {
     mutable std::mutex lock;

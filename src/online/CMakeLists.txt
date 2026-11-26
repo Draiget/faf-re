@@ -1,17 +1,28 @@
 # faf_online: talking to FAF and to our servers, shared by the map editor and the game's launcher
-# (.plans/ingame-launcher, WP1): JSON, URL encoding, FAF's sign-in, and the platform:: parts they stand on
-# (HTTP and WebSocket requests, the sealed token store). Engine addition, not recovered code.
+# (.plans/ingame-launcher, WP1-WP2): JSON, URL encoding, FAF's sign-in and lobby, and the platform:: parts they stand
+# on (HTTP and WebSocket requests, the sealed token store, running a helper program). Engine addition, not recovered
+# code.
 
 add_library(faf_online STATIC
+  ControlService.cpp
   FafAuth.cpp
+  FafLobby.cpp
   Json.cpp
   Url.cpp)
 target_include_directories(faf_online PUBLIC "${PROJECT_SOURCE_DIR}/src")
 if(FAFRE_PLATFORM_WINDOWS)
   target_sources(faf_online PRIVATE
     "${PROJECT_SOURCE_DIR}/src/platform/windows/HttpWindows.cpp"
+    "${PROJECT_SOURCE_DIR}/src/platform/windows/ProcessWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/SecretStoreWindows.cpp")
   target_link_libraries(faf_online PUBLIC winhttp crypt32)
 endif()
 target_link_libraries(faf_online PRIVATE faf_codegen)
 set_target_properties(faf_online PROPERTIES FOLDER "net")
+
+# faf-online-probe: signs in to FAF's lobby and prints what it sees (WP2's check, local stacks and the live server).
+add_executable(faf_online_probe EXCLUDE_FROM_ALL probe/ProbeMain.cpp)
+target_link_libraries(faf_online_probe PRIVATE faf_online faf_codegen)
+# The token and data folders come from plain getenv, as faf_netlink reads its settings.
+target_compile_definitions(faf_online_probe PRIVATE _CRT_SECURE_NO_WARNINGS)
+set_target_properties(faf_online_probe PROPERTIES OUTPUT_NAME "faf-online-probe" FOLDER "net")

@@ -50,6 +50,29 @@ namespace platform::http
   );
 
   /**
+   * A response read as it comes (Server-Sent Events, a large download): Open sends the request and reads the status,
+   * Read returns the next part of the body. Close from another thread ends a blocked Read.
+   */
+  class Stream
+  {
+  public:
+    Stream();
+    ~Stream();
+    Stream(const Stream&) = delete;
+    Stream& operator=(const Stream&) = delete;
+
+    /** Sends `call`; the HTTP status once the server answered. */
+    [[nodiscard]] std::expected<long, std::string> Open(const Call& call);
+    /** The next part of the body (empty: the body ended). */
+    [[nodiscard]] std::expected<std::string, std::string> Read();
+    void Close();
+
+  private:
+    struct State;
+    std::unique_ptr<State> mState;
+  };
+
+  /**
    * A WebSocket client (`ws://` or `wss://`), text messages in and out. One thread may block in Receive while another
    * sends; Close from any thread ends a blocked Receive.
    */

@@ -6,7 +6,9 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iterator>
 #include <mutex>
@@ -22,10 +24,13 @@
 #include <windows.h>
 #include <bcrypt.h>
 
+#include "online/ControlService.h"
 #include "online/FafAuth.h"
+#include "online/FafLobby.h"
 #include "online/Json.h"
 #include "online/Url.h"
 #include "platform/Http.h"
+#include "platform/Process.h"
 #include "platform/SecretStore.h"
 
 namespace
@@ -91,14 +96,22 @@ namespace
     return true;
   }
 
-  /** Accepts one client; `refuse` answers the upgrade with 403, else it echoes every message until a close. */
+  /** For a scripted server: the text messages to send back for one received (each a frame of its own). */
+  using Reply = std::function<std::vector<std::string>(const std::string& received)>;
+
+  /**
+   * Accepts one client; `refuse` answers the upgrade with 403. Without `reply` it echoes every message until a close;
+   * with it, it sends what `reply` returns for each text message, and keeps what it received.
+   */
   class EchoServer
   {
   public:
     explicit EchoServer(
-      bool refuse = false
+      bool refuse = false,
+      Reply reply = {}
     )
       : mRefuse(refuse)
+      , mReply(std::move(reply))
     {
       WSADATA data{};
       (void)::WSAStartup(MAKEWORD(2, 2), &data);
@@ -190,17 +203,17 @@ namespace
         for (std::size_t i = 0; i < payload.size(); ++i) {
           payload[i] = static_cast<char>(payload[i] ^ mask[i % 4]);
         }
-        std::string frame;
-        frame += static_cast<char>(0x80 | opcode);
-        if (payload.size() < 126) {
-          frame += static_cast<char>(payload.size());
-        } else {
-          frame += static_cast<char>(126);
-          frame += static_cast<char>((payload.size() >> 8) & 0xFF);
-          frame += static_cast<char>(payload.size() & 0xFF);
+        if (mReply && opcode == 0x1) {
+          {
+            std::lock_guard<std::mutex> guard(mLock);
+            mReceived.push_back(payload);
+          }
+          for (const std::string& out : mReply(payload)) {
+            SendFrame(client, 0x1, out);
+          }
+          continue;
         }
-        frame += payload;
-        (void)::send(client, frame.data(), static_cast<int>(frame.size()), 0);
+        SendFrame(client, opcode, payload);
         if (opcode == 0x8) {
           break;
         }
@@ -208,7 +221,37 @@ namespace
       ::closesocket(client);
     }
 
+    static void SendFrame(
+      SOCKET client,
+      int opcode,
+      const std::string& payload
+    )
+    {
+      std::string frame;
+      frame += static_cast<char>(0x80 | opcode);
+      if (payload.size() < 126) {
+        frame += static_cast<char>(payload.size());
+      } else {
+        frame += static_cast<char>(126);
+        frame += static_cast<char>((payload.size() >> 8) & 0xFF);
+        frame += static_cast<char>(payload.size() & 0xFF);
+      }
+      frame += payload;
+      (void)::send(client, frame.data(), static_cast<int>(frame.size()), 0);
+    }
+
+  public:
+    [[nodiscard]] std::vector<std::string> Received()
+    {
+      std::lock_guard<std::mutex> guard(mLock);
+      return mReceived;
+    }
+
+  private:
     bool mRefuse = false;
+    Reply mReply;
+    std::mutex mLock;
+    std::vector<std::string> mReceived;
     SOCKET mListener = INVALID_SOCKET;
     unsigned short mPort = 0;
     std::thread mThread;
@@ -517,4 +560,426 @@ TEST(
   auth.Wait();
   EXPECT_EQ(auth.GetState(), FafAuth::State::LoggedOut);
   EXPECT_EQ(auth.Message(), "Sign-in cancelled");
+}
+
+// --- WP2: JSON writing, helper programs, the lobby client -----------------------------------------------------------
+
+TEST(
+  OnlineJson,
+  KeepsAnIdsDigitsAndWritesThemBack
+)
+{
+  using namespace faf::online;
+  const auto parsed = ParseJson(R"({"command":"session","session":9007199254740993})");
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed->Get("session")->text, "9007199254740993"); // a double would read 9007199254740992
+  const std::string written = ToJson(JsonObject({
+    {"session", JsonDigits(parsed->Get("session")->text)},
+    {"text", JsonString("a\"b\\c\n\x01")},
+    {"n", JsonNumber(1500)},
+    {"x", JsonNumber(0.5)},
+    {"ok", JsonBool(true)},
+    {"list", JsonArray({JsonNumber(1), JsonString("s")})},
+  }));
+  EXPECT_EQ(
+    written, R"({"session":9007199254740993,"text":"a\"b\\c\n\u0001","n":1500,"x":0.5,"ok":true,"list":[1,"s"]})"
+  );
+  const auto again = ParseJson(written);
+  ASSERT_TRUE(again);
+  EXPECT_EQ(ToJson(*again), written);
+}
+
+TEST(
+  OnlinePlatformProcess,
+  RunsAProgramAndReadsItsOutput
+)
+{
+  const char* const comspec = std::getenv("ComSpec");
+  const std::string cmd = comspec != nullptr ? comspec : "C:\\Windows\\System32\\cmd.exe";
+  const auto echoed = platform::process::Run(cmd, {"/c", "echo", "hello"}, std::chrono::seconds(20));
+  ASSERT_TRUE(echoed) << echoed.error();
+  EXPECT_EQ(echoed->exitCode, 0);
+  EXPECT_TRUE(echoed->out.starts_with("hello")) << echoed->out;
+  const auto failed = platform::process::Run(cmd, {"/c", "exit", "7"}, std::chrono::seconds(20));
+  ASSERT_TRUE(failed) << failed.error();
+  EXPECT_EQ(failed->exitCode, 7);
+  // A timeout ends the program and what it started (ping, under cmd), so it returns soon after it.
+  const auto started = std::chrono::steady_clock::now();
+  EXPECT_FALSE(platform::process::Run(cmd, {"/c", "ping", "-n", "6", "127.0.0.1"}, std::chrono::milliseconds(500)));
+  EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(3));
+  EXPECT_FALSE(platform::process::Run("C:\\no\\such\\program.exe", {}, std::chrono::seconds(5)));
+}
+
+namespace
+{
+  template <class Done>
+  bool WaitUntil(
+    Done done,
+    std::chrono::milliseconds limit = std::chrono::seconds(10)
+  )
+  {
+    const auto until = std::chrono::steady_clock::now() + limit;
+    while (!done() && std::chrono::steady_clock::now() < until) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return done();
+  }
+} // namespace
+
+TEST(
+  OnlineFafLobby,
+  SignsInWithTheExactSessionAndKeepsTheGameList
+)
+{
+  const std::string session = "9007199254740993";
+  std::atomic<bool> ponged{false};
+  EchoServer server(false, [&](const std::string& received) -> std::vector<std::string> {
+    const auto message = faf::online::ParseJson(received.substr(0, received.find('\n')));
+    if (!message) {
+      return {};
+    }
+    const std::string command = message->String("command");
+    if (command == "ask_session") {
+      return {R"({"command":"session","session":)" + session + "}\n"};
+    }
+    if (command == "auth") {
+      return {
+        R"({"command":"welcome","me":{"id":346886,"login":"Tester"}})"
+        "\n",
+        R"({"command":"game_info","games":[)"
+        R"({"uid":101,"title":"One","featured_mod":"faf","state":"open","num_players":1,"max_players":8,)"
+        R"("mapname":"scmp_009","host":"Tester","rating_type":"global","visibility":"public","password_protected":false,)"
+        R"("sim_mods":{}},)"
+        R"({"uid":102,"title":"Two","featured_mod":"coop","state":"playing","num_players":2,"max_players":4,)"
+        R"("mapname":"x","host":"B","rating_type":"global","visibility":"public","password_protected":true,)"
+        R"("rating_min":800,"rating_max":null,"sim_mods":{"abc":"Mod A"}}]})"
+        "\n",
+        // Two messages in one frame: a game closes, and the lobby asks for a pong.
+        R"({"command":"game_info","uid":101,"state":"closed"})"
+        "\n"
+        R"({"command":"ping"})"
+        "\n",
+        R"({"command":"notice","style":"info","text":"hello"})"
+        "\n",
+      };
+    }
+    if (command == "pong") {
+      ponged = true;
+      return {};
+    }
+    if (command == "game_host") {
+      return {R"({"command":"game_launch","uid":103,"mod":"faf","args":["/numgames",5]})"
+              "\n"};
+    }
+    return {};
+  });
+  faf::online::FafLobbySettings settings;
+  settings.webSocketUrl = server.Url();
+  settings.testUniqueId = "test-uid";
+  settings.version = "1.2.3";
+  faf::online::FafLobby lobby(settings);
+  lobby.Connect([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  ASSERT_TRUE(
+    WaitUntil([&] {
+    return lobby.GetState() == faf::online::FafLobby::State::SignedIn;
+  })
+  ) << lobby.Message();
+  EXPECT_EQ(lobby.Login(), "Tester");
+  EXPECT_EQ(lobby.PlayerId(), "346886");
+  ASSERT_TRUE(WaitUntil([&] {
+    return ponged.load() && lobby.Games().size() == 1u;
+  }));
+  const auto games = lobby.Games();
+  EXPECT_EQ(games[0].uid, "102");
+  EXPECT_EQ(games[0].featuredMod, "coop");
+  EXPECT_EQ(games[0].state, "playing");
+  EXPECT_TRUE(games[0].passwordProtected);
+  EXPECT_EQ(games[0].ratingMin, 800.0);
+  EXPECT_FALSE(games[0].ratingMax);
+  ASSERT_EQ(games[0].simMods.size(), 1u);
+  EXPECT_EQ(games[0].simMods[0].second, "Mod A");
+
+  faf::online::FafHostRequest request;
+  request.title = "Mine";
+  request.mapname = "scmp_009";
+  ASSERT_TRUE(lobby.HostGame(request));
+  std::vector<faf::online::JsonNode> messages;
+  ASSERT_TRUE(WaitUntil([&] {
+    for (auto& message : lobby.TakeMessages()) {
+      messages.push_back(std::move(message));
+    }
+    return !messages.empty() && messages.back().String("command") == "game_launch";
+  }));
+  EXPECT_EQ(messages.front().String("command"), "welcome");
+  EXPECT_EQ(messages.back().Get("uid")->text, "103");
+  EXPECT_TRUE(lobby.Message().contains("hello")) << lobby.Message();
+  lobby.Disconnect();
+
+  const auto received = server.Received();
+  ASSERT_GE(received.size(), 4u);
+  EXPECT_EQ(received[0], "{\"command\":\"ask_session\",\"version\":\"1.2.3\",\"user_agent\":\"faf-re-client\"}\n");
+  EXPECT_EQ(
+    received[1], "{\"command\":\"auth\",\"token\":\"ACCESS\",\"unique_id\":\"test-uid\",\"session\":" + session + "}\n"
+  );
+  EXPECT_EQ(received[2], "{\"command\":\"pong\"}\n");
+  EXPECT_EQ(
+    received[3],
+    "{\"command\":\"game_host\",\"title\":\"Mine\",\"mod\":\"faf\",\"mapname\":\"scmp_009\",\"visibility\":\"public\","
+    "\"enforce_rating_range\":false}\n"
+  );
+}
+
+TEST(
+  OnlineFafLobby,
+  NeverSendsATestUniqueIdToFafsServers
+)
+{
+  faf::online::FafLobbySettings settings;
+  settings.webSocketUrl = "wss://ws.faforever.com/?verify=x";
+  settings.testUniqueId = "test-uid";
+  faf::online::FafLobby lobby(settings);
+  lobby.Connect([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  ASSERT_TRUE(WaitUntil([&] {
+    return lobby.GetState() == faf::online::FafLobby::State::Failed;
+  }));
+  EXPECT_EQ(lobby.Message(), "a test unique_id is never sent to FAF's own servers");
+}
+
+// --- platform::http::Stream: a response read as it comes -------------------------------------------------------------
+
+namespace
+{
+  /** One connection: reads the request head, answers `head`, then each part of `parts` after `pause`, then waits
+   *  `hold` before it closes. */
+  class PlainHttpServer
+  {
+  public:
+    PlainHttpServer(
+      std::string head,
+      std::vector<std::string> parts,
+      std::chrono::milliseconds pause,
+      std::chrono::milliseconds hold
+    )
+    {
+      WSADATA data{};
+      (void)::WSAStartup(MAKEWORD(2, 2), &data);
+      mListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      sockaddr_in address{};
+      address.sin_family = AF_INET;
+      address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      (void)::bind(mListener, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+      int length = sizeof(address);
+      (void)::getsockname(mListener, reinterpret_cast<sockaddr*>(&address), &length);
+      mPort = ntohs(address.sin_port);
+      (void)::listen(mListener, 1);
+      mThread = std::thread([this, head = std::move(head), parts = std::move(parts), pause, hold] {
+        const SOCKET client = ::accept(mListener, nullptr, nullptr);
+        if (client == INVALID_SOCKET) {
+          return;
+        }
+        std::string request;
+        char c = 0;
+        while (request.find("\r\n\r\n") == std::string::npos && ::recv(client, &c, 1, 0) == 1) {
+          request += c;
+        }
+        {
+          std::lock_guard<std::mutex> guard(mLock);
+          mRequestHead = request;
+        }
+        (void)::send(client, head.data(), static_cast<int>(head.size()), 0);
+        for (const std::string& part : parts) {
+          std::this_thread::sleep_for(pause);
+          (void)::send(client, part.data(), static_cast<int>(part.size()), 0);
+        }
+        std::this_thread::sleep_for(hold);
+        ::closesocket(client);
+      });
+    }
+
+    ~PlainHttpServer()
+    {
+      ::closesocket(mListener);
+      if (mThread.joinable()) {
+        mThread.join();
+      }
+      ::WSACleanup();
+    }
+
+    [[nodiscard]] std::string Url() const
+    {
+      return "http://127.0.0.1:" + std::to_string(mPort) + "/api/v1/events";
+    }
+
+    [[nodiscard]] std::string RequestHead()
+    {
+      std::lock_guard<std::mutex> guard(mLock);
+      return mRequestHead;
+    }
+
+  private:
+    std::mutex mLock;
+    std::string mRequestHead;
+    SOCKET mListener = INVALID_SOCKET;
+    unsigned short mPort = 0;
+    std::thread mThread;
+  };
+} // namespace
+
+TEST(
+  OnlineHttpStream,
+  ReadsAnEventStreamAsItComes
+)
+{
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+    {"event: snapshot\ndata: {}\n\n", ": keep-alive\n\n", "event: lobby\ndata: {\"key\":\"eu-1/l3\"}\n\n"},
+    std::chrono::milliseconds(100),
+    std::chrono::milliseconds(0)
+  );
+  platform::http::Stream stream;
+  platform::http::Call call;
+  call.url = server.Url();
+  call.headers = "Accept: text/event-stream\r\nAuthorization: Bearer X\r\n";
+  const auto status = stream.Open(call);
+  ASSERT_TRUE(status) << status.error();
+  EXPECT_EQ(*status, 200);
+  std::string all;
+  for (;;) {
+    const auto part = stream.Read();
+    ASSERT_TRUE(part) << part.error();
+    if (part->empty()) {
+      break;
+    }
+    all += *part;
+  }
+  EXPECT_EQ(all, "event: snapshot\ndata: {}\n\n: keep-alive\n\nevent: lobby\ndata: {\"key\":\"eu-1/l3\"}\n\n");
+}
+
+TEST(
+  OnlineHttpStream,
+  CloseEndsABlockedRead
+)
+{
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+    {},
+    std::chrono::milliseconds(0),
+    std::chrono::milliseconds(3000)
+  );
+  platform::http::Stream stream;
+  platform::http::Call call;
+  call.url = server.Url();
+  ASSERT_TRUE(stream.Open(call));
+  std::atomic<bool> returned{false};
+  std::thread reader([&] {
+    (void)stream.Read();
+    returned = true;
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  EXPECT_FALSE(returned.load());
+  const auto closed = std::chrono::steady_clock::now();
+  stream.Close();
+  reader.join();
+  EXPECT_TRUE(returned.load());
+  EXPECT_LT(std::chrono::steady_clock::now() - closed, std::chrono::seconds(2));
+}
+
+// --- WP3: the control-service client ---------------------------------------------------------------------------------
+
+TEST(
+  OnlineControlService,
+  FollowsTheLobbiesFromTheEventStream
+)
+{
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+    {
+      "event: snapshot\ndata: {\"hosts\":[],\"lobbies\":["
+      "{\"key\":\"eu-1/l1\",\"host\":\"eu-1\",\"name\":\"Cup semi\",\"state\":\"lobby\",\"origin\":\"organised\","
+      "\"map\":\"scmp_009\",\"seats\":[{\"seat\":1,\"kind\":\"human\",\"name\":\"Ann\",\"uid\":10},"
+      "{\"seat\":2,\"kind\":\"human\",\"name\":\"\"}],\"you\":{\"seat\":1,\"join\":\"/connectserver 203.0.113.5:27200 "
+      "/servertoken t /serveruid 10\"}},"
+      "{\"key\":\"eu-1/l2\",\"host\":\"eu-1\",\"name\":\"Old\",\"state\":\"game\",\"seats\":[]}]}\n\n",
+      ": keep-alive\n\n",
+      "event: lobby\r\ndata: {\"key\":\"eu-1/l1\",\"host\":\"eu-1\",\"name\":\"Cup "
+      "semi\",\"state\":\"game\",\"seats\":[]}\r\n\r\n",
+      "event: lobby_removed\ndata: {\"key\":\"eu-1/l2\"}\n\n",
+    },
+    std::chrono::milliseconds(100),
+    std::chrono::milliseconds(2000)
+  );
+  const std::string base = server.Url().substr(0, server.Url().find("/api/"));
+  faf::online::ControlServiceClient client(base, "faf-re-client/test");
+  client.SetTokens([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  client.Start();
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  for (;;) {
+    const auto lobbies = client.Lobbies();
+    if ((lobbies.size() == 1 && lobbies[0].state == "game") || std::chrono::steady_clock::now() > until) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  const auto lobbies = client.Lobbies();
+  client.Stop();
+  ASSERT_EQ(lobbies.size(), 1u) << client.Message();
+  EXPECT_EQ(lobbies[0].key, "eu-1/l1");
+  EXPECT_EQ(lobbies[0].state, "game");
+  EXPECT_TRUE(server.RequestHead().starts_with("GET /api/v1/events ")) << server.RequestHead();
+  EXPECT_TRUE(server.RequestHead().contains("Authorization: Bearer ACCESS"));
+}
+
+TEST(
+  OnlineControlService,
+  ReadsALobbysSeatsAndTheViewersJoinLine
+)
+{
+  const auto parsed = faf::online::ParseJson(
+    R"({"key":"eu-1/l1","state":"lobby","seats":[{"seat":1,"kind":"human","name":"Ann","uid":10},)"
+    R"({"seat":2,"kind":"ai","ai":"rush"}],"you":{"seat":1,"join":"/connectserver a:1 /servertoken t /serveruid 10"}})"
+  );
+  ASSERT_TRUE(parsed);
+  const auto lobby = faf::online::ReadServerLobby(*parsed);
+  ASSERT_EQ(lobby.seats.size(), 2u);
+  EXPECT_EQ(lobby.seats[0].uid, "10");
+  EXPECT_EQ(lobby.seats[1].ai, "rush");
+  EXPECT_TRUE(lobby.seats[1].uid.empty());
+  EXPECT_EQ(lobby.join, "/connectserver a:1 /servertoken t /serveruid 10");
+}
+
+TEST(
+  OnlineControlService,
+  AsksForAGameThePlayerHosts
+)
+{
+  const std::string answer =
+    "{\"ok\":true,\"request\":{\"id\":\"r1\",\"state\":\"queued\",\"position\":1},\"ref\":\"eu-1/r1\"}";
+  PlainHttpServer server(
+    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + std::to_string(answer.size()) +
+      "\r\nConnection: close\r\n\r\n" + answer,
+    {},
+    std::chrono::milliseconds(0),
+    std::chrono::milliseconds(0)
+  );
+  const std::string base = server.Url().substr(0, server.Url().find("/api/"));
+  faf::online::ControlServiceClient client(base, "faf-re-client/test");
+  client.SetTokens([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  faf::online::ServerGameRequest request;
+  request.map = "scmp_007";
+  request.otherSeats = {"human", "rush"};
+  request.options = {{"UnitCap", "500"}};
+  request.byPing = true;
+  const auto result = client.RequestGame(request);
+  ASSERT_TRUE(result) << result.error();
+  EXPECT_EQ(result->String("ref"), "eu-1/r1");
+  EXPECT_TRUE(server.RequestHead().starts_with("POST /api/v1/requests ")) << server.RequestHead();
+  EXPECT_TRUE(server.RequestHead().contains("Content-Type: application/json"));
 }
