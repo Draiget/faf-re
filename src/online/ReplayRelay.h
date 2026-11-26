@@ -64,6 +64,9 @@ namespace faf::online
     void Run();
     /** Sends what the server hasn't had on this connection, connecting (and sending from the start) first if needed. */
     bool Forward();
+    /** A connection that failed: logged when the reason differs from the last one; the next try waits 2 s, doubling up
+     *  to 30 s (the game writes many times a second, and each write would try again). */
+    void Failed(const std::string& why);
     void Log(const std::string& line) const;
 
     ReplayRelaySettings mSettings;
@@ -79,6 +82,9 @@ namespace faf::online
     std::string mStream;       ///< the reader thread's own: every byte the game sent
     std::size_t mSentHere = 0; ///< how much of mStream went out on the current connection
     bool mConnected = false;
+    std::chrono::steady_clock::time_point mNextTry{}; ///< no new connection before this, after a failure
+    std::chrono::seconds mBackoff{0};
+    std::string mLastFailure;
     std::mutex mDoneLock;
     std::condition_variable mDoneSignal;
     bool mDone = false; ///< the stream ended and the relay stopped trying

@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -1375,4 +1376,110 @@ TEST(
     return server.ReceivedBinary().size() >= stream.size();
   }));
   EXPECT_EQ(server.ReceivedBinary(), stream); // the opening kept, every byte in order
+}
+
+namespace
+{
+  /** Answers every request with 401 and counts them (a user service that refuses the replay service's address). */
+  class RefusingHttpServer
+  {
+  public:
+    RefusingHttpServer()
+    {
+      (void)net::SocketsInit();
+      mListener = net::ListenTcp("127.0.0.1", 0);
+      mPort = net::LocalPort(mListener);
+      mThread = std::thread([this] {
+        while (!mStop.load()) {
+          const int ready = net::WaitReadable(mListener, 100);
+          if (ready <= 0) {
+            continue;
+          }
+          net::SocketHandle client = ::accept(mListener, nullptr, nullptr);
+          net::NoSigPipe(client);
+          if (client == net::kInvalidSocket) {
+            continue;
+          }
+          std::string request;
+          char c = 0;
+          while (request.find("\r\n\r\n") == std::string::npos && ::recv(client, &c, 1, 0) == 1) {
+            request += c;
+          }
+          const std::string answer = "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+          (void)net::SendAll(client, answer.data(), answer.size());
+          net::CloseSocket(client);
+          ++mRequests;
+        }
+      });
+    }
+
+    ~RefusingHttpServer()
+    {
+      mStop = true;
+      if (mThread.joinable()) {
+        mThread.join();
+      }
+      net::CloseSocket(mListener);
+    }
+
+    [[nodiscard]] std::string Url() const
+    {
+      return "http://127.0.0.1:" + std::to_string(mPort);
+    }
+
+    [[nodiscard]] int Requests() const
+    {
+      return mRequests.load();
+    }
+
+  private:
+    net::SocketHandle mListener = net::kInvalidSocket;
+    unsigned short mPort = 0;
+    std::atomic<bool> mStop{false};
+    std::atomic<int> mRequests{0};
+    std::thread mThread;
+  };
+} // namespace
+
+TEST(
+  OnlineReplayRelay,
+  ARefusedAddressIsAskedAgainOnlyAfterAPause
+)
+{
+  RefusingHttpServer userService;
+  faf::online::ReplayRelaySettings settings;
+  settings.userServiceUrl = userService.Url();
+  faf::online::ReplayRelay relay(settings);
+  std::mutex lock;
+  std::vector<std::string> lines;
+  relay.SetLog([&](const char* line) {
+    std::lock_guard<std::mutex> guard(lock);
+    lines.emplace_back(line);
+  });
+  const auto port = relay.Listen();
+  ASSERT_TRUE(port) << port.error();
+  relay.Start([] {
+    return std::expected<std::string, std::string>("token");
+  });
+
+  // A game writes its replay many times a second: 30 writes, well inside the relay's 2 s pause.
+  net::SocketHandle game = ConnectLocal(*port);
+  ASSERT_NE(game, net::kInvalidSocket);
+  const std::string piece(1000, 'r');
+  for (int i = 0; i < 30; ++i) {
+    (void)net::SendAll(game, piece.data(), piece.size());
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  EXPECT_TRUE(WaitUntil([&] {
+    return relay.BytesFromGame() == 30u * piece.size();
+  }));
+  // The first write asked and was refused; the rest came within the 2 s pause and didn't ask.
+  EXPECT_EQ(userService.Requests(), 1);
+  net::CloseSocket(game);
+  relay.Stop();
+  std::lock_guard<std::mutex> guard(lock);
+  const auto refused = std::count_if(lines.begin(), lines.end(), [](const std::string& line) {
+    return line.find("answered 401") != std::string::npos;
+  });
+  EXPECT_EQ(refused, 1);
 }

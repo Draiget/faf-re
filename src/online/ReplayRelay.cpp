@@ -13,6 +13,8 @@ namespace faf::online
     constexpr std::size_t kChunk = 16384;
     /** How long the end of a game keeps trying to get its last bytes out (the Rust client's UPLOAD_FLUSH_TIMEOUT). */
     constexpr auto kFlushTime = std::chrono::seconds(60);
+    constexpr auto kFirstBackoff = std::chrono::seconds(2);
+    constexpr auto kMaxBackoff = std::chrono::seconds(30);
   } // namespace
 
   ReplayRelay::ReplayRelay(
@@ -93,15 +95,30 @@ namespace faf::online
     }
   }
 
+  void ReplayRelay::Failed(
+    const std::string& why
+  )
+  {
+    if (why != mLastFailure) {
+      Log(why);
+      mLastFailure = why;
+    }
+    mBackoff = mBackoff.count() == 0 ? kFirstBackoff : std::min<std::chrono::seconds>(kMaxBackoff, mBackoff * 2);
+    mNextTry = std::chrono::steady_clock::now() + mBackoff;
+  }
+
   bool ReplayRelay::Forward()
   {
     if (!mConnected) {
+      if (std::chrono::steady_clock::now() < mNextTry) {
+        return false; // a failure a moment ago: the bytes wait for the next try
+      }
       std::string url = mSettings.webSocketUrl;
       std::string token;
       if (url.empty() || mTokens) {
         const auto got = mTokens ? mTokens() : std::expected<std::string, std::string>(std::unexpected("no tokens"));
         if (!got) {
-          Log("no FAF sign-in: " + got.error());
+          Failed("no FAF sign-in: " + got.error());
           return false;
         }
         token = *got;
@@ -117,7 +134,7 @@ namespace faf::online
         const auto answer =
           sent ? ParseJson(body) : std::expected<JsonNode, std::string>(std::unexpected(sent.error()));
         if (!sent || status != 200 || !answer || answer->String("accessUrl").empty()) {
-          Log(
+          Failed(
             "the replay service's address: " +
             (sent ? "the user service answered " + std::to_string(status) : sent.error())
           );
@@ -126,19 +143,21 @@ namespace faf::online
         url = answer->String("accessUrl");
       }
       if (const auto opened = mSocket.Open(url, {}, mSettings.userAgent); !opened) {
-        Log("the replay service: " + opened.error());
+        Failed("the replay service: " + opened.error());
         return false;
       }
       mConnected = true;
       mSentHere = 0; // a new connection gets the stream from its start
+      mBackoff = std::chrono::seconds(0);
+      mLastFailure.clear();
       Log("sending the replay");
     }
     while (mSentHere < mStream.size()) {
       const std::size_t size = std::min(kChunk, mStream.size() - mSentHere);
       if (const auto sent = mSocket.SendBinary(std::string_view(mStream).substr(mSentHere, size)); !sent) {
-        Log("the replay service dropped: " + sent.error());
         mSocket.Close();
         mConnected = false;
+        Failed("the replay service dropped: " + sent.error());
         return false;
       }
       mSentHere += size;
