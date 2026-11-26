@@ -24,6 +24,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/SCR_String.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -43,6 +44,17 @@
 namespace
 {
   using moho::EGpgNetOpenMode;
+
+  // Engine addition: /noversioncheck at runtime. The in-game launcher turns it on, so its replays screen plays
+  // replays of any FAF game version, with the engine patches of the nearest version this engine models (their own
+  // game files come later). Off by default: the original game refuses them.
+  bool rep_PlayAnyVersion = false;
+  moho::TConVar<bool> gTConVar_rep_PlayAnyVersion(
+    "rep_PlayAnyVersion",
+    "1: play a replay whose header names a FAF game version this engine doesn't model, with the engine patches of "
+    "the nearest version it does, as /noversioncheck; 0 (default): refuse it.",
+    &rep_PlayAnyVersion
+  );
 
   /**
    * Address: 0x00875690 (FUN_00875690, func_OpenGPGNet)
@@ -419,7 +431,7 @@ namespace moho
         // FAF addition, not in the shipped binary: /noversioncheck plays a replay
         // whose header names another engine version instead of refusing it, with
         // the patches of the nearest version this engine models.
-        if (!CFG_GetArgOption("/noversioncheck", 0, nullptr)) {
+        if (!CFG_GetArgOption("/noversioncheck", 0, nullptr) && !rep_PlayAnyVersion) {
           return refuse(
             gpg::STR_Printf(
               "It was recorded by \"%s\"; this game plays replays of FAF game versions %d to %d.",
@@ -434,7 +446,7 @@ namespace moho
           : kFafGameVersionLatest;
         gpg::Warnf(
           "Replay %s was recorded by \"%s\", this engine plays FAF game versions %d..%d; playing it as %d anyway "
-          "(/noversioncheck).",
+          "(/noversioncheck or rep_PlayAnyVersion).",
           filename,
           replayVersion.c_str(),
           kFafGameVersionOldestSupported,
