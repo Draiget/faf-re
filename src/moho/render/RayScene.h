@@ -108,6 +108,11 @@ namespace moho
     std::vector<gpg::gal::RayInstance> mInstances;
     std::vector<std::array<float, 12>> mTransforms;
     std::uint32_t mLoggedFrames = 0U;
+    // The bottom-level pieces built this frame (first sight of a mesh) and what they cost the render thread.
+    std::uint32_t mBuiltPieces = 0U;
+    std::uint32_t mBuiltTriangles = 0U;
+    double mBuildMilliseconds = 0.0;
+    std::uint32_t mBuildLogs = 0U;
     bool mMeshesMissing = false; // this frame, a traced material's mesh isn't in the scene
   };
 } // namespace moho

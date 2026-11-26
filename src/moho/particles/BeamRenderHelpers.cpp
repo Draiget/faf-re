@@ -358,8 +358,13 @@ namespace moho
    * What it does:
    * As above for a particle bucket, plus the drag flag as a canonical 4-byte
    * shader integer (0 or 1), and the extra `_REFRACT` suffix.
+   *
+   * Engine addition: `lowResolution` appends `_LR`, the low-resolution twin of the technique that
+   * ParticleEffectPatch.h adds to particle.fx (see ParticleLowRes.h).
    */
-  void SParticleRenderBucket::SelectTechnique() const
+  void SParticleRenderBucket::SelectTechnique(
+    const bool lowResolution
+  ) const
   {
     const std::int32_t drag = dragEnabled ? 1 : 0;
     ShaderVar& dragEnabledShaderVar = GetParticleDragEnabledShaderVar();
@@ -372,6 +377,9 @@ namespace moho
 
     std::string techniqueName(tag.data(), tag.size());
     techniqueName += ResolveParticleTechniqueSuffix(blendMode, true, kParticleSelectTechniqueWithDragAssertLine);
+    if (lowResolution) {
+      techniqueName += "_LR";
+    }
 
     CD3DDevice* const device = D3D_GetDevice();
     if (device != nullptr) {

@@ -777,6 +777,37 @@ namespace moho
     mEffects.push_back(replacementEffect);
   }
 
+  bool CD3DDeviceResources::ReloadEffectNamed(
+    const char* const effectName
+  )
+  {
+    CD3DEffect* const effect = FindEffect(effectName);
+    if (effect == nullptr) {
+      return false;
+    }
+    const fa::string path = effect->mFile; // the effect is deleted below: keep its path
+    CD3DEffect** matchedEffect = mEffects.end();
+    FindEffectPathIterator(&matchedEffect, mEffects.begin(), mEffects.end(), path);
+    if (matchedEffect == mEffects.end()) {
+      return false;
+    }
+
+    CD3DEffect* const replacementEffect = new CD3DEffect();
+    if (!replacementEffect->InitEffectFromFile(path.c_str())) {
+      delete replacementEffect;
+      return false;
+    }
+
+    (void)mDevice->SetCurEffect(nullptr);
+
+    if (*matchedEffect != nullptr) {
+      delete *matchedEffect;
+    }
+    mEffects.erase(matchedEffect);
+    mEffects.push_back(replacementEffect);
+    return true;
+  }
+
   /**
    * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
    *

@@ -607,6 +607,21 @@ TEST(
   gTextureAnisotropy = saved;
 }
 
+// The same rule on the numbers a Direct3D 11 sampler state carries (Effects 11 samplers take it, EffectSamplersD3D11).
+TEST(
+  GalTextureFiltering,
+  RuleIsDecidedOnTheSamplerDescriptionAlone
+)
+{
+  EXPECT_TRUE(TakesTextureAnisotropy(0x15U, 1U, 1U, "AlbedoTexture"));
+  EXPECT_FALSE(TakesTextureAnisotropy(0x15U, 3U, 1U, "AlbedoTexture")) << "a clamped direction";
+  EXPECT_FALSE(TakesTextureAnisotropy(0x14U, 1U, 1U, "AlbedoTexture")) << "mips by point";
+  EXPECT_FALSE(TakesTextureAnisotropy(0x55U, 1U, 1U, "AlbedoTexture")) << "already anisotropic";
+  EXPECT_FALSE(TakesTextureAnisotropy(0x15U, 1U, 1U, "lookupTexture")) << "a lookup table";
+  EXPECT_FALSE(TakesTextureAnisotropy(0x15U, 1U, 1U, "MyLookup2")) << "the match ignores case";
+  EXPECT_TRUE(TakesTextureAnisotropy(0x15U, 1U, 1U, "")) << "a sampler whose texture is unknown";
+}
+
 TEST(
   GalModernHlsl,
   Direct3D9AlphaTestIsEmulatedInThePixelEntry

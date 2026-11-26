@@ -25,6 +25,7 @@
 #include "D3D11VertexLayouts.h"
 #include "EffectD3D11.h"
 #include "EffectSourceD3D11.h"
+#include "gpg/gal/effects/EffectDescription.h"
 #include "RenderTargetD3D11.h"
 #include "TextureD3D11.h"
 
@@ -787,7 +788,9 @@ namespace gpg::gal
         desc.Width,
         desc.Height
       );
-      const DepthStencilTargetContext depthContext(desc.Width, desc.Height, 3U, false);
+      // Engine change: sampled, so the ambient occlusion pass (GpuBindings::depthTarget) can read the scene depth, as
+      // on Direct3D 12 and Vulkan.
+      const DepthStencilTargetContext depthContext(desc.Width, desc.Height, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
     }
 
@@ -977,7 +980,48 @@ namespace gpg::gal
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
     ComPtr<ID3DX11Effect> effect =
       CompileEffect(sourceData, sourceBytes, context.mSourcePath.c_str(), defines.data(), context.mCachePath.c_str());
-    return std::shared_ptr<Effect>(new EffectD3D11(context, effect.Get()));
+    return std::shared_ptr<Effect>(new EffectD3D11(
+      context, effect.Get(), SamplerTextures(sourceData, sourceBytes, context.mSourcePath.c_str(), defines.data())
+    ));
+  }
+
+  // Which texture parameter each sampler of the effect reads, from the effect source preprocessed, translated and
+  // parsed the way the Direct3D 12 and Vulkan runtimes do (anisotropic filtering leaves lookup tables alone, which only
+  // the texture's name says). Empty when any step fails.
+  std::vector<std::pair<std::string, std::string>> DeviceD3D11::SamplerTextures(
+    const char* const source,
+    const std::size_t sourceBytes,
+    const char* const sourceName,
+    const D3D_SHADER_MACRO* const defines
+  )
+  {
+    std::vector<std::pair<std::string, std::string>> links;
+    if (sourceName == nullptr || sourceName[0] == '\0') {
+      return links;
+    }
+    try {
+      ComPtr<ID3DBlob> preprocessed;
+      ComPtr<ID3DBlob> errors;
+      if (FAILED(::D3DPreprocess(source, sourceBytes, sourceName, defines, nullptr, &preprocessed, &errors))) {
+        return links;
+      }
+      const d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
+        std::string_view(
+          static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U
+        ),
+        mFeatureLevel >= D3D_FEATURE_LEVEL_10_1,
+        std::string_view(source, sourceBytes)
+      );
+      const effects::EffectDescription description = effects::ParseEffect(translated.source);
+      for (const effects::SamplerDesc& sampler : description.samplers) {
+        if (!sampler.name.empty() && !sampler.texture.empty()) {
+          links.emplace_back(sampler.name, sampler.texture);
+        }
+      }
+    } catch (...) {
+      links.clear();
+    }
+    return links;
   }
 
   std::shared_ptr<Texture> DeviceD3D11::CreateTexture(
@@ -1949,11 +1993,21 @@ namespace gpg::gal
     if (directory == nullptr || directory[0] == 0 || mHeadOutputContexts.empty()) {
       return;
     }
+    // FAF_GAL_DUMP_MS (diagnostics): an interval in milliseconds, which also numbers the files 0, 1, 2, ... instead of
+    // by the second.
+    static const long intervalMs = [] {
+      const char* const milliseconds = std::getenv("FAF_GAL_DUMP_MS");
+      return (milliseconds != nullptr) ? std::strtol(milliseconds, nullptr, 10) : 0L;
+    }();
     static const DWORD interval = [] {
+      if (intervalMs > 0L) {
+        return static_cast<DWORD>(intervalMs);
+      }
       const char* const seconds = std::getenv("FAF_GAL_DUMP_SECONDS");
       const long value = (seconds != nullptr) ? std::strtol(seconds, nullptr, 10) : 10L;
       return static_cast<DWORD>((value > 0L) ? value * 1000L : 10000L);
     }();
+    static unsigned long dumpIndex = 0UL;
     const DWORD now = ::GetTickCount();
     if (mLastDumpTick != 0U && now - mLastDumpTick < interval) {
       return;
@@ -1965,7 +2019,11 @@ namespace gpg::gal
 
     char path[MAX_PATH]{};
     std::snprintf(
-      path, sizeof(path), "%s/d3d11_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
+      path,
+      sizeof(path),
+      "%s/d3d11_%06lu.bmp",
+      directory,
+      (intervalMs > 0L) ? dumpIndex++ : static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
     );
     auto* const target = static_cast<RenderTargetD3D11*>(mHeadOutputContexts.front().surface.get());
     DumpTexture(target->GetTexture(), path);
@@ -2856,6 +2914,23 @@ namespace gpg::gal
     if (mGpuDriven != nullptr) {
       mGpuDriven->EndProfileRegion(region);
     }
+  }
+
+  bool DeviceD3D11::CopyDepthStencil(
+    DepthStencilTarget& destination,
+    DepthStencilTarget& source
+  )
+  {
+    auto& to = static_cast<DepthStencilTargetD3D11&>(destination);
+    auto& from = static_cast<DepthStencilTargetD3D11&>(source);
+    if (
+      &to == &from || to.GetContext()->width_ != from.GetContext()->width_ ||
+      to.GetContext()->height_ != from.GetContext()->height_
+    ) {
+      return false;
+    }
+    mImmediate->CopyResource(to.GetTexture(), from.GetTexture());
+    return true;
   }
 
   bool DeviceD3D11::CopyVertexBufferRegion(

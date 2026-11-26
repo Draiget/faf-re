@@ -343,6 +343,9 @@ namespace gpg::gal
       if (slot.renderTarget.get() != binding.renderTarget.get()) {
         slot.renderTarget = binding.renderTarget;
       }
+      if (slot.depthStencil.get() != binding.depthStencil.get()) {
+        slot.depthStencil = binding.depthStencil;
+      }
     }
   } // namespace
 
@@ -367,6 +370,7 @@ namespace gpg::gal
     std::uint64_t tableFrame = ~0ULL;
     std::uint64_t textureVersion = 0;
     const RenderTarget* tableSurface = nullptr;
+    const DepthStencilTarget* tableDepth = nullptr;
     VkDescriptorSet table = VK_NULL_HANDLE;
     std::vector<effects::TextureBinding> tableBindings;
   };
@@ -2060,6 +2064,43 @@ namespace gpg::gal
     return true;
   }
 
+  bool DeviceVulkan::CopyDepthStencil(
+    DepthStencilTarget& destination,
+    DepthStencilTarget& source
+  )
+  {
+    auto& to = static_cast<DepthStencilTargetVulkan&>(destination);
+    auto& from = static_cast<DepthStencilTargetVulkan&>(source);
+    vulkan::TrackedImage& target = to.Image();
+    vulkan::TrackedImage& origin = from.Image();
+    if (
+      &to == &from || target.image == VK_NULL_HANDLE || origin.image == VK_NULL_HANDLE ||
+      target.format != origin.format || target.width != origin.width || target.height != origin.height
+    ) {
+      return false;
+    }
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // Copies are not allowed inside dynamic rendering; the barriers of Transition order it after the draws that wrote
+    // the depth.
+    EndRendering();
+    Transition(origin, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    TransitionForTransferWrite(target);
+    VkImageCopy region{};
+    region.srcSubresource = {AspectOf(origin.format), 0U, 0U, 1U};
+    region.dstSubresource = {AspectOf(target.format), 0U, 0U, 1U};
+    region.extent = {origin.width, origin.height, 1U};
+    Vk().vkCmdCopyImage(
+      mCommands,
+      origin.image,
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      target.image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      1U,
+      &region
+    );
+    return true;
+  }
+
   void DeviceVulkan::TransitionForTransferWrite(
     vulkan::TrackedImage& image
   )
@@ -2731,7 +2772,9 @@ namespace gpg::gal
       Vk().vkGetPhysicalDeviceFormatProperties(mPhysical, format, &properties);
       sampled = (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0U;
     }
-    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
+    // Transfer both ways: CopyDepthStencil copies the scene depth to a sampled twin.
+    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT | (sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImage(mDevice, &info, nullptr, &image.image));
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, image.image, &requirements);
@@ -3343,11 +3386,21 @@ namespace gpg::gal
     if (directory == nullptr || directory[0] == 0 || mHeadOutputContexts.empty() || !mSwapChains.front().hasImage) {
       return;
     }
+    // FAF_GAL_DUMP_MS (diagnostics): an interval in milliseconds, which also numbers the files 0, 1, 2, ... instead of
+    // by the second.
+    static const long intervalMs = [] {
+      const char* const milliseconds = std::getenv("FAF_GAL_DUMP_MS");
+      return (milliseconds != nullptr) ? std::strtol(milliseconds, nullptr, 10) : 0L;
+    }();
     static const DWORD interval = [] {
+      if (intervalMs > 0L) {
+        return static_cast<DWORD>(intervalMs);
+      }
       const char* const seconds = std::getenv("FAF_GAL_DUMP_SECONDS");
       const long value = (seconds != nullptr) ? std::strtol(seconds, nullptr, 10) : 10L;
       return static_cast<DWORD>((value > 0L) ? value * 1000L : 10000L);
     }();
+    static unsigned long dumpIndex = 0UL;
     const DWORD now = ::GetTickCount();
     if (mLastDumpTick != 0U && now - mLastDumpTick < interval) {
       return;
@@ -3358,7 +3411,11 @@ namespace gpg::gal
     mLastDumpTick = now;
     char path[MAX_PATH]{};
     std::snprintf(
-      path, sizeof(path), "%s/vulkan_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
+      path,
+      sizeof(path),
+      "%s/vulkan_%06lu.bmp",
+      directory,
+      (intervalMs > 0L) ? dumpIndex++ : static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
     );
     auto* const target = static_cast<RenderTargetVulkan*>(mHeadOutputContexts.front().surface.get());
     imaging::Image image;
@@ -3983,7 +4040,8 @@ namespace gpg::gal
     bool keepTable = false;
     if (
       gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
-      state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()
+      state.tableSurface == outputContext_.surface.get() && state.tableDepth == outputContext_.depthStencil.get() &&
+      state.textureVersion != parameters.TextureVersion()
     ) {
       keepTable = UsedTextureBindingsKept(
         program,
@@ -3996,7 +4054,8 @@ namespace gpg::gal
     if (
       !keepTable &&
       (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||
-       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get())
+       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get() ||
+       state.tableDepth != outputContext_.depthStencil.get())
     ) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
@@ -4030,6 +4089,15 @@ namespace gpg::gal
           } else {
             view = static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().view;
           }
+        } else if (binding.depthStencil != nullptr && slot.dimension == effects::TextureDimension::Texture2D) {
+          // A sampled depth target (EffectVariable::SetDepthStencil); never the one bound as the depth output.
+          const VkImageView depthView =
+            static_cast<DepthStencilTargetVulkan*>(binding.depthStencil.get())->SampledView();
+          if (depthView != VK_NULL_HANDLE && binding.depthStencil.get() != outputContext_.depthStencil.get()) {
+            view = depthView;
+          } else {
+            kept = &kNoTextureBinding;
+          }
         } else {
           kept = &kNoTextureBinding;
         }
@@ -4062,6 +4130,7 @@ namespace gpg::gal
       state.tableFrame = mFrameCount;
       state.textureVersion = parameters.TextureVersion();
       state.tableSurface = outputContext_.surface.get();
+      state.tableDepth = outputContext_.depthStencil.get();
     }
     bound.textures = state.table;
     bound.sampled = &state.tableBindings;
@@ -4093,6 +4162,11 @@ namespace gpg::gal
           static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().image,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
+      } else if (binding.depthStencil != nullptr) {
+        auto* const depth = static_cast<DepthStencilTargetVulkan*>(binding.depthStencil.get());
+        if (depth->SampledView() != VK_NULL_HANDLE && binding.depthStencil.get() != outputContext_.depthStencil.get()) {
+          Transition(depth->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
       }
     }
   }

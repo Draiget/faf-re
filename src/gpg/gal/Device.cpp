@@ -530,6 +530,13 @@ namespace gpg::gal
   {
     return false;
   }
+  bool Device::CopyDepthStencil(
+    DepthStencilTarget&,
+    DepthStencilTarget&
+  )
+  {
+    return false;
+  }
   RayGeometryId Device::CreateRayGeometry(
     const RayGeometryDesc&
   )

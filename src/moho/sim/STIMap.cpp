@@ -542,6 +542,32 @@ namespace
     return capsMask;
   }
 
+  /**
+   * Engine addition (rivers): whether the cells `[x0, x1) x [z0, z1)` of a footprint include a fall of a
+   * river. A fall has no occupancy caps at all: nothing on the ground or the water crosses the step in the
+   * surface and nothing is built on it. One load and a branch for a map without falls.
+   */
+  [[nodiscard]] bool FootprintTouchesFall(
+    const moho::STIMap& map,
+    const std::int32_t x0,
+    const std::int32_t z0,
+    const std::int32_t x1,
+    const std::int32_t z1
+  ) noexcept
+  {
+    if (!map.mWaterBodies || !map.mWaterBodies->HasFalls()) {
+      return false;
+    }
+    for (std::int32_t z = z0; z < z1; ++z) {
+      for (std::int32_t x = x0; x < x1; ++x) {
+        if (map.mWaterBodies->IsFallCell(x, z)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   [[nodiscard]] std::uint16_t ClampWordFromFloat(
     float value
   ) noexcept
@@ -2667,6 +2693,18 @@ namespace moho
     ) {
       return static_cast<EOccupancyCaps>(0u);
     }
+    // Engine addition (rivers): the cell is a fall.
+    if (
+      FootprintTouchesFall(
+        *this,
+        static_cast<std::int32_t>(x),
+        static_cast<std::int32_t>(z),
+        static_cast<std::int32_t>(x) + 1,
+        static_cast<std::int32_t>(z) + 1
+      )
+    ) {
+      return static_cast<EOccupancyCaps>(0u);
+    }
 
     const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
     const std::size_t row0 = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
@@ -2805,6 +2843,20 @@ namespace moho
       const std::size_t index =
         static_cast<std::size_t>(x) + static_cast<std::size_t>(z) * static_cast<std::size_t>(mTerrainType.width);
       terrainType = mTerrainType.data[index];
+
+      // Engine addition (rivers): a fall reports the first blocking terrain type, so a navigation mesh
+      // built from `GetTerrainType(x, z).Blocking` (FAF's NavGenerator) agrees with the occupancy check.
+      if (
+        mWaterBodies && mWaterBodies->HasFalls() &&
+        mWaterBodies->IsFallCell(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z))
+      ) {
+        for (std::size_t type = 0; type < kTerrainTypeCount; ++type) {
+          if (mBlocking[type] != 0u) {
+            terrainType = static_cast<std::uint8_t>(type);
+            break;
+          }
+        }
+      }
     }
 
     return GetTerrainType(terrainType);
@@ -3043,9 +3095,114 @@ namespace moho
         waterResult = hit;
       }
     };
+    // A river's surface is not a plane: the line is followed over the river's cells until it goes under
+    // the surface there (fixed steps of half a unit across the ground, then a bisection; float
+    // arithmetic only, as the sim needs).
+    const auto tryRiver = [&](const std::uint8_t number) {
+      const SWaterBody& body = mWaterBodies->Body(number);
+      if (body.cellCount == 0u) {
+        return;
+      }
+      float ta = line.closest;
+      float tb = line.farthest;
+      const auto clip = [&](const float start, const float direction, const float low, const float high) {
+        if (direction == 0.0f) {
+          if (!(start >= low && start <= high)) {
+            tb = ta - 1.0f;
+          }
+          return;
+        }
+        const float t0 = (low - start) / direction;
+        const float t1 = (high - start) / direction;
+        ta = std::max(ta, std::min(t0, t1));
+        tb = std::min(tb, std::max(t0, t1));
+      };
+      clip(line.pos.y, line.dir.y, body.levelMin, body.levelMax);
+      clip(line.pos.x, line.dir.x, static_cast<float>(body.x0), static_cast<float>(body.x1));
+      clip(line.pos.z, line.dir.z, static_cast<float>(body.z0), static_cast<float>(body.z1));
+      if (!(ta <= tb)) {
+        return;
+      }
+      const float cellsX = static_cast<float>(mWaterBodies->CellWidth());
+      const float cellsZ = static_cast<float>(mWaterBodies->CellHeight());
+      const auto under = [&](const float t) {
+        const Wm3::Vec3f point = PointOnLine(line, t);
+        if (!(point.x >= 0.0f && point.x < cellsX && point.z >= 0.0f && point.z < cellsZ)) {
+          return false;
+        }
+        if (
+          mWaterBodies->BodyOfCell(static_cast<std::int32_t>(point.x), static_cast<std::int32_t>(point.z)) != number
+        ) {
+          return false;
+        }
+        return point.y <= mWaterBodies->LevelAt(point.x, point.z, kWaterBodyNoWater);
+      };
+
+      constexpr float kHorizontalStep = 0.5f;
+      constexpr float kMaxSteps = 8192.0f;
+      const float horizontal = std::sqrt((line.dir.x * line.dir.x) + (line.dir.z * line.dir.z));
+      float step = tb - ta;
+      if (horizontal > 0.0f) {
+        step = std::min(step, kHorizontalStep / horizontal);
+      }
+      step = std::max(step, (tb - ta) / kMaxSteps);
+      if (!(step > 0.0f)) {
+        step = tb - ta;
+      }
+
+      float hitT = 0.0f;
+      bool hit = false;
+      bool wasUnder = false;
+      float previous = ta;
+      for (float index = 0.0f;; index += 1.0f) {
+        const float t = std::min(ta + (index * step), tb);
+        const bool isUnder = under(t);
+        if (isUnder && !wasUnder) {
+          hit = true;
+          if (index == 0.0f) {
+            hitT = t;
+          } else {
+            float outside = previous;
+            float inside = t;
+            for (std::int32_t pass = 0; pass < 20; ++pass) {
+              const float middle = outside + ((inside - outside) * 0.5f);
+              if (under(middle)) {
+                inside = middle;
+              } else {
+                outside = middle;
+              }
+            }
+            hitT = inside;
+          }
+          break;
+        }
+        wasUnder = isUnder;
+        previous = t;
+        if (t >= tb) {
+          break;
+        }
+      }
+      if (!hit) {
+        return;
+      }
+      if (terrainFound && !(hitT < terrainResult.distance)) {
+        return;
+      }
+      if (!waterFound || hitT < waterResult.distance) {
+        waterFound = true;
+        waterHit = PointOnLine(line, hitT);
+        waterResult = {};
+        waterResult.distance = hitT;
+      }
+    };
+
     tryLevel(mWaterEnabled != 0u ? mWaterElevation : kWaterBodyNoWater);
     for (std::size_t number = 1; number <= mWaterBodies->BodyCount(); ++number) {
-      tryLevel(mWaterBodies->Body(static_cast<std::uint8_t>(number)).elevation);
+      if (mWaterBodies->IsRiver(static_cast<std::uint8_t>(number))) {
+        tryRiver(static_cast<std::uint8_t>(number));
+      } else {
+        tryLevel(mWaterBodies->Body(static_cast<std::uint8_t>(number)).elevation);
+      }
     }
 
     if (waterFound) {
@@ -3266,6 +3423,11 @@ namespace moho
           return static_cast<EOccupancyCaps>(0u);
         }
       }
+    }
+
+    // Engine addition (rivers): the footprint covers a fall.
+    if (FootprintTouchesFall(map, x0, z0, x1, z1)) {
+      return static_cast<EOccupancyCaps>(0u);
     }
 
     std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);

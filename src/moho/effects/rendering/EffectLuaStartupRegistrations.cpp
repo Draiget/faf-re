@@ -18,6 +18,7 @@
 #include "moho/render/EBeamParam.h"
 #include "moho/render/EEmitterCurve.h"
 #include "moho/render/EEmitterParam.h"
+#include "moho/render/lights/SimLights.h"
 #include "moho/resource/RResId.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
@@ -3127,6 +3128,274 @@ namespace moho
     return index;
   }
 
+  // ---------------------------------------------------------------------------------------------------------------------------------
+  // FAF addition, not in the shipped binary: Lua dynamic lights (docs/DYNAMIC_LIGHTS.md, "Lua lights"). Visual only;
+  // the registry is in moho/render/lights/SimLights.cpp. Every function behaves the same on every client (a handle is
+  // always returned), so scripts that use them take the same branches whatever the quality level or the camera.
+  //
+  //   id = CreateLight(entity | nil, bone | nil, r, g, b, radius, intensity)   a point light on a bone (nil entity: at
+  //   the origin, see SetLightPosition) SetLight(id, r, g, b, radius, intensity)                                 colour
+  //   0..1, radius in world units, intensity 0..100 SetLightOffset(id, x, y, z) offset in bone space
+  //   SetLightPosition(id, x, y, z)                                            world position of a light without an
+  //   entity SetLightSpot(id, dx, dy, dz, coneDegrees)                                spotlight along a bone-space
+  //   direction; cone <= 0: point light DestroyLight(id)                                                         true
+  //   when it existed; a light also ends when its entity dies
+  namespace dynlight_lua
+  {
+    constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+    constexpr const char* kCreateHelp = "id = CreateLight(entity|nil, bone|nil, r, g, b, radius, intensity)";
+    constexpr const char* kSetHelp = "ok = SetLight(id, r, g, b, radius, intensity)";
+    constexpr const char* kOffsetHelp = "ok = SetLightOffset(id, x, y, z)";
+    constexpr const char* kPositionHelp = "ok = SetLightPosition(id, x, y, z)";
+    constexpr const char* kSpotHelp = "ok = SetLightSpot(id, dx, dy, dz, coneDegrees)";
+    constexpr const char* kDestroyHelp = "ok = DestroyLight(id)";
+
+    float Number(
+      LuaPlus::LuaState* const state,
+      const int index
+    )
+    {
+      lua_State* const raw = state->m_state;
+      if (lua_type(raw, index) != LUA_TNUMBER) {
+        LuaPlus::LuaStackObject(state, index).TypeError("number");
+      }
+      return static_cast<float>(lua_tonumber(raw, index));
+    }
+
+    std::uint32_t Id(
+      LuaPlus::LuaState* const state,
+      const int index
+    )
+    {
+      const float v = Number(state, index);
+      return v >= 1.0f && v < 4294967295.0f ? static_cast<std::uint32_t>(v) : 0u;
+    }
+
+    void ExpectArgs(
+      LuaPlus::LuaState* const state,
+      const char* const help,
+      const int expected
+    )
+    {
+      const int count = lua_gettop(state->m_state);
+      if (count != expected) {
+        LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, help, expected, count);
+      }
+    }
+  } // namespace dynlight_lua
+
+  int cfunc_CreateLightL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    lua_State* const raw = state->m_state;
+    ExpectArgs(state, kCreateHelp, 7);
+
+    Entity* entity = nullptr;
+    int bone = -1;
+    if (!lua_isnil(raw, 1)) {
+      LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+      entity = SCR_FromLua_Entity(entityObject, state);
+      LuaPlus::LuaStackObject boneArg(state, 2);
+      bone = ENTSCR_ResolveBoneIndex(entity, boneArg, true);
+    }
+    const float r = Number(state, 3);
+    const float g = Number(state, 4);
+    const float b = Number(state, 5);
+    const float radius = Number(state, 6);
+    const float intensity = Number(state, 7);
+
+    Sim* const sim = ResolveGlobalSim(raw);
+    const float origin[3] = {0.0f, 0.0f, 0.0f};
+    const std::uint32_t id = lights::SimLightCreate(sim, entity, bone, origin);
+    if (id != 0) {
+      (void)lights::SimLightSetColour(sim, id, r, g, b, radius, intensity);
+    }
+    lua_pushnumber(raw, static_cast<lua_Number>(id));
+    return 1;
+  }
+
+  int cfunc_CreateLight(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_CreateLightL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_CreateLight_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "CreateLight", &cfunc_CreateLight, nullptr, "<global>", dynlight_lua::kCreateHelp
+    );
+    return &binder;
+  }
+
+  int cfunc_SetLightL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    ExpectArgs(state, kSetHelp, 6);
+    const std::uint32_t id = Id(state, 1);
+    const bool ok = lights::SimLightSetColour(
+      ResolveGlobalSim(state->m_state),
+      id,
+      Number(state, 2),
+      Number(state, 3),
+      Number(state, 4),
+      Number(state, 5),
+      Number(state, 6)
+    );
+    lua_pushboolean(state->m_state, ok ? 1 : 0);
+    return 1;
+  }
+
+  int cfunc_SetLight(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_SetLightL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_SetLight_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "SetLight", &cfunc_SetLight, nullptr, "<global>", dynlight_lua::kSetHelp
+    );
+    return &binder;
+  }
+
+  int cfunc_SetLightOffsetL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    ExpectArgs(state, kOffsetHelp, 4);
+    const std::uint32_t id = Id(state, 1);
+    const bool ok = lights::SimLightSetOffset(
+      ResolveGlobalSim(state->m_state), id, Number(state, 2), Number(state, 3), Number(state, 4)
+    );
+    lua_pushboolean(state->m_state, ok ? 1 : 0);
+    return 1;
+  }
+
+  int cfunc_SetLightOffset(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_SetLightOffsetL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_SetLightOffset_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "SetLightOffset", &cfunc_SetLightOffset, nullptr, "<global>", dynlight_lua::kOffsetHelp
+    );
+    return &binder;
+  }
+
+  int cfunc_SetLightPositionL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    ExpectArgs(state, kPositionHelp, 4);
+    const std::uint32_t id = Id(state, 1);
+    const bool ok = lights::SimLightSetPosition(
+      ResolveGlobalSim(state->m_state), id, Number(state, 2), Number(state, 3), Number(state, 4)
+    );
+    lua_pushboolean(state->m_state, ok ? 1 : 0);
+    return 1;
+  }
+
+  int cfunc_SetLightPosition(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_SetLightPositionL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_SetLightPosition_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "SetLightPosition", &cfunc_SetLightPosition, nullptr, "<global>", dynlight_lua::kPositionHelp
+    );
+    return &binder;
+  }
+
+  int cfunc_SetLightSpotL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    ExpectArgs(state, kSpotHelp, 5);
+    const std::uint32_t id = Id(state, 1);
+    const bool ok = lights::SimLightSetSpot(
+      ResolveGlobalSim(state->m_state), id, Number(state, 2), Number(state, 3), Number(state, 4), Number(state, 5)
+    );
+    lua_pushboolean(state->m_state, ok ? 1 : 0);
+    return 1;
+  }
+
+  int cfunc_SetLightSpot(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_SetLightSpotL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_SetLightSpot_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "SetLightSpot", &cfunc_SetLightSpot, nullptr, "<global>", dynlight_lua::kSpotHelp
+    );
+    return &binder;
+  }
+
+  int cfunc_DestroyLightL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    using namespace dynlight_lua;
+    if (!state || !state->m_state) {
+      return 0;
+    }
+    ExpectArgs(state, kDestroyHelp, 1);
+    const bool ok = lights::SimLightDestroy(ResolveGlobalSim(state->m_state), Id(state, 1));
+    lua_pushboolean(state->m_state, ok ? 1 : 0);
+    return 1;
+  }
+
+  int cfunc_DestroyLight(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_DestroyLightL(ResolveBindingState(luaContext));
+  }
+
+  CScrLuaInitForm* func_DestroyLight_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(), "DestroyLight", &cfunc_DestroyLight, nullptr, "<global>", dynlight_lua::kDestroyHelp
+    );
+    return &binder;
+  }
 } // namespace moho
 
 namespace
@@ -3205,6 +3474,12 @@ namespace
       (void)::moho::func_CreateEmitterOnEntity_LuaFuncDef();
       (void)::moho::func_CreateLightParticle_LuaFuncDef();
       (void)::moho::func_CreateLightParticleIntel_LuaFuncDef();
+      (void)::moho::func_CreateLight_LuaFuncDef();
+      (void)::moho::func_SetLight_LuaFuncDef();
+      (void)::moho::func_SetLightOffset_LuaFuncDef();
+      (void)::moho::func_SetLightPosition_LuaFuncDef();
+      (void)::moho::func_SetLightSpot_LuaFuncDef();
+      (void)::moho::func_DestroyLight_LuaFuncDef();
       (void)::moho::func_CreateAttachedEmitter_LuaFuncDef();
       (void)::moho::func_CreateTrail_LuaFuncDef();
       (void)::moho::func_CreateAttachedBeam_LuaFuncDef();

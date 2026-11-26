@@ -1,0 +1,39 @@
+name: 2p-waterrivers-x86-vs-x64
+description: >
+  Rivers (docs/projects/RIVERS.md) in a two-client game, x86 against x64: both clients play the water-rivers test map with
+  sim_FixWaterBodies and sim_FixRivers on and run the map script (25 checks). Client 1 is the x86 build (a copy of the
+  game's bin folder with the engine as riversim_x86.exe, staged as bin_x86_riversim), client 2 the x64 build
+  (bin_x64_riversim\riversim.exe): the level field, the falls and every unit's path must come out the same, or the
+  checksums differ and a GPGNet "Desync" is reported.
+  Setup: python tools/scenarios/water-rivers/make_map.py "<game>/maps/SCMP_012" "<vault>/maps".
+timeout: 10m
+
+mode: direct
+lobby: auto
+map: faf_re_waterrivers
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x86_riversim\riversim_x86.exe'
+  init: '%ProgramData%\FAForever\bin\init_faf.lua'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: RiverX86, faction: uef, args: ['/con', 'sim_FixWaterBodies=1;sim_FixRivers=1'] }
+  - { uid: 2, name: RiverX64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64_riversim\riversim.exe', args: ['/con', 'sim_FixWaterBodies=1;sim_FixRivers=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 150s
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RIVERTEST DONE passed 25 failed 0' }

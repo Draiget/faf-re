@@ -14,6 +14,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/RiverFlowBind.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
@@ -266,12 +267,15 @@ namespace moho
     // Engine addition (water bodies): each water at its own level.
     if (const auto* const levels = WaterBodySurfaces::For(terrainRes); levels != nullptr) {
       bool drawn = true;
+      water::BindRiverFlow(terrainRes);
       for (const WaterBodySurfaces::Level& level : *levels) {
         GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        water::BindRiverMesh(level.river); // a river's mesh keeps the heights of its vertices
         for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
           drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
         }
       }
+      water::BindRiverMesh(false);
       return drawn;
     }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);

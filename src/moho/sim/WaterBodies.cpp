@@ -166,6 +166,50 @@ namespace moho
         return polygon.empty() || WaterBodyPolygonContains(polygon, static_cast<float>(x), static_cast<float>(z));
       };
 
+      if (desc.isRiver) {
+        // A river owns the vertices of its channel; there is no seed and no fill.
+        std::string reason;
+        const std::shared_ptr<const CWaterRiver> river =
+          CWaterRiver::Build(desc.river, heights, width, height, heightScale, &reason);
+        if (!river) {
+          std::snprintf(line, sizeof(line), "water body %zu skipped: river: %s", descIndex + 1u, reason.c_str());
+          AddLog(log, line);
+          continue;
+        }
+        const auto number = static_cast<std::uint8_t>(result->mBodies.size() + 1u);
+        std::uint32_t taken = 0;
+        for (std::int32_t z = river->Z0(); z <= river->Z1(); ++z) {
+          for (std::int32_t x = river->X0(); x <= river->X1(); ++x) {
+            const std::size_t index =
+              static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+            if (result->mVertexBody[index] == 0u && river->IsWetVertex(x, z)) {
+              result->mVertexBody[index] = number;
+              ++taken;
+            }
+          }
+        }
+        if (taken == 0u) {
+          std::snprintf(
+            line,
+            sizeof(line),
+            "water body %zu skipped: every wet vertex of its river is another body's",
+            descIndex + 1u
+          );
+          AddLog(log, line);
+          continue;
+        }
+        SWaterBody body;
+        body.elevation = river->LevelMax();
+        body.levelMin = river->LevelMin();
+        body.levelMax = river->LevelMax();
+        body.deep = desc.deep;
+        body.abyss = desc.abyss;
+        result->mBodies.push_back(body);
+        result->mRivers.push_back(river);
+        result->mHasRivers = true;
+        continue;
+      }
+
       if (!desc.hasSeed) {
         if (polygon.empty()) {
           std::snprintf(line, sizeof(line), "water body %zu skipped: no Seed and no Outline", descIndex + 1u);
@@ -202,7 +246,9 @@ namespace moho
         body.elevation = desc.dry ? kWaterBodyNoWater : desc.elevation;
         body.deep = desc.dry ? kWaterBodyNoWater : desc.deep;
         body.abyss = desc.dry ? kWaterBodyNoWater : desc.abyss;
+        body.levelMin = body.levelMax = body.elevation;
         result->mBodies.push_back(body);
+        result->mRivers.emplace_back();
         continue;
       }
 
@@ -248,7 +294,9 @@ namespace moho
       body.elevation = desc.dry ? kWaterBodyNoWater : desc.elevation;
       body.deep = desc.dry ? kWaterBodyNoWater : desc.deep;
       body.abyss = desc.dry ? kWaterBodyNoWater : desc.abyss;
+      body.levelMin = body.levelMax = body.elevation;
       result->mBodies.push_back(body);
+      result->mRivers.emplace_back();
 
       // Four-way fill over vertices, from the seed.
       pending.clear();
@@ -329,6 +377,28 @@ namespace moho
     if (!anyCell) {
       return nullptr;
     }
+
+    // The falls of every river as one bit per map cell, for the movement checks.
+    for (const std::shared_ptr<const CWaterRiver>& river : result->mRivers) {
+      if (!river || !river->HasFalls()) {
+        continue;
+      }
+      if (result->mFallCells.empty()) {
+        result->mFallCells.assign(
+          (static_cast<std::size_t>(cellWidth) * static_cast<std::size_t>(cellHeight) + 7u) / 8u, 0u
+        );
+      }
+      for (std::int32_t z = river->Z0(); z < river->Z1(); ++z) {
+        for (std::int32_t x = river->X0(); x < river->X1(); ++x) {
+          if (river->IsFallCell(x, z)) {
+            const std::size_t index =
+              static_cast<std::size_t>(z) * static_cast<std::size_t>(cellWidth) + static_cast<std::size_t>(x);
+            result->mFallCells[index >> 3u] =
+              static_cast<std::uint8_t>(result->mFallCells[index >> 3u] | (1u << (index & 7u)));
+          }
+        }
+      }
+    }
     static std::atomic<std::uint32_t> sGenerations{0};
     result->mGeneration = ++sGenerations;
     return result;
@@ -380,7 +450,16 @@ namespace moho
   ) const noexcept
   {
     const std::uint8_t body = BodyOfCell(ClampedCell(x, CellWidth()), ClampedCell(z, CellHeight()));
-    return body != 0u ? mBodies[body - 1u].elevation : seaLevel;
+    if (body == 0u) {
+      return seaLevel;
+    }
+    if (const CWaterRiver* const river = River(body); river != nullptr) {
+      float level = 0.0f;
+      if (river->LevelAt(x, z, level)) {
+        return level;
+      }
+    }
+    return mBodies[body - 1u].elevation;
   }
 
   float CWaterBodies::LevelOfVertex(
@@ -390,7 +469,28 @@ namespace moho
   ) const noexcept
   {
     const std::uint8_t body = BodyOfVertex(x, z);
-    return body != 0u ? mBodies[body - 1u].elevation : seaLevel;
+    if (body == 0u) {
+      return seaLevel;
+    }
+    if (const CWaterRiver* const river = River(body); river != nullptr) {
+      float level = 0.0f;
+      if (river->VertexLevel(std::clamp(x, 0, mVertexWidth - 1), std::clamp(z, 0, mVertexHeight - 1), level)) {
+        return level;
+      }
+    }
+    return mBodies[body - 1u].elevation;
+  }
+
+  bool CWaterBodies::FlowAt(
+    const float x,
+    const float z,
+    float& fx,
+    float& fz
+  ) const noexcept
+  {
+    const std::uint8_t body = BodyOfCell(ClampedCell(x, CellWidth()), ClampedCell(z, CellHeight()));
+    const CWaterRiver* const river = River(body);
+    return river != nullptr && river->FlowAt(x, z, fx, fz);
   }
 
   float CWaterBodies::HighestLevel() const noexcept

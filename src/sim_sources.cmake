@@ -25,7 +25,7 @@ set(_faf_client_only_patterns
   "^moho/terrain/"
   "^moho/mesh/"
   # Particle and beam drawing (the particle buffers the sim fills stay).
-  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles)\\.cpp$"
+  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles|ParticleEffectPatch|ParticleLowRes)\\.cpp$"
   # Audio output (the sim's sound manager and parameters stay).
   "^moho/audio/(AudioEngine|AudioOutputWatch|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
   # The script debugger's windows (Dear ImGui, issue #413).
@@ -77,6 +77,9 @@ set(_faf_sim_patterns
   # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on
   # the sim thread), their reflection and serialisers.
   "^moho/render/(CDecalBuffer|CDecalBufferSerializer|CDecalBufferTypeInfo|CDecalGroup|CDecalHandle|CDecalHandleSerializer|CDecalHandleTypeInfo|CDecalTypes|IDecalGroup|SDecalInfoTypeInfo)\\.cpp$"
+  # The sim's half of the Lua dynamic lights (Sim::Tick, Sim's destructor and the Lua light methods call it; it draws
+  # nothing and includes no render header).
+  "^moho/render/lights/SimLights\\.cpp$"
   # The base of the sim's debug overlays (moho/debug, RDebugCollision, ...).
   "^moho/render/RDebugOverlay\\.cpp$"
   # Transform and camera geometry the sim computes with (entity transforms,
