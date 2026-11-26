@@ -61,6 +61,9 @@ namespace gpg::gal::dxgi
       {5U, DXGI_FORMAT_B5G5R5A1_UNORM},
       {6U, DXGI_FORMAT_B5G6R5_UNORM},
       {7U, DXGI_FORMAT_R16G16_UNORM},
+      // FAF addition: a token above the 1-7 range of the D3D9 contract; only engine code that creates its own targets
+      // asks for it (the water simulation's RGBA16F result, docs/WATER_SIMULATION.md).
+      {9U, DXGI_FORMAT_R16G16B16A16_FLOAT},
       {2U, DXGI_FORMAT_R8G8B8A8_UNORM},
     };
   } // namespace

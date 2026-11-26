@@ -808,9 +808,11 @@ namespace gpg::gal
     VkDescriptorImageInfo& depthInfo = images[kGpuMaxTextures + 1U];
     depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     depthInfo.imageView = mNullViews[0];
-    if (bindings.readBoundDepth && outputContext_.depthStencil != nullptr) {
+    if (bindings.depthTarget != nullptr || (bindings.readBoundDepth && outputContext_.depthStencil != nullptr)) {
       // BeginRendering moves it back to DEPTH_STENCIL_ATTACHMENT_OPTIMAL for the next draw.
-      auto* const depth = static_cast<DepthStencilTargetVulkan*>(outputContext_.depthStencil.get());
+      auto* const depth = static_cast<DepthStencilTargetVulkan*>(
+        bindings.depthTarget != nullptr ? bindings.depthTarget : outputContext_.depthStencil.get()
+      );
       if (depth->SampledView() != VK_NULL_HANDLE) {
         Transition(depth->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         depthInfo.imageView = depth->SampledView();

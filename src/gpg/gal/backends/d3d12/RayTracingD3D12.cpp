@@ -165,6 +165,10 @@ namespace gpg::gal
     mTlasBytes = 0U;
     mTlasAddress = 0U;
     mRayInstanceDescs.clear();
+    mRayBuiltDescs.clear();
+    mRayBuiltRecords.clear();
+    mRayBuiltTextures.clear();
+    mRayBuiltChanges = ~0ULL;
     mRayAttributes = d3d12::TrackedResource{};
     mRayAttributesBytes = 0U;
     mRayAttributesUsed = 0U;
@@ -322,6 +326,7 @@ namespace gpg::gal
     const RayGeometryId id = mNextRayGeometry++;
     mRayGeometries.emplace(id, piece);
     mRayGeometryBytes += piece.range.bytes;
+    ++mRayGeometryChanges;
     return id;
   }
 
@@ -338,6 +343,7 @@ namespace gpg::gal
     mRayFrees.push_back(RayFree{RecordingSerial(), found->second.range});
     mRayGeometryBytes -= found->second.range.bytes;
     mRayGeometries.erase(found);
+    ++mRayGeometryChanges;
   }
 
   bool DeviceD3D12::SetRayInstances(
@@ -396,9 +402,31 @@ namespace gpg::gal
       mRayRecords.push_back(slot);
       mRayRecords.push_back(alphaTested ? 1U : 0U);
     }
+    // The same list over the same pieces as the last build (an idle scene: nothing moved): the structure built then
+    // is still right, and so are the records the draws read.
+    const bool unchanged = mTlasAddress != 0U && mRayBuiltChanges == mRayGeometryChanges &&
+      mRayBuiltDescs.size() == mRayInstanceDescs.size() && mRayBuiltRecords == mRayRecords &&
+      mRayBuiltTextures == mRayTextures &&
+      (mRayInstanceDescs.empty() ||
+       std::memcmp(
+         mRayBuiltDescs.data(),
+         mRayInstanceDescs.data(),
+         mRayInstanceDescs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC)
+       ) == 0);
+    if (unchanged) {
+      return true;
+    }
     WriteRayRecords();
     mRayTablesFrame = ~0ULL; // the table changes with the list
-    return BuildRayScene();
+    if (!BuildRayScene()) {
+      mRayBuiltChanges = ~0ULL;
+      return false;
+    }
+    mRayBuiltChanges = mRayGeometryChanges;
+    mRayBuiltDescs = mRayInstanceDescs;
+    mRayBuiltRecords = mRayRecords;
+    mRayBuiltTextures = mRayTextures;
+    return true;
   }
 
   bool DeviceD3D12::AppendRayAttributes(
