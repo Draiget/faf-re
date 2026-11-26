@@ -2037,6 +2037,71 @@ void moho::APP_SetAqtimeInstrumentationMode(
  * Finds a command-line option case-insensitively and optionally copies
  * its following positional arguments.
  */
+namespace
+{
+  // Engine addition (in-game launcher plan, WP4): a launcher match's switches (CFG_SetLaunchArgs). Function-local
+  // statics, as CFG_GetArgOption can run while other files' globals are still being made.
+  std::mutex& LaunchArgsLock()
+  {
+    static std::mutex lock;
+    return lock;
+  }
+
+  std::vector<std::string>& LaunchArgs()
+  {
+    static std::vector<std::string> args;
+    return args;
+  }
+
+  /** CFG_GetArgOption's search in the launcher match's switches: the same matching as on the command line. */
+  bool FindLaunchArgOption(
+    const gpg::StrArg option,
+    const std::uint32_t requiredArgCount,
+    fa::vector<fa::string>* const outArgs
+  )
+  {
+    std::lock_guard<std::mutex> lock(LaunchArgsLock());
+    const std::vector<std::string>& args = LaunchArgs();
+    for (std::size_t index = 0; index < args.size(); ++index) {
+      if (gpg::STR_CompareNoCase(args[index].c_str(), option) != 0) {
+        continue;
+      }
+      if (args.size() - index - 1 < requiredArgCount) {
+        continue;
+      }
+      if (outArgs != nullptr) {
+        outArgs->clear();
+        outArgs->reserve(requiredArgCount);
+        for (std::uint32_t argIndex = 0; argIndex < requiredArgCount; ++argIndex) {
+          outArgs->push_back(fa::string(args[index + 1 + argIndex].c_str()));
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+} // namespace
+
+void moho::CFG_SetLaunchArgs(
+  std::vector<std::string> args
+)
+{
+  std::lock_guard<std::mutex> lock(LaunchArgsLock());
+  LaunchArgs() = std::move(args);
+}
+
+void moho::CFG_ClearLaunchArgs()
+{
+  std::lock_guard<std::mutex> lock(LaunchArgsLock());
+  LaunchArgs().clear();
+}
+
+bool moho::CFG_HasLaunchArgs()
+{
+  std::lock_guard<std::mutex> lock(LaunchArgsLock());
+  return !LaunchArgs().empty();
+}
+
 bool moho::CFG_GetArgOption(
   const gpg::StrArg option,
   const std::uint32_t requiredArgCount,
@@ -2045,6 +2110,12 @@ bool moho::CFG_GetArgOption(
 {
   if (option == nullptr || option[0] == '\0') {
     return false;
+  }
+
+  // Engine addition (in-game launcher plan, WP4): a match the in-game launcher started reads its switches here
+  // first. Empty otherwise, so the loop below is the whole search, as in the binary.
+  if (FindLaunchArgOption(option, requiredArgCount, outArgs)) {
+    return true;
   }
 
   for (int index = 1; index < __argc; ++index) {

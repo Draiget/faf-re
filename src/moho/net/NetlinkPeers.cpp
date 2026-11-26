@@ -729,9 +729,9 @@ namespace moho
   bool NATIVENET_Enabled()
   {
     // `/nativenet` on the command line: /con runs on the first frame, after
-    // the launcher's first messages.
-    static const bool fromCommandLine = CFG_GetArgOption("/nativenet", 0u, nullptr);
-    return net_NativeNet != 0 || fromCommandLine;
+    // the launcher's first messages. Read each time, not kept, as a match the
+    // in-game launcher starts sets it for that match only (CFG_SetLaunchArgs).
+    return net_NativeNet != 0 || CFG_GetArgOption("/nativenet", 0u, nullptr);
   }
 
   void NATIVENET_Start()
@@ -772,8 +772,9 @@ namespace moho
     if (!Links().IsNative()) {
       return false;
     }
-    // Issue #275: a game coming back has no lobby. These messages only set up its links.
-    static const bool comingBack = CFG_GetArgOption("/rejoin", 0u, nullptr);
+    // Issue #275: a game coming back has no lobby. These messages only set up its links. Read each time: a match
+    // the in-game launcher starts has its own switches (CFG_SetLaunchArgs).
+    const bool comingBack = CFG_GetArgOption("/rejoin", 0u, nullptr);
     const auto command = name.view();
     const auto isString = [&](const std::size_t i) {
       return args.size() > i && args[i].mType == SNetCommandArg::NETARG_String;

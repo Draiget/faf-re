@@ -657,6 +657,16 @@ namespace moho
   fa::string CFG_GetArgs();
 
   /**
+   * Engine addition (in-game launcher plan, WP4): the switches of one match the in-game launcher starts, read as if
+   * they were on the command line. CFG_GetArgOption looks in them first, then in the real command line, and so do
+   * the Lua functions GetCommandLineArg and HasCommandLineArg, which call it. Empty unless such a match runs, so a
+   * game another launcher started reads its command line as it always did.
+   */
+  void CFG_SetLaunchArgs(std::vector<std::string> args);
+  void CFG_ClearLaunchArgs();
+  [[nodiscard]] bool CFG_HasLaunchArgs();
+
+  /**
    * Address: 0x0041B790 (FUN_0041B790, cfunc_GetCommandLineArg)
    *
    * What it does:
