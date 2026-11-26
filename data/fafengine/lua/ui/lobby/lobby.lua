@@ -140,3 +140,20 @@ do
         AddChatText(text)
     end
 end
+
+--- Engine addition (in-game launcher plan, WP4): the in-game launcher's own test (FAF_ONLINE_AUTOTEST, set only by
+--- that test) ticks the host's ready box and presses Launch here, as a player would (FAF's TryLaunch wants every human
+--- ready, the host too); nothing else calls it. True when it pressed.
+function FafReTestPressLaunch()
+    if not (GUI and GUI.launchGameButton and GUI.launchGameButton.OnClick and gameInfo and GUI.slots) then
+        return false
+    end
+    for slot, player in gameInfo.PlayerOptions:pairs() do
+        local row = GUI.slots[slot]
+        if player.OwnerID == localPlayerID and not player.Ready and row and row.ready then
+            row.ready:SetCheck(true)
+        end
+    end
+    GUI.launchGameButton.OnClick(GUI.launchGameButton)
+    return true
+end

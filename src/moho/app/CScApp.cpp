@@ -48,6 +48,7 @@
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/net/Common.h"
 #include "moho/app/CWaitHandleSet.h"
+#include "moho/app/OnlineLauncher.h"
 #include "moho/app/WinApp.h"
 #include "moho/core/ThreadPlacement.h"
 #include "moho/math/MathReflection.h"
@@ -1525,6 +1526,7 @@ void CScApp::Main()
     moho::SND_Frame();
   }
   moho::DISK_UpdateWatcher();
+  moho::ONLINE_Frame(); // engine addition (in-game launcher): nothing until its Lua is used
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
   if (realTimeClock) {
@@ -1650,6 +1652,7 @@ void CScApp::Destroy()
   moho::REN_SaveGlyphCache(true);          // engine addition (ren_GlyphCache)
   moho::SCR_FlushUiScriptChunkCache(true); // engine addition (res_UiScriptChunkCache)
   moho::WLD_Teardown();
+  moho::ONLINE_Shutdown(); // engine addition (in-game launcher), before GPGNet goes
   moho::GPGNET_Shutdown();
   moho::UI_Exit();
   moho::GetWldSessionLoader()->Finalize();

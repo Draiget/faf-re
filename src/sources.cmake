@@ -1099,6 +1099,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/SofdecRuntime.cpp
   moho/movie/sfd/SfdHeaderInfo.cpp
   moho/app/CScApp.cpp
+  moho/app/OnlineLauncher.cpp
   moho/app/ServerLobbyUi.cpp
   moho/app/UserWorkerPool.cpp
   moho/app/CWaitHandleSet.cpp

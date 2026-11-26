@@ -1,4 +1,5 @@
 #include "moho/sim/UserLuaPrivate.h"
+#include "moho/app/OnlineLauncher.h"
 
 namespace
 {
@@ -169,6 +170,11 @@ int moho::cfunc_ExitApplication(
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kExitApplicationHelpText);
 
+  // Engine addition (in-game launcher plan, WP4): a match the in-game launcher started goes back to the launcher
+  // instead; in launcher mode a finished game never quits. Any other game quits as in the binary.
+  if (moho::ONLINE_ReturnToLauncherInsteadOfQuitting()) {
+    return 0;
+  }
   gShellApp->ExitMainLoop();
   return 0;
 }

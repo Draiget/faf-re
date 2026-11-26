@@ -301,6 +301,8 @@ foreach(_src IN LISTS FAF_SHELL_EVENT_TABLE_SOURCES)
     APPEND PROPERTY COMPILE_OPTIONS ${FAF_SHELL_EVENT_TABLE_OPTIONS})
 endforeach()
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
+# The in-game launcher's FAF sign-in and lobby (moho/app/OnlineLauncher.cpp; faf_online, cmake/FafPosix.cmake).
+target_link_libraries(faf_client_objs PUBLIC faf_online)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static faf_imgui_sdl  # FAudio names its static target FAudio-static, with no alias
   faf_freetype faf_msdfgen faf_ffmpeg faf_netlink)

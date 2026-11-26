@@ -110,6 +110,8 @@ target_link_libraries(faf_engine PUBLIC faf_codegen Wm3Headers)
 target_link_libraries(faf_engine PUBLIC SDL3::SDL3-static faf_imgui_sdl)
 # In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
 target_link_libraries(faf_engine PUBLIC faf_netlink)
+# The in-game launcher's FAF sign-in and lobby (moho/app/OnlineLauncher.cpp, a client file).
+target_link_libraries(faf_engine PUBLIC faf_online)
 # The rejoin key's signatures (moho/net/RejoinKey.cpp) and the rejoin save's packing (issue #275).
 target_link_libraries(faf_engine PUBLIC faf_monocypher faf_zstd)
 # MSDF text (moho/render/font, issue #306): both static, client only.

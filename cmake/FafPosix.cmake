@@ -306,6 +306,7 @@ endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/online" "${CMAKE_BINARY_DIR}/online" EXCLUDE_FROM_ALL)
 add_executable(faf_online_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/online/OnlineTests.cpp")
 target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
+add_test(NAME online COMMAND faf_online_tests)
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
