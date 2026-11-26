@@ -30,6 +30,7 @@
 #include "moho/net/Common.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/ui/IUIManager.h"
+#include "online/ControlService.h"
 #include "online/FafAuth.h"
 #include "online/FafLobby.h"
 #include "online/GameLink.h"
@@ -84,6 +85,53 @@ namespace
     }
 #endif
     return {};
+  }
+
+  /**
+   * Our control services (docs/CONTROL_SERVICE.md) whose lobbies the launcher lists beside FAF's games: one address
+   * per line in control-services.txt in DataFolder() ('#' starts a comment), and FAF_ONLINE_CONTROL (a test hook,
+   * comma-separated). None by default. The player's FAF access token goes to each of them, so the list is a file Lua
+   * can't write: a UI mod can't send the token elsewhere.
+   */
+  std::vector<std::string> ControlServiceAddresses()
+  {
+    std::vector<std::string> out;
+    const auto add = [&out](std::string line) {
+      if (const std::size_t hash = line.find('#'); hash != std::string::npos) {
+        line.erase(hash);
+      }
+      while (!line.empty() &&
+             (line.back() == '\r' || line.back() == ' ' || line.back() == '\t' || line.back() == '/')) {
+        line.pop_back();
+      }
+      std::size_t first = 0;
+      while (first < line.size() && (line[first] == ' ' || line[first] == '\t')) {
+        ++first;
+      }
+      line.erase(0, first);
+      if (
+        (line.starts_with("http://") || line.starts_with("https://")) &&
+        std::find(out.begin(), out.end(), line) == out.end()
+      ) {
+        out.push_back(line);
+      }
+    };
+    std::ifstream in(DataFolder() / "control-services.txt");
+    for (std::string line; std::getline(in, line);) {
+      add(line);
+    }
+    if (const char* const test = std::getenv("FAF_ONLINE_CONTROL"); test != nullptr) {
+      std::string all = test;
+      for (std::size_t start = 0; start <= all.size();) {
+        const std::size_t comma = all.find(',', start);
+        add(all.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+        if (comma == std::string::npos) {
+          break;
+        }
+        start = comma + 1;
+      }
+    }
+    return out;
   }
 
   std::string Lower(
@@ -193,6 +241,8 @@ namespace
     std::chrono::steady_clock::time_point finishingSince;
     bool endedFromLobby = false;
     std::string fixedToken; ///< FAF_ONLINE_ACCESS_TOKEN_FILE's, a test hook
+    /// Our control services (ControlServiceAddresses), followed while the player is signed in to FAF.
+    std::vector<std::unique_ptr<ControlServiceClient>> controls;
 
     // FAF_ONLINE_AUTOTEST (a test hook): host on <map> (host:<map>:<seconds>[:game]), or join the first open game the
     // launcher lists through its Join (join:<seconds>); leave after <seconds> in the lobby or the game, quit after.
@@ -256,6 +306,9 @@ namespace
 
     ~Service()
     {
+      for (const auto& control : controls) {
+        control->Stop();
+      }
       if (iceThread.joinable()) {
         iceThread.join();
       }
@@ -631,8 +684,10 @@ namespace
     return "off";
   }
 
+  const char* ControlStateName(ControlServiceClient::State state);
+
   /** table FafOnline_Status(): signIn, message, code, url, secondsLeft, login; lobby, lobbyMessage, notice; match,
-   * matchMessage. */
+   * matchMessage; loadedMod; servers, serversMessage, serverCount (our control services). */
   int StatusBody(
     lua_State* const L
   )
@@ -651,6 +706,19 @@ namespace
     SetField(L, "match", MatchStateName(s.match));
     SetField(L, "matchMessage", s.matchMessage);
     SetField(L, "loadedMod", LoadedFeaturedMod(s));
+    // Our control services: how many, and the worst state among them (off, connecting, failed, live).
+    std::string servers = s.controls.empty() ? "none" : "live";
+    std::string serversMessage;
+    for (const auto& control : s.controls) {
+      const auto state = control->GetState();
+      if (state != ControlServiceClient::State::Live) {
+        servers = ControlStateName(state);
+        serversMessage = control->Address() + ": " + control->Message();
+      }
+    }
+    SetField(L, "servers", servers);
+    SetField(L, "serversMessage", serversMessage);
+    SetField(L, "serverCount", static_cast<double>(s.controls.size()));
     return 1;
   }
 
@@ -731,6 +799,99 @@ namespace
       lua_rawseti(L, -2, index++);
     }
     return 1;
+  }
+
+  void PushResult(lua_State* L, const std::expected<void, std::string>& result);
+
+  const char* ControlStateName(
+    const ControlServiceClient::State state
+  )
+  {
+    switch (state) {
+    case ControlServiceClient::State::Stopped:
+      return "off";
+    case ControlServiceClient::State::Connecting:
+      return "connecting";
+    case ControlServiceClient::State::Live:
+      return "live";
+    case ControlServiceClient::State::Failed:
+      return "failed";
+    }
+    return "off";
+  }
+
+  /** Why this build can't join a game on our servers from the launcher yet. */
+  const char* ServerJoinUnavailable()
+  {
+#if FAF_SERVER_MODE
+    // A server session lives until the process ends (remote/client/ServerConnect.cpp): it has no end that returns
+    // to the launcher yet.
+    return "Joining a server game from the launcher comes later: a server game can't hand back to the launcher yet.";
+#else
+    return "This build of the game can't play on our servers (it was built without server mode).";
+#endif
+  }
+
+  /**
+   * table FafOnline_ServerGames(): the lobbies of our control services, each a table: key, host, name, state, kind,
+   * origin, tournament, map, service, humans, humanSeats, aiSeats, openSeats, seated (the player has a seat), stale,
+   * joinable, why. Join and watch lines are the player's credentials and stay here.
+   */
+  int ServerGamesBody(
+    lua_State* const L
+  )
+  {
+    lua_newtable(L);
+    int index = 1;
+    for (const auto& control : TheService().controls) {
+      for (const ServerLobby& lobby : control->Lobbies()) {
+        int humans = 0;
+        int humanSeats = 0;
+        int aiSeats = 0;
+        int openSeats = 0;
+        for (const ServerSeat& seat : lobby.seats) {
+          if (seat.kind == "ai") {
+            ++aiSeats;
+          } else {
+            ++humanSeats;
+            if (seat.uid.empty()) {
+              ++openSeats;
+            } else {
+              ++humans;
+            }
+          }
+        }
+        lua_newtable(L);
+        SetField(L, "key", lobby.key);
+        SetField(L, "host", lobby.host);
+        SetField(L, "name", lobby.name);
+        SetField(L, "state", lobby.state);
+        SetField(L, "kind", lobby.kind);
+        SetField(L, "origin", lobby.origin);
+        SetField(L, "tournament", lobby.tournament);
+        SetField(L, "map", lobby.map);
+        SetField(L, "service", control->Address());
+        SetField(L, "humans", static_cast<double>(humans));
+        SetField(L, "humanSeats", static_cast<double>(humanSeats));
+        SetField(L, "aiSeats", static_cast<double>(aiSeats));
+        SetField(L, "openSeats", static_cast<double>(openSeats));
+        SetBool(L, "seated", !lobby.join.empty());
+        SetBool(L, "stale", lobby.stale);
+        SetBool(L, "joinable", false);
+        SetField(L, "why", ServerJoinUnavailable());
+        lua_rawseti(L, -2, index++);
+      }
+    }
+    return 1;
+  }
+
+  /** ok, why = FafOnline_JoinServer(key): refused until a server game can hand back to the launcher. */
+  int JoinServerBody(
+    lua_State* const L
+  )
+  {
+    PushResult(L, std::unexpected(std::string(ServerJoinUnavailable())));
+    return 2;
   }
 
   void PushResult(
@@ -882,6 +1043,22 @@ namespace
       "<global>",
       "bool, string FafOnline_Join(uid, [password]) - asks FAF to join that game; the match starts in this game."
     );
+    static CScrLuaBinder serverGames(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_ServerGames",
+      &Binding<&ServerGamesBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_ServerGames() - the games on our servers, from the control services in control-services.txt."
+    );
+    static CScrLuaBinder joinServer(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_JoinServer",
+      &Binding<&JoinServerBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_JoinServer(key) - joins a game on our servers (not yet: says why)."
+    );
     static CScrLuaBinder host(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_Host",
@@ -932,13 +1109,26 @@ void moho::ONLINE_Frame()
     (void)TheService();
   }
   Service& s = *gService;
-  // Signed in: into FAF's lobby; signed out: out of it.
+  // Signed in: into FAF's lobby and our control services' event streams; signed out: out of them.
   if (s.SignedIn() && !s.lobbyStarted) {
     s.lobby.Connect(s.Tokens());
     s.lobbyStarted = true;
+    for (const std::string& address : ControlServiceAddresses()) {
+      auto control =
+        std::make_unique<ControlServiceClient>(address, std::string("faf-re-client/") + gpg::diag::BuildVersion());
+      control->SetLog(LogLine);
+      control->SetTokens(s.Tokens());
+      control->Start();
+      LogLine(("control service " + address + ": following its lobbies").c_str());
+      s.controls.push_back(std::move(control));
+    }
   } else if (!s.SignedIn() && s.auth.GetState() == FafAuth::State::LoggedOut && s.lobbyStarted) {
     s.lobby.Disconnect();
     s.lobbyStarted = false;
+    for (const auto& control : s.controls) {
+      control->Stop();
+    }
+    s.controls.clear();
   }
   for (const JsonNode& message : s.lobby.TakeMessages()) {
     const std::string command = message.String("command");

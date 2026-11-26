@@ -461,6 +461,12 @@ end
 
 --- Why this build can't play a game right now, or nil.
 local function WhyNotJoinable(game, status)
+    if game.source == 'server' then
+        if game.joinable then
+            return nil
+        end
+        return game.why ~= '' and game.why or 'This game can\'t be joined from here.'
+    end
     if game.state ~= 'open' then
         return 'The game has started.'
     end
@@ -569,12 +575,13 @@ local function BuildOnlinePage(launcher, page)
     view.runningButton:Paint(false)
 
     view.list = VirtualList(games, {
-        { 'GAME', 0.31, function(g) return (g.password and '[locked] ' or '') .. g.title end },
-        { 'MAP', 0.19, function(g) return g.map end },
+        { 'ON', 0.08, function(g) return g.source == 'server' and 'Server' or 'FAF' end },
+        { 'GAME', 0.28, function(g) return (g.password and '[locked] ' or '') .. g.title end },
+        { 'MAP', 0.17, function(g) return g.map end },
         { 'PLAYERS', 0.09, function(g) return string.format('%d / %d', g.players, g.maxPlayers) end },
-        { 'MOD', 0.12, function(g) return ModName(g.featuredMod) end },
-        { 'RATING', 0.12, function(g) return RatingText(g) end },
-        { 'HOST', 0.17, function(g) return g.host end },
+        { 'MOD', 0.11, function(g) return g.source == 'server' and '' or ModName(g.featuredMod) end },
+        { 'RATING', 0.11, function(g) return RatingText(g) end },
+        { 'HOST', 0.16, function(g) return g.host end },
     }, function(item, double)
         launcher:Refresh()
         if double then
@@ -650,6 +657,14 @@ local function RefreshOnline(launcher)
         if status.loadedMod ~= '' then
             line = line .. ' - game files: ' .. ModName(status.loadedMod)
         end
+        if status.serverCount and status.serverCount > 0 then
+            local servers = ({ live = 'our servers live', connecting = 'connecting to our servers',
+                failed = 'our servers failed', off = 'our servers off' })[status.servers] or status.servers
+            line = line .. ' - ' .. servers
+            if status.servers == 'failed' and status.serversMessage ~= '' then
+                line = line .. ' (' .. status.serversMessage .. ')'
+            end
+        end
     elseif waiting then
         line = 'Signing in'
     else
@@ -682,11 +697,32 @@ local function RefreshOnline(launcher)
     local open = 0
     local all = FafOnline_Games()
     for _, game in all do
+        game.source = 'faf'
+    end
+    -- Our servers' lobbies: open while starting or in the lobby, started in game; ended ones are left out.
+    if rawget(_G, 'FafOnline_ServerGames') then
+        for _, lobby in FafOnline_ServerGames() do
+            local state = nil
+            if lobby.state == 'starting' or lobby.state == 'lobby' then
+                state = 'open'
+            elseif lobby.state == 'game' then
+                state = 'playing'
+            end
+            if state then
+                table.insert(all, {
+                    source = 'server', uid = lobby.key, title = lobby.name ~= '' and lobby.name or lobby.key,
+                    map = lobby.map, players = lobby.humans, maxPlayers = lobby.humanSeats, featuredMod = '',
+                    host = lobby.host, state = state, password = false, joinable = lobby.joinable, why = lobby.why,
+                })
+            end
+        end
+    end
+    for _, game in all do
         if game.state == 'open' then
             open = open + 1
         end
         if (view.showRunning or game.state == 'open') and Matches(game, filter) then
-            game.key = game.uid
+            game.key = game.source .. ':' .. game.uid
             if WhyNotJoinable(game, status) then
                 game.color = Colors.dim
             end
@@ -997,7 +1033,12 @@ function Launcher:OpenHostDialog()
 end
 
 function Launcher:Join(game, password)
-    local ok, why = FafOnline_Join(game.uid, password)
+    local ok, why
+    if game.source == 'server' then
+        ok, why = FafOnline_JoinServer(game.uid)
+    else
+        ok, why = FafOnline_Join(game.uid, password)
+    end
     if ok then
         self.lastError = false
         LOG('LAUNCHER: joining game ' .. game.uid)

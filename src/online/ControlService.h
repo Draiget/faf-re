@@ -87,6 +87,11 @@ namespace faf::online
     {
       return mState.load();
     }
+    /** The service's address as given. */
+    [[nodiscard]] const std::string& Address() const noexcept
+    {
+      return mBaseUrl;
+    }
     [[nodiscard]] std::string Message() const;
     [[nodiscard]] std::vector<ServerLobby> Lobbies() const;
     /** Asks for a game the player hosts; the service's answer (`request`, `ref`, `placement`) or why not. */
