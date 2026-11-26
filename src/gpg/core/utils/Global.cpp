@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#include <utility>
 #if !FAFRE_PLATFORM_WINDOWS
 #include <pthread.h>
 #endif
@@ -1859,6 +1860,13 @@ void gpg::LogHighMemoryReservation()
 }
 #endif
 
+namespace
+{
+  // Set while HandleAssertFailure runs the die handler on this thread, until a crash report takes it
+  // (gpg::TakeAssertFailureReport).
+  thread_local bool tAssertReportPending = false;
+} // namespace
+
 // 0x0093EDE0
 void gpg::HandleAssertFailure(
   const char* msg,
@@ -1866,7 +1874,22 @@ void gpg::HandleAssertFailure(
   const char* file
 )
 {
+  // Engine addition: the crash report writer takes this (TakeAssertFailureReport). The previous value comes back,
+  // also if the handler throws, for an assertion that fails inside the die handler of another.
+  struct PendingScope
+  {
+    bool outer = std::exchange(tAssertReportPending, true);
+    ~PendingScope()
+    {
+      tAssertReportPending = outer;
+    }
+  } const scope;
   InvokeDieHandler(STR_Printf("Failed assertion: %s\nFile: %s\nLine: %d", msg, file, line).c_str());
+}
+
+bool gpg::TakeAssertFailureReport()
+{
+  return std::exchange(tAssertReportPending, false);
 }
 
 /**
@@ -1912,6 +1935,9 @@ void gpg::Die(
   va_start(va, args);
   const fa::string msg = STR_Va(args, va);
   va_end(va);
+  // Engine addition: a Die inside an assertion's die handler ends the process all the same, so its report is a
+  // fatal one (TakeAssertFailureReport).
+  tAssertReportPending = false;
   InvokeDieHandler(msg.c_str());
   __debugbreak();
   while (true) {}

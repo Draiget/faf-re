@@ -21,6 +21,7 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 
 namespace gpg::diag
@@ -45,9 +46,23 @@ namespace gpg::diag
       return registry;
     }
 
-    // Re-entry guard: the first fatal path to arrive writes the report; any
-    // nested fault inside the writer must not try to write a second one.
-    volatile LONG sReportInProgress = 0;
+    // Re-entry guard: the first fatal path to arrive writes the report; a
+    // nested fault inside the writer, and the faults that follow a fatal one
+    // (Die's breakpoint after its report), must not write a second one. A
+    // failed assertion's report (gpg::TakeAssertFailureReport) frees the
+    // writer again when done, as the game goes on, so a later crash still
+    // gets its report; a fatal fault on another thread meanwhile waits for it.
+    constexpr LONG kReportIdle = 0;
+    constexpr LONG kReportWriting = 1;
+    constexpr LONG kReportFatalWritten = 2;
+    volatile LONG sReportState = kReportIdle;
+    volatile LONG sWritingAssertReport = 0;   // the report being written is an assertion's
+    thread_local bool tWritingReport = false; // this thread writes the report now (a nested fault)
+
+    // This report's paths (CrashReportPath, CrashDumpPath), named when a
+    // report starts (NameReport), or on first use.
+    char sReportPath[MAX_PATH * 2] = {};
+    char sDumpPath[MAX_PATH * 2] = {};
 
     // One fprintf + flush per line. If the process dies mid-report, every
     // completed line is already on disk.
@@ -92,50 +107,55 @@ namespace gpg::diag
       (void)::strcpy_s(outDir, bytes, exePath);
     }
 
-  } // namespace
-
-  // Per-crash timestamped path: `<exe dir>\faf_crash_YYYYMMDD_HHMMSS.txt`.
-  // Computed once per process; the re-entry guard means one report per run.
-  const char* CrashReportPath()
-  {
-    static char sPath[MAX_PATH * 2] = {};
-    static bool sResolved = false;
-    if (!sResolved) {
-      sResolved = true;
+    // `<exe dir>\faf_crash_YYYYMMDD_HHMMSS.txt`, `_assert.txt` for a failed
+    // assertion's report (the game goes on after one, so the crash after it
+    // keeps it), and the dump beside it with the same stem.
+    void NameReport(
+      const bool assertion
+    )
+    {
       char exeDir[MAX_PATH * 2] = {};
       ResolveExeDir(exeDir, sizeof(exeDir));
       SYSTEMTIME now{};
       ::GetLocalTime(&now);
-      (void)::sprintf_s(
-        sPath,
-        sizeof(sPath),
-        "%sfaf_crash_%04u%02u%02u_%02u%02u%02u.txt",
-        exeDir,
-        now.wYear,
-        now.wMonth,
-        now.wDay,
-        now.wHour,
-        now.wMinute,
-        now.wSecond
-      );
+      const auto name = [&](char* const path, const std::size_t bytes, const char* const extension) {
+        (void)::sprintf_s(
+          path,
+          bytes,
+          "%sfaf_crash_%04u%02u%02u_%02u%02u%02u%s%s",
+          exeDir,
+          now.wYear,
+          now.wMonth,
+          now.wDay,
+          now.wHour,
+          now.wMinute,
+          now.wSecond,
+          assertion ? "_assert" : "",
+          extension
+        );
+      };
+      name(sReportPath, sizeof(sReportPath), ".txt");
+      name(sDumpPath, sizeof(sDumpPath), ".dmp");
     }
-    return sPath;
+
+  } // namespace
+
+  // The newest report's timestamped path (NameReport).
+  const char* CrashReportPath()
+  {
+    if (sReportPath[0] == '\0') {
+      NameReport(false);
+    }
+    return sReportPath;
   }
 
-  // Dump path pairs with this run's report: same timestamp stem, `.dmp`.
+  // Dump path pairs with the newest report: same timestamp stem, `.dmp`.
   const char* CrashDumpPath()
   {
-    static char sPath[MAX_PATH * 2] = {};
-    static bool sResolved = false;
-    if (!sResolved) {
-      sResolved = true;
-      const std::size_t length = std::strlen(CrashReportPath());
-      (void)::strcpy_s(sPath, sizeof(sPath), CrashReportPath());
-      if (length > 4) {
-        (void)::strcpy_s(sPath + length - 4, 5, ".dmp");
-      }
+    if (sDumpPath[0] == '\0') {
+      NameReport(false);
     }
-    return sPath;
+    return sDumpPath;
   }
 
   const char* CrashLatestReportPath()
@@ -825,9 +845,35 @@ namespace gpg::diag
     const CrashReportContext& context
   )
   {
-    if (::InterlockedCompareExchange(&sReportInProgress, 1, 0) != 0) {
-      return false; // a nested fault while a report is already being written
+    if (::InterlockedCompareExchange(&sReportState, kReportWriting, kReportIdle) != kReportIdle) {
+      if (tWritingReport) {
+        return false; // a nested fault inside the writer
+      }
+      // Another thread writes an assertion's report: wait for it (up to 5 s),
+      // then this report follows. After a fatal report, none follows.
+      for (int waited = 0; waited < 500 && sReportState == kReportWriting && sWritingAssertReport != 0; ++waited) {
+        ::Sleep(10);
+      }
+      if (::InterlockedCompareExchange(&sReportState, kReportWriting, kReportIdle) != kReportIdle) {
+        return false;
+      }
     }
+    // Taken only once this call owns the writer, so a refused report takes
+    // nothing.
+    const bool assertion = gpg::TakeAssertFailureReport();
+    (void)::InterlockedExchange(&sWritingAssertReport, assertion ? 1 : 0);
+    tWritingReport = true;
+    struct StateOnExit
+    {
+      LONG next;
+      ~StateOnExit()
+      {
+        tWritingReport = false;
+        (void)::InterlockedExchange(&sWritingAssertReport, 0);
+        (void)::InterlockedExchange(&sReportState, next);
+      }
+    } const stateOnExit{assertion ? kReportIdle : kReportFatalWritten};
+    NameReport(assertion);
 
     std::FILE* sink = std::fopen(CrashReportPath(), "w");
     if (sink == nullptr) {

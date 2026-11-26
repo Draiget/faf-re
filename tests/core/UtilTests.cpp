@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <gtest/gtest.h>
 
 #include "CoreTestSupport.h"
@@ -121,6 +122,40 @@ namespace
     EXPECT_EQ(gCaptured, "Failed assertion: x == y\nFile: c:\\some\\file.cpp\nLine: 42");
 
     EXPECT_EQ(gpg::SetDieHandler(previous), &Capture);
+  }
+
+  // What gpg::TakeAssertFailureReport gave inside the handler: the first report of a failed assertion is the
+  // assertion's, a second one in the same handler (a fault in the crash dialog) is not, nor a nested assertion's
+  // once the outer one took it.
+  std::string gTakes;
+  void TakeTwiceAndNest(
+    const char* const message
+  )
+  {
+    gTakes += gpg::TakeAssertFailureReport() ? '1' : '0';
+    gTakes += gpg::TakeAssertFailureReport() ? '1' : '0';
+    if (std::string_view(message).find("outer") != std::string_view::npos) {
+      gpg::HandleAssertFailure("inner", 2, "UtilTests.cpp");
+      gTakes += gpg::TakeAssertFailureReport() ? '1' : '0'; // the outer's, already taken
+    }
+  }
+
+  TEST(
+    GpgDieHandler,
+    AFailedAssertionGrantsOneReport
+  )
+  {
+    EXPECT_FALSE(gpg::TakeAssertFailureReport()); // no assertion
+    const gpg::die_handler_t previous = gpg::SetDieHandler(&TakeTwiceAndNest);
+    gpg::HandleAssertFailure("outer", 1, "UtilTests.cpp");
+    (void)gpg::SetDieHandler(previous);
+    EXPECT_EQ(
+      gTakes,
+      "10"
+      "10"
+      "0"
+    );                                            // outer: first, second; inner: first, second; outer after inner
+    EXPECT_FALSE(gpg::TakeAssertFailureReport()); // after the handler returned
   }
 
   // ---------------------------------------------------------------------------------------------

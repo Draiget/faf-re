@@ -15,6 +15,7 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
+#include "gpg/core/utils/Global.h"
 
 #include <algorithm>
 #include <array>
@@ -49,7 +50,18 @@ namespace
 
   std::array<CrashSection, 8> gSections{};
   int gSectionCount = 0;
-  std::atomic<bool> gWritingReport{false};
+  /// The report writer's state, as in CrashReport.cpp: idle, writing, or done for a fatal error (then a nested
+  /// fault and the faults after it write nothing). A failed assertion's report (gpg::TakeAssertFailureReport) goes
+  /// back to idle, as the game goes on; a fatal fault on another thread meanwhile waits for it.
+  enum class ReportState : int
+  {
+    Idle,
+    Writing,
+    FatalWritten,
+  };
+  std::atomic<ReportState> gReportState{ReportState::Idle};
+  std::atomic<bool> gWritingAssertReport{false}; // the report being written is an assertion's
+  thread_local bool tWritingReport = false;      // this thread writes the report now (a nested fault)
 
   char gExeDir[kPathBytes]{};
   char gDiagLogPath[kPathBytes]{};
@@ -327,15 +339,29 @@ namespace gpg::diag
     ++gSectionCount;
   }
 
-  const char* CrashReportPath()
+  namespace
   {
-    if (gReportPath[0] == '\0') {
+    /// `<exe dir>/faf_crash_YYYYMMDD_HHMMSS.txt`, `_assert.txt` for a failed assertion's report (the game goes on
+    /// after one, so the crash after it keeps it), and the dump beside it with the same stem.
+    void NameReport(
+      const bool assertion
+    )
+    {
       const std::time_t now = std::time(nullptr);
       std::tm parts{};
       (void)::localtime_r(&now, &parts);
       char stamp[32]{};
       (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &parts);
-      std::snprintf(gReportPath, sizeof(gReportPath), "%sfaf_crash_%s.txt", ExeDir(), stamp);
+      const char* const suffix = assertion ? "_assert" : "";
+      std::snprintf(gReportPath, sizeof(gReportPath), "%sfaf_crash_%s%s.txt", ExeDir(), stamp, suffix);
+      std::snprintf(gDumpPath, sizeof(gDumpPath), "%sfaf_crash_%s%s.dmp", ExeDir(), stamp, suffix);
+    }
+  } // namespace
+
+  const char* CrashReportPath()
+  {
+    if (gReportPath[0] == '\0') {
+      NameReport(false);
     }
     return gReportPath;
   }
@@ -351,11 +377,7 @@ namespace gpg::diag
   const char* CrashDumpPath()
   {
     if (gDumpPath[0] == '\0') {
-      std::snprintf(gDumpPath, sizeof(gDumpPath), "%s", CrashReportPath());
-      char* const dot = std::strrchr(gDumpPath, '.');
-      if (dot != nullptr) {
-        std::snprintf(dot, sizeof(gDumpPath) - static_cast<std::size_t>(dot - gDumpPath), ".dmp");
-      }
+      NameReport(false);
     }
     return gDumpPath;
   }
@@ -364,10 +386,40 @@ namespace gpg::diag
     const CrashReportContext& context
   )
   {
-    bool expected = false;
-    if (!gWritingReport.compare_exchange_strong(expected, true)) {
-      return false;
+    const auto takeWriter = [] {
+      ReportState expected = ReportState::Idle;
+      return gReportState.compare_exchange_strong(expected, ReportState::Writing);
+    };
+    if (!takeWriter()) {
+      if (tWritingReport) {
+        return false; // a nested fault inside the writer
+      }
+      // Another thread writes an assertion's report: wait for it (up to 5 s), then this report follows. After a
+      // fatal report, none follows.
+      const timespec tenMilliseconds{0, 10'000'000};
+      for (int waited = 0; waited < 500 && gReportState.load() == ReportState::Writing && gWritingAssertReport.load();
+           ++waited) {
+        (void)::nanosleep(&tenMilliseconds, nullptr);
+      }
+      if (!takeWriter()) {
+        return false;
+      }
     }
+    // Taken only once this call owns the writer, so a refused report takes nothing.
+    const bool assertion = gpg::TakeAssertFailureReport();
+    gWritingAssertReport.store(assertion);
+    tWritingReport = true;
+    struct StateOnExit
+    {
+      ReportState next;
+      ~StateOnExit()
+      {
+        tWritingReport = false;
+        gWritingAssertReport.store(false);
+        gReportState.store(next);
+      }
+    } const stateOnExit{assertion ? ReportState::Idle : ReportState::FatalWritten};
+    NameReport(assertion);
 
     const char* const reportPath = CrashReportPath();
     std::FILE* const sink = std::fopen(reportPath, "w");

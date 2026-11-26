@@ -50,6 +50,14 @@ namespace gpg
   void HandleAssertFailure(const char* msg, int lineNum, const char* file); // 0x0093EDE0
 
   /**
+   * Engine addition: true once per failed assertion, for the first crash report its die handler writes on this
+   * thread; false for every other report. Unlike Die, a failed assertion goes on once the handler returns, so the
+   * crash report writer (gpg/core/diagnostics) names that report as an assertion's and stays free for the next
+   * fault. A fault later in the same handler (in the crash dialog, say) is fatal and takes false.
+   */
+  [[nodiscard]] bool TakeAssertFailureReport();
+
+  /**
    * Address: 0x00938FE0 (FUN_00938FE0, gpg::SetDieHandler)
    * Mangled: ?SetDieHandler@gpg@@YAP6AXPBD@ZP6AX0@Z@Z
    *
