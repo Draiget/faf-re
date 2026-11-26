@@ -10,6 +10,7 @@ add_library(faf_online STATIC
   GameLink.cpp
   Json.cpp
   LaunchArgs.cpp
+  ReplayRelay.cpp
   "${PROJECT_SOURCE_DIR}/src/netbridge/GpgNet.cpp"
   Url.cpp)
 target_include_directories(faf_online PUBLIC "${PROJECT_SOURCE_DIR}/src")

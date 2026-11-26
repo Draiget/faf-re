@@ -29,6 +29,7 @@
 #include "online/FafLobby.h"
 #include "online/GameLink.h"
 #include "online/LaunchArgs.h"
+#include "online/ReplayRelay.h"
 #include "online/Json.h"
 #include "online/Url.h"
 #include "platform/Http.h"
@@ -205,6 +206,11 @@ namespace
         for (std::size_t i = 0; i < payload.size(); ++i) {
           payload[i] = static_cast<char>(payload[i] ^ mask[i % 4]);
         }
+        if (mReply && opcode == 0x2) {
+          std::lock_guard<std::mutex> guard(mLock);
+          mReceivedBinary += payload;
+          continue;
+        }
         if (mReply && opcode == 0x1) {
           {
             std::lock_guard<std::mutex> guard(mLock);
@@ -249,11 +255,19 @@ namespace
       return mReceived;
     }
 
+    /** Every binary message's bytes, in order. */
+    [[nodiscard]] std::string ReceivedBinary()
+    {
+      std::lock_guard<std::mutex> guard(mLock);
+      return mReceivedBinary;
+    }
+
   private:
     bool mRefuse = false;
     Reply mReply;
     std::mutex mLock;
     std::vector<std::string> mReceived;
+    std::string mReceivedBinary;
     SOCKET mListener = INVALID_SOCKET;
     unsigned short mPort = 0;
     std::thread mThread;
@@ -1288,4 +1302,53 @@ TEST(
     "127.0.0.1:2",
   };
   EXPECT_EQ(BuildLaunchArgs(launch, &player, local), expected);
+}
+
+// --- WP4: the live replay relay
+// ----------------------------------------------------------------------------------------
+
+TEST(
+  OnlineReplayRelay,
+  PassesTheGamesStreamOnWithItsOpening
+)
+{
+  EchoServer server(false, [](const std::string&) {
+    return std::vector<std::string>{};
+  });
+  faf::online::ReplayRelaySettings settings;
+  settings.webSocketUrl = server.Url();
+  faf::online::ReplayRelay relay(settings);
+  const auto port = relay.Listen();
+  ASSERT_TRUE(port) << port.error();
+  relay.Start({});
+
+  // A fake game: the posting opening, then 100 KB of replay, then the end of the stream.
+  std::string stream = std::string("P/51/Tester") + '\0';
+  for (int i = 0; i < 100000; ++i) {
+    stream += static_cast<char>((i * 7) & 0xFF);
+  }
+  {
+    WSADATA data{};
+    (void)::WSAStartup(MAKEWORD(2, 2), &data);
+    const SOCKET game = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = htons(*port);
+    ASSERT_EQ(::connect(game, reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
+    for (std::size_t at = 0; at < stream.size(); at += 7000) {
+      const std::size_t size = std::min<std::size_t>(7000, stream.size() - at);
+      (void)::send(game, stream.data() + at, static_cast<int>(size), 0);
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    ::closesocket(game);
+    ::WSACleanup();
+  }
+  EXPECT_TRUE(relay.Finish(std::chrono::seconds(20)));
+  EXPECT_EQ(relay.BytesFromGame(), stream.size());
+  EXPECT_EQ(relay.BytesSent(), stream.size());
+  ASSERT_TRUE(WaitUntil([&] {
+    return server.ReceivedBinary().size() >= stream.size();
+  }));
+  EXPECT_EQ(server.ReceivedBinary(), stream); // the opening kept, every byte in order
 }

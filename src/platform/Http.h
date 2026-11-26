@@ -95,6 +95,8 @@ namespace platform::http
     Open(const std::string& url, const std::string& headers = {}, const std::string& userAgent = {});
     /** One whole text message. */
     [[nodiscard]] std::expected<void, std::string> SendText(std::string_view text);
+    /** One whole binary message. */
+    [[nodiscard]] std::expected<void, std::string> SendBinary(std::string_view bytes);
     /** Blocks until one whole message (text or binary) has come, the server closed, or the connection failed. */
     [[nodiscard]] std::expected<Received, std::string> Receive(std::string& message);
     /** Sends a normal close and drops the connection; a blocked Receive returns. Safe to call more than once. */
@@ -102,6 +104,8 @@ namespace platform::http
     [[nodiscard]] bool IsOpen() const;
 
   private:
+    [[nodiscard]] std::expected<void, std::string> Send(std::string_view bytes, bool utf8);
+
     struct State;
     std::unique_ptr<State> mState;
   };

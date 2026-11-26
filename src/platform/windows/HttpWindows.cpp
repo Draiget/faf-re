@@ -454,6 +454,21 @@ namespace platform::http
     const std::string_view text
   )
   {
+    return Send(text, true);
+  }
+
+  std::expected<void, std::string> WebSocket::SendBinary(
+    const std::string_view bytes
+  )
+  {
+    return Send(bytes, false);
+  }
+
+  std::expected<void, std::string> WebSocket::Send(
+    const std::string_view text,
+    const bool utf8
+  )
+  {
     HINTERNET socket = nullptr;
     {
       std::lock_guard<std::mutex> lock(mState->lock);
@@ -464,7 +479,7 @@ namespace platform::http
     }
     const DWORD result = ::WinHttpWebSocketSend(
       socket,
-      WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE,
+      utf8 ? WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE : WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE,
       const_cast<char*>(text.data()),
       static_cast<DWORD>(text.size())
     );
