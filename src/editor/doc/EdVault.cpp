@@ -7,7 +7,7 @@
 #include <cstring>
 #include <fstream>
 
-#include "editor/doc/EdHttp.h"
+#include "platform/Http.h"
 
 #include "zlib.h"
 
@@ -53,10 +53,10 @@ namespace faf::editor
       std::atomic<std::uint64_t>& total
     )
     {
-      HttpCall call;
+      platform::http::Call call;
       call.url = url;
       long status = 0;
-      if (const auto sent = HttpRequest(call, status, body, &received, &total); !sent) {
+      if (const auto sent = platform::http::Request(call, status, body, &received, &total); !sent) {
         return std::unexpected(sent.error());
       }
       if (status != 200) {

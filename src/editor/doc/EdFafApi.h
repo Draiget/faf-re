@@ -11,6 +11,9 @@
 #include <thread>
 #include <vector>
 
+#include "online/FafAuth.h"
+#include "online/Json.h"
+
 namespace faf::editor
 {
   /**
@@ -27,33 +30,9 @@ namespace faf::editor
   /** Where the session's lines go (the editor's log); none by default. */
   void SetFafLog(void (*log)(const char*)) noexcept;
 
-  /** A JSON value: what the API answers are made of. */
-  struct JsonNode
-  {
-    enum class Kind
-    {
-      Null,
-      Bool,
-      Number,
-      String,
-      Array,
-      Object,
-    };
-    Kind kind = Kind::Null;
-    bool boolean = false;
-    double number = 0.0;
-    std::string text;
-    std::vector<JsonNode> items;
-    std::vector<std::pair<std::string, JsonNode>> members;
-
-    [[nodiscard]] const JsonNode* Get(const std::string& key) const;
-    [[nodiscard]] std::string String(const std::string& key) const;
-    [[nodiscard]] double Number(const std::string& key, double fallback = 0.0) const;
-    [[nodiscard]] bool Bool(const std::string& key) const;
-  };
-
-  /** `text` read as JSON (strings with their \u escapes as UTF-8); the error otherwise. */
-  [[nodiscard]] std::expected<JsonNode, std::string> ParseJson(const std::string& text);
+  /** The JSON reader, from faf_online since WP1 of the in-game launcher plan (src/online/Json.h). */
+  using online::JsonNode;
+  using online::ParseJson;
 
   /** One map in the vault, as a search finds it (its latest version). */
   struct VaultMap
@@ -149,14 +128,10 @@ namespace faf::editor
   class EdFafSession
   {
   public:
-    enum class State
-    {
-      LoggedOut,
-      Working,
-      WaitingForApproval,
-      LoggedIn,
-    };
+    /** The sign-in's state (faf_online's FafAuth, which holds the sign-in since WP1). */
+    using State = online::FafAuth::State;
 
+    EdFafSession();
     ~EdFafSession();
     void SetTokenFile(std::filesystem::path file);
     /** Logs in with the kept refresh token, if there is one; else stays logged out. */
@@ -167,7 +142,10 @@ namespace faf::editor
     /** Stops waiting for the browser's approval. */
     void CancelLogin();
     /** The FAF name logged in with (from the API's /me), empty until known. */
-    [[nodiscard]] std::string UserName() const;
+    [[nodiscard]] std::string UserName() const
+    {
+      return mAuth.UserName();
+    }
     /**
      * Uploads a packaged map (its zip) to the vault as the FAF client does, on a worker thread; UploadState says how
      * it went. Only while logged in, one at a time.
@@ -182,7 +160,10 @@ namespace faf::editor
     };
     [[nodiscard]] UploadState Upload() const;
     /** Seconds left before the login code runs out, while waiting for approval. */
-    [[nodiscard]] int SecondsLeft() const;
+    [[nodiscard]] int SecondsLeft() const
+    {
+      return mAuth.SecondsLeft();
+    }
     void Search(const VaultQuery& query, int page);
     /** A finished search's maps (once each search). */
     bool TakeResults(std::vector<VaultMap>& maps, int& pages);
@@ -212,11 +193,20 @@ namespace faf::editor
 
     [[nodiscard]] State GetState() const noexcept
     {
-      return mState.load();
+      return mAuth.GetState();
     }
-    [[nodiscard]] std::string Message() const;
-    [[nodiscard]] std::string UserCode() const;
-    [[nodiscard]] std::string VerifyUrl() const;
+    [[nodiscard]] std::string Message() const
+    {
+      return mAuth.Message();
+    }
+    [[nodiscard]] std::string UserCode() const
+    {
+      return mAuth.UserCode();
+    }
+    [[nodiscard]] std::string VerifyUrl() const
+    {
+      return mAuth.VerifyUrl();
+    }
     [[nodiscard]] bool Searching() const noexcept
     {
       return mSearching.load();
@@ -224,15 +214,11 @@ namespace faf::editor
     /** The sign-in's page should open in the browser now (once). */
     [[nodiscard]] bool TakeOpenPage() noexcept
     {
-      return mOpenPage.exchange(false);
+      return mAuth.TakeOpenPage();
     }
 
   private:
     void Run(std::function<void()> job);
-    void SetMessage(std::string text);
-    [[nodiscard]] std::expected<void, std::string> RefreshAccess();
-    void SaveRefreshToken() const;
-    void FetchUserName();
     /** One page of a search (a new access token and again when the old one ran out); the error otherwise. */
     [[nodiscard]] std::expected<void, std::string>
     FetchMaps(const VaultQuery& query, int page, std::vector<VaultMap>& maps, int& pages);
@@ -245,20 +231,11 @@ namespace faf::editor
     std::map<std::string, Named> mNamed;
     UploadState mUpload;
 
-    std::filesystem::path mTokenFile;
-    std::atomic<State> mState{State::LoggedOut};
+    /** The sign-in: state, message, tokens. ~EdFafSession joins the vault threads that use it before it ends. */
+    online::FafAuth mAuth;
     std::atomic<bool> mSearching{false};
     std::atomic<bool> mStop{false};
-    std::atomic<bool> mCancel{false};
-    std::atomic<bool> mOpenPage{false};
-    std::atomic<long long> mCodeExpires{0};
-    std::string mUserName;
     mutable std::mutex mLock;
-    std::string mMessage;
-    std::string mUserCode;
-    std::string mVerifyUrl;
-    std::string mAccessToken;
-    std::string mRefreshToken;
     bool mHaveResults = false;
     std::vector<VaultMap> mResults;
     int mPages = 0;

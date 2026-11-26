@@ -26,7 +26,7 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
 else()
   set_target_properties(faf_editor PROPERTIES OUTPUT_NAME FafEditor)
 endif()
-target_link_libraries(faf_editor PRIVATE faf_engine faf_imgui)
+target_link_libraries(faf_editor PRIVATE faf_engine faf_imgui faf_online)
 # /memtrace names the call sites of what a play leaves behind (EdMemTrace.cpp).
 target_link_libraries(faf_editor PRIVATE dbghelp)
 # Height images (tools/EdHeightFile.cpp) through the Windows imaging component; the file dialogs.

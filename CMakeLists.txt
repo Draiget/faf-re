@@ -161,6 +161,8 @@ endif()
 # --- Peer links (issue #229) and the adapter replacement --------------------------------
 add_subdirectory(src/netlink)
 add_subdirectory(src/netbridge)
+# FAF sign-in, HTTP and WebSocket for the map editor and the in-game launcher (.plans/ingame-launcher).
+add_subdirectory(src/online)
 
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)

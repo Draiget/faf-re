@@ -518,7 +518,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/ArmySlotTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArmySlots.cpp
   editor/AdaptiveTablesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAdaptiveTables.cpp
   editor/RecentMapsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdRecentMaps.cpp
-  editor/VaultTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdVault.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdHttp.cpp
+  editor/VaultTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdVault.cpp
   editor/FafApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdFafApi.cpp
   editor/CommandsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCommands.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWindowChrome.cpp
   editor/KeymapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdKeymap.cpp
@@ -561,7 +561,7 @@ target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CM
 # The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
 target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).
-target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123 winhttp crypt32 shell32)
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main faf_online ole32 windowscodecs zlib123 winhttp crypt32 shell32)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
@@ -610,6 +610,17 @@ if(FAFRE_PLATFORM_WINDOWS)
   set_target_properties(faf_dxgi_tests PROPERTIES FOLDER "Tests/Existing")
   add_test(NAME dxgi_swap_chain_policy COMMAND faf_dxgi_tests)
   set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
+endif()
+
+# faf_online (src/online, .plans/ingame-launcher WP1): JSON, URL encoding, the sealed token store, a WebSocket echo on
+# 127.0.0.1, and FAF's sign-in against canned answers (no network). Windows only until the POSIX platform:: parts exist.
+if(FAFRE_PLATFORM_WINDOWS)
+  add_executable(faf_online_tests EXCLUDE_FROM_ALL online/OnlineTests.cpp)
+  target_compile_options(faf_online_tests PRIVATE /EHsc)
+  target_link_libraries(faf_online_tests PRIVATE faf_online gtest_main ws2_32 bcrypt)
+  set_target_properties(faf_online_tests PROPERTIES FOLDER "Tests/Online")
+  add_test(NAME online COMMAND faf_online_tests)
+  set_tests_properties(online PROPERTIES LABELS "Online")
 endif()
 
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the

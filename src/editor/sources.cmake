@@ -40,7 +40,6 @@ set(FAF_EDITOR_SOURCES
   doc/EdLuaText.cpp
   doc/EdRecentMaps.cpp
   doc/EdVault.cpp
-  doc/EdHttp.cpp
   doc/EdFafApi.cpp
   ui/EdControls.cpp
   ui/EdIconFont.cpp

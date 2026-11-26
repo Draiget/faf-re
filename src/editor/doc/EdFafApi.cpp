@@ -14,10 +14,10 @@
 #define NOMINMAX
 #endif
 #include <Windows.h>
-#include <dpapi.h>
 #include <shellapi.h>
 
-#include "editor/doc/EdHttp.h"
+#include "online/Url.h"
+#include "platform/Http.h"
 #include <cstdarg>
 #include <cstdio>
 
@@ -44,223 +44,6 @@ namespace faf::editor
       gFafLog(line);
     }
 
-    struct JsonReader
-    {
-      const std::string& text;
-      std::size_t at = 0;
-      std::string error;
-
-      void Space()
-      {
-        while (at < text.size() && (text[at] == ' ' || text[at] == '\t' || text[at] == '\r' || text[at] == '\n')) {
-          ++at;
-        }
-      }
-
-      static void PutUtf8(
-        std::string& out,
-        std::uint32_t code
-      )
-      {
-        if (code < 0x80u) {
-          out += static_cast<char>(code);
-        } else if (code < 0x800u) {
-          out += static_cast<char>(0xC0u | (code >> 6));
-          out += static_cast<char>(0x80u | (code & 0x3Fu));
-        } else if (code < 0x10000u) {
-          out += static_cast<char>(0xE0u | (code >> 12));
-          out += static_cast<char>(0x80u | ((code >> 6) & 0x3Fu));
-          out += static_cast<char>(0x80u | (code & 0x3Fu));
-        } else {
-          out += static_cast<char>(0xF0u | (code >> 18));
-          out += static_cast<char>(0x80u | ((code >> 12) & 0x3Fu));
-          out += static_cast<char>(0x80u | ((code >> 6) & 0x3Fu));
-          out += static_cast<char>(0x80u | (code & 0x3Fu));
-        }
-      }
-
-      bool Hex4(
-        std::uint32_t& code
-      )
-      {
-        if (at + 4 > text.size()) {
-          return false;
-        }
-        code = static_cast<std::uint32_t>(std::strtoul(text.substr(at, 4).c_str(), nullptr, 16));
-        at += 4;
-        return true;
-      }
-
-      bool String(
-        std::string& out
-      )
-      {
-        ++at; // the opening quote
-        while (at < text.size()) {
-          const char c = text[at++];
-          if (c == '"') {
-            return true;
-          }
-          if (c != '\\') {
-            out += c;
-            continue;
-          }
-          if (at >= text.size()) {
-            break;
-          }
-          const char e = text[at++];
-          switch (e) {
-          case 'n':
-            out += '\n';
-            break;
-          case 't':
-            out += '\t';
-            break;
-          case 'r':
-            out += '\r';
-            break;
-          case 'b':
-            out += '\b';
-            break;
-          case 'f':
-            out += '\f';
-            break;
-          case 'u': {
-            std::uint32_t code = 0;
-            if (!Hex4(code)) {
-              error = "a broken \\u escape";
-              return false;
-            }
-            // A surrogate pair.
-            if (code >= 0xD800u && code < 0xDC00u && at + 6 <= text.size() && text[at] == '\\' && text[at + 1] == 'u') {
-              at += 2;
-              std::uint32_t low = 0;
-              if (Hex4(low) && low >= 0xDC00u && low < 0xE000u) {
-                code = 0x10000u + ((code - 0xD800u) << 10) + (low - 0xDC00u);
-              }
-            }
-            PutUtf8(out, code);
-            break;
-          }
-          default:
-            out += e;
-            break;
-          }
-        }
-        error = "a string doesn't end";
-        return false;
-      }
-
-      bool Value(
-        JsonNode& node,
-        const int depth
-      )
-      {
-        if (depth > 128) {
-          error = "nested too deep";
-          return false;
-        }
-        Space();
-        if (at >= text.size()) {
-          error = "the text ends inside a value";
-          return false;
-        }
-        const char c = text[at];
-        if (c == '{') {
-          node.kind = JsonNode::Kind::Object;
-          ++at;
-          Space();
-          if (at < text.size() && text[at] == '}') {
-            ++at;
-            return true;
-          }
-          for (;;) {
-            Space();
-            if (at >= text.size() || text[at] != '"') {
-              error = "an object's key isn't a string";
-              return false;
-            }
-            std::string key;
-            if (!String(key)) {
-              return false;
-            }
-            Space();
-            if (at >= text.size() || text[at] != ':') {
-              error = "no ':' after a key";
-              return false;
-            }
-            ++at;
-            JsonNode child;
-            if (!Value(child, depth + 1)) {
-              return false;
-            }
-            node.members.emplace_back(std::move(key), std::move(child));
-            Space();
-            if (at < text.size() && text[at] == ',') {
-              ++at;
-              continue;
-            }
-            if (at < text.size() && text[at] == '}') {
-              ++at;
-              return true;
-            }
-            error = "an object doesn't end";
-            return false;
-          }
-        }
-        if (c == '[') {
-          node.kind = JsonNode::Kind::Array;
-          ++at;
-          Space();
-          if (at < text.size() && text[at] == ']') {
-            ++at;
-            return true;
-          }
-          for (;;) {
-            JsonNode child;
-            if (!Value(child, depth + 1)) {
-              return false;
-            }
-            node.items.push_back(std::move(child));
-            Space();
-            if (at < text.size() && text[at] == ',') {
-              ++at;
-              continue;
-            }
-            if (at < text.size() && text[at] == ']') {
-              ++at;
-              return true;
-            }
-            error = "an array doesn't end";
-            return false;
-          }
-        }
-        if (c == '"') {
-          node.kind = JsonNode::Kind::String;
-          return String(node.text);
-        }
-        if (text.compare(at, 4, "true") == 0 || text.compare(at, 5, "false") == 0) {
-          node.kind = JsonNode::Kind::Bool;
-          node.boolean = text[at] == 't';
-          at += node.boolean ? 4 : 5;
-          return true;
-        }
-        if (text.compare(at, 4, "null") == 0) {
-          at += 4;
-          return true;
-        }
-        char* end = nullptr;
-        node.number = std::strtod(text.c_str() + at, &end);
-        if (end == text.c_str() + at) {
-          error = std::string("unexpected '") + c + "'";
-          return false;
-        }
-        node.kind = JsonNode::Kind::Number;
-        at = static_cast<std::size_t>(end - text.c_str());
-        return true;
-      }
-    };
-
     /** `included`'s resource of this type and id, or null. */
     const JsonNode* Included(
       const JsonNode& root,
@@ -282,41 +65,6 @@ namespace faf::editor
       return nullptr;
     }
 
-    std::string Form(
-      const std::vector<std::pair<std::string, std::string>>& fields
-    )
-    {
-      std::string out;
-      for (const auto& [key, value] : fields) {
-        out += (out.empty() ? "" : "&") + UrlEncode(key) + "=" + UrlEncode(value);
-      }
-      return out;
-    }
-
-    /** A POST to Hydra's token or device endpoint. */
-    std::expected<void, std::string> PostForm(
-      const std::string& path,
-      const std::vector<std::pair<std::string, std::string>>& fields,
-      long& status,
-      JsonNode& answer
-    )
-    {
-      HttpCall call;
-      call.method = "POST";
-      call.url = std::string(kFafOAuthUrl) + path;
-      call.headers = "Content-Type: application/x-www-form-urlencoded\r\nAccept: application/json\r\n";
-      call.body = Form(fields);
-      std::string body;
-      if (const auto sent = HttpRequest(call, status, body); !sent) {
-        return std::unexpected(sent.error());
-      }
-      auto parsed = ParseJson(body);
-      if (!parsed) {
-        return std::unexpected("FAF's login answered " + std::to_string(status) + " with text that isn't JSON");
-      }
-      answer = std::move(*parsed);
-      return {};
-    }
   } // namespace
 
   void SetFafLog(
@@ -324,66 +72,6 @@ namespace faf::editor
   ) noexcept
   {
     gFafLog = log;
-  }
-
-  const JsonNode* JsonNode::Get(
-    const std::string& key
-  ) const
-  {
-    for (const auto& [name, value] : members) {
-      if (name == key) {
-        return &value;
-      }
-    }
-    return nullptr;
-  }
-
-  std::string JsonNode::String(
-    const std::string& key
-  ) const
-  {
-    const JsonNode* const value = Get(key);
-    if (value == nullptr) {
-      return {};
-    }
-    if (value->kind == Kind::Number) {
-      const double n = value->number;
-      return std::floor(n) == n ? std::to_string(static_cast<long long>(n)) : std::to_string(n);
-    }
-    return value->kind == Kind::String ? value->text : std::string();
-  }
-
-  double JsonNode::Number(
-    const std::string& key,
-    const double fallback
-  ) const
-  {
-    const JsonNode* const value = Get(key);
-    return value != nullptr && value->kind == Kind::Number ? value->number : fallback;
-  }
-
-  bool JsonNode::Bool(
-    const std::string& key
-  ) const
-  {
-    const JsonNode* const value = Get(key);
-    return value != nullptr && value->kind == Kind::Bool && value->boolean;
-  }
-
-  std::expected<JsonNode, std::string> ParseJson(
-    const std::string& text
-  )
-  {
-    JsonReader reader{text, 0, {}};
-    JsonNode out;
-    if (!reader.Value(out, 0)) {
-      return std::unexpected(reader.error);
-    }
-    reader.Space();
-    if (reader.at != text.size()) {
-      return std::unexpected("text after the value");
-    }
-    return out;
   }
 
   namespace
@@ -496,7 +184,7 @@ namespace faf::editor
   {
     const std::string sort =
       (query.descending ? "-" : "") + (query.sortProperty.empty() ? std::string("gamesPlayed") : query.sortProperty);
-    return std::string(kFafApiUrl) + "/data/map?filter=" + UrlEncode(VaultQueryFilter(query)) +
+    return std::string(kFafApiUrl) + "/data/map?filter=" + online::UrlEncode(VaultQueryFilter(query)) +
       "&include=latestVersion,author&sort=" + sort +
       "&page%5Bsize%5D=30&page%5Bnumber%5D=" + std::to_string(std::max(page, 1)) + "&page%5Btotals%5D";
   }
@@ -641,6 +329,30 @@ namespace faf::editor
     return {};
   }
 
+  namespace
+  {
+    /** The editor's FAF sign-in: FAF's servers, the FAF client's id (the user's choice, 2026-11-10), no lobby scope. */
+    online::FafEndpoints EditorEndpoints()
+    {
+      online::FafEndpoints endpoints;
+      endpoints.oauthUrl = kFafOAuthUrl;
+      endpoints.apiUrl = kFafApiUrl;
+      endpoints.clientId = kFafClientId;
+      endpoints.scopes = kFafScopes;
+      endpoints.tokenDescription = "FAF map editor login";
+      endpoints.approveWho = "the editor";
+      return endpoints;
+    }
+  } // namespace
+
+  EdFafSession::EdFafSession()
+    : mAuth(EditorEndpoints())
+  {
+    mAuth.SetLog([](const char* const line) {
+      FafLog("editor: %s", line);
+    });
+  }
+
   EdFafSession::~EdFafSession()
   {
     mStop = true;
@@ -658,301 +370,31 @@ namespace faf::editor
     mThreads.emplace_back(std::move(job));
   }
 
-  void EdFafSession::SetMessage(
-    std::string text
-  )
-  {
-    if (!text.empty()) {
-      FafLog("editor: FAF: %s", text.c_str());
-    }
-    std::lock_guard<std::mutex> lock(mLock);
-    mMessage = std::move(text);
-  }
-
-  std::string EdFafSession::UserName() const
-  {
-    std::lock_guard<std::mutex> lock(mLock);
-    return mUserName;
-  }
-
-  int EdFafSession::SecondsLeft() const
-  {
-    const long long now =
-      std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    return static_cast<int>(std::max<long long>(0, mCodeExpires.load() - now));
-  }
-
-  void EdFafSession::CancelLogin()
-  {
-    mCancel = true;
-  }
-
-  void EdFafSession::FetchUserName()
-  {
-    // The API's own record of who is logged in (the FAF client's /me).
-    HttpCall call;
-    call.url = std::string(kFafApiUrl) + "/me";
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      call.headers = "Accept: application/json\r\nAuthorization: Bearer " + mAccessToken + "\r\n";
-    }
-    long status = 0;
-    std::string body;
-    std::string error;
-    std::expected<JsonNode, std::string> me = std::unexpected(std::string());
-    if (const auto sent = HttpRequest(call, status, body); !sent) {
-      error = sent.error();
-    } else if (status == 200) {
-      me = ParseJson(body);
-      if (!me) {
-        error = me.error();
-      }
-    }
-    if (!me) {
-      FafLog("editor: FAF: /me answered %ld%s%s", status, error.empty() ? "" : ": ", error.c_str());
-      return;
-    }
-    std::string name;
-    if (const JsonNode* const data = me->Get("data")) {
-      if (const JsonNode* const attributes = data->Get("attributes")) {
-        name = attributes->String("userName");
-        if (name.empty()) {
-          name = attributes->String("login");
-        }
-      }
-    }
-    FafLog("editor: FAF: logged in as %s", name.empty() ? "(no name in /me)" : name.c_str());
-    std::lock_guard<std::mutex> lock(mLock);
-    mUserName = name;
-  }
-
-  std::string EdFafSession::Message() const
-  {
-    std::lock_guard<std::mutex> lock(mLock);
-    return mMessage;
-  }
-
-  std::string EdFafSession::UserCode() const
-  {
-    std::lock_guard<std::mutex> lock(mLock);
-    return mUserCode;
-  }
-
-  std::string EdFafSession::VerifyUrl() const
-  {
-    std::lock_guard<std::mutex> lock(mLock);
-    return mVerifyUrl;
-  }
-
   void EdFafSession::SetTokenFile(
     std::filesystem::path file
   )
   {
-    mTokenFile = std::move(file);
-    std::ifstream in(mTokenFile, std::ios::binary);
-    const std::string sealed((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    if (sealed.empty()) {
-      return;
-    }
-    DATA_BLOB input{static_cast<DWORD>(sealed.size()), reinterpret_cast<BYTE*>(const_cast<char*>(sealed.data()))};
-    DATA_BLOB output{};
-    if (::CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, 0, &output)) {
-      std::lock_guard<std::mutex> lock(mLock);
-      mRefreshToken.assign(reinterpret_cast<const char*>(output.pbData), output.cbData);
-      ::LocalFree(output.pbData);
-    }
-  }
-
-  void EdFafSession::SaveRefreshToken() const
-  {
-    if (mTokenFile.empty()) {
-      return;
-    }
-    std::string token;
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      token = mRefreshToken;
-    }
-    std::ofstream out(mTokenFile, std::ios::binary | std::ios::trunc);
-    if (token.empty()) {
-      return;
-    }
-    DATA_BLOB input{static_cast<DWORD>(token.size()), reinterpret_cast<BYTE*>(token.data())};
-    DATA_BLOB output{};
-    if (::CryptProtectData(&input, L"FAF map editor login", nullptr, nullptr, nullptr, 0, &output)) {
-      out.write(reinterpret_cast<const char*>(output.pbData), output.cbData);
-      ::LocalFree(output.pbData);
-    }
-  }
-
-  std::expected<void, std::string> EdFafSession::RefreshAccess()
-  {
-    std::string refresh;
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      refresh = mRefreshToken;
-    }
-    if (refresh.empty()) {
-      return std::unexpected("not logged in");
-    }
-    long status = 0;
-    JsonNode answer;
-    if (
-      auto posted = PostForm(
-        "/oauth2/token",
-        {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}},
-        status,
-        answer
-      );
-      !posted
-    ) {
-      return std::unexpected(std::move(posted.error()));
-    }
-    if (status != 200 || answer.String("access_token").empty()) {
-      std::lock_guard<std::mutex> lock(mLock);
-      mRefreshToken.clear();
-      return std::unexpected("FAF's login refused the kept login (" + answer.String("error") + "); log in again");
-    }
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      mAccessToken = answer.String("access_token");
-      if (!answer.String("refresh_token").empty()) {
-        mRefreshToken = answer.String("refresh_token"); // Hydra hands out a new one each time
-      }
-    }
-    SaveRefreshToken();
-    return {};
+    mAuth.SetTokenFile(std::move(file));
   }
 
   void EdFafSession::Resume()
   {
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      if (mRefreshToken.empty() || mState.load() != State::LoggedOut) {
-        return;
-      }
-    }
-    mState = State::Working;
-    SetMessage("Logging in to FAF...");
-    Run([this] {
-      if (const auto refreshed = RefreshAccess()) {
-        FetchUserName();
-        mState = State::LoggedIn;
-        SetMessage("Logged in to FAF");
-      } else {
-        mState = State::LoggedOut;
-        SetMessage(refreshed.error());
-        SaveRefreshToken();
-      }
-    });
+    mAuth.Resume();
   }
 
   void EdFafSession::StartLogin()
   {
-    if (mState.load() == State::Working || mState.load() == State::WaitingForApproval) {
-      return;
-    }
-    mState = State::Working;
-    mCancel = false;
-    SetMessage("Asking FAF for a login code...");
-    Run([this] {
-      long status = 0;
-      JsonNode device;
-      const auto posted =
-        PostForm("/oauth2/device/auth", {{"client_id", kFafClientId}, {"scope", kFafScopes}}, status, device);
-      if (!posted || status != 200) {
-        mState = State::LoggedOut;
-        SetMessage(
-          posted || posted.error().empty() ? "FAF's login answered " + std::to_string(status) : posted.error()
-        );
-        return;
-      }
-      const std::string deviceCode = device.String("device_code");
-      {
-        std::lock_guard<std::mutex> lock(mLock);
-        mUserCode = device.String("user_code");
-        mVerifyUrl = device.String("verification_uri_complete");
-        if (mVerifyUrl.empty()) {
-          mVerifyUrl = device.String("verification_uri");
-        }
-      }
-      // FAF's page in the browser, the code already in it (as the FAF client opens it): the panel opens it on the
-      // UI thread, as ShellExecute needs COM set up where it runs.
-      mOpenPage = true;
-      mState = State::WaitingForApproval;
-      SetMessage("Approve the editor on FAF's page in your browser (code " + UserCode() + ")");
-      int interval = std::max(1, static_cast<int>(device.Number("interval", 5.0)));
-      const auto until =
-        std::chrono::steady_clock::now() + std::chrono::seconds(static_cast<int>(device.Number("expires_in", 600.0)));
-      mCodeExpires = std::chrono::duration_cast<std::chrono::seconds>(until.time_since_epoch()).count();
-      std::string lastPoll;
-      while (!mStop.load() && !mCancel.load() && std::chrono::steady_clock::now() < until) {
-        for (int i = 0; i < interval * 10 && !mStop.load() && !mCancel.load(); ++i) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        if (mStop.load() || mCancel.load()) {
-          break;
-        }
-        JsonNode token;
-        const auto answered = PostForm(
-          "/oauth2/token",
-          {{"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
-           {"device_code", deviceCode},
-           {"client_id", kFafClientId}},
-          status,
-          token
-        );
-        // Each new kind of answer once in the log, so a login that never ends says why.
-        const std::string poll = std::to_string(status) + " " + (answered ? token.String("error") : answered.error());
-        if (poll != lastPoll) {
-          FafLog("editor: FAF: waiting for approval, the token endpoint answers %s", poll.c_str());
-          lastPoll = poll;
-        }
-        if (!answered) {
-          continue; // a dropped answer: ask again
-        }
-        if (status == 200 && !token.String("access_token").empty()) {
-          {
-            std::lock_guard<std::mutex> lock(mLock);
-            mAccessToken = token.String("access_token");
-            mRefreshToken = token.String("refresh_token");
-          }
-          SaveRefreshToken();
-          FetchUserName();
-          mState = State::LoggedIn;
-          SetMessage("Logged in to FAF");
-          return;
-        }
-        const std::string why = token.String("error");
-        if (why == "slow_down") {
-          interval += 5;
-        } else if (why != "authorization_pending") {
-          mState = State::LoggedOut;
-          SetMessage(why == "access_denied" ? "The login was declined on FAF's page" : "FAF's login stopped: " + why);
-          return;
-        }
-      }
-      if (mCancel.load()) {
-        mState = State::LoggedOut;
-        SetMessage("Sign-in cancelled");
-      } else if (!mStop.load()) {
-        mState = State::LoggedOut;
-        SetMessage("The sign-in code ran out before it was approved; sign in again");
-      }
-    });
+    mAuth.StartLogin();
   }
 
   void EdFafSession::Logout()
   {
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      mAccessToken.clear();
-      mRefreshToken.clear();
-      mUserName.clear();
-    }
-    SaveRefreshToken();
-    mState = State::LoggedOut;
-    SetMessage("Logged out of FAF");
+    mAuth.Logout();
+  }
+
+  void EdFafSession::CancelLogin()
+  {
+    mAuth.CancelLogin();
   }
 
   std::string MapUploadBody(
@@ -992,7 +434,7 @@ namespace faf::editor
       if (mUpload.running) {
         return;
       }
-      if (mState.load() != State::LoggedIn) {
+      if (mAuth.GetState() != State::LoggedIn) {
         mUpload = UploadState{false, true, false, "Sign in to FAF first (the start screen's FAF vault page)"};
         return;
       }
@@ -1016,22 +458,22 @@ namespace faf::editor
           boundary = "----FafEditorUpload" + std::to_string(n) + "x9q";
         }
         for (int attempt = 0; attempt < 2; ++attempt) {
-          HttpCall call;
+          platform::http::Call call;
           call.method = "POST";
           call.url = std::string(kFafApiUrl) + "/maps/upload";
           {
             std::lock_guard<std::mutex> lock(mLock);
-            call.headers = "Accept: application/json\r\nAuthorization: Bearer " + mAccessToken +
+            call.headers = "Accept: application/json\r\nAuthorization: Bearer " + mAuth.AccessToken() +
               "\r\nContent-Type: multipart/form-data; boundary=" + boundary + "\r\n";
           }
           call.body = MapUploadBody(boundary, zip.filename().string(), bytes, ranked);
           long status = 0;
           std::string body;
-          if (const auto sent = HttpRequest(call, status, body); !sent) {
+          if (const auto sent = platform::http::Request(call, status, body); !sent) {
             result.message = "The upload didn't reach FAF: " + sent.error();
             break;
           }
-          if (status == 401 && attempt == 0 && RefreshAccess()) {
+          if (status == 401 && attempt == 0 && mAuth.RefreshAccess()) {
             continue;
           }
           if (status >= 200 && status < 300) {
@@ -1064,7 +506,7 @@ namespace faf::editor
     const int page
   )
   {
-    if (mState.load() != State::LoggedIn || mSearching.exchange(true)) {
+    if (mAuth.GetState() != State::LoggedIn || mSearching.exchange(true)) {
       return;
     }
     Run([this, query, page] {
@@ -1080,7 +522,7 @@ namespace faf::editor
         mPages = pages;
         mHaveResults = true;
       }
-      SetMessage(error.empty() ? std::string() : error);
+      mAuth.SetMessage(error.empty() ? std::string() : error);
       mSearching = false;
     });
   }
@@ -1090,7 +532,7 @@ namespace faf::editor
     const VaultQuery& query
   )
   {
-    if (mState.load() != State::LoggedIn) {
+    if (mAuth.GetState() != State::LoggedIn) {
       return;
     }
     {
@@ -1143,23 +585,23 @@ namespace faf::editor
     std::string error;
     {
       for (int attempt = 0; attempt < 2; ++attempt) {
-        HttpCall call;
+        platform::http::Call call;
         call.url = VaultSearchUrl(query, page);
         {
           std::lock_guard<std::mutex> lock(mLock);
-          call.headers = "Accept: application/vnd.api+json\r\nAuthorization: Bearer " + mAccessToken + "\r\n";
+          call.headers = "Accept: application/vnd.api+json\r\nAuthorization: Bearer " + mAuth.AccessToken() + "\r\n";
         }
         long status = 0;
         std::string body;
-        if (const auto sent = HttpRequest(call, status, body); !sent) {
+        if (const auto sent = platform::http::Request(call, status, body); !sent) {
           error = sent.error();
           break;
         }
         if (status == 401 && attempt == 0) {
           // The access token lasts an hour: a new one from the refresh token, then the search again.
-          if (const auto refreshed = RefreshAccess(); !refreshed) {
+          if (const auto refreshed = mAuth.RefreshAccess(); !refreshed) {
             error = refreshed.error();
-            mState = State::LoggedOut;
+            mAuth.MarkLoggedOut();
             break;
           }
           continue;
@@ -1251,10 +693,10 @@ namespace faf::editor
             mPictureCache.empty() ? std::filesystem::path() : mPictureCache / size / file;
           bool ok = (programData[0] != '\0' && readFile(client)) || (!own.empty() && readFile(own));
           if (!ok) {
-            HttpCall call;
+            platform::http::Call call;
             call.url = next;
             long status = 0;
-            ok = HttpRequest(call, status, body) && status == 200 && !body.empty();
+            ok = platform::http::Request(call, status, body) && status == 200 && !body.empty();
             if (ok && !own.empty()) {
               std::error_code code;
               std::filesystem::create_directories(own.parent_path(), code);
