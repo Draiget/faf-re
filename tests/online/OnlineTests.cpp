@@ -28,6 +28,7 @@
 #include "online/FafAuth.h"
 #include "online/FafLobby.h"
 #include "online/GameLink.h"
+#include "online/LaunchArgs.h"
 #include "online/Json.h"
 #include "online/Url.h"
 #include "platform/Http.h"
@@ -1159,4 +1160,132 @@ TEST(
   for (const auto& message : lobby.TakeMessages()) {
     EXPECT_NE(message.String("command"), "HostGame");
   }
+}
+
+// --- WP4: a FAF match's switches
+// ---------------------------------------------------------------------------------------
+
+TEST(
+  OnlineLaunchArgs,
+  ACustomGameGetsTheServersArgsThePlayersAndTheLaunchersOwn
+)
+{
+  using namespace faf::online;
+  const auto launchMessage = ParseJson(
+    R"({"command":"game_launch","args":["/numgames",12],"uid":51,"mod":"faf","name":"x","init_mode":0,)"
+    R"("game_type":"custom","rating_type":"global"})"
+  );
+  const auto me = ParseJson(
+    R"({"id":346886,"login":"Draiget","country":"RU","clan":"BC","ratings":{)"
+    R"("global":{"rating":[1523.4,85.6],"number_of_games":321},"ladder_1v1":{"rating":[1400,90],"number_of_games":50}}})"
+  );
+  ASSERT_TRUE(launchMessage && me);
+  const GameLaunch launch = ReadGameLaunch(*launchMessage);
+  EXPECT_EQ(launch.uid, "51");
+  const LaunchPlayer player = ReadLaunchPlayer(*me);
+  EXPECT_EQ(player.id, "346886");
+  ASSERT_EQ(player.ratings.size(), 2u);
+  LaunchLocal local;
+  local.gpgnetPort = 52114;
+  local.replayPort = 52115;
+  local.logFile = "C:\\logs\\game_51.log";
+  local.forceRelay = true;
+  const std::vector<std::string> expected{
+    "/numgames",
+    "12",
+    "/mean",
+    "1523",
+    "/deviation",
+    "86",
+    "/country",
+    "RU",
+    "/clan",
+    "BC",
+    "/init",
+    "init_faf.lua",
+    "/nobugreport",
+    "/savereplay",
+    "gpgnet://127.0.0.1:52115/51/Draiget.SCFAreplay",
+    "/gpgnet",
+    "127.0.0.1:52114",
+    "/log",
+    "C:\\logs\\game_51.log",
+    "/nativenet",
+    "/nativenetrelay",
+  };
+  EXPECT_EQ(BuildLaunchArgs(launch, &player, local), expected);
+}
+
+TEST(
+  OnlineLaunchArgs,
+  TheRatingPairIsNeverLeftOut
+)
+{
+  using namespace faf::online;
+  GameLaunch launch;
+  launch.uid = "7";
+  launch.ratingType = "tmm_2v2";
+  LaunchLocal local;
+  local.gpgnetPort = 1;
+  local.nativeNet = false;
+  // No player record: the TrueSkill starting pair.
+  auto args = BuildLaunchArgs(launch, nullptr, local);
+  ASSERT_GE(args.size(), 4u);
+  EXPECT_EQ(
+    std::vector<std::string>(args.begin(), args.begin() + 4),
+    (std::vector<std::string>{"/mean", "1500", "/deviation", "500"})
+  );
+  // A rating type the player has no rating in: their global one.
+  LaunchPlayer player;
+  player.login = "Bo";
+  player.ratings["global"] = {1200.0, 150.0, 10};
+  args = BuildLaunchArgs(launch, &player, local);
+  EXPECT_EQ(
+    std::vector<std::string>(args.begin(), args.begin() + 4),
+    (std::vector<std::string>{"/mean", "1200", "/deviation", "150"})
+  );
+}
+
+TEST(
+  OnlineLaunchArgs,
+  AMatchmakerGameGetsItsFactionTeamSpotAndOptions
+)
+{
+  using namespace faf::online;
+  const auto launchMessage = ParseJson(
+    R"({"command":"game_launch","args":["/numgames",3],"uid":900,"mod":"faf","game_type":"matchmaker",)"
+    R"("rating_type":"ladder_1v1","faction":3,"team":2,"expected_players":2,"map_position":1,)"
+    R"("game_options":{"Share":"ShareUntilDeath"}})"
+  );
+  ASSERT_TRUE(launchMessage);
+  const GameLaunch launch = ReadGameLaunch(*launchMessage);
+  LaunchPlayer player;
+  player.login = "Ann";
+  player.ratings["ladder_1v1"] = {1650.0, 70.0, 40};
+  LaunchLocal local;
+  local.gpgnetPort = 2;
+  local.nativeNet = false;
+  const std::vector<std::string> expected{
+    "/numgames",
+    "3",
+    "/mean",
+    "1650",
+    "/deviation",
+    "70",
+    "/cybran",
+    "/team",
+    "2",
+    "/players",
+    "2",
+    "/startspot",
+    "1",
+    "/gameoptions",
+    "Share:ShareUntilDeath",
+    "/init",
+    "init_faf.lua",
+    "/nobugreport",
+    "/gpgnet",
+    "127.0.0.1:2",
+  };
+  EXPECT_EQ(BuildLaunchArgs(launch, &player, local), expected);
 }
