@@ -19,6 +19,7 @@
 
 namespace gpg::gal
 {
+  class DepthStencilTarget;
   class RenderTarget;
   class Texture;
 } // namespace gpg::gal
@@ -30,10 +31,12 @@ namespace gpg::gal::effects
   {
     std::shared_ptr<Texture> texture;
     std::shared_ptr<RenderTarget> renderTarget;
+    std::shared_ptr<DepthStencilTarget>
+      depthStencil; // FAF addition: its depth, sampled (EffectVariable::SetDepthStencil)
 
     [[nodiscard]] bool Empty() const noexcept
     {
-      return texture == nullptr && renderTarget == nullptr;
+      return texture == nullptr && renderTarget == nullptr && depthStencil == nullptr;
     }
   };
 
@@ -79,6 +82,8 @@ namespace gpg::gal::effects
 
     void SetTexture(std::uint32_t parameter, const std::shared_ptr<Texture>& texture);
     void SetRenderTarget(std::uint32_t parameter, const std::shared_ptr<RenderTarget>& renderTarget);
+    /** FAF addition: the depth of `depthStencil`, sampled (null unbinds). */
+    void SetDepthStencil(std::uint32_t parameter, const std::shared_ptr<DepthStencilTarget>& depthStencil);
     [[nodiscard]] const TextureBinding& Binding(std::uint32_t parameter) const;
 
   private:

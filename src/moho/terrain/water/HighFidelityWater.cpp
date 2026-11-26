@@ -5,20 +5,24 @@
 #include <cmath>
 #include <cstdint>
 
-#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/core/utils/Global.h"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
-#include "moho/render/ID3DVertexStream.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
+#include "moho/render/ID3DVertexStream.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/RiverFlowBind.h"
+#include "moho/terrain/water/WaterBanksBind.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
+#include "moho/terrain/water/WaterQuality.h"
 #include "moho/terrain/water/WaterShaderVars.h"
+#include "moho/terrain/water/WaterSimulation.h"
 
 namespace
 {
@@ -50,6 +54,12 @@ namespace moho
     constexpr int kFresnelLookupTextureFormatToken = 17;
     constexpr float kFresnelLookupInvDimensionMinusOne = 1.0f / 127.0f;
 
+    // The projected grid of the wave simulation (WaterSimulation.h): vertices that only carry their screen position (u,
+    // v), 255 x 255 of them, the most the 16-bit indices reach (65,025 of 65,536).
+    constexpr int kGridSide = 255;
+    CD3DVertexSheet* gGridVertexSheet = nullptr;
+    CD3DIndexSheet* gGridIndexSheet = nullptr;
+
     struct HighFidelityWaterVertex
     {
       float x;
@@ -75,6 +85,58 @@ namespace moho
       const float halfWidth = static_cast<float>((field->width - 1) >> 1);
       const float halfHeight = static_cast<float>((field->height - 1) >> 1);
       return {halfWidth * 2.0f, halfHeight * 2.0f};
+    }
+
+    // Builds the projected grid once (and again after a device reset released it). A vertex's position is (u, 0, v) and
+    // its uv (u, v): the water vertex shader reads the uv as the place on the screen.
+    bool EnsureWaterGrid()
+    {
+      if (gGridVertexSheet != nullptr && gGridIndexSheet != nullptr) {
+        return true;
+      }
+      ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+      CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kHighFidelityWaterVertexFormatToken);
+      if (vertexFormat == nullptr) {
+        return false;
+      }
+      DeleteOwned(gGridVertexSheet);
+      DeleteOwned(gGridIndexSheet);
+      gGridVertexSheet = resources->NewVertexSheet(kVertexSheetUsageToken, kGridSide * kGridSide, vertexFormat);
+      gGridIndexSheet = resources->CreateIndexSheet(false, (kGridSide - 1) * (kGridSide - 1) * 6);
+      if (gGridVertexSheet == nullptr || gGridIndexSheet == nullptr) {
+        DeleteOwned(gGridVertexSheet);
+        DeleteOwned(gGridIndexSheet);
+        return false;
+      }
+      ID3DVertexStream* const stream = gGridVertexSheet->GetVertStream(0U);
+      auto* const vertices =
+        static_cast<HighFidelityWaterVertex*>(stream->Lock(0, kGridSide * kGridSide, false, false));
+      for (int z = 0; z < kGridSide; ++z) {
+        for (int x = 0; x < kGridSide; ++x) {
+          const float u = static_cast<float>(x) / static_cast<float>(kGridSide - 1);
+          const float v = static_cast<float>(z) / static_cast<float>(kGridSide - 1);
+          vertices[z * kGridSide + x] = {u, 0.0f, v, u, v};
+        }
+      }
+      stream->Unlock();
+      std::int16_t* const indices = gGridIndexSheet->Lock(0U, gGridIndexSheet->GetSize(), true, false);
+      int at = 0;
+      for (int z = 0; z + 1 < kGridSide; ++z) {
+        for (int x = 0; x + 1 < kGridSide; ++x) {
+          const auto i0 = static_cast<std::int16_t>(z * kGridSide + x);
+          const auto i1 = static_cast<std::int16_t>(z * kGridSide + x + 1);
+          const auto i2 = static_cast<std::int16_t>((z + 1) * kGridSide + x);
+          const auto i3 = static_cast<std::int16_t>((z + 1) * kGridSide + x + 1);
+          indices[at++] = i0;
+          indices[at++] = i2;
+          indices[at++] = i1;
+          indices[at++] = i1;
+          indices[at++] = i2;
+          indices[at++] = i3;
+        }
+      }
+      gGridIndexSheet->Unlock();
+      return true;
     }
 
     void SetShaderVarMem(
@@ -309,6 +371,8 @@ namespace moho
     mFresnelLookupTexture.reset();
     // Engine addition (ren_WaterDetail): rebuilt on the next detailed-water draw.
     sWaterHdNoiseTexture.reset();
+    DeleteOwned(gGridVertexSheet);
+    DeleteOwned(gGridIndexSheet);
     DeleteOwned(mVertexSheet);
     DeleteOwned(mIndexSheet);
     mWaterMapTexture.reset();
@@ -338,15 +402,19 @@ namespace moho
     GetWater2UtilityTextureCShaderVar().GetTexture(utilityTexture);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
-    // Engine addition (water bodies): the mask is laid at each water's own level.
+    // Engine addition (water bodies): the mask is laid at each water's own level. FAF (banks): the mask of a lake or
+    // a river is the depth test alone, so its edge is where the surface meets the ground (docs/WATER_SIMULATION.md,
+    // "Banks"); the sea's is the shipped one.
     if (const auto* const levels = WaterBodySurfaces::For(terrainRes); levels != nullptr) {
       bool drawn = true;
       for (const WaterBodySurfaces::Level& level : *levels) {
         GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        water::BindBankMask(!level.sea);
         for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
           drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
         }
       }
+      water::BindBankMask(false);
       return drawn;
     }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
@@ -393,6 +461,7 @@ namespace moho
     GetWater2RefractionMapShaderVar().SetRenderTargetTexture(refractionTexture);
     GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(reflectionTexture);
     GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
+    water::BindShaderParams(); // FAF: the filter tap counts of the patched effect (docs/WATER_SIMULATION.md)
 
     const WaterShaderNumericState& shaderState = shaderProperties->mNumericState;
     if (
@@ -458,20 +527,65 @@ namespace moho
     (void)SetWater2TerrainScaleShaderVarData(terrainScale);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
+    // FAF: with the wave simulation the surface of a map without water bodies is the projected grid (the waves lift its
+    // vertices). The call also switches the grid off for the draws below when there is none (it keeps the last value
+    // otherwise); a map with water bodies draws one water at a time (below): the projected grid of the water where it
+    // is near enough, else the meshes of WaterBodySurfaces, and the ripples bend the normals of both
+    // (docs/WATER_SIMULATION.md, "Water bodies").
+    const WaterExtents2D gridExtents = GetWaterMapExtents(*mTerrainRes);
+    const bool projectedGrid = water::BindWaterGrid(*camera, gridExtents.x, gridExtents.z) && EnsureWaterGrid();
     // Engine addition (water bodies): each water at its own level. Only the sea samples the
     // planar reflection, which is mirrored at the sea; a body samples its own (see ReflectionFor).
     if (const auto* const levels = WaterBodySurfaces::For(mTerrainRes); levels != nullptr) {
       bool drawn = true;
+      // FAF: the projected grid of each water (the waves lift it), clipped to the blocks the water owns, in the part of
+      // the screen that holds the water; the meshes where there is no grid (switched off, off the screen, further
+      // waters than the cap of a frame)
+      const std::shared_ptr<ID3DTextureSheet> owner =
+        std::static_pointer_cast<ID3DTextureSheet>(WaterBodySurfaces::OwnerTexture(mTerrainRes));
+      const bool gridSheet = owner != nullptr && EnsureWaterGrid();
+      // FAF (rivers): the flow of the map's rivers; a river is drawn as its own mesh (the sloped surface, the vertices
+      // keep their heights), never as a grid, and never mirrors at a plane (docs/projects/RIVERS.md)
+      water::BindRiverFlow(mTerrainRes);
       for (const WaterBodySurfaces::Level& level : *levels) {
         GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
         GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(
-          level.sea ? reflectionTexture : WaterBodySurfaces::ReflectionFor(level.elevation)
+          level.sea
+            ? reflectionTexture
+            : (level.river ? WaterBodySurfaces::EmptyReflection() : WaterBodySurfaces::ReflectionFor(level.elevation))
         );
+        if (level.river) {
+          water::BindWaterGridLevelOff();
+          water::BindRiverMesh(true);
+          for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
+            drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
+          }
+          water::BindRiverMesh(false);
+          continue;
+        }
+        water::GridLevel grid;
+        grid.elevation = level.elevation;
+        grid.body = level.body;
+        grid.x0 = level.x0;
+        grid.z0 = level.z0;
+        grid.x1 = level.x1;
+        grid.z1 = level.z1;
+        grid.extentX = gridExtents.x;
+        grid.extentZ = gridExtents.z;
+        grid.sheetReady = gridSheet;
+        if (water::BindWaterGridLevel(*camera, grid, owner)) {
+          drawn = device->DrawIndexedSheetPrimitive(gGridVertexSheet, gGridIndexSheet, &primitiveType) && drawn;
+          continue;
+        }
         for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
           drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
         }
       }
+      water::EndWaterGridLevels();
       return drawn;
+    }
+    if (projectedGrid) {
+      return device->DrawIndexedSheetPrimitive(gGridVertexSheet, gGridIndexSheet, &primitiveType);
     }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
   }

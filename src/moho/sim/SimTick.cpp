@@ -1,5 +1,6 @@
 #include "moho/sim/SimPrivate2.h"
 #include "moho/sim/SimEditorHook.h"
+#include "moho/render/lights/SimLights.h"
 
 namespace
 {
@@ -1299,6 +1300,7 @@ void Sim::AdvanceBeat(
       FAF_PROFILE_ZONE_NAMED("Sim::EffectManager");
       TickEffectManager(mEffectManager);
     }
+    lights::SimLightsTick(this); // dynamic lights (visual only), docs/DYNAMIC_LIGHTS.md
     {
       FAF_PROFILE_ZONE_NAMED("Sim::FormationDb");
       UpdateFormationDb(mFormationDB);

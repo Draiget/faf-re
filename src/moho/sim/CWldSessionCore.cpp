@@ -7,7 +7,9 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/render/DynamicLights.h"
+#include "moho/render/lights/LightFeeds.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/terrain/water/Waterfall.h"
 
 namespace moho
 {
@@ -1733,6 +1735,10 @@ namespace moho
         *static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()), beat.mCurTick
       );
       sWorldParticles.AddParticles(*static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()));
+      // Dynamic Lights (docs/DYNAMIC_LIGHTS.md), render only: the irradiance field's own feed of the same beat. While
+      // it is on, the screen-space effect lights above neither collect nor draw (DynamicLights::IsActive), so the two
+      // never run together.
+      lights::FeedParticleBuffer(*static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()), beat.mCurTick);
     }
 
     auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1754,6 +1760,9 @@ namespace moho
 
     if (worldCamera != nullptr) {
       terrainRes->UpdateWaveSystem(worldCamera->CameraGetView(), worldCamera->CameraGetTargetZoom(), mGameTick);
+      // Engine addition (docs/projects/RIVERS.md): the curtains of the waterfalls in view, added after the renderer
+      // cleared its beams for this beat; a beat in which the game did not advance (a pause) keeps the last ones.
+      water::falls::OnBeat(worldCamera->CameraGetView(), beat.mAdvanced);
     }
 
     // Engine addition: all of the beat's map changes in one call, the same as `NotifyMapChange` for

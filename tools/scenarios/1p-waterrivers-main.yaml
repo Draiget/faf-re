@@ -1,0 +1,40 @@
+name: 1p-waterrivers-main
+description: >
+  Rivers (docs/projects/RIVERS.md), recovered x64 engine with sim_FixWaterBodies and sim_FixRivers on. The map
+  (tools/scenarios/water-rivers/make_map.py) has three rivers cut into a plateau: A, a deep river with a 7.5 unit
+  waterfall; B, a shallow one with a 0.75 step as its fall; B2, the same shallows without a fall. The map's script
+  checks the surface along river A against the profile, the fall cells' blocking terrain type, a sonar on and off
+  the fall, then runs a frigate, a hover tank, a submarine, an amphibious tank and an interceptor over the fall of A,
+  a land tank over the river, and two amphibious tanks over B and B2; every check is one "RIVERTEST PASS|FAIL" line, then "RIVERTEST DONE passed N
+  failed M". Naval, hover, submarine and amphibious units must stop above the fall, air crosses, the amphibious unit stops at
+  B's fall and walks across B2, the land tank goes around the river.
+  Setup: python tools/scenarios/water-rivers/make_map.py "<game>/maps/SCMP_012" "<vault>/maps" (the vault
+  init_mpemu_localvault.lua reads), and the exe built from the branch copied into bin_x64 as main_x64_riversim.exe.
+  1p-waterrivers-off.yaml is the control run with sim_FixRivers=0.
+timeout: 4m
+
+mode: direct
+lobby: auto
+map: faf_re_waterrivers
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_riversim.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: RiverTest, faction: uef, args: ['/title', 'waterrivers-main', '/con', 'sim_FixWaterBodies=1;sim_FixRivers=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 110s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RIVERTEST DONE passed 25 failed 0' }

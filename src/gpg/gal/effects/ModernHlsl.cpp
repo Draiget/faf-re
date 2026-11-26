@@ -84,6 +84,31 @@ float2 faf_shadow_uv(float2 uv)
     return faf_ShadowCascades[0].zw;
 }
 float4 faf_shadow_read(faf_shadow_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, faf_shadow_uv(uv), 0); }
+// ---- engine addition (shadow filtering): a filter that reads the atlas in the texels of the tile that holds its
+// centre. tex2Dtile gives that tile's move into the texture (texture uv = uv * xy + zw; x of 0 for a point past the
+// shadowed volume, which is lit), tex2Dtilesize the texture's size in texels (the atlas's, not a tile's) and
+// tex2Dtileload a read at texture coordinates, which skips the per-lookup remap above. The same names exist for
+// faf_sampler (the prelude), where the move is the identity, so a filter written against them also works without
+// cascades. ----
+float4 tex2Dtile(faf_shadow_sampler s, float2 uv)
+{
+    const int count = (int)faf_ShadowCascades[0].x;
+    if (count <= 0) return float4(1, 1, 0, 0);
+    [unroll] for (int k = 0; k < 4; ++k) {
+        if (k < count) {
+            const float4 box = faf_ShadowCascades[1 + 2 * k];
+            if (all(uv >= box.xy) && all(uv <= box.zw)) return faf_ShadowCascades[2 + 2 * k];
+        }
+    }
+    return float4(0, 0, faf_ShadowCascades[0].zw);
+}
+float2 tex2Dtilesize(faf_shadow_sampler s)
+{
+    uint w, h;
+    s.t2.GetDimensions(w, h);
+    return float2(w, h);
+}
+float4 tex2Dtileload(faf_shadow_sampler s, float2 p) { return s.t2.SampleLevel(s.s, p, 0); }
 float4 tex2D(faf_shadow_sampler s, float2 uv) { return faf_shadow_read(s, uv); }
 float4 tex2D(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
 float4 tex2Dbias(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
@@ -260,6 +285,9 @@ float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, flo
     return float2(1, 1);
 }
 static float2 faf_ray_key_tap = float2(-1e31, -1e31);
+// The ground's shadow on a mesh point doesn't depend on the filter tap: kept for the point's other taps.
+static float4 faf_ray_ground_key = float4(-1e31, -1e31, -1e31, -1e31);
+static bool faf_ray_ground_value = false;
 // x: sunlit for a mesh point at full.z; y: sunlit for a terrain point whose z is 0.01 short. `tap` is the
 // lookup's offset from the point (mesh.fx's filter taps): with a sun disc each tap traces towards its own
 // point of it, and mesh.fx's average of the taps makes the soft edge.
@@ -300,7 +328,11 @@ float2 faf_ray_light(float4 full, float2 tap)
         }
         bool shaded = faf_ray_mesh_blocked(meshPoint, meshRay, faf_RayShadows[4].y, tMax);
         if (!shaded) {
-            shaded = faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+            if (!all(full == faf_ray_ground_key)) {
+                faf_ray_ground_value = faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+                faf_ray_ground_key = full;
+            }
+            shaded = faf_ray_ground_value;
         }
         lit = shaded ? float2(0, 1) : float2(1, 1);
     } else if (full.w < 2.5) {
@@ -356,14 +388,20 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
     // Engine addition (ren_RayWaterReflections): water2.fx reflects the sky cubemap and a mirrored copy of the units.
     // `faf_ray_water` traces the reflected ray into the ray-traced scene (ground and meshes); where it meets
     // something that is on the screen, it returns where (in the refraction copy's coordinates, the frame drawn
-    // before the water) and how much to take of it (less towards the screen's edges); otherwise zero, and the
-    // sky stays. The call site mixes the copy's colour there into the sky reflection.
-    constexpr const char* kRayWaterHelpers = R"hlsl(
+    // before the water), how much to take of it (less towards the screens edges) and how far along the view axis
+    // the hit lies; otherwise zero, and the sky stays. The call site mixes the copy's colour there into the sky
+    // reflection, after checking against the scene depth that the copy shows the hit there and not something nearer
+    // the camera (the copy holds what the camera sees: an occluder at that pixel would be mirrored in its place).
+    // The scene's declaration is apart: the shadow lookups' helpers declare it too (water2.fx with the shadow map of
+    // the units on the water, WaterReflectionPatch.cpp, has both), and a name is declared once.
+    constexpr const char* kRayWaterScene = R"hlsl(
 [[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
-float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, float4 viewportScaleOffset)
+)hlsl";
+    constexpr const char* kRayWaterHelpers = R"hlsl(
+float4 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, float4 viewportScaleOffset)
 {
     if (faf_RayShadows[8].x <= 0 || direction.y <= 0.01) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     RayDesc ray;
     ray.Origin = surface + float3(0, 0.05, 0);
@@ -374,16 +412,16 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
     query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, 3, ray);
     query.Proceed();
     if (query.CommittedStatus() != COMMITTED_TRIANGLE_HIT) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     const float3 hit = ray.Origin + ray.Direction * query.CommittedRayT();
     const float4 clip = mul(float4(hit, 1), worldToClip);
     if (clip.w <= 0) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     const float2 ndc = clip.xy / clip.w;
     const float edge = saturate((1 - max(abs(ndc.x), abs(ndc.y))) * 8);
-    return float3(ndc * viewportScaleOffset.xy + viewportScaleOffset.zw, edge);
+    return float4(ndc * viewportScaleOffset.xy + viewportScaleOffset.zw, edge, clip.w);
 }
 )hlsl";
 
@@ -393,7 +431,8 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
      * reflection mixed over the sky. Returns the body unchanged when it doesn't have that shape.
      */
     [[nodiscard]] std::string PassWaterRays(
-      const std::string& body
+      const std::string& body,
+      const bool sceneDepth
     )
     {
       const auto skipSpace = [&](std::size_t at) {
@@ -468,8 +507,16 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
         }
         const std::string call_text = body.substr(call, semicolon - 1U - call);
         std::string out = body.substr(0U, begin);
-        out += " float3 faf_water_hit = faf_ray_water(ViewPosition - " + input + ".mViewVec, " + direction +
+        out += " float4 faf_water_hit = faf_ray_water(ViewPosition - " + input + ".mViewVec, " + direction +
           ", mul(WorldToView, Projection), ViewportScaleOffset);";
+        if (sceneDepth) {
+          // The copy shows the hit only where the scene depth there is the hit's own (a tolerance of 0.75 units and
+          // two percent of the distance, faded out over as much again); elsewhere the sky stays. waterSsrParams2.w
+          // is 1 while the scene depth copy is bound (WaterReflections.cpp).
+          out += " if (waterSsrParams2.w > 0.5) { const float faf_tolerance = 0.75 + 0.02 * faf_water_hit.w; "
+                 "faf_water_hit.z *= 1 - saturate((abs(FafWaterSceneZ(faf_water_hit.xy) - faf_water_hit.w) - "
+                 "faf_tolerance) / faf_tolerance); }";
+        }
         out += head + "lerp(" + call_text + ", tex2D(RefractionSampler, faf_water_hit.xy), faf_water_hit.z);";
         out += body.substr(semicolon);
         return out;
@@ -639,7 +686,9 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
       const SamplerDesc& sampler
     )
     {
-      static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
+      static constexpr std::string_view kCalls[] = {
+        "tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad", "tex2Dtile", "tex2Dtilesize", "tex2Dtileload"
+      };
       const std::string_view name = sampler.name;
       std::size_t index = 0U;
       while (index < source.size()) {
@@ -748,6 +797,15 @@ float4 tex3Dproj(faf_sampler s, float4 uv) { return s.t3.Sample(s.s, uv.xyz / uv
 float4 tex2D(faf_sampler s, float2 uv, float2 dx, float2 dy) { return s.t2.SampleGrad(s.s, uv, dx, dy); }
 float4 tex2Dgrad(faf_sampler s, float2 uv, float2 dx, float2 dy) { return s.t2.SampleGrad(s.s, uv, dx, dy); }
 float4 tex2Dlod(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy, uv.w); }
+// Engine addition (shadow filtering): the plain-texture twins of faf_shadow_sampler's tile reads (see there).
+float4 tex2Dtile(faf_sampler s, float2 uv) { return float4(1, 1, 0, 0); }
+float2 tex2Dtilesize(faf_sampler s)
+{
+    uint w, h;
+    s.t2.GetDimensions(w, h);
+    return float2(w, h);
+}
+float4 tex2Dtileload(faf_sampler s, float2 p) { return s.t2.SampleLevel(s.s, p, 0); }
 float4 texCUBE(faf_sampler s, float3 uv, float3 dx, float3 dy) { return s.tc.SampleGrad(s.s, uv, dx, dy); }
 float4 texCUBEgrad(faf_sampler s, float3 uv, float3 dx, float3 dy) { return s.tc.SampleGrad(s.s, uv, dx, dy); }
 float4 texCUBElod(faf_sampler s, float4 uv) { return s.tc.SampleLevel(s.s, uv.xyz, uv.w); }
@@ -1524,7 +1582,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         return sampler.name == name;
       });
     };
-    const bool rayWater = gRayQueryShaders && !shadowCascades && hasParameter(kRayShadowParameter) &&
+    const bool rayWater = gRayQueryShaders && (!shadowCascades || rayShadows) && hasParameter(kRayShadowParameter) &&
       hasSampler("SkySampler") && hasSampler("RefractionSampler") && hasParameter("ViewPosition") &&
       hasParameter("WorldToView") && hasParameter("Projection") && hasParameter("ViewportScaleOffset");
 
@@ -1640,13 +1698,17 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         } else if (numericParameters.contains(parameter->name) || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
-          if (rayWater && parameter->name == kRayShadowParameter) {
+          if (rayWater && !shadowCascades && parameter->name == kRayShadowParameter) {
+            body += kRayWaterScene;
             body += kRayWaterHelpers;
           }
           if (shadowCascades && parameter->name == kShadowCascadeParameter) {
             body += kShadowCascadeHelpers;
             body += kShadowCoordinateHelpers;
             body += rayShadows ? kRayShadowHelpers : kRayShadowFallback;
+            if (rayWater) {
+              body += kRayWaterHelpers; // after the helpers that declare faf_RayScene
+            }
           }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
@@ -1703,7 +1765,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           functionBody = PassShadowCoordinates(functionBody, shadowLookupSamplers);
         }
         if (rayWater) {
-          functionBody = PassWaterRays(functionBody);
+          functionBody = PassWaterRays(functionBody, body.find("FafWaterSceneZ(") != std::string::npos);
         }
         body += ReplaceSamplerTypes(original.substr(0U, open)) + "{" + copies + ReplaceSamplerTypes(functionBody) + "}";
         continue;

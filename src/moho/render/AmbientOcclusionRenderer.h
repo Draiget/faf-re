@@ -20,17 +20,22 @@ namespace moho
   extern int ren_Ao;
 
   /**
-   * Engine addition (`ren_Ao`): ambient occlusion, the darkening in creases, under units and where
-   * terrain meets them, from the depth of terrain and the opaque meshes. Direct3D 12 and Vulkan only:
-   * it reads the bound depth target (`GpuBindings::readBoundDepth`). Direct3D 9 and 11 keep the
-   * original look.
+   * Engine addition (`ren_AmbientOcclusion`, `ren_Ao`): ambient occlusion, the darkening in creases, under units and
+   * where terrain meets them, from the depth of terrain and the opaque meshes, in one frame slot (after the opaque
+   * meshes, before effects and water). At most one occlusion kernel runs at a time:
+   *  - Standard: this renderer's compute kernel, with contact shadows and terrain shadows (Direct3D 12 and Vulkan; it
+   * reads the bound depth target, `GpuBindings::readBoundDepth`);
+   *  - Low, Medium, High: GTAO (AmbientOcclusion.h, gpg::gal::AmbientOcclusionPass; Direct3D 11 too), after which the
+   * compute pass only adds the contact and terrain shadows;
+   *  - with ray-traced shadows tracing, the traced occlusion (`ren_RayAo`) in the compute pass.
+   * Direct3D 9 keeps the original look.
    */
   class AmbientOcclusionRenderer
   {
   public:
     [[nodiscard]] static AmbientOcclusionRenderer& Get();
 
-    /** `ren_Ao` is on, the renderer is Direct3D 12 or Vulkan with compute, and the programs built. */
+    /** The option is not Off and the device has an occlusion kernel (the compute one, or GTAO's GPU programs). */
     [[nodiscard]] bool IsActive();
 
     /**
@@ -51,12 +56,14 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
+    bool mGtaoPossible = false; // the GPU programs GTAO draws with exist (Direct3D 11, 12, Vulkan)
     std::shared_ptr<gpg::gal::GpuProgram> mCompute;
     std::string mRaySource; // the compute source, with FAF_RAY_QUERY defined where the device traces rays (ren_RayAo)
     std::shared_ptr<gpg::gal::GpuProgram> mBake;
     std::shared_ptr<gpg::gal::GpuBuffer> mHeights;
     std::shared_ptr<gpg::gal::GpuBuffer> mTerrainShadow;
     const void* mBakedField = nullptr;
+    std::uint64_t mBakedRevision = 0U;
     float mBakedSun[3]{};
     std::int32_t mFieldWidth = 0;
     std::int32_t mFieldHeight = 0;

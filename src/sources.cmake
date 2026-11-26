@@ -280,6 +280,20 @@ set(FAF_ENGINE_SOURCES
   moho/misc/CombinedMilitaryExtractor.cpp
   moho/misc/CountermeasureExtractor.cpp
   moho/particles/CWorldParticles.cpp
+  moho/render/lights/LightCollector.cpp
+  moho/render/lights/LightField.cpp
+  moho/render/lights/LightGrid.cpp
+  moho/render/lights/LightEffectPatch.cpp
+  moho/render/lights/LightBinding.cpp
+  moho/render/lights/LightDebugView.cpp
+  moho/render/lights/LightTexture.cpp
+  moho/render/lights/LightTextureCache.cpp
+  moho/render/lights/LightMeshEmission.cpp
+  moho/render/lights/SimLights.cpp
+  moho/render/lights/LightFeeds.cpp
+  moho/render/lights/LightFeedSources.cpp
+  moho/render/lights/LightCensus.cpp
+  moho/render/lights/LightMeshFeed.cpp
   moho/app/WinApp.cpp
   moho/misc/WinPlatform.cpp
   gpg/core/diagnostics/CrashHooks.cpp
@@ -339,9 +353,24 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/LowFidelityWater.cpp
   moho/terrain/water/WaterFactory.cpp
   moho/terrain/water/WaterShaderVars.cpp
+  moho/terrain/water/WaterQuality.cpp
+  moho/terrain/water/WaterEffectPatch.cpp
+  moho/terrain/water/WaterReflectionPatch.cpp
+  moho/terrain/water/WaterReflections.cpp
+  moho/terrain/water/WaterSimulation.cpp
+  moho/terrain/water/WaterMeshFeed.cpp
   moho/terrain/water/WaveSystem.cpp
+  moho/terrain/water/Waterfall.cpp
+  moho/terrain/water/WaterfallPlan.cpp
   moho/terrain/water/Shoreline.cpp
   moho/terrain/water/WaterBodySurfaces.cpp
+  moho/terrain/water/RiverFlow.cpp
+  moho/terrain/water/RiverFlowPatch.cpp
+  moho/terrain/water/WaterBankPatch.cpp
+  moho/terrain/water/WaterBankGrowth.cpp
+  moho/terrain/water/WaterBanksBind.cpp
+  moho/terrain/water/TerrainWaterLevelPatch.cpp
+  moho/terrain/water/TerrainWaterLevels.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
   moho/ui/UiDisplayScale.cpp
@@ -418,6 +447,8 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserStartupRegistrations.cpp
   moho/sim/Sim.cpp
   moho/sim/SimTick.cpp
+  moho/sim/SimWaterEvents.cpp
+  moho/sim/SimWaterEvents.cpp
   moho/sim/SimLuaGetters.cpp
   moho/sim/SimLuaFunctions.cpp
   moho/sim/SimLuaSetters.cpp
@@ -741,6 +772,8 @@ set(FAF_ENGINE_SOURCES
   moho/effects/rendering/CEfxBeam.cpp
   moho/effects/rendering/CEffectImplSerializer.cpp
   moho/particles/CParticleTextureCountedPtr.cpp
+  moho/particles/ParticleEffectPatch.cpp
+  moho/particles/ParticleLowRes.cpp
   moho/particles/SWorldBeam.cpp
   moho/render/EmitterTypeTypeInfo.cpp
   moho/effects/rendering/IEffect.cpp
@@ -854,6 +887,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SConditionTriggerTypes.cpp
   moho/sim/STIMap.cpp
   moho/sim/WaterBodies.cpp
+  moho/sim/WaterRivers.cpp
   moho/sim/STIMapWaterBodies.cpp
   moho/sim/CArmyStatItemTypeInfo.cpp
   moho/sim/CArmyStats.cpp
@@ -929,14 +963,20 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalBufferTypeInfo.cpp
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
+  moho/render/AmbientOcclusion.cpp
   moho/render/AmbientOcclusionRenderer.cpp
   moho/render/Atmosphere.cpp
   moho/render/BounceLight.cpp
   moho/render/DynamicLights.cpp
   moho/render/TemporalAA.cpp
+  moho/render/FrameLimiter.cpp
+  moho/render/RenderFeatures.cpp
+  moho/render/ImageQualityFeatures.cpp
+  moho/render/RenderScale.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp
+  moho/render/SmaaRenderer.cpp
   moho/render/WideBloomRenderer.cpp
   moho/render/BoxRenderer.cpp
   moho/render/CRenFrame.cpp
@@ -1037,6 +1077,8 @@ set(FAF_ENGINE_SOURCES
   moho/render/RenderInfo.cpp
   moho/render/RayScene.cpp
   moho/render/Shadow.cpp
+  moho/render/shadow/ShadowEffectPatch.cpp
+  moho/render/shadow/ShadowFilter.cpp
   moho/render/SelectionBracketParams.cpp
   moho/render/SelectionBracketRenderer.cpp
   moho/render/RenderGeometryBuffers.cpp
@@ -1115,7 +1157,9 @@ set(FAF_ENGINE_SOURCES
   gpg/core/utils/LocalCache.cpp
   gpg/gal/ContextInterfaces.cpp
   gpg/gal/Device.cpp
+  gpg/gal/AmbientOcclusionPass.cpp
   gpg/gal/RenderProfiler.cpp
+  gpg/gal/RenderScalePass.cpp
   gpg/gal/DxgiAdapterInfo.cpp
   gpg/gal/Effect.cpp
   gpg/gal/GalBaseClasses.cpp

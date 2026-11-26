@@ -19,6 +19,7 @@
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/water/RiverFlow.h"
 #include "moho/terrain/water/ShoreCell.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -51,7 +52,8 @@ namespace
   constexpr float kNoWaterElevation = -10000.0f;
   constexpr float kHeightfieldSampleScale = 0.0078125f;
   constexpr std::uint32_t kShorelineVertexSheetUsageToken = 1U;
-  constexpr std::int32_t kShorelineVertexSheetVertexCount = 0x3000;
+  // Retail 0x3000 (4096 triangles): a long coast overflows that and the cells past the cap are dropped in blocks.
+  constexpr std::int32_t kShorelineVertexSheetVertexCount = 0x30000;
   constexpr std::int32_t kShorelineVertexFormatToken = 0;
 
   moho::StatItem* sEngineStatShorelineTotalCellsStage1 = nullptr;
@@ -95,7 +97,8 @@ namespace
   };
   static_assert(sizeof(ShorelineMeshRecord) == 0x18, "ShorelineMeshRecord size must be 0x18");
 
-  constexpr std::int32_t kMaxShorelineTriangles = 4094;
+  // Retail 4094. Room for three triangles of the last cell past the cap check stays inside the sheet.
+  constexpr std::int32_t kMaxShorelineTriangles = 65000;
 
   void WriteShorelineMeshRecord(
     ShorelineMeshRecord& dest,
@@ -530,7 +533,33 @@ namespace
   )
   {}
 
-  constexpr std::array<ShoreCellMaskBuilder, 16> kShoreCellMaskBuilders = {
+  /**
+   * Not in the shipped binary. The cutout of the water pass only needs the polygon to COVER the part of the cell whose
+   * terrain is below the water: the depth test against the terrain does the exact cut. The shipped marching-squares
+   * polygons left the saddle cells (masks 6 and 9) without any polygon and only knew the four corners of a cell two
+   * height samples wide, so a 2x2 patch of coast stayed "land" and the water showed a rectangular hole. This builder
+   * covers the whole cell (plus the point bias) and is used for every cell with both dry and wet samples. It does not
+   * depend on the water level: the cell is the whole block, whatever level (the sea's or a water body's) made it a
+   * shore cell.
+   */
+  void BuildShoreCellFullQuad(
+    moho::ShoreCell& cell,
+    float,
+    const ShoreCorner3& corner00,
+    const ShoreCorner3&,
+    const ShoreCorner3&,
+    const ShoreCorner3& corner11
+  )
+  {
+    cell.mType = 2;
+    cell.mPoints[0] = {corner00.x - kPointBias, corner11.z + kPointBias};
+    cell.mPoints[1] = {corner00.x - kPointBias, corner00.z - kPointBias};
+    cell.mPoints[2] = {corner11.x + kPointBias, corner11.z + kPointBias};
+    cell.mPoints[3] = {corner11.x + kPointBias, corner00.z - kPointBias};
+    UpdateShoreCellCentroid(cell, 4);
+  }
+
+  [[maybe_unused]] constexpr std::array<ShoreCellMaskBuilder, 16> kShoreCellMaskBuilders = {
     &BuildShoreCellMask0,
     &BuildShoreCellMask1,
     &BuildShoreCellMask2,
@@ -608,7 +637,8 @@ namespace
     const float height00,
     const float height10,
     const float height01,
-    const float height11
+    const float height11,
+    const float drawElevation
   )
   {
     const ShoreCorner3 corner00{baseX, height00, baseZ};
@@ -622,14 +652,15 @@ namespace
     }
 
     ResetShoreCell(*cell);
-    if (maskType >= 0 && maskType < static_cast<std::int32_t>(kShoreCellMaskBuilders.size())) {
-      kShoreCellMaskBuilders[static_cast<std::size_t>(maskType)](
-        *cell, waterElevation, corner00, corner10, corner01, corner11
-      );
+    if (maskType >= 0) {
+      // The shipped per-mask polygons (kShoreCellMaskBuilders) are kept above for reference; see
+      // BuildShoreCellFullQuad.
+      BuildShoreCellFullQuad(*cell, waterElevation, corner00, corner10, corner01, corner11);
     }
 
     (void)terrainResource;
-    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDb, waterElevation);
+    // (the level the cell is drawn at, which is the level it is cut at except for a river's: see `Generate`)
+    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDb, drawElevation);
     AppendShoreCellRef(shoreline.mCells, cell);
   }
 
@@ -638,7 +669,9 @@ namespace
 namespace moho
 {
   bool ren_Shoreline = false;
-  float ren_ShorelineCutoff = 1000.0f; // 0x00F57D64 (shipped .data)
+  // Retail 1000: shoreline cells further than 1000 units (view depth) were skipped, so the land cutout of the water
+  // pass vanished in blocks along far coasts. 0 = never fade (SpatialEntryLess: mFadeOut <= 0 entries do not fade).
+  float ren_ShorelineCutoff = 0.0f; // 0x00F57D64 (shipped .data: 1000)
 
   bool ren_ShorelineMemo = true;
   namespace
@@ -797,14 +830,35 @@ namespace moho
       for (std::int32_t x = 0; x < width; x += 2) {
         for (std::int32_t z = 0; z < height; z += 2) {
           // Engine addition (water bodies): each block's shore is cut at its own water's level.
-          const float waterElevation = map->HasWaterBodies() ? WaterOfBlock(*map, x, z).level : seaElevation;
+          const SWaterOfBlock block = map->HasWaterBodies() ? WaterOfBlock(*map, x, z) : SWaterOfBlock{};
+          const float waterElevation = map->HasWaterBodies() ? block.level : seaElevation;
           if (waterElevation == kNoWaterElevation) {
             continue;
           }
+          // A river's surface slopes, and the cells are drawn grouped by level, one draw each: a river block's cut is
+          // drawn at its level rounded to an eighth of a unit (the cut itself is made at the exact level), a few
+          // dozen draws along a river instead of one per block.
+          const float drawElevation =
+            map->HasWaterBodies() && block.body != 0u && map->mWaterBodies->IsRiver(block.body)
+            ? water::RiverShoreLevel(waterElevation)
+            : waterElevation;
           const float height00 = ReadHeightSampleMeters(heightField, x, z);
           const float height10 = ReadHeightSampleMeters(heightField, x + 2, z);
           const float height01 = ReadHeightSampleMeters(heightField, x, z + 2);
           const float height11 = ReadHeightSampleMeters(heightField, x + 2, z + 2);
+
+          // Nine samples of the cell, not just the corners: a ridge or pool between the corners makes the cell a shore
+          // cell too. (A dry body's block has been skipped above: it has no level to cut at.)
+          float lowest = height00;
+          float highest = height00;
+          for (std::int32_t sz = 0; sz <= 2; ++sz) {
+            for (std::int32_t sx = 0; sx <= 2; ++sx) {
+              const float sample = ReadHeightSampleMeters(heightField, x + sx, z + sz);
+              lowest = std::min(lowest, sample);
+              highest = std::max(highest, sample);
+            }
+          }
+          const bool mixedCell = highest >= waterElevation && lowest < waterElevation;
 
           std::int32_t maskType = 0;
           if (height00 >= waterElevation) {
@@ -820,7 +874,7 @@ namespace moho
             maskType |= 8;
           }
 
-          if (maskType != 0 && maskType != 6 && maskType != 9 && maskType != 15) {
+          if (mixedCell) {
             CreateShoreCellFromMask(
               *this,
               terrainResource,
@@ -831,7 +885,8 @@ namespace moho
               height00,
               height10,
               height01,
-              height11
+              height11,
+              drawElevation
             );
           }
         }

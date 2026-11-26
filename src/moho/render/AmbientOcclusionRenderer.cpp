@@ -17,7 +17,10 @@
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
+#include "gpg/gal/AmbientOcclusionPass.h"
+#include "moho/render/AmbientOcclusion.h"
 #include "moho/render/AmbientOcclusionShader.h"
+#include "moho/render/lights/LightField.h"
 #include "moho/render/BoundDepthSupport.h"
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/Shadow.h"
@@ -38,8 +41,11 @@ namespace moho
 
   TConVar<int> gTConVar_ren_Ao(
     "ren_Ao",
-    "Ambient occlusion from scene depth: 1 on, 0 off, -1 (the default) on Direct3D 12 and Vulkan. "
-    "Direct3D 9 and 11 can't read the depth target and keep the original look.",
+    "The compute kernel of ambient occlusion with contact shadows and terrain shadows, Direct3D 12 and Vulkan: 1 on, 0 "
+    "off, -1 (the "
+    "default) on. It runs when the Ambient Occlusion option (ren_AmbientOcclusion) is Standard and, without its own "
+    "occlusion kernel, for "
+    "the contact and terrain shadows when the option is a GTAO level; 0 turns all of that off.",
     &ren_Ao
   );
   TConVar<float> gTConVar_ren_AoRadius("ren_AoRadius", "Ambient occlusion reach in world units.", &ren_AoRadius);
@@ -85,14 +91,14 @@ namespace moho
 
   // Engine addition (ren_RayAo): ambient occlusion by rays against the ray-traced scene (RayScene.h) while
   // ray-traced shadows are on.
-  int ren_RayAo = 1;
+  int ren_RayAo = 0;
   int ren_RayAoRays = 6;
   TConVar<int> gTConVar_ren_RayAo(
     "ren_RayAo",
     "Direct3D 12 and Vulkan with ray tracing, while ren_RayTracedShadows is on: ambient occlusion by short rays over "
     "the half-sphere above each point (ren_RayAoRays of them, ren_AoRadius long) instead of from the screen's depth, "
-    "so units, buildings and ground off the screen or behind others shade too. 1 on (default; nothing while "
-    "ren_RayTracedShadows is off), 0 off.",
+    "so units, buildings and ground off the screen or behind others shade too. 1 on, 0 off (default: everything "
+    "that traces rays is off until the player turns it on; nothing happens while ren_RayTracedShadows is off).",
     &ren_RayAo
   );
   TConVar<int> gTConVar_ren_RayAoRays("ren_RayAoRays", "Rays per point for ren_RayAo (1-16).", &ren_RayAoRays);
@@ -105,12 +111,12 @@ namespace moho
     &ren_RayAoLift
   );
 
-  float ren_TerrainShadows = 0.45f;
+  float ren_TerrainShadows = 0.0f;
   TConVar<float> gTConVar_ren_TerrainShadows(
     "ren_TerrainShadows",
     "Terrain shadows from the heightfield beyond the shadow map's reach (part of ren_Ao): how much of the sun's "
-    "direct light they take, 0 to 1 (0 off). Off on maps that bake their own (stratum 7 terrain info) and when "
-    "shadows are off.",
+    "direct light they take, 0 to 1 (0 off, the default; 0.45 was the old default). Off on maps that bake their own "
+    "(stratum 7 terrain info), when shadows are off and while the light field of Dynamic Lights shades the hills.",
     &ren_TerrainShadows
   );
 
@@ -131,7 +137,8 @@ namespace moho
       float bias;
       float fadeStart;
       float fadeEnd;
-      float unused[2];
+      float kernelOff; // 1 when GTAO is the occlusion kernel: this pass only adds the contact and terrain shadows
+      float unused;
       VMatrix4 viewProjection;
       float sun[4];
       float contact[4];
@@ -157,7 +164,7 @@ namespace moho
 
   bool AmbientOcclusionRenderer::IsActive()
   {
-    if (ren_Ao == 0) {
+    if (REN_GetAmbientOcclusionLevel() <= 0) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -200,10 +207,12 @@ namespace moho
       }
       mSupported = mCompute != nullptr && mComposite != nullptr;
       if (mSupported) {
-        gpg::Logf("Ambient occlusion: on this renderer (ren_Ao)");
+        gpg::Logf("Ambient occlusion: the compute kernel is available on this renderer (ren_Ao)");
       }
+      // GTAO draws with pixel shaders and needs only the GPU programs (Direct3D 11 too).
+      mGtaoPossible = (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U;
     }
-    return mSupported;
+    return mSupported || mGtaoPossible;
   }
 
   bool AmbientOcclusionRenderer::PrepareTerrainShadows(
@@ -223,14 +232,18 @@ namespace moho
     if (field == nullptr || field->Width() < 2 || field->Height() < 2) {
       return false;
     }
+    // The key holds the heights' revision: a map allocated at the address of the one before with the same size, and a
+    // field that was terraformed, both rebake.
+    const std::uint64_t revision = HeightFieldRevision();
     if (
-      field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight &&
-      sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]
+      field == mBakedField && revision == mBakedRevision && field->Width() == mFieldWidth &&
+      field->Height() == mFieldHeight && sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]
     ) {
       return mTerrainShadow != nullptr;
     }
 
     mBakedField = field;
+    mBakedRevision = revision;
     mFieldWidth = field->Width();
     mFieldHeight = field->Height();
     std::copy(sun, sun + 3, mBakedSun);
@@ -344,9 +357,35 @@ namespace moho
     const Shadow* const shadow
   )
   {
-    if (!mSupported || width < 8 || height < 8 || ren_AoRadius <= 0.0f || ren_AoIntensity <= 0.0f) {
+    const int level = REN_GetAmbientOcclusionLevel();
+    if (level <= 0 || (!mSupported && !mGtaoPossible) || width < 8 || height < 8) {
       return;
     }
+    // At most one occlusion kernel runs. The traced one wins while ray-traced shadows trace (the sun terms and the
+    // occlusion are then traced against the same scene); otherwise Standard is this file's kernel and Low to High are
+    // GTAO, which this file's compute pass then only completes with the contact and terrain shadows (the kernel is
+    // switched off in it).
+    const bool rayTraced = gpg::gal::effects::gRayShadows.vectors[4][0] > 0.0f;
+    const bool rayAo = mSupported && rayTraced && ren_RayAo > 0 && ren_Ao != 0 &&
+      (mDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U;
+    int gtaoQuality = rayAo ? 0 : REN_GtaoQualityFor(level, mSupported);
+    if (level == 1 && mSupported && ren_Ao == 0) {
+      return; // ren_Ao 0 switches the standard kernel off
+    }
+    if (gtaoQuality > 0 && !mGtaoPossible) {
+      gtaoQuality = 0;
+    }
+    if (gtaoQuality > 0 && REN_ApplyAmbientOcclusion(mDevice, camera, x, y, width, height, gtaoQuality)) {
+      if (!mSupported || ren_Ao == 0) {
+        return; // GTAO alone
+      }
+    } else if (gtaoQuality > 0) {
+      gtaoQuality = 0; // GTAO could not draw (a refusal is logged once): this file's kernel stands in, where it can
+    }
+    if (!mSupported || ren_Ao == 0 || ren_AoRadius <= 0.0f || ren_AoIntensity <= 0.0f) {
+      return;
+    }
+    const bool kernelOff = gtaoQuality > 0;
     const auto samplesAcross = static_cast<std::uint32_t>(width + 1) / 2U;
     const auto samplesDown = static_cast<std::uint32_t>(height + 1) / 2U;
     const std::uint32_t needed = samplesAcross * samplesDown;
@@ -395,7 +434,12 @@ namespace moho
         constants.contact[0] = std::max(ren_AoContactLength, 0.1f);
         constants.contact[1] = std::max(ren_AoContactThickness, constants.contact[0] / 8.0f);
       }
-      if (ren_TerrainShadows > 0.0f && shadowReach >= 0.0f && PrepareTerrainShadows(constants.sun)) {
+      // The light field's march (Dynamic Lights) shades the hills in the lit passes when the terrain takes it
+      // (ren_DynLightsTerrainSunShadow, off by default); the bake would darken the same hills again.
+      if (
+        ren_TerrainShadows > 0.0f && shadowReach >= 0.0f && !lights::TerrainSunShadowActive() &&
+        PrepareTerrainShadows(constants.sun)
+      ) {
         constants.terrainGrid[0] = static_cast<float>(mFieldWidth);
         constants.terrainGrid[1] = static_cast<float>(mFieldHeight);
         constants.terrainGrid[2] = static_cast<float>(mShadowCellSize);
@@ -435,6 +479,14 @@ namespace moho
         constants.rayParams[1] = static_cast<float>(std::clamp(ren_RayAoRays, 1, 16));
         constants.rayParams[2] = std::max(ren_RayAoLift, 0.0f);
         constants.rayParams[3] = gpg::gal::effects::gRayShadows.vectors[7][1];
+      }
+    }
+
+    if (kernelOff) {
+      constants.kernelOff = 1.0f;
+      // Only the contact and terrain shadows are left for this pass: nothing to do without them.
+      if (constants.sun[3] <= 0.0f && constants.terrainGrid[3] <= 0.0f) {
+        return;
       }
     }
 

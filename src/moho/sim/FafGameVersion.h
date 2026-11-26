@@ -36,7 +36,11 @@ namespace moho
     /// Engine feature, not an FA-Binary-Patches one: a map's `ScenarioInfo.WaterBodies` add water levels
     /// besides its sea (.plans/water-levels/PLAN.md). In no release yet: on only by `sim_FixWaterBodies`.
     WaterBodies = 6,
-    Count = 7,
+    /// Engine feature: a water body with a `River` (a sloped surface along a centreline, falls that block
+    /// movement, docs/projects/RIVERS.md). Needs `WaterBodies`. In no release yet: on only by `sim_FixRivers`.
+    /// Off, a river body with an `Elevation` is a flat lake and one without is skipped.
+    WaterRivers = 7,
+    Count = 8,
   };
 
   /// `SFafSimFixInfo::mFirstGameVersion` of a fix no FAF release carries yet: on only by its switch.

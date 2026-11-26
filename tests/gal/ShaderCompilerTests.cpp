@@ -270,17 +270,27 @@ technique10 Lit
 
 // Engine addition (ren_RayWaterReflections): water2.fx's sky lookup becomes a traced reflection mixed over the
 // sky, whatever its input parameter is called, and the effect compiles for both targets.
-TEST(
-  GalShaderCompiler,
-  RayTracedWaterReflectionsCompileForBothTargets
-)
+namespace
 {
-  if (Compiler() == nullptr) {
-    GTEST_SKIP() << Unavailable();
-  }
-  const ShaderCompiler& compiler = *Compiler();
-  gRayQueryShaders = true;
-  const std::string source = std::string(RayShadowDeclaration()) + R"fx(
+  // `withDepth`: the scene depth copy and its reader, as the water reflection patch declares them
+  // (WaterReflectionPatch.cpp): the traced reflection is then checked against the depth.
+  std::string RayWaterSource(
+    const bool withDepth
+  )
+  {
+    std::string source(RayShadowDeclaration());
+    if (withDepth) {
+      source += R"fx(
+float4 waterSsrParams2;
+texture waterSceneDepth;
+sampler2D waterSceneDepthSampler = sampler_state { Texture = (waterSceneDepth); };
+float FafWaterSceneZ( float2 uv )
+{
+    return tex2Dlod( waterSceneDepthSampler, float4( uv, 0.0, 0.0 ) ).x;
+}
+)fx";
+    }
+    source += R"fx(
 float3 ViewPosition;
 float4x4 WorldToView;
 float4x4 Projection;
@@ -321,10 +331,26 @@ technique10 Water
     }
 }
 )fx";
+    return source;
+  }
+} // namespace
+
+TEST(
+  GalShaderCompiler,
+  RayTracedWaterReflectionsCompileForBothTargets
+)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  gRayQueryShaders = true;
+  const std::string source = RayWaterSource(false);
   const Generated generated = Generate(source);
   gRayQueryShaders = false;
   const std::string& hlsl = generated.modern.hlsl;
   EXPECT_NE(hlsl.find("RayQuery<"), std::string::npos) << hlsl;
+  EXPECT_EQ(hlsl.find("FafWaterSceneZ"), std::string::npos) << hlsl; // no scene depth declared: no depth check
   EXPECT_NE(hlsl.find("faf_ray_water(ViewPosition - water.mViewVec, R"), std::string::npos) << hlsl;
   EXPECT_NE(hlsl.find("faf_water_hit.z)"), std::string::npos) << hlsl;
   ASSERT_EQ(generated.modern.entries.size(), 2U);
@@ -338,6 +364,34 @@ technique10 Water
   // Without ray queries the sky lookup stays as it is.
   const Generated plain = Generate(source);
   EXPECT_EQ(plain.modern.hlsl.find("faf_ray_water"), std::string::npos);
+}
+
+// With the water reflection patch's scene depth in the effect, the traced hit is checked against it before the
+// refraction copy's colour is taken there, and the effect compiles for both targets.
+TEST(
+  GalShaderCompiler,
+  RayTracedWaterReflectionsCheckTheHitAgainstTheSceneDepth
+)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  gRayQueryShaders = true;
+  const Generated generated = Generate(RayWaterSource(true));
+  gRayQueryShaders = false;
+  const std::string& hlsl = generated.modern.hlsl;
+  EXPECT_NE(
+    hlsl.find("faf_water_hit.z *= 1 - saturate((abs(FafWaterSceneZ(faf_water_hit.xy) - faf_water_hit.w)"),
+    std::string::npos
+  ) << hlsl;
+  ASSERT_EQ(generated.modern.entries.size(), 2U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    const CompiledShader spirv = compiler.Compile(hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+  }
 }
 
 // Engine addition (tessellation): the generated hull and domain entry points compile for both targets with the
