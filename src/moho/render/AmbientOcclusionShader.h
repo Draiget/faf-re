@@ -12,6 +12,10 @@
 // distance is, and multiplies the result into the colour (alpha holds the glow
 // amount and the water mask, so the program doesn't write it).
 //
+// With GTAO as the occlusion kernel (AmbientOcclusion.h) `KernelOff` skips the screen-space samples: the pass then adds
+// only the contact and terrain shadows (and the traced occlusion, while ray-traced shadows trace, in place of both
+// kernels).
+//
 // Positions are rebuilt in world space from the camera's inverse view-projection.
 // The scene depth is the depth target bound when the dispatch runs
 // (`GpuBindings::readBoundDepth`), at t6; on Vulkan that is binding 10.
@@ -31,7 +35,8 @@ cbuffer AoConstants : register(b0)
     float Bias;        // cosine a neighbour must rise above the surface before it occludes
     float FadeStart;   // camera distance where occlusion starts to fade
     float FadeEnd;     // and where it is gone
-    float2 Unused;
+    float KernelOff;   // 1 when another kernel (GTAO) does the occlusion: this pass only adds the contact and terrain shadows
+    float Unused;
     row_major float4x4 ViewProjection;
     float4 Sun;        // direction towards the sun, then the contact shadow strength (0: off)
     float4 Contact;    // contact ray length and the thickness that counts as a blocker, world units
@@ -365,6 +370,9 @@ void AoCS(uint3 id : SV_DispatchThreadID)
     float taps = 0.0;
     [unroll]
     for (int i = 0; i < AO_SAMPLES; ++i) {
+        if (KernelOff > 0.5) {
+            break;
+        }
         const float along = (i + 0.5) / AO_SAMPLES;
         const float angle = along * AO_TURNS * 6.2831853 + spin;
         const int2 tap = pixel + int2(round(float2(cos(angle), sin(angle)) * (along * sampleRadius * 2.0)));

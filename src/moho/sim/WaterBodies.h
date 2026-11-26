@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "moho/sim/WaterRivers.h"
+
 namespace moho
 {
   /// The water level of a place with no water, as every reader of `STIMap`'s level uses it.
@@ -59,13 +61,24 @@ namespace moho
     std::int32_t z0{0};
     std::int32_t x1{0};
     std::int32_t z1{0};
+    /**
+     * A river (`River` key of the body): `river.points` is its centreline and the body has no seed, outline
+     * or fill. Its water is the channel around the centreline whose terrain is below the river's level
+     * there (`CWaterRiver`); `elevation` is then ignored and the body's is the river's highest level.
+     */
+    bool isRiver{false};
+    SRiverDesc river;
   };
 
   /// One filled body.
   struct SWaterBody
   {
-    /// `kWaterBodyNoWater` for a dry body.
+    /// `kWaterBodyNoWater` for a dry body. For a river the highest level of the river, so a reader that
+    /// takes it as "the body's level" stays inside the body's range; `LevelAt` has the level of a place.
     float elevation{kWaterBodyNoWater};
+    /// The lowest and highest level of the body: both `elevation` unless it is a river.
+    float levelMin{kWaterBodyNoWater};
+    float levelMax{kWaterBodyNoWater};
     float deep{kWaterBodyNoWater};
     float abyss{kWaterBodyNoWater};
     /// Cells it owns, and the rectangle of cells `[x0, x1) x [z0, z1)` holding them.
@@ -81,7 +94,8 @@ namespace moho
    * its height field. Each height-field vertex and each cell belongs to the sea
    * (0) or to one body (1..255). A cell belongs to the lowest-numbered body that
    * owns one of its four corners, so a body's cells cover every point whose
-   * terrain lies below its level.
+   * terrain lies below its level. A river body (`SWaterBodyDesc::isRiver`) owns the vertices of its
+   * channel and has a level per vertex and falls.
    */
   class CWaterBodies
   {
@@ -134,14 +148,60 @@ namespace moho
     /// The body of a vertex, clamped to the map; 0 for the sea.
     [[nodiscard]] std::uint8_t BodyOfVertex(std::int32_t x, std::int32_t z) const noexcept;
 
-    /// The water level at world `(x, z)`: its cell's body's, else `seaLevel`.
+    /// The water level at world `(x, z)`: its cell's body's (a river's sloped surface, bilinear over the cell), else
+    /// `seaLevel`.
     [[nodiscard]] float LevelAt(float x, float z, float seaLevel) const noexcept;
 
-    /// The water level at vertex `(x, z)`: its body's, else `seaLevel`.
+    /// The water level at vertex `(x, z)`: its body's (a river's level at the vertex), else `seaLevel`.
     [[nodiscard]] float LevelOfVertex(std::int32_t x, std::int32_t z, float seaLevel) const noexcept;
 
     /// The highest water level of any body.
     [[nodiscard]] float HighestLevel() const noexcept;
+
+    /// Whether any body is a river, and whether any river has a fall.
+    [[nodiscard]] bool HasRivers() const noexcept
+    {
+      return mHasRivers;
+    }
+    [[nodiscard]] bool HasFalls() const noexcept
+    {
+      return !mFallCells.empty();
+    }
+
+    /// The river of body `number` (1-based), null for a lake or the sea.
+    [[nodiscard]] const CWaterRiver* River(
+      std::uint8_t number
+    ) const noexcept
+    {
+      return number != 0u && number <= mRivers.size() ? mRivers[number - 1u].get() : nullptr;
+    }
+    [[nodiscard]] bool IsRiver(
+      std::uint8_t number
+    ) const noexcept
+    {
+      return River(number) != nullptr;
+    }
+
+    /**
+     * Whether cell `(cx, cz)` is a fall of a river: the surface steps by `kRiverFallDrop` or more across it,
+     * and nothing that moves on the ground or the water crosses it. One bit lookup; false for a map
+     * without falls, for a cell off the map.
+     */
+    [[nodiscard]] bool IsFallCell(
+      std::int32_t cx,
+      std::int32_t cz
+    ) const noexcept
+    {
+      if (mFallCells.empty() || cx < 0 || cz < 0 || cx >= CellWidth() || cz >= CellHeight()) {
+        return false;
+      }
+      const std::size_t index =
+        static_cast<std::size_t>(cz) * static_cast<std::size_t>(CellWidth()) + static_cast<std::size_t>(cx);
+      return (mFallCells[index >> 3u] & (1u << (index & 7u))) != 0u;
+    }
+
+    /// The unit flow direction of the river at world `(x, z)`; false where there is no river.
+    [[nodiscard]] bool FlowAt(float x, float z, float& fx, float& fz) const noexcept;
 
     /**
      * The body of the 2 x 2 cells whose first corner is vertex `(x, z)`, one texel of the
@@ -165,5 +225,10 @@ namespace moho
     std::vector<std::uint8_t> mVertexBody;
     std::vector<std::uint8_t> mCellBody;
     std::vector<SWaterBody> mBodies;
+    /// Parallel to `mBodies`: the river of a body, null for a lake. Immutable, so a copy shares them.
+    std::vector<std::shared_ptr<const CWaterRiver>> mRivers;
+    bool mHasRivers{false};
+    /// One bit per cell: a fall of some river. Empty when no river has a fall.
+    std::vector<std::uint8_t> mFallCells;
   };
 } // namespace moho

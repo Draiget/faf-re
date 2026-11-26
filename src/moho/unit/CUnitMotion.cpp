@@ -20,30 +20,32 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiPathSpline.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/entity/Entity.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
-#include "moho/ai/CAiPathSpline.h"
-#include "moho/entity/Entity.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CEconomy.h"
 #include "moho/sim/COGrid.h"
-#include "moho/sim/SPhysBody.h"
-#include "moho/sim/SimConVarAccess.h"
-#include "moho/sim/STIMap.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimConVarAccess.h"
 #include "moho/sim/SimStartupRegistrations.h"
-#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/sim/SimWaterEvents.h"
+#include "moho/sim/SPhysBody.h"
+#include "moho/sim/STIMap.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "moho/math/Wm3Segment3FafExtras.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "Wm3Box3.h"
-#include "moho/misc/DiagnosticBudget.h"
 
 namespace moho
 {
@@ -2190,6 +2192,13 @@ namespace moho
       } else {
         const char* impactSurface = (unit->mVarDat.mLayerMask == LAYER_Land) ? "Terrain" : "Water";
         unit->CallbackStr("OnImpact", &impactSurface);
+        // A wreck that falls into the sea (an aircraft shot down) splashes where it lands, by what it cost (render
+        // only: nothing feeds back).
+        if (unit->mVarDat.mLayerMask != LAYER_Land) {
+          if (const RUnitBlueprint* const impactBlueprint = unit->GetBlueprint(); impactBlueprint != nullptr) {
+            SimWaterUnitDeath(newPos.x, newPos.y, newPos.z, impactBlueprint->Economy.BuildCostMass, unit->ArmyRef);
+          }
+        }
 
         const EUnitMotionState currentState = mMotionState;
         if (currentState != kUnitMotionStateCrashed) {

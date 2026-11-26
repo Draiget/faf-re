@@ -1,6 +1,7 @@
 #include "moho/particles/CWorldParticles.h"
 
 #include <optional>
+#include <vector>
 
 #include "gpg/gal/RenderProfiler.h"
 
@@ -14,6 +15,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/SharedPtrUtils.h"
+#include "moho/particles/ParticleLowRes.h"
 #include "legacy/containers/AutoPtr.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -965,19 +967,89 @@ namespace moho
     const float waterSurface = efx_ParticleWaterSurface;
 
     std::optional<gpg::gal::RenderProfileScope> profileStep(std::in_place, "EffParticles"); // FAF instrumentation
-    for (const auto& [bucketKey, bucket] : mParticleBuckets) {
+    // Engine addition (ParticleLowRes.h): the large quads of a run of buckets (same sort scalar, same blend class) go
+    // into a lower-resolution target, composited onto the scene before the small ones are drawn at full resolution. The
+    // same call starts the soft particles (ADD / ALPHABLEND / PREMODALPHA buckets fade by the scene depth), which need
+    // no run grouping.
+    const bool particlePass = suppressTLight == 0 && camera != nullptr && moho::particlelowres::Begin(*camera);
+    const bool lowResolution = particlePass && moho::particlelowres::LowResActive();
+    std::vector<moho::SParticleRenderBucket*> lowResolutionRun;
+    std::vector<bool> lowResolutionLarge;
+    std::vector<moho::LargeQuadStats> lowResolutionStats;
+    const auto bucketEnd = mParticleBuckets.end();
+    for (auto bucketIt = mParticleBuckets.begin(); bucketIt != bucketEnd;) {
+      const moho::SParticleBucketKey& bucketKey = bucketIt->first;
+      moho::SParticleRenderBucket* const bucket = bucketIt->second;
       if (renderAboveSurface) {
-        if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
-          (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
+        if (bucketKey.sortScalar < waterSurface || bucket == nullptr) {
+          ++bucketIt;
+          continue;
         }
       } else {
         if (bucketKey.sortScalar > waterSurface) {
           break;
         }
-        if (bucket != nullptr) {
-          (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
+        if (bucket == nullptr) {
+          ++bucketIt;
+          continue;
         }
       }
+
+      if (particlePass && moho::ParticleLowResEligible(*bucket)) {
+        moho::particlelowres::EnsureSoftDepth();
+      }
+      if (lowResolution && moho::ParticleLowResEligible(*bucket)) {
+        const float runSortScalar = bucketKey.sortScalar;
+        lowResolutionRun.clear();
+        for (; bucketIt != bucketEnd; ++bucketIt) {
+          moho::SParticleRenderBucket* const member = bucketIt->second;
+          if (
+            bucketIt->first.sortScalar != runSortScalar || member == nullptr || !moho::ParticleLowResEligible(*member)
+          ) {
+            break;
+          }
+          if (moho::PrepareParticleBucket(*member, static_cast<float>(tick))) {
+            lowResolutionRun.push_back(member);
+          }
+        }
+        // Only the buckets with a quad that could be large from here and enough of them to pay for the passes take the
+        // two-resolution path; the rest draw once, as always. The path is per bucket, in the buckets' own order: the
+        // large quads of one bucket are composited before its small ones are drawn and before the next bucket's
+        // quads, so the order between buckets (blend classes, textures) is the one of the full-resolution pass. (One
+        // composite for the whole run drew every small quad over every large one, which moved the picture: warm
+        // overdraw that the other blend class should have covered.)
+        moho::LargeQuadStats runStats;
+        lowResolutionLarge.clear();
+        for (moho::SParticleRenderBucket* const member : lowResolutionRun) {
+          moho::LargeQuadStats memberStats;
+          moho::ParticleBucketLargeStats(
+            *member, moho::particlelowres::Gate(), static_cast<float>(tick) + frameAlpha, memberStats
+          );
+          lowResolutionLarge.push_back(moho::particlelowres::WorthIt(memberStats));
+          lowResolutionStats.push_back(memberStats);
+          runStats.Add(memberStats);
+        }
+        moho::particlelowres::NoteRun(runSortScalar, lowResolutionRun.size(), runStats);
+        for (std::size_t index = 0U; index < lowResolutionRun.size(); ++index) {
+          moho::SParticleRenderBucket& member = *lowResolutionRun[index];
+          if (lowResolutionLarge[index] && moho::particlelowres::BeginAccumulate(lowResolutionStats[index])) {
+            moho::DrawParticleBucket(member, moho::ParticleDrawPass::LowResolution);
+            moho::particlelowres::Composite();
+            moho::DrawParticleBucket(member, moho::ParticleDrawPass::SmallOnly);
+            moho::particlelowres::EndRun();
+          } else {
+            moho::DrawParticleBucket(member, moho::ParticleDrawPass::Normal);
+          }
+        }
+        lowResolutionStats.clear();
+        continue;
+      }
+
+      (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
+      ++bucketIt;
+    }
+    if (particlePass) {
+      moho::particlelowres::End();
     }
 
     profileStep.reset();

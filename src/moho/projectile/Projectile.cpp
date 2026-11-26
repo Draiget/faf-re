@@ -14,13 +14,15 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/exceptions/StdExcept.h"
 #include "legacy/math/X87Math.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityId.h"
 #include "moho/math/GridPos.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
-#include "moho/math/Wm3Segment3FafExtras.h"
 #include "moho/math/Wm3Queries.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -31,24 +33,23 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
-#include "moho/sim/COGrid.h"
 #include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/EImpactTypeTypeInfo.h"
 #include "moho/sim/FafGameVersion.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/SimBlockLane.h"
+#include "moho/sim/SimKeyframe.h"
+#include "moho/sim/SimWaterEvents.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/STIMap.h"
-#include "moho/sim/Sim.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/core/Unit.h"
 #include "Wm3Segment3.h"
-#include "moho/misc/DiagnosticBudget.h"
-#include "moho/sim/SimBlockLane.h"
-#include "moho/sim/SimKeyframe.h"
 
 namespace moho
 {
@@ -1052,6 +1053,36 @@ namespace moho
    */
   void Projectile::Impact()
   {
+    // The sea feels a shell, a bomb or a torpedo landing on or under the water (render only: the water simulation reads
+    // it, nothing feeds back).
+    if (
+      mImpactType == IMPACT_Water || mImpactType == IMPACT_Underwater || mImpactType == IMPACT_ProjectileUnderwater ||
+      mImpactType == IMPACT_UnitUnderwater
+    ) {
+      float damage = mDamage;
+      if (!(damage >= 1.0f)) {
+        const LuaPlus::LuaObject damageData = mLuaObj.GetByName("DamageData");
+        if (damageData.IsTable()) {
+          const LuaPlus::LuaObject amount = damageData.GetByName("DamageAmount");
+          if (amount.IsNumber()) {
+            damage = static_cast<float>(amount.GetNumber());
+          }
+        }
+      }
+      const bool below = mImpactType != IMPACT_Water;
+      // debris and sparks (a dying ship throws dozens, none with damage) are not shells
+      if (damage >= 12.0f) {
+        // a shell of the player's own side or an ally's is shown where it lands; an enemy's only where the player sees
+        const Entity* const waterLauncher = mLauncherWeak.GetObjectPtr();
+        SimWaterImpact(
+          mImpactPosition.x,
+          mImpactPosition.z,
+          damage,
+          below ? 0.5f : 1.0f,
+          waterLauncher != nullptr ? waterLauncher->ArmyRef : nullptr
+        );
+      }
+    }
 
     // Resolve the launcher entity (asm 0x0069DEE0-0069DEF8).
     Entity* const launcherEntity = mLauncherWeak.GetObjectPtr();

@@ -1771,7 +1771,9 @@ namespace moho
           if (body.elevation == kWaterBodyNoWater) {
             shown = std::max(terrain, mSurfaceElevation + 0.01f * elevationSpan);
           } else {
-            const float below = body.elevation - terrain;
+            // The depth under the body's own level at the vertex (a river's level slopes), against the
+            // body's deep range.
+            const float below = bodies.LevelOfVertex(vx, vz, body.elevation) - terrain;
             const float bodyRange = body.elevation - body.deep;
             shown = mSurfaceElevation - ((bodyRange > 0.0f && seaRange > 0.0f) ? below * seaRange / bodyRange : below);
           }

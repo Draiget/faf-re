@@ -139,7 +139,8 @@ namespace moho
     /** Engine addition: `ren_TextureAnisotropy` (see gpg/gal/effects/TextureFiltering.h). */
     TConVar<int> gTConVar_ren_TextureAnisotropy(
       "ren_TextureAnisotropy",
-      "Direct3D 12 and Vulkan: anisotropic filtering (2-16) for the tiled textures the effects sample trilinearly - "
+      "Direct3D 11, 12 and Vulkan: anisotropic filtering (2-16) for the tiled textures the effects sample trilinearly "
+      "- "
       "terrain layers, unit albedo, normal and specular maps - so ground and hulls seen at a slant stay sharp; 0 keeps "
       "the effects' own filtering. 8 by default. Applies at the next draw of each effect.",
       &gpg::gal::effects::gTextureAnisotropy

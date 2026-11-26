@@ -4,6 +4,7 @@
 
 #include "gpg/gal/PipelineDefer.h"
 #include "moho/console/CConCommand.h"
+#include "moho/render/lights/LightBinding.h"
 
 namespace moho
 {
@@ -209,6 +210,7 @@ namespace moho
     // FAF: the default-pool buffers the hardware batches share go too; a
     // device reset needs every one of them released.
     HardwareMeshBatch::ReleaseSharedBuffers();
+    lights::ReleaseBinding();
   }
 
   /**
@@ -229,6 +231,7 @@ namespace moho
 
     // FAF: see Reset.
     HardwareMeshBatch::ReleaseSharedBuffers();
+    lights::ReleaseBinding();
   }
 
   /**

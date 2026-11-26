@@ -2,7 +2,7 @@
 
 A map has one sea at one level. Water bodies add lakes, pools and rivers at other levels, and dry ground below the sea, without touching the `.scmap`. Each body is a few lines in the map's `_scenario.lua`.
 
-**Where it works:** in this engine, with the game switch `sim_FixWaterBodies` on. No FAF release turns it on yet; for testing, start the game with `/con sim_FixWaterBodies=1`. With the switch off, in the original game, or in any other engine, the map plays and looks as if the bodies weren't there: sea only. So a map whose layout depends on its lakes is a different map where they're off.
+**Where it works:** in this engine, with the game switch `sim_FixWaterBodies` on (rivers: `sim_FixRivers` as well). No FAF release turns it on yet; for testing, start the game with `/con sim_FixWaterBodies=1`. With the switch off, in the original game, or in any other engine, the map plays and looks as if the bodies weren't there: sea only. So a map whose layout depends on its lakes is a different map where they're off.
 
 Map editors keep opening the map: they ignore a scenario key they don't know.
 
@@ -33,7 +33,7 @@ A body starts at its seed and spreads to every connected point of the terrain th
 - The terrain at the seed must be below the level, or the body is skipped.
 - Bodies fill in list order. Ground an earlier body took stays with it.
 - At most 255 bodies per map.
-- Levels are flat. A sloping river or a waterfall is several bodies, each at its own level.
+- Levels are flat. A sloping river or a waterfall is a river (below), not a chain of bodies.
 
 ## Fields
 
@@ -55,6 +55,37 @@ An outline is a closed curve through its points (a Catmull-Rom spline). Use it t
 - **put two pools at different levels in one basin**: give each pool an outline and no seed. Without a seed, every point inside the outline that is below the level belongs to the body.
 
 The curve passes through its points but bulges outward between them, about 2 map units in the middle of each side of a 16-unit square. Leave a few units between neighbouring outlines.
+
+## Rivers
+
+A body with a `River` key is a river: its surface runs downhill along a centreline, and a **fall** is a step in the surface that no unit crosses. It needs `sim_FixRivers` on (see below); there is no seed, outline or fill.
+
+```lua
+{
+    Name = 'Silverrun',                        -- optional
+    Elevation = 44,                            -- optional: the flat lake the body is where rivers are off
+    River = {
+        -- downstream order: { x, z, Level = surface there, HalfWidth = half the channel's width }
+        Points = {
+            { 28, 64, Level = 44, HalfWidth = 6 },
+            { 100, 60, Level = 41.5, HalfWidth = 7 },
+            { 130, 76, Level = 39, HalfWidth = 7, Fall = true, Below = 31.5 },  -- 39 above the lip, 31.5 below it
+            { 205, 82, Level = 28, HalfWidth = 8 },
+        },
+        Steps = 8,       -- segments per span of the centreline (default 8, 1 to 32)
+        Margin = 2,      -- units of level kept beyond the half width (default 2, 1 to 16)
+        FlowScale = 1,   -- render only: the visual speed
+    },
+}
+```
+
+- The centreline is an open Catmull-Rom spline through the points. `Level` and `HalfWidth` are linear along it. A `Fall` point is a break: the span before it ends at `Level`, the span after it starts at `Below`.
+- Rules (a body that breaks one is skipped, with the reason in the log): 2 to 256 points; `HalfWidth` 1 to 64; `Level` never rises downstream (after a fall it must not exceed `Below`); a fall is not the first or last point, its `Below` is at least 0.75 under its `Level`, and a river has at most 16; the levels span at most 500; the river's rectangle of vertices (its extent plus the half width and the margin) holds at most 4M vertices and a quarter of the map's.
+- **The water.** A vertex is water of the river when it lies within the half width of the nearest point of the centreline and its terrain is below the river's level there (the level of the nearest segment, in 1/128 unit steps). There is no fill, so a river cannot leak into a basin beside its channel. Where two bodies want a vertex, the lower body number has it. The surface at a position is the bilinear level of its cell's four corners, so `GetSurfaceHeight`, depth for building and shots, `AboveWater` and the like follow the slope.
+- **Falls.** A cell with two wet corners whose levels differ by 0.75 or more is a fall cell. A footprint that touches a fall cell has no occupancy at all: ships, hover units, submarines, amphibious and land units cannot enter, cross or be built on it (a stairstep bed alone would not stop ships and hovercraft; the surface step does). Aircraft are not affected. Ground beside the lip is not a fall cell. `GetTerrainType(x, z)` reports the first blocking terrain type (`Dirt09` in FAF's table) for a fall cell, so FAF's navigation mesh (`NavGenerator` reads `.Blocking`) plans around it as the engine does.
+- Hover units float on a river like on a lake (its depth rules), never across a fall. The current does not push units.
+- **Rivers off.** Without `sim_FixRivers` a river body with an `Elevation` is a flat lake there, filled from its `Seed` (default: its first point), and one without is skipped.
+- Until the renderer follows (a later change), a river is drawn flat at its highest level; the game's surface queries have the sloped level.
 
 ## In the game
 

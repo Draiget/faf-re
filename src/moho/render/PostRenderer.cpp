@@ -19,13 +19,13 @@ namespace moho
 
   TConVar<float> gTConVar_ren_Sharpen(
     "ren_Sharpen",
-    "Contrast-adaptive sharpening of the world views on Direct3D 12 and Vulkan, 0 to 1 (0.5 by default); 0 off.",
+    "Contrast-adaptive sharpening of the world views on Direct3D 11, 12 and Vulkan, 0 to 1 (0.5 by default); 0 off.",
     &ren_Sharpen
   );
 
   TConVar<int> gTConVar_ren_Grade(
     "ren_Grade",
-    "Colour grade of the world views on Direct3D 12 and Vulkan (vibrance and a gentle contrast curve): 1 (the "
+    "Colour grade of the world views on Direct3D 11, 12 and Vulkan (vibrance and a gentle contrast curve): 1 (the "
     "default) on, 0 off.",
     &ren_Grade
   );
@@ -63,7 +63,8 @@ namespace moho
       mDevice = device;
       gpg::gal::DeviceContext* const context = device->GetDeviceContext();
       const bool modern = context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D11 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
          context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};

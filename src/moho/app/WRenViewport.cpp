@@ -8,9 +8,20 @@
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/TemporalAA.h"
 #include "moho/render/PostRenderer.h"
+#include "moho/render/RenderScale.h"
+#include "moho/render/SmaaRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
+#include "moho/particles/ParticleLowRes.h"
+#include "moho/render/lights/LightBinding.h"
+#include "moho/render/lights/LightDebugView.h"
+#include "moho/render/lights/LightFeeds.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
+#include "moho/terrain/water/WaterMeshFeed.h"
+#include "moho/terrain/water/WaterQuality.h"
+#include "moho/terrain/water/WaterReflections.h"
+#include "moho/terrain/water/WaterSimulation.h"
 
 #include <array>
 #include <cstdlib>
@@ -1516,6 +1527,8 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(
     meshRenderer->Reset();
   }
   ReleaseWaterBodyReflections();
+  moho::water::ReleaseReflectionTargets(); // FAF: the Water Quality reflection targets are device resources too
+  moho::water::ReleaseWaterReflections();  // and so is the copy of the scene depth the water reads
 
   mFrame.ResetTransientResources();
 
@@ -1539,6 +1552,10 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(
 
   mBloomRenderers[0].ResetRenderTargets();
   mBloomRenderers[1].ResetRenderTargets();
+
+  // Engine addition: the render scale's targets and SMAA's working targets belong to the device that is going away.
+  moho::REN_ReleaseRenderScale();
+  moho::SmaaRenderer::Get().Release();
 
   // Release order is the binary's: the shared dynamic sheet first, then the
   // six per-head locks. These are the default-pool surfaces that make
@@ -1578,6 +1595,25 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // FAF instrumentation, not in the binary: refill the draw stats just zeroed
   // with the previous frame's submissions (CD3DDevice::PublishDrawStatistics).
   moho::D3D_GetDevice()->PublishDrawStatistics();
+
+  // Dynamic Lights switched on after the effects were built without the light pass: rebuild them now, before anything
+  // of this frame is drawn. The terrain renderers set the water and terrain variables once, when they are made: the new
+  // effects have lost them, so they are made again.
+  // The same for the terrain effect of a map with water bodies (the water level patch, TerrainWaterLevels.h).
+  // The particle effect is patched only while the soft particles or the large-particle quality are on: built again when
+  // that changes (its variables find the new effect by name, nothing else holds on to it).
+  (void)moho::particlelowres::ApplyLive();
+  const bool lightsRebuilt = moho::lights::ApplyLiveLevel();
+  if (moho::water::ApplyTerrainWaterLevelsLive() || lightsRebuilt) {
+    for (SWorldViewInfo& worldView : mWorldViews) {
+      if (worldView.mTerrain && moho::REN_GetTerrainRes() != nullptr) {
+        worldView.mTerrain.reset(IRenTerrain::Create());
+        if (worldView.mTerrain) {
+          (void)worldView.mTerrain->Create(REN_GetTerrainRes());
+        }
+      }
+    }
+  }
 
   for (SWorldViewInfo& worldView : mWorldViews) {
     worldView.mView->Func1();
@@ -1827,6 +1863,98 @@ namespace
     }();
     return disabled;
   }
+
+  // Engine addition (render scale): the scaled frame's state while the world loop runs (render thread only).
+  // UpdateRenderViewportCoordinates reads it to hand the world pass the scaled view rectangle; null whenever the world
+  // is drawn at the window's size.
+  moho::ScaledWorldFrame* sActiveScaledWorld = nullptr;
+
+  // The scope of the frame being drawn, for RenderWorldView, which runs once per view inside the loop of Render.
+  class ScaledWorldScope;
+  ScaledWorldScope* sScaledWorldScope = nullptr;
+
+  // Scaled drawing of the world loop: begins when the level asks for it, always puts the engine's lanes back, even when
+  // the loop throws.
+  class ScaledWorldScope
+  {
+  public:
+    ScaledWorldScope(
+      moho::CD3DDevice& device,
+      const int head,
+      std::shared_ptr<moho::CD3DRenderTarget>& primary,
+      std::shared_ptr<moho::CD3DRenderTarget>& secondary,
+      std::shared_ptr<moho::CD3DDepthStencil>& viewportDepth
+    )
+      : mDevice(device)
+      , mPrimary(primary)
+      , mSecondary(secondary)
+      , mViewportDepth(viewportDepth)
+    {
+      if (moho::REN_BeginScaledWorld(mFrame, device, head, primary, secondary, viewportDepth)) {
+        sActiveScaledWorld = &mFrame;
+      }
+      sScaledWorldScope = this;
+    }
+    ScaledWorldScope(const ScaledWorldScope&) = delete;
+    ScaledWorldScope& operator=(const ScaledWorldScope&) = delete;
+    ~ScaledWorldScope()
+    {
+      End();
+      sScaledWorldScope = nullptr;
+    }
+
+    // The world part of a view is drawn: native lanes back, then the view is upscaled into the back buffer. What is
+    // drawn after this (post effects, the unit overlay: life bars, names, icons) is at the window's size and stays
+    // sharp. True when a scaled view was resolved.
+    bool Suspend(
+      gpg::gal::Device* const galDevice
+    )
+    {
+      if (!mFrame.active || !mFrame.swapped) {
+        return false;
+      }
+      End();
+      if (galDevice != nullptr) {
+        // The post effects sharpen the upscaled view (ren_Sharpen), so the upscale does not sharpen it a second time.
+        const bool postSharpens = !RenderAdditionsDisabled() && moho::ren_Sharpen > 0.0f;
+        moho::REN_ResolveScaledWorld(mFrame, *galDevice, postSharpens ? 0.0f : moho::ren_RenderScaleSharpness);
+      }
+      return true;
+    }
+
+    // The next view of the frame: the scaled targets again (not cleared).
+    void Resume()
+    {
+      if (mFrame.active && !mFrame.swapped) {
+        moho::REN_ResumeScaledWorld(mFrame, mDevice, mPrimary, mSecondary, mViewportDepth);
+        sActiveScaledWorld = &mFrame;
+      }
+    }
+
+    // The world loop is done.
+    void Finish(
+      gpg::gal::Device* const galDevice
+    )
+    {
+      (void)Suspend(galDevice);
+      mFrame.active = false;
+    }
+
+  private:
+    void End()
+    {
+      if (sActiveScaledWorld == &mFrame) {
+        sActiveScaledWorld = nullptr;
+      }
+      moho::REN_EndScaledWorld(mFrame, mDevice, mPrimary, mSecondary, mViewportDepth);
+    }
+
+    moho::CD3DDevice& mDevice;
+    std::shared_ptr<moho::CD3DRenderTarget>& mPrimary;
+    std::shared_ptr<moho::CD3DRenderTarget>& mSecondary;
+    std::shared_ptr<moho::CD3DDepthStencil>& mViewportDepth;
+    moho::ScaledWorldFrame mFrame;
+  };
 } // namespace
 
 /**
@@ -1835,7 +1963,7 @@ namespace
  */
 /**
  * Engine addition (ren_Fxaa, ren_Sharpen, ren_Grade): anti-aliasing, sharpening and grading for a
- * world view on Direct3D 12 and Vulkan, which have no multisampled back buffer. The head is copied
+ * world view on Direct3D 11, 12 and Vulkan, which have no multisampled back buffer. The head is copied
  * into the refraction target (the view's refraction pass is done with it) and drawn back through each
  * pass inside the view's viewport, colour only. It runs before the view's overlay pass, so strategic
  * icons, range rings and the other overlays stay pixel-exact, as the interface does.
@@ -1894,6 +2022,10 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
   if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); !temporal && fxaa.IsActive()) {
     overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
       fxaa.Render(copy, width, height);
+    });
+  } else if (moho::SmaaRenderer& smaa = moho::SmaaRenderer::Get(); !temporal && smaa.IsActive()) {
+    overHeadCopy("Smaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+      smaa.Render(copy, width, height);
     });
   }
   if (moho::PostRenderer& post = moho::PostRenderer::Get(); post.IsActive()) {
@@ -2006,6 +2138,12 @@ void moho::WRenViewport::RenderWorldView(
   // origin) - every view, main and minimap alike, rendered its
   // terrain/mesh/water passes through that full-screen rect instead of
   // this view's own CameraSetViewport-pushed one.
+  //
+  // Engine addition (render scale): with a level below 100 % the world of this view is drawn into the scaled targets
+  // (the scope swaps the head's lanes in Render), and the rectangle read below is the scaled one.
+  if (sScaledWorldScope != nullptr) {
+    sScaledWorldScope->Resume();
+  }
   UpdateRenderViewportCoordinates();
 
   // Render the atmosphere/cloud sky dome for this world view before the
@@ -2051,6 +2189,17 @@ void moho::WRenViewport::RenderWorldView(
       const gpg::gal::RenderProfileScope profileShadows("Shadows");
       // ren_Taa: the shadow map is fitted to the unmoved camera, so its texels don't move with the offset.
       mShadowRenderer.RenderFrameShadows(terrain, *unjitteredCamera, worldView->mView->CameraGetTargetZoom());
+    }
+
+    // The sun's shadow camera for the light field: the shaders rebuild a pixel's world position from its shadow
+    // coordinates (docs/LIGHTING_V2.md).
+    moho::lights::SetSunShadowCamera(mShadowRenderer.mCamera.inverseViewProjection, mShadowRenderer.mShadowCameraValid);
+
+    // Dynamic lights: evaluate the pool for this frame before anything is lit (docs/DYNAMIC_LIGHTS.md).
+    {
+      const gpg::gal::RenderProfileScope profileLights("LightsFrame"); // render profile: the lights of the frame
+      moho::lights::BeginFrame(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds());
+      moho::lights::SetView(*mCam);
     }
 
     FogOn(worldView->mView->CameraGetZoom());
@@ -2100,6 +2249,25 @@ void moho::WRenViewport::RenderWorldView(
   {
     const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
     meshRenderer->Batch(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), *mCam, mCam->viewport.r[1]);
+  }
+  // Dynamic lights: the glowing unit and projectile meshes on screen become lights, and the shadow casters of the next
+  // frame are listed.
+  {
+    const gpg::gal::RenderProfileScope profileLightMeshes("LightsMeshes"); // render profile: glowing meshes as lights
+    moho::lights::FeedMeshes(static_cast<float>(moho::REN_GetGameTick()) + moho::REN_GetSimDeltaSeconds());
+  }
+  // FAF: the wave simulation of the water, before RenderWater reads it: the hulls and bodies of the batch push it first
+  {
+    const gpg::gal::RenderProfileScope profileWaterFeed(
+      "WaterFeed"
+    ); // render profile: the hulls and bodies of the batch
+    moho::water::FeedWaterFromMeshes(*meshRenderer);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileWaterStep(
+      "WaterStep"
+    ); // render profile: the CPU side of the wave simulation
+    moho::water::StepWaterSimulation(*mCam);
   }
 
   {
@@ -2286,9 +2454,27 @@ void moho::WRenViewport::RenderWorldView(
   // one in `Cartographic::Render` only ever runs for a view whose
   // orthographic flag is set, which is the minimap and whichever view the
   // player has toggled into cartographic mode.
+  //
+  // Engine addition (render scale): the view's world is finished. It is upscaled into the back buffer first; the post
+  // effects then run on the upscaled image (they sharpen it, and ren_RenderScaleSharpness stays out of the way), and
+  // the overlay is drawn at the window's size.
+  bool scaledViewResolved = false;
+  if (sScaledWorldScope != nullptr) {
+    const gpg::gal::RenderProfileScope profileRenderScale("RenderScale");
+    scaledViewResolved = sScaledWorldScope->Suspend(gpg::gal::Device::GetInstance());
+  }
+  if (scaledViewResolved) {
+    UpdateRenderViewportCoordinates();
+  }
   RenderWorldViewPostEffects();
   mCam = unjitteredCamera;           // ren_Taa: overlays stay pixel-exact
   UpdateRenderViewportCoordinates(); // ren_RenderScale: the view's full rectangle again
+  if (scaledViewResolved) {
+    // Putting the native head back (REN_EndScaledWorld) and the upscale reset the device's viewport to the whole head;
+    // the overlay below is built for this view's rectangle (its pixel projection spans the view), so in a split screen
+    // its icons, life bars and rings came out stretched over the whole window.
+    SetViewportToLocalScreen();
+  }
   moho::TemporalAA::Get().EndView(); // a frame the resolve didn't take is not left pending for another view
 
   if (moho::ren_Ui && worldView->mView != nullptr) {
@@ -2497,8 +2683,24 @@ void moho::WRenViewport::Render(
   SWorldViewInfo* const begin = worldViews.begin();
   SWorldViewInfo* const end = worldViews.end();
 
+  // Engine addition (render scale): with a level below 100 % the world views are drawn into smaller targets (the head,
+  // the viewport's frame-copy and normal targets and the view rectangles are swapped for scaled ones) and each view is
+  // upscaled into the back buffer when its world is done; the frames drawn above and everything after the loop
+  // (cartographic view, interface, bloom) stay at the window's size.
+  ScaledWorldScope scaledWorld(
+    *device, head, mPrimaryTargetLocks[head], mSecondaryTargetLocks[head], mDepthStencilLocks[head]
+  );
+  if (begin == end) {
+    scaledWorld.Finish(nullptr);
+  }
+
   for (SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
     RenderWorldView(worldView, head, begin, regenerateShoreline);
+  }
+
+  {
+    const gpg::gal::RenderProfileScope profileRenderScale("RenderScale");
+    scaledWorld.Finish(galDevice);
   }
 
   // Every world view has consumed this frame's decal set, so drop the decal
@@ -2530,6 +2732,11 @@ void moho::WRenViewport::Render(
   {
     const gpg::gal::RenderProfileScope profileCartographic("Cartographic");
     (void)RenderCartographic(head, worldViews);
+  }
+
+  // Dynamic lights debug view (ren_DynLightsView): the light grid over the world, before the UI.
+  if (mCam != nullptr) {
+    moho::lights::DrawDebugView(*mCam, mPrimBatcher.get());
   }
 
   // Draw the UI control tree over the rendered viewport. The binary does this
@@ -2878,8 +3085,23 @@ void moho::WRenViewport::RenderWater(
   // refraction from mPrimaryTargetLocks[head], reflection from
   // mSecondaryTargetLocks[head].
   const std::int32_t head = mHead;
+  // FAF: with a Water Quality level that resizes the reflection target the sea samples that target instead
+  // (docs/WATER_SIMULATION.md).
+  const moho::water::ReflectionTarget scaledReflection = moho::water::AcquireReflectionTarget(
+    head, device->GetHeadWidth(static_cast<unsigned int>(head)), device->GetHeadHeight(static_cast<unsigned int>(head))
+  );
+  // FAF: the scene depth, the parameters and the sun shadow map for what the water shows of the scene around it
+  // (docs/WATER_REFLECTIONS.md). They are bound once for every level the water pass then draws.
+  moho::water::BindWaterReflections(
+    device->GetGalDevice(),
+    *mCam,
+    mShadowRenderer.mShadowFidelity != 0 && !ShadowsDisabledByEnv() ? &mShadowRenderer : nullptr
+  );
   terrain->DrawWaterTerrain(
-    moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), mPrimaryTargetLocks[head], mSecondaryTargetLocks[head]
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds(),
+    mPrimaryTargetLocks[head],
+    scaledReflection.color ? scaledReflection.color : mSecondaryTargetLocks[head]
   );
 }
 
@@ -2899,8 +3121,22 @@ void moho::WRenViewport::RenderReflections()
   moho::CD3DDevice* const colorDevice = moho::D3D_GetDevice();
   moho::CD3DDevice* const targetDevice = moho::D3D_GetDevice();
   const std::size_t reflectionIndex = static_cast<std::size_t>(mHead);
+  // FAF: the Water Quality level may give the reflection pass a target of its own, smaller or larger than the screen
+  // (docs/WATER_SIMULATION.md).
+  const moho::water::ReflectionTarget scaledReflection = moho::water::AcquireReflectionTarget(
+    mHead,
+    targetDevice->GetHeadWidth(static_cast<unsigned int>(mHead)),
+    targetDevice->GetHeadHeight(static_cast<unsigned int>(mHead))
+  );
   targetDevice->SetRenderTarget1(
-    mSecondaryTargetLocks[reflectionIndex].get(), mDepthStencilLocks[reflectionIndex].get(), true, 0, 1.0f, 0
+    scaledReflection.color ? static_cast<moho::ID3DRenderTarget*>(scaledReflection.color.get())
+                           : static_cast<moho::ID3DRenderTarget*>(mSecondaryTargetLocks[reflectionIndex].get()),
+    scaledReflection.depth ? static_cast<moho::ID3DDepthStencil*>(scaledReflection.depth.get())
+                           : static_cast<moho::ID3DDepthStencil*>(mDepthStencilLocks[reflectionIndex].get()),
+    true,
+    0,
+    1.0f,
+    0
   );
 
   // TEMPORARY: FAF_NO_REFLECTION=1 skips the mirrored mesh pass (black-wedge
@@ -2933,7 +3169,32 @@ void moho::WRenViewport::RenderReflections()
     RenderWaterBodyReflection(false);
     return;
   }
-  SetViewportToLocalScreen();
+  if (scaledReflection.color) {
+    // the local screen rectangle in the pixels of the resized target
+    Wm3::Vector2i scaledPos{
+      static_cast<int>(static_cast<float>(mScreenPos.x) * scaledReflection.scale),
+      static_cast<int>(static_cast<float>(mScreenPos.y) * scaledReflection.scale)
+    };
+    Wm3::Vector2i scaledSize{
+      std::max(
+        1,
+        std::min(
+          static_cast<int>(static_cast<float>(mScreenSize.x) * scaledReflection.scale),
+          scaledReflection.width - scaledPos.x
+        )
+      ),
+      std::max(
+        1,
+        std::min(
+          static_cast<int>(static_cast<float>(mScreenSize.y) * scaledReflection.scale),
+          scaledReflection.height - scaledPos.y
+        )
+      )
+    };
+    targetDevice->SetViewport(&scaledPos, &scaledSize, 0.0f, 1.0f);
+  } else {
+    SetViewportToLocalScreen();
+  }
   colorDevice->SetColorWriteState(true, true);
 
   moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
@@ -2976,7 +3237,8 @@ namespace
         }
         const std::uint8_t number =
           bodies.BodyOfCell(static_cast<std::int32_t>(hit.x), static_cast<std::int32_t>(hit.z));
-        if (number != 0u && bodies.Body(number).elevation != moho::kWaterBodyNoWater) {
+        // A river's sloped surface is no mirror plane: it reflects the sky, not units.
+        if (number != 0u && !bodies.IsRiver(number) && bodies.Body(number).elevation != moho::kWaterBodyNoWater) {
           // 4 for each hit, plus 1 more the nearer the ray is to the centre (at most 2 away).
           score[number] += 4 + (2 - std::max(std::abs(row - 2), std::abs(column - 2)));
         }
@@ -3096,6 +3358,18 @@ void moho::WRenViewport::UpdateRenderViewportCoordinates()
     mScreenPos.y = static_cast<int>(camera->viewport.r[3].y);
     mScreenSize.x = static_cast<int>(camera->viewport.r[3].z);
     mScreenSize.y = static_cast<int>(camera->viewport.r[3].w);
+    if (sActiveScaledWorld != nullptr && sActiveScaledWorld->active && sActiveScaledWorld->head == mHead) {
+      // Engine addition (render scale): the world pass sees a smaller window - the view's rectangle and the target size
+      // are scaled together.
+      const gpg::gal::RenderScaleRect scaled =
+        moho::REN_ScaledViewRect(*sActiveScaledWorld, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
+      mScreenPos.x = scaled.x;
+      mScreenPos.y = scaled.y;
+      mScreenSize.x = scaled.width;
+      mScreenSize.y = scaled.height;
+      mFullScreen.x = sActiveScaledWorld->width;
+      mFullScreen.y = sActiveScaledWorld->height;
+    }
     return;
   }
 
@@ -3253,8 +3527,18 @@ void moho::WRenViewport::TransformTerrainNormals()
   const std::int32_t head = mHead;
   device->SetRenderTarget1(mPrimaryTargetLocks[head].get(), mDepthStencilLocks[head].get(), false, 0, 1.0f, 0);
 
-  const int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
-  const int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
+  int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
+  int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
+  if (
+    sActiveScaledWorld != nullptr && sActiveScaledWorld->active && sActiveScaledWorld->swapped &&
+    sActiveScaledWorld->head == head
+  ) {
+    // Engine addition (render scale): the lane this pass draws into is the scaled one. A quad of the window's size
+    // would fill only the top-left part of it with the lower-left part of the normal buffer (zoomed by 1 / scale), and
+    // the ground's lighting would sample the wrong normals.
+    headWidth = sActiveScaledWorld->width;
+    headHeight = sActiveScaledWorld->height;
+  }
   mFrame.mName = "TCreateBasis";
   mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
   mFrame.SetTexture(0u, mSecondaryTargetLocks[head]);
