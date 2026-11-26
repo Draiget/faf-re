@@ -189,6 +189,51 @@ namespace faf::netbridge
     setsockopt(s, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&bytes), sizeof(bytes));
   }
 
+  // A send to a closed connection fails instead of raising SIGPIPE, which would end the program (as
+  // src/platform/posix/NetPosix.cpp does it): a send flag on Linux, a socket option on macOS (NoSigPipe).
+  constexpr int kSendFlags =
+#if FAFRE_PLATFORM_LINUX // MSG_NOSIGNAL; macOS has no such send flag
+    MSG_NOSIGNAL;
+#else
+    0;
+#endif
+
+  /** macOS: no SIGPIPE from this socket (SO_NOSIGPIPE). Call it on every socket made or accepted. */
+  inline void NoSigPipe(
+    [[maybe_unused]] const SocketHandle s
+  )
+  {
+#if FAFRE_PLATFORM_MACOS // SO_NOSIGPIPE, the socket option only macOS has
+    const int on = 1;
+    (void)setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+#endif
+  }
+
+  /**
+   * Waits up to `ms` for `s` to have data, or a connection to accept: 1 when it has, 0 after the wait, -1 on an error
+   * (the socket closed). A thread that must stop waits in these slices: closing a socket from another thread wakes a
+   * blocked accept or recv on Windows, but not on Linux or macOS.
+   */
+  inline int WaitReadable(
+    const SocketHandle s,
+    const int ms
+  )
+  {
+    if (s == kInvalidSocket) {
+      return -1;
+    }
+    fd_set read;
+    FD_ZERO(&read);
+    FD_SET(s, &read);
+    timeval timeout{ms / 1000, (ms % 1000) * 1000};
+#if FAFRE_PLATFORM_WINDOWS
+    const int ready = select(0, &read, nullptr, nullptr, &timeout);
+#else
+    const int ready = select(s + 1, &read, nullptr, nullptr, &timeout);
+#endif
+    return ready > 0 ? 1 : (ready == 0 ? 0 : -1);
+  }
+
   inline bool SendAll(
     const SocketHandle s,
     const char* data,
@@ -196,7 +241,7 @@ namespace faf::netbridge
   )
   {
     while (size > 0) {
-      const int n = send(s, data, static_cast<int>(size), 0);
+      const int n = static_cast<int>(send(s, data, static_cast<int>(size), kSendFlags));
       if (n <= 0) {
         return false;
       }

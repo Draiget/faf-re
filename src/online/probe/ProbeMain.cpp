@@ -46,8 +46,15 @@ namespace
 
   std::filesystem::path DefaultTokenFile()
   {
-    const char* const local = std::getenv("LOCALAPPDATA");
-    return std::filesystem::path(local != nullptr ? local : ".") / "faf-re" / "online" / "probe.token";
+    // Windows: %LOCALAPPDATA%; Linux and macOS: $XDG_DATA_HOME, else ~/.local/share.
+    for (const char* name : {"LOCALAPPDATA", "XDG_DATA_HOME"}) {
+      if (const char* const folder = std::getenv(name); folder != nullptr && folder[0] != '\0') {
+        return std::filesystem::path(folder) / "faf-re" / "online" / "probe.token";
+      }
+    }
+    const char* const home = std::getenv("HOME");
+    return std::filesystem::path(home != nullptr ? home : ".") / ".local" / "share" / "faf-re" / "online" /
+      "probe.token";
   }
 
   void Print(

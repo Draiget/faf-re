@@ -138,7 +138,14 @@ namespace faf::online
 
   void GameLink::Run()
   {
+    // In slices, so Stop is seen on every system (netbridge::WaitReadable).
+    int ready = 0;
+    while (!mStop.load() && (ready = netbridge::WaitReadable(mListener, 200)) == 0) {}
+    if (mStop.load() || ready < 0) {
+      return;
+    }
     const netbridge::SocketHandle game = ::accept(mListener, nullptr, nullptr);
+    netbridge::NoSigPipe(game);
     if (game == netbridge::kInvalidSocket) {
       if (!mStop.load()) {
         Log("the game didn't connect");
@@ -154,7 +161,11 @@ namespace faf::online
     netbridge::GpgDecoder decoder;
     char buffer[16384];
     while (!mStop.load()) {
-      const int got = ::recv(game, buffer, sizeof(buffer), 0);
+      const int waited = netbridge::WaitReadable(game, 200);
+      if (waited == 0) {
+        continue;
+      }
+      const int got = waited < 0 ? -1 : static_cast<int>(::recv(game, buffer, sizeof(buffer), 0));
       if (got <= 0) {
         break;
       }

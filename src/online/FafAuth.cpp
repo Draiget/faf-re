@@ -216,6 +216,14 @@ namespace faf::online
       token = mRefreshToken;
     }
     std::ofstream out(mTokenFile, std::ios::binary | std::ios::trunc);
+    // Owner only, before the token goes in: on POSIX that is what keeps it to this user (platform/SecretStore.h).
+    std::error_code ignored;
+    std::filesystem::permissions(
+      mTokenFile,
+      std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+      std::filesystem::perm_options::replace,
+      ignored
+    );
     if (token.empty()) {
       return;
     }

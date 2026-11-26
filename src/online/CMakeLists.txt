@@ -20,6 +20,14 @@ if(FAFRE_PLATFORM_WINDOWS)
     "${PROJECT_SOURCE_DIR}/src/platform/windows/ProcessWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/SecretStoreWindows.cpp")
   target_link_libraries(faf_online PUBLIC winhttp crypt32 ws2_32)
+else()
+  # Linux and macOS: BSD sockets with Mbed TLS (the build's faf_mbedtls, cmake/deps/libdatachannel).
+  target_sources(faf_online PRIVATE
+    "${PROJECT_SOURCE_DIR}/src/platform/posix/HttpPosix.cpp"
+    "${PROJECT_SOURCE_DIR}/src/platform/posix/ProcessPosix.cpp"
+    "${PROJECT_SOURCE_DIR}/src/platform/posix/SecretStorePosix.cpp")
+  find_package(Threads REQUIRED)
+  target_link_libraries(faf_online PUBLIC faf_mbedtls Threads::Threads)
 endif()
 target_link_libraries(faf_online PRIVATE faf_codegen)
 set_target_properties(faf_online PROPERTIES FOLDER "net")

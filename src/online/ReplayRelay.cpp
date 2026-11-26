@@ -149,7 +149,12 @@ namespace faf::online
 
   void ReplayRelay::Run()
   {
-    const netbridge::SocketHandle game = ::accept(mListener, nullptr, nullptr);
+    // In slices, so Stop is seen on every system (netbridge::WaitReadable).
+    int ready = 0;
+    while (!mStop.load() && (ready = netbridge::WaitReadable(mListener, 200)) == 0) {}
+    const netbridge::SocketHandle game =
+      mStop.load() || ready < 0 ? netbridge::kInvalidSocket : ::accept(mListener, nullptr, nullptr);
+    netbridge::NoSigPipe(game);
     if (game == netbridge::kInvalidSocket) {
       std::lock_guard<std::mutex> lock(mDoneLock);
       mDone = true;
@@ -162,7 +167,11 @@ namespace faf::online
     }
     char buffer[65536];
     for (;;) {
-      const int got = ::recv(game, buffer, sizeof(buffer), 0);
+      const int waited = netbridge::WaitReadable(game, 200);
+      if (waited == 0 && !mStop.load()) {
+        continue;
+      }
+      const int got = waited < 0 || mStop.load() ? -1 : static_cast<int>(::recv(game, buffer, sizeof(buffer), 0));
       if (got <= 0 || mStop.load()) {
         break;
       }

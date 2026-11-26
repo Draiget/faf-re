@@ -297,6 +297,16 @@ if(FAF_POSIX_CLIENT OR FAF_LINUX_CLIENT)
   include(FafPosixClient)
 endif()
 
+# --- faf_online (in-game launcher plan) ------------------------------------------------------
+# FAF's sign-in and lobby, HTTPS and WebSocket on Mbed TLS (src/online, src/platform/posix): in every Linux / macOS
+# build, built only for what asks for it (faf_online_tests, faf_online_probe, and the client once it links them).
+if(NOT TARGET faf_mbedtls)
+  add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/mbedtls" "${CMAKE_BINARY_DIR}/deps/mbedtls" EXCLUDE_FROM_ALL)
+endif()
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/online" "${CMAKE_BINARY_DIR}/online" EXCLUDE_FROM_ALL)
+add_executable(faf_online_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/online/OnlineTests.cpp")
+target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
+
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
 # them on faf_engine: every golden case, the pathfinder's and the random stream's too.

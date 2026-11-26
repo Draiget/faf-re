@@ -613,12 +613,13 @@ if(FAFRE_PLATFORM_WINDOWS)
 endif()
 
 # faf_online (src/online, .plans/ingame-launcher WP1): JSON, URL encoding, the sealed token store, a WebSocket echo on
-# 127.0.0.1, and FAF's sign-in against canned answers (no network). Windows only until the POSIX platform:: parts exist.
+# 127.0.0.1, and FAF's sign-in against canned answers (no network). Linux and macOS build the same file in
+# cmake/FafPosixClient.cmake.
 if(FAFRE_PLATFORM_WINDOWS)
   add_executable(faf_online_tests EXCLUDE_FROM_ALL online/OnlineTests.cpp)
   target_compile_options(faf_online_tests PRIVATE /EHsc)
   target_compile_definitions(faf_online_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
-  target_link_libraries(faf_online_tests PRIVATE faf_online gtest_main ws2_32 bcrypt)
+  target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
   set_target_properties(faf_online_tests PROPERTIES FOLDER "Tests/Online")
   add_test(NAME online COMMAND faf_online_tests)
   set_tests_properties(online PROPERTIES LABELS "Online")

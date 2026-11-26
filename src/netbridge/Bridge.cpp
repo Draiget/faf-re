@@ -304,6 +304,7 @@ namespace faf::netbridge
   void Bridge::AcceptRpc()
   {
     SocketHandle s = accept(mRpcListen, nullptr, nullptr);
+    NoSigPipe(s);
     if (s == kInvalidSocket) {
       return;
     }
@@ -955,6 +956,7 @@ namespace faf::netbridge
   void Bridge::AcceptGpg()
   {
     SocketHandle s = accept(mGpgListen, nullptr, nullptr);
+    NoSigPipe(s);
     if (s == kInvalidSocket) {
       return;
     }

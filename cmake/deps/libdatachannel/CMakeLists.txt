@@ -8,7 +8,7 @@
 #   RTC_ENABLE_MEDIA=0       no media tracks, RTP or SRTP (libsrtp not needed)
 #   RTC_ENABLE_WEBSOCKET=0   no WebSocket client or server
 #   USE_MBEDTLS=1            DTLS and certificates through Mbed TLS, with
-#                            MBEDTLS_SSL_DTLS_SRTP (faf_mbedtls_config.h)
+#                            MBEDTLS_SSL_DTLS_SRTP (cmake/deps/mbedtls/faf_mbedtls_config.h)
 #   usrsctp                  without INET / INET6: libdatachannel feeds it
 #                            through AF_CONN, as its CMakeLists.txt sets
 #                            sctp_inet / sctp_inet6 OFF
@@ -25,14 +25,10 @@ foreach(_probe "${_dc}/src/peerconnection.cpp" "${_sctp}/user_socket.c" "${_mbed
 endforeach()
 
 # --- Mbed TLS ----------------------------------------------------------------
-file(GLOB _mbed_sources CONFIGURE_DEPENDS "${_mbed}/library/*.c")
-add_library(faf_mbedtls STATIC ${_mbed_sources})
-target_include_directories(faf_mbedtls PUBLIC "${_mbed}/include")
-target_include_directories(faf_mbedtls PRIVATE "${_mbed}/library")
-# faf_mbedtls_config.h: DTLS-SRTP on, which libdatachannel's DTLS code uses.
-target_compile_definitions(faf_mbedtls PUBLIC
-  "MBEDTLS_USER_CONFIG_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/faf_mbedtls_config.h\"")
-set_target_properties(faf_mbedtls PROPERTIES C_STANDARD 99 FOLDER "dependencies")
+# Its own build file (cmake/deps/mbedtls), as faf_online links it too.
+if(NOT TARGET faf_mbedtls)
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../mbedtls" "${CMAKE_BINARY_DIR}/deps/mbedtls")
+endif()
 
 # --- usrsctp -----------------------------------------------------------------
 add_library(faf_usrsctp STATIC
@@ -75,20 +71,19 @@ set_target_properties(faf_datachannel PROPERTIES CXX_STANDARD 17 FOLDER "depende
 target_link_libraries(faf_datachannel PRIVATE faf_usrsctp faf_mbedtls faf_juice)
 
 if(FAFRE_PLATFORM_POSIX)
-  foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
+  foreach(_t faf_usrsctp faf_datachannel)
     target_compile_options(${_t} PRIVATE -w)
   endforeach()
   find_package(Threads REQUIRED)
   target_link_libraries(faf_usrsctp PUBLIC Threads::Threads)
   target_link_libraries(faf_datachannel PUBLIC Threads::Threads)
 else()
-  foreach(_t faf_mbedtls faf_usrsctp faf_datachannel)
+  foreach(_t faf_usrsctp faf_datachannel)
     target_compile_definitions(${_t} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
     target_compile_options(${_t} PRIVATE /W0)
   endforeach()
   # libdatachannel throws; the root CMakeLists.txt leaves exceptions to each target.
   target_compile_options(faf_datachannel PRIVATE /EHsc)
-  target_link_libraries(faf_mbedtls PUBLIC bcrypt)
   target_link_libraries(faf_usrsctp PUBLIC ws2_32 iphlpapi)
   target_link_libraries(faf_datachannel PUBLIC ws2_32)
 endif()
