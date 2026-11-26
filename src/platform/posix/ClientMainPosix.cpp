@@ -1,14 +1,15 @@
 // Engine addition (issues #255, #256): the Linux client's entry point, in WinMain's place
 // (moho/app/WinMain.cpp, Windows only). It keeps what WinMain does around the game itself: the
-// main thread's name, the crash diagnostics, the application object run by WIN_AppExecute, its
-// exit value, and the fatal-error report for an exception nothing caught. WinMain's Windows-only
-// switches (the crash tests, hardware watches, accessibility keys, Media Center) have no Linux
-// counterpart yet.
+// main thread's name, the crash diagnostics and the report of an engine Die(), the application
+// object run by WIN_AppExecute, its exit value, and the fatal-error report for an exception nothing
+// caught. WinMain's Windows-only switches (the crash tests, hardware watches, accessibility keys,
+// Media Center) have no Linux counterpart yet.
 
 #include <cstdio>
 #include <exception>
 
 #include "gpg/core/diagnostics/CrashHooks.h"
+#include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Error.hpp"
@@ -20,6 +21,20 @@
 
 // Set by headless/GameEntry.cpp, as in the Windows game (moho/app/WinMain.cpp defines it there).
 int (*gGameReplayPlayerMain)(int argc, char** argv) = nullptr;
+
+namespace
+{
+  /// WinMain's die handler (moho/app/WinMain.cpp): gpg::Die writes the crash report before it stops
+  /// the process with a breakpoint trap, a signal the fatal-signal hooks don't take.
+  void FatalErrorDieHandler(
+    const char* const message
+  )
+  {
+    gpg::diag::CrashReportContext reportContext{};
+    reportContext.reason = (message != nullptr) ? message : "engine Die()";
+    gpg::diag::HandleFatalPath(reportContext);
+  }
+} // namespace
 
 int main()
 {
@@ -36,6 +51,7 @@ int main()
   // installs its hooks: without them a crash leaves only the constructors' early trace on stderr. WinMain's
   // `/heapcheck` is the MSVC CRT's heap validation, which POSIX has not.
   gpg::diag::InstallCrtDiagnosticHooks();
+  gpg::SetDieHandler(&FatalErrorDieHandler);
 
   // The window system (platform/Window.h, SDL3) before anything makes a window.
   if (!platform::window::Init()) {
