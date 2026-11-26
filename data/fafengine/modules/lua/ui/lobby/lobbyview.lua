@@ -220,7 +220,7 @@ end
 --- (FAF's world picture, a question mark, says no more than an empty place).
 local function CountryFlag(country)
     if country and country ~= '' and country ~= 'world' then
-        return UIUtil.UIFile('/countries/' .. country .. '.dds')
+        return UIUtil.UIFile('/countries/' .. string.lower(country) .. '.dds') -- FAF ships them lower case
     end
     return nil
 end

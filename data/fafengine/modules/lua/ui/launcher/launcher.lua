@@ -371,6 +371,9 @@ local function GameGrid(parent, launcher)
                 Theme.HitArea(cell, function(self, event)
                     if event.Type == 'WheelRotation' then
                         grid:Scroll(event.WheelRotation > 0 and -1 or 1)
+                        if grid.onHover then
+                            grid.onHover(nil)
+                        end
                         return true
                     end
                     local item = cell.item
@@ -380,9 +383,15 @@ local function GameGrid(parent, launcher)
                     if event.Type == 'MouseEnter' then
                         grid.hoverKey = item.key
                         grid:Paint()
+                        if grid.onHover and grid.mode ~= 'list' then
+                            grid.onHover(item, cell)
+                        end
                     elseif event.Type == 'MouseExit' then
                         if grid.hoverKey == item.key then
                             grid.hoverKey = false
+                            if grid.onHover then
+                                grid.onHover(nil)
+                            end
                         end
                         grid:Paint()
                     elseif (event.Type == 'ButtonPress' or event.Type == 'ButtonDClick') and event.Modifiers.Left then
@@ -694,6 +703,212 @@ local function DetailsPanel(parent, launcher)
     return panel
 end
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- The game under the mouse, after a short pause: the share of the rating each team brings and the teams side by side,
+-- each player with flag and rating (FAF games; our servers' lobbies have no rated roster here).
+
+local kHoverDelay = 0.35
+local kHoverRow = 22
+
+--- A country's flag as FAF ships them (/countries/<code>.dds, lower case), or nil.
+local function FlagFile(country)
+    if country and country ~= '' then
+        local path = UIUtil.UIFile('/countries/' .. string.lower(country) .. '.dds')
+        if DiskGetFileInfo(path) then
+            return path
+        end
+    end
+    return nil
+end
+
+local function TeamColor(team)
+    local number = tonumber(team) or 0
+    return number > 1 and Theme.TeamColors[math.mod(number - 2, 8) + 1] or C.muted
+end
+
+local function HoverCard(parent, launcher)
+    local card = Theme.Panel(parent, 'f60a141c', C.lineStrong)
+    card.Depth:Set(function() return parent.Depth() + 200 end)
+    Theme.Brackets(card, C.accent)
+    LayoutHelpers.SetDimensions(card, 10, 10)
+    LayoutHelpers.AtLeftTopIn(card, parent, 0, 0)
+    card:DisableHitTest(true)
+    Theme.SetVisible(card, false)
+
+    -- The pause before it shows, counted on a control of its own (a hidden one gets no frames).
+    local ticker = Group(parent)
+    ticker:DisableHitTest()
+    LayoutHelpers.SetDimensions(ticker, 1, 1)
+    LayoutHelpers.AtLeftTopIn(ticker, parent, 0, 0)
+    ticker:SetNeedsFrameUpdate(true)
+    ticker.OnFrame = function(self, delta)
+        if card.want and not card.shown and GetSystemTimeSeconds() - card.since >= kHoverDelay then
+            card.shown = true
+            local ok, err = pcall(card.Build, card, card.want, card.anchor)
+            if not ok then
+                WARN('LAUNCHER: the game card failed: ' .. tostring(err))
+                Theme.SetVisible(card, false)
+            end
+        end
+    end
+
+    --- The game the mouse is over now (nil: none), and its tile.
+    card.Want = function(self, item, cell)
+        if item and self.want and self.want.key == item.key then
+            return
+        end
+        self.want = item
+        self.anchor = cell
+        self.since = GetSystemTimeSeconds()
+        self.shown = false
+        Theme.SetVisible(self, false)
+    end
+
+    card.Build = function(self, game, cell)
+        if self.content then
+            self.content:Destroy()
+            self.content = false
+        end
+        if game.source == 'server' or not game.teams or table.getn(game.teams) == 0 or not cell then
+            return
+        end
+        local content = Group(self)
+        content:DisableHitTest()
+        self.content = content
+        local width = math.min(math.max(cell.Width(), Scale(560)), parent.Width())
+        local pad = Scale(16)
+        local inner = width - 2 * pad
+        content.Left:Set(function() return self.Left() + pad end)
+        content.Top:Set(function() return self.Top() + pad end)
+        content.Width:Set(inner)
+        content.Height:Set(10)
+        local y = 0
+        local function At(control, x, top)
+            control.Left:Set(function() return content.Left() + x end)
+            control.Top:Set(function() return content.Top() + top end)
+        end
+
+        local title = Theme.Cell(content, 16, C.text, true)
+        At(title, 0, 0)
+        title.Right:Set(function() return content.Left() + inner end)
+        title:SetText(game.title or '')
+        y = Scale(30)
+
+        -- The bar: each team's share of the rating, when two or more teams have ratings.
+        local teams = TeamFigures(game)
+        local rated, total = {}, 0
+        for _, team in teams do
+            if (tonumber(team.team) or 0) > 1 and team.total > 0 then
+                table.insert(rated, team)
+                total = total + team.total
+            end
+        end
+        if table.getn(rated) >= 2 then
+            local x = 0
+            for i, team in rated do
+                local share = team.total / total
+                local segmentWidth = (i == table.getn(rated)) and (inner - x) or math.floor(inner * share)
+                local segment = Theme.Rect(content, TeamColor(team.team))
+                At(segment, x, y)
+                segment.Width:Set(math.max(1, segmentWidth - (i < table.getn(rated) and Scale(2) or 0)))
+                segment.Height:Set(Scale(18))
+                local label = Theme.Text(content, string.format('%d%%', math.floor(share * 100 + 0.5)), 11, C.page, true)
+                label.Left:Set(function() return segment.Left() + Scale(6) end)
+                LayoutHelpers.AtVerticalCenterIn(label, segment)
+                label.Depth:Set(function() return segment.Depth() + 1 end)
+                x = x + segmentWidth
+            end
+            y = y + Scale(26)
+        end
+
+        -- The teams side by side, two to a band; with two teams "VS" between them.
+        local gap = Scale(36)
+        local columnWidth = math.floor((inner - gap) / 2)
+        local function TeamColumn(team, x, top)
+            local color = TeamColor(team.team)
+            local head = Theme.Caption(content, TeamName(team.team), color)
+            At(head, x, top)
+            local figures = Theme.Text(content, '', 11, C.subtle)
+            if team.rated > 0 then
+                figures:SetText(string.format('Avg %d  -  Total %d', math.floor(team.total / team.rated + 0.5),
+                    math.floor(team.total + 0.5)))
+            end
+            figures.Right:Set(function() return content.Left() + x + columnWidth end)
+            figures.Top:Set(function() return content.Top() + top end)
+            local line = Theme.Rect(content, C.line)
+            At(line, x, top + Scale(16))
+            line.Width:Set(columnWidth)
+            line.Height:Set(1)
+            local rowTop = top + Scale(22)
+            for _, player in team.players do
+                -- The closures below keep this row's place; rowTop itself moves on (Lua keeps the variable).
+                local thisTop = rowTop
+                local flagFile = FlagFile(player.country)
+                if flagFile then
+                    local flag = Bitmap(content, flagFile)
+                    flag:DisableHitTest()
+                    LayoutHelpers.SetDimensions(flag, 20, 14)
+                    At(flag, x, rowTop + Scale(4))
+                end
+                local name = Theme.Text(content, player.login .. ((player.clan and player.clan ~= '') and
+                    (' [' .. player.clan .. ']') or ''), 13, C.text)
+                At(name, x + Scale(28), rowTop + Scale(2))
+                if player.login == game.host then
+                    local star = Theme.Icon(content, 'star', 13, C.gold, 2)
+                    star.Left:Set(function() return name.Right() + Scale(6) end)
+                    star.Top:Set(function() return name.Top() + Scale(2) end)
+                end
+                local rating = Theme.Text(content, player.rating and tostring(math.floor(player.rating + 0.5)) or '', 13,
+                    C.muted)
+                rating.Right:Set(function() return content.Left() + x + columnWidth end)
+                rating.Top:Set(function() return content.Top() + thisTop + Scale(2) end)
+                rowTop = rowTop + Scale(kHoverRow)
+            end
+            return rowTop
+        end
+        local i = 1
+        while teams[i] do
+            local left, right = teams[i], teams[i + 1]
+            local bottom = TeamColumn(left, 0, y)
+            if right then
+                bottom = math.max(bottom, TeamColumn(right, columnWidth + gap, y))
+                if table.getn(teams) == 2 then
+                    local versus = Theme.Text(content, 'VS', 13, C.subtle, true)
+                    versus.Left:Set(function()
+                        return content.Left() + columnWidth + math.floor((gap - versus.Width()) / 2)
+                    end)
+                    local bandTop = y
+                    versus.Top:Set(function() return content.Top() + bandTop + Scale(40) end)
+                end
+            end
+            y = bottom + Scale(12)
+            i = i + 2
+        end
+
+        local open = math.max(0, (game.maxPlayers or 0) - (game.players or 0))
+        if open > 0 then
+            local note = Theme.Text(content, open == 1 and '1 open slot' or (open .. ' open slots'), 12, C.subtle)
+            At(note, 0, y)
+            y = y + Scale(20)
+        end
+
+        -- Under the tile when it fits, else over it; never past the list's sides.
+        local height = y + 2 * pad
+        self.Width:Set(width)
+        self.Height:Set(height)
+        local left = math.max(parent.Left(), math.min(cell.Left(), parent.Right() - width))
+        local top = cell.Bottom() + Scale(8)
+        if top + height > parent.Bottom() then
+            top = math.max(parent.Top(), cell.Top() - Scale(8) - height)
+        end
+        self.Left:Set(left)
+        self.Top:Set(top)
+        self:DisableHitTest(true)
+        Theme.SetVisible(self, true)
+    end
+    return card
+end
+
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- The multiplayer page.
@@ -956,6 +1171,11 @@ local function BuildOnlinePage(launcher, page)
     LayoutHelpers.FillParent(view.grid, listArea)
     view.grid.Width:Set(function() return view.grid.Right() - view.grid.Left() end)
     view.grid.Height:Set(function() return view.grid.Bottom() - view.grid.Top() end)
+    -- The teams of the game under the mouse, over the list.
+    view.hover = HoverCard(games, launcher)
+    view.grid.onHover = function(item, cell)
+        view.hover:Want(item, cell)
+    end
 
     view.empty = Theme.Text(listArea, '', 14, C.subtle)
     LayoutHelpers.AtCenterIn(view.empty, listArea)
@@ -1978,10 +2198,17 @@ function TestJoin()
             elseif GetSystemTimeSeconds() - testJoinSeen < 14 then
                 if GetSystemTimeSeconds() - testJoinSeen >= 2 then
                     current:SelectGame(item.key)
+                    -- The hover card as the mouse over the first tile shows it, for the screenshot.
+                    if view.hover and view.grid.cells[1] and view.grid.cells[1].item then
+                        view.hover:Want(view.grid.cells[1].item, view.grid.cells[1])
+                    end
                 end
                 return
             end
             testJoinDone = true
+            if view.hover then
+                view.hover:Want(nil)
+            end
             current:SelectGame(item.key)
             LOG('LAUNCHER TEST: joining ' .. item.title .. ' (' .. item.uid .. ') hosted by ' .. item.host)
             current:JoinSelected()
