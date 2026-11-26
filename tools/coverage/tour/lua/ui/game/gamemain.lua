@@ -732,6 +732,7 @@ do
         { 'sim_FixTargetPointCollisionCentre', 1 },
         { 'sim_FixWaterBodies', 1 },
         { 'sim_GatherLargeBuffers', 1 },
+        { 'sim_GatherOccupiedCells', 1 },
         { 'sim_GatherPrefetch', 1 },
         { 'sim_GatherReserve', 1 },
         { 'sim_IntelRasterRows', 1 },

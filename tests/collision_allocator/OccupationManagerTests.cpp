@@ -1,6 +1,18 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <random>
+#include <vector>
+
 #include "moho/sim/COGrid.h"
+#include "platform/PlatformDefines.h"
+
+namespace moho
+{
+  extern bool sim_GatherOccupiedCells; // COGrid.cpp
+}
 
 #if defined(FAF_OCCUPATION_DELETE_TRACE)
 namespace
@@ -211,6 +223,145 @@ namespace
       if (oldHead) {
         EXPECT_EQ(oldHeadCount, 1);
         EXPECT_EQ(oldHead->next, oldNext);
+      }
+    }
+  }
+
+  /**
+   * sim_GatherOccupiedCells (64-bit builds): a gather that visits only the occupied cells returns the same shapes in
+   * the same order as the walk over every cell, for every family mix, with rects that cross the map's edge, after
+   * shapes moved and went away. The bits match the bucket heads throughout, and a rebuild from the heads (a keyframe
+   * load) gives the same bits. On x86 the switch has no effect.
+   */
+  void CheckOccupiedGather(
+    const std::uint32_t worldWidth,
+    const std::uint32_t worldHeight,
+    const int shapeCount
+  )
+  {
+    moho::EntityOccupationManager manager(worldWidth, worldHeight);
+    const int cellsX = manager.mWidth;
+    const int cellsZ = manager.mHeight;
+    std::mt19937 random(12345u + worldWidth + worldHeight);
+    const auto pick = [&random](const int low, const int high) {
+      return std::uniform_int_distribution<int>(low, high)(random);
+    };
+    constexpr std::uint32_t kFamilies[] = {
+      moho::ENTITYTYPE_Unit, moho::ENTITYTYPE_Prop, moho::ENTITYTYPE_Projectile, moho::ENTITYTYPE_Entity
+    };
+    const auto place = [&](moho::CollisionShapeBase& shape) {
+      shape.mStartX = static_cast<std::uint16_t>(pick(0, cellsX - 1));
+      shape.mStartZ = static_cast<std::uint16_t>(pick(0, cellsZ - 1));
+      shape.mWidth = static_cast<std::uint16_t>(std::min(pick(1, 6), cellsX - shape.mStartX));
+      shape.mHeight = static_cast<std::uint16_t>(std::min(pick(1, 6), cellsZ - shape.mStartZ));
+    };
+
+    std::vector<std::unique_ptr<moho::CollisionShapeBase>> shapes;
+    for (int i = 0; i < shapeCount; ++i) {
+      auto shape = std::make_unique<moho::CollisionShapeBase>(&manager, kFamilies[pick(0, 3)]);
+      place(*shape);
+      shape->Add();
+      shapes.push_back(std::move(shape));
+    }
+
+    const auto checkBits = [&manager] {
+#if FAFRE_ARCH_64BIT
+      moho::EntityCollisionCellNode* const* const families[] = {
+        manager.mUnitBuckets, manager.mPropBuckets, manager.mEntityBuckets
+      };
+      for (int family = 0; family < 3; ++family) {
+        for (int bucket = 0; bucket <= manager.mLastIndex; ++bucket) {
+          const bool bit = ((manager.mOccupiedBits[family][bucket >> 6] >> (bucket & 63)) & 1u) != 0u;
+          ASSERT_EQ(bit, families[family][bucket] != nullptr) << "family " << family << ", bucket " << bucket;
+        }
+      }
+#endif
+    };
+
+    const auto checkRebuild = [&manager, &checkBits] {
+#if FAFRE_ARCH_64BIT
+      for (std::vector<std::uint64_t>& bits : manager.mOccupiedBits) {
+        std::fill(bits.begin(), bits.end(), 0xA5A5A5A5A5A5A5A5ull); // stale bits, as before a keyframe load
+      }
+      manager.RebuildOccupiedBits();
+      checkBits();
+#endif
+    };
+
+    const auto compareGathers = [&](const int queries) {
+      for (int q = 0; q < queries; ++q) {
+        moho::CollisionDBRect rect{};
+        rect.mStartX = static_cast<std::uint16_t>(pick(0, cellsX + 14)); // past the edge too
+        rect.mStartZ = static_cast<std::uint16_t>(pick(0, cellsZ + 14));
+        rect.mWidth = static_cast<std::uint16_t>(pick(1, std::max(cellsX / 3, 8)));
+        rect.mHeight = static_cast<std::uint16_t>(pick(1, std::max(cellsZ / 3, 8)));
+        std::uint32_t flags = 0u;
+        while (flags == 0u) {
+          for (const std::uint32_t family : kFamilies) {
+            flags |= pick(0, 1) != 0 ? family : 0u;
+          }
+        }
+        gpg::core::FastVectorN<moho::CollisionShapeBase*, 20> walked;
+        gpg::core::FastVectorN<moho::CollisionShapeBase*, 20> skipped;
+        moho::sim_GatherOccupiedCells = false;
+        const int walkedCount = manager.GatherUnmarkedUnitsInRect(walked, rect, static_cast<moho::EEntityType>(flags));
+        moho::sim_GatherOccupiedCells = true;
+        const int skippedCount =
+          manager.GatherUnmarkedUnitsInRect(skipped, rect, static_cast<moho::EEntityType>(flags));
+        ASSERT_EQ(walkedCount, skippedCount) << "query " << q;
+        for (int i = 0; i < walkedCount; ++i) {
+          ASSERT_EQ(walked.start_[i], skipped.start_[i]) << "query " << q << ", shape " << i;
+        }
+      }
+    };
+
+    checkBits();
+    compareGathers(400);
+    // Moves, removals and new shapes: the bits follow every bucket that fills or empties.
+    for (int round = 0; round < 5; ++round) {
+      for (int i = 0; i < shapeCount / 2; ++i) {
+        moho::CollisionShapeBase& shape =
+          *shapes[static_cast<std::size_t>(pick(0, static_cast<int>(shapes.size()) - 1))];
+        shape.Remove();
+        place(shape);
+        shape.Add();
+      }
+      for (int i = 0; i < shapeCount / 8 && !shapes.empty(); ++i) {
+        shapes.erase(shapes.begin() + pick(0, static_cast<int>(shapes.size()) - 1));
+      }
+      for (int i = 0; i < shapeCount / 16; ++i) {
+        auto shape = std::make_unique<moho::CollisionShapeBase>(&manager, kFamilies[pick(0, 3)]);
+        place(*shape);
+        shape->Add();
+        shapes.push_back(std::move(shape));
+      }
+      checkBits();
+      compareGathers(200);
+    }
+    checkRebuild();
+    compareGathers(200);
+    shapes.clear();
+    checkBits();
+    moho::sim_GatherOccupiedCells = true;
+  }
+
+  TEST(
+    OccupationManagerGather,
+    OccupiedCellsGiveTheSameShapesInTheSameOrder
+  )
+  {
+    // 64 x 64 cells (one word a row), 256 x 256, a map twice as wide as tall, and 1024 x 1024.
+    const struct
+    {
+      std::uint32_t width;
+      std::uint32_t height;
+      int shapes;
+    } kGrids[] = {{256, 256, 150}, {1024, 1024, 600}, {1024, 512, 400}, {4096, 4096, 3000}};
+    for (const auto& grid : kGrids) {
+      SCOPED_TRACE(::testing::Message() << "world " << grid.width << " x " << grid.height);
+      CheckOccupiedGather(grid.width, grid.height, grid.shapes);
+      if (::testing::Test::HasFatalFailure()) {
+        return;
       }
     }
   }

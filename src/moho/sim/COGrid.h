@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/BitArray2D.h"
@@ -10,6 +11,7 @@
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/sim/CollisionShape.h"
 #include "moho/sim/SFootprint.h"
+#include "platform/PlatformDefines.h"
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
 #include "Wm3AxisAlignedBox3.h"
@@ -73,6 +75,22 @@ namespace moho
     EntityCollisionCellNode* mFreeNodeHead;          // +0x1C
     std::int32_t mFreeNodeCount;                     // +0x20
     fa::vector<EntityCollisionCellNode*> mAllBlocks; // +0x24
+#if FAFRE_ARCH_64BIT
+    /**
+     * Engine addition, 64-bit builds only (x64 and Apple silicon; x86 keeps the binary's layout): one bit per bucket
+     * for each family (units, props, entities and projectiles, in `SelectBucketArray`'s order), set while the bucket
+     * holds a node. Kept by every write of a bucket head, whatever `sim_GatherOccupiedCells` says, so the switch can
+     * change at any tick. `GatherUnmarkedInRect` skips the cells whose bits are clear and visits the rest in the same
+     * order.
+     */
+    std::vector<std::uint64_t> mOccupiedBits[3];
+
+    /** The family slot of `mOccupiedBits` for `bucketHeads`, one of the three bucket arrays. */
+    [[nodiscard]] int OccupiedFamily(const EntityCollisionCellNode* const* bucketHeads) const noexcept;
+
+    /** Sets every bit from the bucket heads as they are now (a keyframe load relinks every bucket at once). */
+    void RebuildOccupiedBits();
+#endif
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)

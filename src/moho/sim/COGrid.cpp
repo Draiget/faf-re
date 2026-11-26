@@ -505,7 +505,37 @@ namespace moho
     std::memset(mUnitBuckets, 0, bucketBytes);
     std::memset(mPropBuckets, 0, bucketBytes);
     std::memset(mEntityBuckets, 0, bucketBytes);
+
+#if FAFRE_ARCH_64BIT
+    for (std::vector<std::uint64_t>& bits : mOccupiedBits) {
+      bits.assign((bucketCount + 63u) / 64u, 0u);
+    }
+#endif
   }
+
+#if FAFRE_ARCH_64BIT
+  int EntityOccupationManager::OccupiedFamily(
+    const EntityCollisionCellNode* const* const bucketHeads
+  ) const noexcept
+  {
+    return bucketHeads == mUnitBuckets ? 0 : (bucketHeads == mPropBuckets ? 1 : 2);
+  }
+
+  void EntityOccupationManager::RebuildOccupiedBits()
+  {
+    EntityCollisionCellNode* const* const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
+    for (int family = 0; family < 3; ++family) {
+      std::vector<std::uint64_t>& bits = mOccupiedBits[family];
+      std::fill(bits.begin(), bits.end(), 0u);
+      for (int bucket = 0; bucket <= mLastIndex; ++bucket) {
+        if (families[family][bucket] != nullptr) {
+          const auto bit = static_cast<std::uint32_t>(bucket);
+          bits[bit >> 6u] |= 1ull << (bit & 63u);
+        }
+      }
+    }
+  }
+#endif
 
   /**
    * Address: 0x00720680 (FUN_00720680, Moho::COGrid::~COGrid)
@@ -640,6 +670,10 @@ namespace moho
     EntityCollisionCellNode** const bucketHeads = SelectBucketArray(*this, shape->mBucketFlags);
     node->next = bucketHeads[bucketIndex];
     bucketHeads[bucketIndex] = node;
+#if FAFRE_ARCH_64BIT
+    const auto bit = static_cast<std::uint32_t>(bucketIndex);
+    mOccupiedBits[OccupiedFamily(bucketHeads)][bit >> 6u] |= 1ull << (bit & 63u);
+#endif
 
     --mFreeNodeCount;
   }
@@ -754,6 +788,9 @@ namespace moho
         }
       }
     }
+#if FAFRE_ARCH_64BIT
+    RebuildOccupiedBits(); // every bucket was cleared and relinked above
+#endif
   }
 
   /**
@@ -781,6 +818,12 @@ namespace moho
     }
 
     *link = node->next;
+#if FAFRE_ARCH_64BIT
+    if (bucketHeads[bucketIndex] == nullptr) {
+      const auto bit = static_cast<std::uint32_t>(bucketIndex);
+      mOccupiedBits[OccupiedFamily(bucketHeads)][bit >> 6u] &= ~(1ull << (bit & 63u));
+    }
+#endif
     node->owner = nullptr;
     node->next = mFreeNodeHead;
     ++mFreeNodeCount;
@@ -913,6 +956,16 @@ namespace moho
     &sim_GatherPrefetch
   );
 
+  /// Engine addition (64-bit builds): the occupation gather visits only the cells whose buckets hold an entity
+  /// (`EntityOccupationManager::mOccupiedBits`); same results, same order. x86 always walks every cell.
+  bool sim_GatherOccupiedCells = true;
+  TConVar<bool> gTConVar_sim_GatherOccupiedCells(
+    "sim_GatherOccupiedCells",
+    "Occupation-grid gathers skip cells with no entities, found 64 at a time (64-bit builds; same results, same "
+    "order).",
+    &sim_GatherOccupiedCells
+  );
+
   int GatherUnmarkedInRect(
     EntityOccupationManager& manager,
     gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans,
@@ -948,53 +1001,101 @@ namespace moho
       tGatherVisits.Begin();
     }
 
-    if (zCount > 0) {
+    const std::uint32_t flagBits = std::to_underlying(flags);
+    const bool includeUnits = (flagBits & ENTITYTYPE_Unit) != 0u && unitBuckets != nullptr;
+    const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u && propBuckets != nullptr;
+    const bool includeDynamic =
+      (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u && entityBuckets != nullptr;
+    const bool prefetch = sim_GatherPrefetch;
+
+    // One cell: its units, then its props, then its entities and projectiles, as 0x004FD000 walks them.
+    // `nextIndex` is the cell visited next (-1: none), whose unit list the prefetch loads ahead.
+    const auto visitCell = [&](const int bucketIndex, const int nextIndex) {
+      if (includeUnits) {
+        if (prefetch && nextIndex >= 0) {
+          __builtin_prefetch(unitBuckets[nextIndex]);
+        }
+        for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
+          if (prefetch && node->next != nullptr) {
+            __builtin_prefetch(node->next);
+          }
+          CollisionShapeBase* const shape = node->owner;
+          if (ClaimGatherShape(shape, useSharedMarks)) {
+            outSpans.PushBack(shape);
+          }
+        }
+      }
+
+      if (includeProps) {
+        for (EntityCollisionCellNode* node = propBuckets[bucketIndex]; node; node = node->next) {
+          CollisionShapeBase* const shape = node->owner;
+          if (ClaimGatherShape(shape, useSharedMarks)) {
+            outSpans.PushBack(shape);
+          }
+        }
+      }
+
+      if (includeDynamic) {
+        for (EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node; node = node->next) {
+          CollisionShapeBase* const shape = node->owner;
+          if (((flagBits & shape->mBucketFlags) != 0u) && ClaimGatherShape(shape, useSharedMarks)) {
+            outSpans.PushBack(shape);
+          }
+        }
+      }
+    };
+
+#if FAFRE_ARCH_64BIT
+    // Engine addition (sim_GatherOccupiedCells): only the cells whose included buckets hold a node, found
+    // 64 at a time in `mOccupiedBits`, in the same ascending order. A skipped cell has empty buckets for every
+    // included family, so it adds nothing and the result is the same, element for element. Rows whose cells
+    // would wrap through `mLastIndex` take the walk below.
+    const bool occupiedOnly = sim_GatherOccupiedCells && zCount > 0 && xCount > 0 &&
+      currentRowBase + (zCount - 1) * manager.mWidth + (xCount - 1) <= manager.mLastIndex;
+    if (occupiedOnly) {
+      const std::uint64_t* const unitBits = includeUnits ? manager.mOccupiedBits[0].data() : nullptr;
+      const std::uint64_t* const propBits = includeProps ? manager.mOccupiedBits[1].data() : nullptr;
+      const std::uint64_t* const entityBits = includeDynamic ? manager.mOccupiedBits[2].data() : nullptr;
+      const auto occupiedWord = [&](const int word) {
+        return (unitBits != nullptr ? unitBits[word] : 0u) | (propBits != nullptr ? propBits[word] : 0u) |
+          (entityBits != nullptr ? entityBits[word] : 0u);
+      };
+      for (int row = 0; row < zCount; ++row) {
+        const int rowStart = currentRowBase + row * manager.mWidth;
+        const int rowEnd = rowStart + xCount; // one past the row's last cell
+        int pending = -1;                     // an occupied cell found, visited once the next one is known
+        for (int word = rowStart >> 6; (word << 6) < rowEnd; ++word) {
+          std::uint64_t bits = occupiedWord(word);
+          const int wordStart = word << 6;
+          if (wordStart < rowStart) {
+            bits &= ~0ull << (rowStart - wordStart);
+          }
+          if (rowEnd - wordStart < 64) {
+            bits &= (1ull << (rowEnd - wordStart)) - 1u;
+          }
+          while (bits != 0u) {
+            const int cell = wordStart + std::countr_zero(bits);
+            bits &= bits - 1u;
+            if (pending >= 0) {
+              visitCell(pending, cell);
+            }
+            pending = cell;
+          }
+        }
+        if (pending >= 0) {
+          visitCell(pending, -1);
+        }
+      }
+    } else
+#endif
+      if (zCount > 0) {
       do {
         if (xCount > 0) {
           int position = currentRowBase;
           int remainingX = xCount;
-          const std::uint32_t flagBits = std::to_underlying(flags);
-          const bool includeUnits = (flagBits & ENTITYTYPE_Unit) != 0u;
-          const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u;
-          const bool includeDynamic = (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u;
-
-          const bool prefetch = sim_GatherPrefetch;
           do {
             const int bucketIndex = position & manager.mLastIndex;
-
-            if (includeUnits && unitBuckets) {
-              if (prefetch && remainingX > 1) {
-                __builtin_prefetch(unitBuckets[(position + 1) & manager.mLastIndex]);
-              }
-              for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
-                if (prefetch && node->next != nullptr) {
-                  __builtin_prefetch(node->next);
-                }
-                CollisionShapeBase* const shape = node->owner;
-                if (ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(shape);
-                }
-              }
-            }
-
-            if (includeProps && propBuckets) {
-              for (EntityCollisionCellNode* node = propBuckets[bucketIndex]; node; node = node->next) {
-                CollisionShapeBase* const shape = node->owner;
-                if (ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(shape);
-                }
-              }
-            }
-
-            if (includeDynamic && entityBuckets) {
-              for (EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node; node = node->next) {
-                CollisionShapeBase* const shape = node->owner;
-                if (((flagBits & shape->mBucketFlags) != 0u) && ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(shape);
-                }
-              }
-            }
-
+            visitCell(bucketIndex, remainingX > 1 ? ((position + 1) & manager.mLastIndex) : -1);
             ++position;
             --remainingX;
           } while (remainingX != 0);
