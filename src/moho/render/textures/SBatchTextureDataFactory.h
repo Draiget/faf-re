@@ -40,6 +40,12 @@ namespace moho
      * stores DXT blocks into `SBatchTextureData`.
      */
     std::shared_ptr<SBatchTextureData> LoadImpl(gpg::StrArg path) override;
+
+    /**
+     * Engine addition (in-game launcher, moho/ui/UiArt.h): what LoadImpl does after reading the file, for an image
+     * file's bytes held in memory. Null when the device isn't ready or the bytes aren't an image it decodes.
+     */
+    [[nodiscard]] static std::shared_ptr<SBatchTextureData> FromImageBytes(const char* bytes, std::uint32_t size);
   };
 
   static_assert(

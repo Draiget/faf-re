@@ -11,6 +11,7 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/render/textures/SBatchTextureData.h"
 #include "moho/render/textures/SBatchTextureDataFactory.h"
+#include "moho/ui/UiArt.h"
 
 namespace moho
 {
@@ -246,6 +247,16 @@ namespace moho
       // empty buffer - so no texture in the game ever loaded, every Bitmap
       // control reported 0x0, and each dialog collapsed onto a single point
       // because MAUI lays controls out relative to one another's size.
+      // Engine addition (in-game launcher): pictures the UI drew in memory (moho/ui/UiArt.h) under their own
+      // prefix, which no mounted folder has.
+      if (filename != nullptr && uiart::IsMemoryPath(filename)) {
+        const auto bytes = uiart::FindImage(filename);
+        return bytes != nullptr && !bytes->empty()
+          ? SBatchTextureDataFactory::FromImageBytes(
+              reinterpret_cast<const char*>(bytes->data()), static_cast<std::uint32_t>(bytes->size())
+            )
+          : nullptr;
+      }
       gpg::RType* resourceType = SBatchTextureData::sType;
       if (resourceType == nullptr) {
         resourceType = gpg::LookupRType(typeid(SBatchTextureData));

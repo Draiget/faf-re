@@ -625,6 +625,14 @@ if(FAFRE_PLATFORM_WINDOWS)
   set_tests_properties(online PROPERTIES LABELS "Online")
 endif()
 
+# The UI's own pictures (moho/ui/UiArt.cpp, the in-game launcher): icons from SVG elements, rounded boxes, the PNG
+# bytes and the table the texture loader reads them from.
+add_executable(faf_ui_art_tests EXCLUDE_FROM_ALL ui/UiArtTests.cpp)
+target_link_libraries(faf_ui_art_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_ui_art_tests PROPERTIES FOLDER "Tests/UI")
+add_test(NAME ui_art COMMAND faf_ui_art_tests)
+set_tests_properties(ui_art PROPERTIES LABELS "UI")
+
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
 # reports it as Not Run.

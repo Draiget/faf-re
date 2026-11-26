@@ -24,6 +24,17 @@ namespace moho
     }
 
     const gpg::MemBuffer<const char> mappedFile = DISK_MemoryMapFile(path);
+    return FromImageBytes(mappedFile.mBegin, static_cast<std::uint32_t>(mappedFile.mEnd - mappedFile.mBegin));
+  }
+
+  std::shared_ptr<SBatchTextureData> SBatchTextureDataFactory::FromImageBytes(
+    const char* const bytes,
+    const std::uint32_t size
+  )
+  {
+    if (!gpg::gal::Device::IsReady()) {
+      return {};
+    }
     std::shared_ptr<SBatchTextureData> decodedData(new SBatchTextureData());
 
     gpg::MemBuffer<char> decodedBlocks;
@@ -32,13 +43,8 @@ namespace moho
       return {};
     }
 
-    const auto mappedBytes = static_cast<std::uint32_t>(mappedFile.mEnd - mappedFile.mBegin);
     device->GetTexture2D(
-      mappedFile.mBegin,
-      mappedBytes,
-      &decodedBlocks,
-      &decodedData->mWidth,
-      reinterpret_cast<int*>(&decodedData->mHeight)
+      bytes, size, &decodedBlocks, &decodedData->mWidth, reinterpret_cast<int*>(&decodedData->mHeight)
     );
 
     if (!CopyBatchTextureDataFromMemBuffer(*decodedData, decodedBlocks)) {
