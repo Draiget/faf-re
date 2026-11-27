@@ -31,6 +31,7 @@
 #include "moho/app/OnlineLauncher.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "online/FafReplay.h"
 #include "online/FafVault.h"
@@ -227,7 +228,7 @@ namespace
   struct Job
   {
     int id = 0;
-    std::string kind; ///< "replays", "replay", "mods", "mod", "api", "thumbnail"
+    std::string kind; ///< "replays", "replay", "mods", "mod", "map", "api", "thumbnail"
     std::thread thread;
     std::atomic<bool> done{false};
     std::atomic<std::uint64_t> received{0};
@@ -897,6 +898,24 @@ namespace
   }
 
   /**
+   * FAF's userInit.lua keeps every DiskGetFileInfo answer for the session, "no such file" included, so a folder mounted
+   * or removed later would keep its old answer. The engine's hook on that file (fafengine/lua/userInit.lua) keeps the
+   * same cache with DiskForgetFileInfo() to empty it; called after every mount change made here.
+   */
+  void ForgetFileInfo(
+    lua_State* const L
+  )
+  {
+    lua_pushstring(L, "DiskForgetFileInfo");
+    lua_rawget(L, LUA_GLOBALSINDEX);
+    if (!lua_isfunction(L, -1)) {
+      lua_pop(L, 1);
+      return;
+    }
+    lua_call(L, 0, 0); // it only empties a table (this Lua has no lua_pcall: errors throw)
+  }
+
+  /**
    * ok, why = FafLibrary_RemoveMod(folder): the mod's folder (its name under the vault's mods folder) out of the file
    * system and off the disk.
    */
@@ -918,6 +937,7 @@ namespace
       return 2;
     }
     (void)moho::DISK_UnmountNow(("/mods/" + folder).c_str());
+    ForgetFileInfo(L);
     std::filesystem::remove_all(path, error);
     if (error) {
       lua_pushboolean(L, 0);
@@ -925,6 +945,154 @@ namespace
       return 2;
     }
     LogLine("removed the mod " + path.string());
+    lua_pushboolean(L, 1);
+    lua_pushnil(L);
+    return 2;
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Maps from FAF's vault: the same archive rules as mods (one folder, nothing leaving it), a map's folder holding its
+  // <name>_scenario.lua; installed into the vault's maps folder and mounted at /maps/<folder>.
+
+  std::filesystem::path MapsFolder()
+  {
+    return VaultFolder() / "maps";
+  }
+
+  /** The map archive `zip` unpacked into `mapsFolder` (an older copy replaced): its folder's name, or why not. */
+  std::expected<std::string, std::string> InstallMapZip(
+    const std::string& zip,
+    const std::filesystem::path& mapsFolder
+  )
+  {
+    auto entries = ReadZip(zip);
+    if (!entries) {
+      return std::unexpected(entries.error());
+    }
+    std::string root;
+    bool scenario = false;
+    for (const ZipEntry& entry : *entries) {
+      std::string name = entry.name;
+      for (char& c : name) {
+        c = c == '\\' ? '/' : c;
+      }
+      const std::string top = name.substr(0, name.find('/'));
+      if (top.empty() || top == name) {
+        return std::unexpected("the archive's files aren't in one folder (" + entry.name + ")");
+      }
+      if (root.empty()) {
+        root = top;
+      } else if (Lower(top) != Lower(root)) {
+        return std::unexpected("the archive holds more than one folder (" + root + ", " + top + ")");
+      }
+      if (name.find("/../") != std::string::npos || name.ends_with("/..") || name.find(':') != std::string::npos) {
+        return std::unexpected("the archive's entry " + entry.name + " would leave the map's folder");
+      }
+      scenario = scenario || (Lower(name).ends_with("_scenario.lua") && name.rfind('/') == root.size());
+    }
+    if (!SafeFolderName(root)) {
+      return std::unexpected(std::string("the archive's folder has no usable name"));
+    }
+    if (!scenario) {
+      return std::unexpected("the archive has no " + root + "/<name>_scenario.lua");
+    }
+    std::error_code error;
+    std::filesystem::create_directories(mapsFolder, error);
+    const std::filesystem::path part = mapsFolder / (root + ".part");
+    std::filesystem::remove_all(part, error);
+    for (const ZipEntry& entry : *entries) {
+      std::string name = entry.name;
+      for (char& c : name) {
+        c = c == '\\' ? '/' : c;
+      }
+      if (name.ends_with("/")) {
+        continue;
+      }
+      const std::filesystem::path file = part / std::filesystem::path(name.substr(root.size() + 1));
+      std::filesystem::create_directories(file.parent_path(), error);
+      std::ofstream out(file, std::ios::binary | std::ios::trunc);
+      out.write(entry.data.data(), static_cast<std::streamsize>(entry.data.size()));
+      if (!out) {
+        std::filesystem::remove_all(part, error);
+        return std::unexpected("can't write " + file.string());
+      }
+    }
+    const std::filesystem::path target = mapsFolder / root;
+    std::filesystem::remove_all(target, error);
+    std::filesystem::rename(part, target, error);
+    if (error) {
+      std::filesystem::remove_all(part, error);
+      return std::unexpected("can't write " + target.string());
+    }
+    return root;
+  }
+
+  /** id = FafLibrary_InstallMap{url=}: a map from FAF's content server into the vault's maps folder, usable at once. */
+  int InstallMapBody(
+    lua_State* const L
+  )
+  {
+    const std::string url = lua_istable(L, 1) ? TableString(L, 1, "url") : "";
+    if (!AllowedModUrl(url)) {
+      lua_pushnil(L);
+      lua_pushstring(L, "maps download only from FAF's content server");
+      return 2;
+    }
+    const std::filesystem::path maps = MapsFolder();
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("map", [url, maps](Job& job) {
+      platform::http::Call call;
+      call.url = url;
+      call.userAgent = UserAgent();
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body, &job.received, &job.total); !sent) {
+        job.Fail("the map didn't download: " + sent.error());
+        return;
+      }
+      if (status != 200) {
+        job.Fail("FAF's content server answered HTTP " + std::to_string(status));
+        return;
+      }
+      const auto installed = InstallMapZip(body, maps);
+      if (!installed) {
+        job.Fail(installed.error());
+        return;
+      }
+      LogLine("installed the map " + *installed + " into " + maps.string());
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.path = (maps / *installed).string();
+      job.message = *installed;
+    })));
+    return 1;
+  }
+
+  /** ok, why = FafLibrary_RemoveMap(folder): a vault map out of the file system and off the disk. */
+  int RemoveMapBody(
+    lua_State* const L
+  )
+  {
+    const std::string folder = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    if (!SafeFolderName(folder)) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, "not a map's folder");
+      return 2;
+    }
+    const std::filesystem::path path = MapsFolder() / folder;
+    std::error_code error;
+    if (!std::filesystem::is_directory(path, error)) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, ("no map folder " + path.string()).c_str());
+      return 2;
+    }
+    (void)moho::DISK_UnmountNow(("/maps/" + folder).c_str());
+    ForgetFileInfo(L);
+    std::filesystem::remove_all(path, error);
+    if (error) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, ("can't delete " + path.string() + ": " + error.message()).c_str());
+      return 2;
+    }
+    LogLine("removed the map " + path.string());
     lua_pushboolean(L, 1);
     lua_pushnil(L);
     return 2;
@@ -1055,7 +1223,9 @@ namespace
     lua_State* const L
   )
   {
-    lua_pushboolean(L, MountThumbnails() ? 1 : 0);
+    const bool mounted = MountThumbnails();
+    ForgetFileInfo(L);
+    lua_pushboolean(L, mounted ? 1 : 0);
     return 1;
   }
 
@@ -1302,6 +1472,15 @@ namespace
       std::lock_guard<std::mutex> guard(job->lock);
       gThumbnailsNew.insert(job->path); // readable after the next FafLibrary_MountThumbnails
     }
+    if (job->kind == "map" && !job->failed && !job->mounted) {
+      job->mounted = true;
+      const std::string folder = job->message;
+      (void)moho::DISK_UnmountNow(("/maps/" + folder).c_str()); // an older version's
+      if (!moho::DISK_MountDirectoryNow(std::filesystem::path(job->path), ("/maps/" + folder).c_str())) {
+        job->Fail("installed, but the game couldn't read it yet: it is there after a restart");
+      }
+      ForgetFileInfo(L);
+    }
     if (job->kind == "mod" && !job->failed && !job->mounted) {
       job->mounted = true;
       const std::string folder = job->message;
@@ -1309,6 +1488,7 @@ namespace
       if (!moho::DISK_MountDirectoryNow(std::filesystem::path(job->path), ("/mods/" + folder).c_str())) {
         job->Fail("installed, but the game couldn't read it yet: it is there after a restart");
       }
+      ForgetFileInfo(L);
     }
     {
       std::lock_guard<std::mutex> guard(job->lock);
@@ -1422,6 +1602,30 @@ namespace
       nullptr,
       "<global>",
       "bool, string FafLibrary_RemoveMod(folder) - takes a mod out of the game and off the disk."
+    );
+    static moho::CScrLuaBinder installMap(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_InstallMap",
+      &Binding<&InstallMapBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_InstallMap{url=} - downloads a map from FAF's vault into the maps folder, mounted at once."
+    );
+    static moho::CScrLuaBinder removeMap(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_RemoveMap",
+      &Binding<&RemoveMapBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafLibrary_RemoveMap(folder) - takes a vault map out of the game and off the disk."
+    );
+    static moho::CScrLuaBinder rawFileInfo(
+      moho::SCR_UserLuaInitSet(),
+      "FafDisk_FileInfo",
+      &moho::cfunc_DiskGetFileInfo,
+      nullptr,
+      "<global>",
+      "FileInfo|false FafDisk_FileInfo(path) - the engine's DiskGetFileInfo, never cached."
     );
     static moho::CScrLuaBinder modsFolder(
       moho::SCR_UserLuaInitSet(),

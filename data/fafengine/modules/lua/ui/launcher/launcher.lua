@@ -1974,6 +1974,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
+        (self.page == 'maps' and self.mapsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2551,6 +2552,7 @@ local function BuildTopBar(launcher, body)
         { 'play', 'Play', function() launcher:ShowPage('online') end, kPlayPages },
         { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
         { 'replays', 'Replays', function() launcher:Replays() end, { replays = true } },
+        { 'maps', 'Maps', function() launcher:ShowPage('maps') end, { maps = true } },
         { 'mods', 'Mods', function() launcher:Mods() end, { mods = true } },
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true } },
         { 'settings', 'Settings', function() launcher:Options() end, { options = true } },
@@ -2985,6 +2987,23 @@ local function Build(launcher)
             matchPage:Destroy()
         end
     end
+    -- Maps: this computer's and FAF's vault (mapspage.lua), with the engine's map installs.
+    if rawget(_G, 'FafLibrary_InstallMap') then
+        local mapsPage = Group(content, 'launcher maps')
+        LayoutHelpers.FillParent(mapsPage, content)
+        mapsPage.Width:Set(function() return mapsPage.Right() - mapsPage.Left() end)
+        mapsPage.Height:Set(function() return mapsPage.Bottom() - mapsPage.Top() end)
+        local mapsBuilt, mapsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/mapspage.lua').Build(launcher, mapsPage)
+        end)
+        if mapsBuilt then
+            launcher.pages.maps = mapsPage
+            Theme.SetVisible(mapsPage, false)
+        else
+            WARN('LAUNCHER: the maps page failed to build: ' .. tostring(mapsWhy))
+            mapsPage:Destroy()
+        end
+    end
     -- Co-op: FAF's co-op missions (coop.lua), with the engine's FAF API access.
     if rawget(_G, 'FafLibrary_Api') then
         local coopPage = Group(content, 'launcher coop')
@@ -3252,6 +3271,46 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchermapstest: the Maps page: this computer's maps, the vault's first page, a map downloaded and removed.
+            if GetCommandLineArg('/launchermapstest', 0) and current.mapsView then
+                local maps = current.mapsView
+                current:ShowPage('maps')
+                Wait(2)
+                Step('maps: ' .. table.getn(maps:Items()) .. ' on this computer')
+                maps.tab = 'vault'
+                maps:Search()
+                for i = 1, 15 do
+                    current:Refresh()
+                    if not maps.jobs.search then
+                        break
+                    end
+                    Wait(1)
+                end
+                maps.chosen = maps.vault[1]
+                Wait(3)
+                Step('maps: vault ' .. table.getn(maps.vault) .. ' maps, page ' .. maps.vaultPage .. ' of ' ..
+                    tostring(maps.vaultPages) .. ', first ' .. tostring(maps.chosen and maps.chosen.name) ..
+                    (maps.failure and (', failure ' .. maps.failure) or ''))
+                if maps.chosen then
+                    maps:Act()
+                    for i = 1, 20 do
+                        current:Refresh()
+                        if not maps.jobs.install then
+                            break
+                        end
+                        Wait(1)
+                    end
+                    Wait(2)
+                    local file = '/maps/' .. maps.chosen.folder .. '/' .. maps.chosen.folder .. '_scenario.lua'
+                    local loaded, why = pcall(import('/lua/ui/maputil.lua').LoadScenario, file)
+                    Step('maps: after Download: ' .. tostring(maps.statusText) .. ', installed ' ..
+                        tostring(maps:Installed(maps.chosen)) .. ', file seen ' .. tostring(DiskGetFileInfo(file) and true) ..
+                        ', load ' .. tostring(loaded) .. ' ' .. tostring(loaded and type(why) or why))                    maps:Act()
+                    Wait(2)
+                    Step('maps: after Remove: ' .. tostring(maps.statusText) .. ', installed ' ..
+                        tostring(maps:Installed(maps.chosen)))
+                end
+            end
             -- /launchercooptest: the Co-op page: FAF's missions, the first one's fastest completions.
             if GetCommandLineArg('/launchercooptest', 0) and current.coopView then
                 current:ShowPage('coop')

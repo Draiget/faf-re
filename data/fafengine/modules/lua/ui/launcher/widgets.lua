@@ -28,6 +28,13 @@ function LocalScenario(map)
     return scenarios[key]
 end
 
+--- Forgets what LocalScenario found for a map's folder (a map just downloaded or removed).
+function ForgetScenario(map)
+    if map then
+        scenarios[string.lower(map)] = nil
+    end
+end
+
 function MapTitle(map)
     local scenario = LocalScenario(map)
     if scenario and scenario.name then
