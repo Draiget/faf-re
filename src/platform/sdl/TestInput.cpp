@@ -6,6 +6,11 @@
 //   waitlog <text>                 until a logged line contains <text> (120 s, then "TESTINPUT timeout")
 //   key [@<win>] <vk> [ctrl] [shift] [alt]   press and release a Windows virtual-key code (hex 0x41,
 //                                  decimal, or one letter/digit), with the modifier keys held around it
+//   hold <ctrl|shift|alt>...       these modifier keys go down and stay held - for the mouse steps
+//                                  that follow and for the engine's own key polls (MAUI_KeyIsDown,
+//                                  which otherwise needs the desktop's key state and foreground) -
+//                                  until `release` or the end of the script
+//   release                        the held modifier keys go up
 //   text [@<win>] <utf-8>          the input method commits this text (SDL_EVENT_TEXT_INPUT)
 //                                  (keys and text go to the window with the keyboard, else the main one)
 //   move <win> <x> <y>             the mouse moves to client pixel x, y of a window
@@ -25,8 +30,16 @@
 //
 // <win> is `main` (the game's window), `view` (its child window, where there is one; else main),
 // or the title of a developer window with `_` for spaces (Moho_Log).
+//
+// Mouse steps go through SDL's own input entry points (the ones its platform drivers call), so
+// SDL's mouse state follows the script, and the window gets SDL's mouse and keyboard focus for
+// them. The desktop's cursor never moves: where the game asks the desktop for the cursor
+// (ShellGetMousePosition, platform/shell/Shell.cpp), it gets the script's position instead
+// (GetScriptMouseScreenPosition) until the script ends.
 
 #include "platform/sdl/TestInput.h"
+
+#include <cmath>
 
 #include <algorithm>
 #include <atomic>
@@ -47,9 +60,24 @@
 #include "gpg/core/utils/Logging.h"
 #include "platform/sdl/WindowSdlPlatform.h"
 
+// SDL's internal input entry points (src/events/SDL_mouse_c.h, SDL_keyboard_c.h): SDL is linked
+// statically on every platform (src/CMakeLists.txt, cmake/FafPosixClient.cmake).
+extern "C" void
+SDL_SendMouseMotion(Uint64 timestamp, SDL_Window* window, SDL_MouseID mouseID, bool relative, float x, float y);
+extern "C" void SDL_SendMouseButtonClicks(
+  Uint64 timestamp,
+  SDL_Window* window,
+  SDL_MouseID mouseID,
+  Uint8 button,
+  bool down,
+  int clicks
+);
+extern "C" bool SDL_SetKeyboardFocus(SDL_Window* window);
+
 namespace
 {
   constexpr Uint64 kWaitLogTimeoutMs = 120000;
+  constexpr SDL_MouseID kScriptMouseId = 1; // SDL_DEFAULT_MOUSE_ID
 
   struct Script
   {
@@ -74,6 +102,27 @@ namespace
     // The desktop's clipboard text from before the first `clip` step, put back when the script ends.
     bool clipboardSaved = false;
     std::string savedClipboard;
+  };
+
+  // Set by the first mouse step: from then on the script owns the cursor position.
+  std::atomic<bool> sScriptMouse{false};
+
+  // The modifiers a `hold` step holds (SDL_Keymod bits). Read by IsModifierHeld on the main thread's
+  // key polls; written by the steps on the main thread.
+  std::atomic<unsigned int> sHeldModifiers{0};
+
+  struct HeldModifier
+  {
+    const char* name;
+    SDL_Keycode key;
+    SDL_Scancode scancode;
+    SDL_Keymod flag;
+  };
+
+  constexpr HeldModifier kHoldableModifiers[] = {
+    {"ctrl", SDLK_LCTRL, SDL_SCANCODE_LCTRL, SDL_KMOD_LCTRL},
+    {"shift", SDLK_LSHIFT, SDL_SCANCODE_LSHIFT, SDL_KMOD_LSHIFT},
+    {"alt", SDLK_LALT, SDL_SCANCODE_LALT, SDL_KMOD_LALT},
   };
 
   void SaveClipboard(
@@ -197,24 +246,29 @@ namespace
     return SDL_BUTTON_LEFT;
   }
 
+  // The window takes SDL's keyboard focus (the mouse focus follows the motion), as a click on it
+  // would give it; the game reads the cursor only for the window that has both.
+  void FocusForMouse(
+    SDL_Window* const window
+  )
+  {
+    sScriptMouse = true;
+    if (SDL_GetKeyboardFocus() != window) {
+      (void)SDL_SetKeyboardFocus(window);
+    }
+  }
+
   void PushMotion(
     SDL_Window* const window,
     const float x,
     const float y,
-    const float xrel,
-    const float yrel,
-    const SDL_MouseButtonFlags state
+    const float /*xrel*/,
+    const float /*yrel*/,
+    const SDL_MouseButtonFlags /*state*/
   )
   {
-    SDL_Event event{};
-    event.type = SDL_EVENT_MOUSE_MOTION;
-    event.motion.windowID = SDL_GetWindowID(window);
-    event.motion.x = x;
-    event.motion.y = y;
-    event.motion.xrel = xrel;
-    event.motion.yrel = yrel;
-    event.motion.state = state;
-    (void)SDL_PushEvent(&event);
+    FocusForMouse(window);
+    SDL_SendMouseMotion(0, window, kScriptMouseId, false, x, y);
   }
 
   void PushButton(
@@ -226,15 +280,9 @@ namespace
     const Uint8 clicks
   )
   {
-    SDL_Event event{};
-    event.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
-    event.button.windowID = SDL_GetWindowID(window);
-    event.button.button = button;
-    event.button.down = down;
-    event.button.clicks = clicks;
-    event.button.x = x;
-    event.button.y = y;
-    (void)SDL_PushEvent(&event);
+    FocusForMouse(window);
+    SDL_SendMouseMotion(0, window, kScriptMouseId, false, x, y);
+    SDL_SendMouseButtonClicks(0, window, kScriptMouseId, button, down, clicks);
   }
 
   void PushKey(
@@ -337,6 +385,39 @@ namespace
     }
   }
 
+  // `hold`: the keys go down in SDL's queue, and SDL's modifier state - which the mouse events'
+  // modifiers are read from (WindowSdl.cpp) - holds them, re-applied each frame by Tick.
+  void RunHold(
+    const std::vector<std::string>& words
+  )
+  {
+    SDL_Window* const window = KeyWindow();
+    unsigned int held = sHeldModifiers.load();
+    for (std::size_t index = 1; index < words.size(); ++index) {
+      for (const HeldModifier& modifier : kHoldableModifiers) {
+        if (words[index] == modifier.name && (held & modifier.flag) == 0u) {
+          held |= modifier.flag;
+          PushKey(window, modifier.key, modifier.scancode, static_cast<SDL_Keymod>(held), true);
+        }
+      }
+    }
+    sHeldModifiers = held;
+    SDL_SetModState(static_cast<SDL_Keymod>(SDL_GetModState() | held));
+  }
+
+  void RunRelease()
+  {
+    SDL_Window* const window = KeyWindow();
+    unsigned int held = sHeldModifiers.exchange(0u);
+    for (const HeldModifier& modifier : kHoldableModifiers) {
+      if ((held & modifier.flag) != 0u) {
+        held &= ~static_cast<unsigned int>(modifier.flag);
+        PushKey(window, modifier.key, modifier.scancode, static_cast<SDL_Keymod>(held), false);
+        SDL_SetModState(static_cast<SDL_Keymod>(SDL_GetModState() & ~modifier.flag));
+      }
+    }
+  }
+
   void RunMouse(
     const std::vector<std::string>& words
   )
@@ -407,6 +488,18 @@ namespace
     }
     sLastX = x;
     sLastY = y;
+    float stateX = 0.0f;
+    float stateY = 0.0f;
+    const SDL_MouseButtonFlags buttons = SDL_GetMouseState(&stateX, &stateY);
+    gpg::Logf(
+      "TESTINPUT mouse: window %u, mouse focus %u, keyboard focus %u, SDL state %.0f %.0f buttons 0x%x",
+      SDL_GetWindowID(window),
+      SDL_GetMouseFocus() != nullptr ? SDL_GetWindowID(SDL_GetMouseFocus()) : 0u,
+      SDL_GetKeyboardFocus() != nullptr ? SDL_GetWindowID(SDL_GetKeyboardFocus()) : 0u,
+      stateX,
+      stateY,
+      static_cast<unsigned int>(buttons)
+    );
   }
 
   void FinishFrames(
@@ -462,6 +555,10 @@ namespace
     }
     if (verb == "key") {
       RunKey(words);
+    } else if (verb == "hold") {
+      RunHold(words);
+    } else if (verb == "release") {
+      RunRelease();
     } else if (verb == "text") {
       std::vector<std::string> target = words;
       SDL_Window* const window = TargetWindow(target);
@@ -557,6 +654,9 @@ namespace platform::window::test
     if (!script.active) {
       return;
     }
+    if (const unsigned int held = sHeldModifiers.load(); held != 0u) {
+      SDL_SetModState(static_cast<SDL_Keymod>(SDL_GetModState() | held));
+    }
     if (script.framesLeft > 0) {
       const Uint64 nowNs = SDL_GetTicksNS();
       if (script.lastFrameNs != 0) {
@@ -611,8 +711,62 @@ namespace platform::window::test
         (void)SDL_SetClipboardText(script.savedClipboard.c_str());
         script.clipboardSaved = false;
       }
+      RunRelease();
       gpg::Logf("TESTINPUT: done");
       script.active = false;
+    }
+  }
+
+  bool GetScriptMouseScreenPosition(
+    int& x,
+    int& y
+  )
+  {
+    if (!sScriptMouse.load(std::memory_order_relaxed) || !TheScript().active) {
+      return false;
+    }
+    SDL_Window* const window = SDL_GetMouseFocus();
+    if (window == nullptr) {
+      return false;
+    }
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    (void)SDL_GetMouseState(&mouseX, &mouseY);
+    int windowX = 0;
+    int windowY = 0;
+    if (!SDL_GetWindowPosition(window, &windowX, &windowY)) {
+      return false;
+    }
+    const float density = SDL_GetWindowPixelDensity(window);
+    const float scale = density > 0.0f ? density : 1.0f;
+    x = static_cast<int>(std::floor((static_cast<float>(windowX) + mouseX) * scale));
+    y = static_cast<int>(std::floor((static_cast<float>(windowY) + mouseY) * scale));
+    return true;
+  }
+
+  bool IsModifierHeld(
+    const int virtualKey
+  )
+  {
+    const unsigned int held = sHeldModifiers.load(std::memory_order_relaxed);
+    if (held == 0u) {
+      return false;
+    }
+    switch (virtualKey) {
+    case 0x10: // VK_SHIFT
+    case 0xA0: // VK_LSHIFT
+    case 0xA1: // VK_RSHIFT
+      return (held & SDL_KMOD_SHIFT) != 0u;
+    case 0x11: // VK_CONTROL
+    case 0xA2: // VK_LCONTROL
+    case 0xA3: // VK_RCONTROL
+      return (held & SDL_KMOD_CTRL) != 0u;
+    case 0x12: // VK_MENU
+    case 0xA4: // VK_LMENU
+    case 0xA5: // VK_RMENU
+      return (held & SDL_KMOD_ALT) != 0u;
+    default:
+      return false;
     }
   }
 

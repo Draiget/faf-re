@@ -1368,7 +1368,15 @@ namespace moho
    * publishes the command-issue helper, and enqueues it into each unit's command
    * manager. Defined in Sim.cpp.
    */
-  void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
+  /// `notifyUi` (engine addition): false skips the UI script's OnCommandIssued, for orders the engine
+  /// sends again on the player's behalf (queue editing, moho/ui/UserQueueReorder.h), which must not
+  /// trigger the script's reactions to a new order (assist copies, rebuilds, command feedback).
+  void ISSUE_Command(
+    const gpg::fastvector<UserUnit*>& units,
+    SSTICommandIssueData commandIssueData,
+    bool clearQueue,
+    bool notifyUi = true
+  );
 
   /**
    * Address: 0x008B0730 (FUN_008B0730,

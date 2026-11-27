@@ -2630,6 +2630,9 @@ namespace moho
 
   extern bool ui_TransportPreOrders;
 
+  extern bool ui_QueueReorder;
+  extern bool ui_QueueTakeFirstKeepsRest;
+
   extern int ui_CommandGraphMaxNodeUnits;
 
   extern int ui_CurveSegments;
@@ -2894,6 +2897,19 @@ namespace moho
     "ui_TransportPreOrders",
     "Enable cargo pre-orders and drop ghosts for units inside transports",
     &moho::ui_TransportPreOrders
+  );
+
+  TConVar<bool> gTConVar_ui_QueueReorder(
+    "ui_QueueReorder",
+    "Shift+Alt+right-click a queued order to do it first; Alt when dropping a dragged order on another reorders the "
+    "queue",
+    &moho::ui_QueueReorder
+  );
+
+  TConVar<bool> gTConVar_ui_QueueTakeFirstKeepsRest(
+    "ui_QueueTakeFirstKeepsRest",
+    "Doing a queued order first keeps the orders before it (1) or drops them for those units (0)",
+    &moho::ui_QueueTakeFirstKeepsRest
   );
 
   /**

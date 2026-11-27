@@ -321,6 +321,14 @@ set_target_properties(faf_transport_preorder_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME transport_preorders COMMAND faf_transport_preorder_tests)
 set_tests_properties(transport_preorders PROPERTIES LABELS "Sim")
 
+# Engine addition: queue reorder plans (doing a queued order first, dropping an order on another).
+add_executable(faf_queue_reorder_tests EXCLUDE_FROM_ALL sim/QueueReorderPlanTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/ui/QueueReorderPlan.cpp)
+target_include_directories(faf_queue_reorder_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_queue_reorder_tests PRIVATE gtest_main)
+set_target_properties(faf_queue_reorder_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME queue_reorder COMMAND faf_queue_reorder_tests)
+set_tests_properties(queue_reorder PROPERTIES LABELS "Sim")
+
 # Engine addition: water bodies filled over a height field (.plans/water-levels/PLAN.md).
 add_executable(faf_water_bodies_tests EXCLUDE_FROM_ALL sim/WaterBodiesTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp)
 target_include_directories(faf_water_bodies_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include "platform/sdl/TestInput.h"
 
 #include "gpg/gal/RenderProfiler.h"
 #include "lua/LuaIncrementalGc.h"
@@ -160,6 +161,11 @@ bool moho::MAUI_KeyIsDown(
   bool isSpecial = false;
   const int virtualKey = ShellKeyToVirtualKey(static_cast<int>(keyCode), &isSpecial);
   (void)isSpecial;
+  // Engine addition: a test run's `hold` step (platform/sdl/TestInput.h) holds Shift, Ctrl or Alt
+  // without the desktop's keyboard or foreground window.
+  if (platform::window::test::IsModifierHeld(virtualKey)) {
+    return true;
+  }
   // Engine change: the same answer with the costly check last. GetForegroundWindow enters the kernel,
   // the world view asks for Shift each frame, and the key is rarely down.
   return ::GetKeyState(virtualKey) < 0 && gpg::gal::WindowIsForeground();

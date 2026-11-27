@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include "moho/ui/UserQueueReorder.h"
 #include <utility>
 
 namespace
@@ -337,8 +338,20 @@ void moho::UICommandDragger::DragRelease(
 )
 {
   const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
-  const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
-  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, true);
+
+  // Engine addition (`ui_QueueReorder`): Alt held when the order is dropped on another order node
+  // reorders the queue instead of moving the order (moho/ui/UserQueueReorder.h). The drag preview
+  // goes back to the order's own position, as when a drag is cancelled.
+  const bool altHeld = (std::to_underlying(eventData->mModifiers) & moho::MEM_Alt) != 0u;
+  if (
+    altHeld &&
+    moho::QUEUE_DropCommandOnNode(*mSession, *mGraph, mCam->CameraGetView(), mousePos.x, mousePos.y, mCommandId)
+  ) {
+    moho::ReanchorCommandGraphDrawNode(*mGraph, mCommandId);
+  } else {
+    const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
+    moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, true);
+  }
   func_OnCommandDragEnd(const_cast<moho::SMauiEventData*>(eventData), mCommandId, mSession->mState);
   delete this;
 }

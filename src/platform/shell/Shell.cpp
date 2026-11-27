@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "platform/Window.h"
+#include "platform/sdl/TestInput.h"
 
 #include "platform/shell/app.h"
 #include "platform/shell/dc.h"
@@ -1090,6 +1091,12 @@ const wchar_t* kShellFrameName = L"frame";
 
 ShellPoint ShellGetMousePosition()
 {
+  // Engine addition: a test script's mouse steps (platform/sdl/TestInput.h) own the cursor.
+  int scriptX = 0;
+  int scriptY = 0;
+  if (platform::window::test::GetScriptMouseScreenPosition(scriptX, scriptY)) {
+    return ShellPoint(scriptX, scriptY);
+  }
   POINT point{};
   (void)::GetCursorPos(&point);
   return ShellPoint(point.x, point.y);

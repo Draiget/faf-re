@@ -173,6 +173,80 @@ do
     end
 end
 
+-- Queue editing from the game view (ui_QueueReorder, ui_QueueTakeFirstKeepsRest): client-only,
+-- sent as ordinary orders. Older executables have neither command, so neither option is shown.
+do
+    local function Supported(command)
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function Toggle(command, key, title, tip)
+        return {
+            title = title,
+            key = key,
+            type = 'toggle',
+            default = 1,
+            tip = tip,
+            set = function(key, value, startup)
+                -- A missing or malformed preference takes the default (on).
+                if value ~= 0 and value ~= 1 then
+                    value = 1
+                end
+                ConExecute(command .. " " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = "<LOC _On>", key = 1 },
+                    { text = "<LOC _Off>", key = 0 },
+                },
+            },
+        }
+    end
+
+    local gameplay = options and options.gameplay
+    if gameplay and gameplay.items then
+        local entries = {}
+        if Supported('ui_QueueReorder') and not HasOptionKey(gameplay.items, 'queue_reorder') then
+            table.insert(entries, Toggle('ui_QueueReorder', 'queue_reorder', "Queue Editing",
+                "Hold Shift and Alt and right-click a queued order to make the selected units do it first. " ..
+                "Hold Alt when you drop a dragged order on another one to move it there in the queue. " ..
+                "Off while Alt forces attack-move."))
+        end
+        if Supported('ui_QueueTakeFirstKeepsRest') and not HasOptionKey(gameplay.items, 'queue_take_first_keeps_rest') then
+            table.insert(entries, Toggle('ui_QueueTakeFirstKeepsRest', 'queue_take_first_keeps_rest',
+                "Queue Editing: Keep Earlier Orders",
+                "On: an order done first goes to the front and the units keep the orders that were before it. " ..
+                "Off: those units drop the orders that were before it."))
+        end
+
+        local position = table.getn(gameplay.items) + 1
+        for index, item in ipairs(gameplay.items) do
+            if item.key == 'transport_preorders' or item.key == 'assist_to_upgrade' then
+                position = index + 1
+                if item.key == 'transport_preorders' then
+                    break
+                end
+            end
+        end
+        for offset, entry in ipairs(entries) do
+            table.insert(gameplay.items, position + offset - 1, entry)
+        end
+    end
+end
+
 
 -- Local rendering only. Older executables must neither show this option nor
 -- receive an unknown command when preferences are applied at startup.

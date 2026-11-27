@@ -744,7 +744,8 @@ namespace moho
   void ISSUE_Command(
     const gpg::fastvector<UserUnit*>& units,
     SSTICommandIssueData data,
-    const bool clearQueue
+    const bool clearQueue,
+    const bool notifyUi
   )
   {
     CWldSession* const session = WLD_GetActiveSession();
@@ -862,7 +863,9 @@ namespace moho
       }
 
       if (!attachedUnits.empty() && simUnits.empty()) {
-        UI_OnCommandIssued(units, data, clearQueue);
+        if (notifyUi) {
+          UI_OnCommandIssued(units, data, clearQueue);
+        }
         session->DirtyCommandGraph();
         return;
       }
@@ -939,7 +942,9 @@ namespace moho
       UserUnitManagerAdd(unitManager, commandHelper, issueBeat, data.mIndex);
     }
 
-    UI_OnCommandIssued(units, data, clearQueue);
+    if (notifyUi) {
+      UI_OnCommandIssued(units, data, clearQueue);
+    }
     session->DirtyCommandGraph();
   }
 } // namespace moho

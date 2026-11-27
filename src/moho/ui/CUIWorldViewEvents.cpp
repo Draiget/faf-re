@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include "moho/ui/UserQueueReorder.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -3464,6 +3465,27 @@ bool moho::CUIWorldView::HandleEvent(
   if (eventData.mEventType == MET_ButtonRelease && eventData.mKeyCode == kPostDraggerRightButton) {
     const bool overHoveredCommand = HasHoveredCommand(cursorInfo);
     const auto modifiers = std::to_underlying(eventData.mModifiers);
+
+    // Engine addition (`ui_QueueReorder`): Shift+Alt right-release on an order node makes the
+    // selected units do that order first. Sent as ordinary queue edits (moho/ui/UserQueueReorder.h).
+    // The click is taken even when nothing applies, so it never turns into retail's queued move;
+    // a short note says nothing moved.
+    if (
+      overHoveredCommand && (modifiers & MEM_Shift) != 0u && (modifiers & MEM_Alt) != 0u &&
+      (modifiers & MEM_Ctrl) == 0u && QUEUE_IsQueueOrder(*mWldSession, cursorInfo.mIsDragger)
+    ) {
+      if (!QUEUE_TakeCommandFirst(*mWldSession, cursorInfo.mIsDragger)) {
+        UI_StartCursorText(
+          ToHintBannerPos(cursorInfo.mMouseScreenPos),
+          "Nothing to move first: this order stays where it is",
+          kHintBannerDefaultColor,
+          2.0f,
+          false
+        );
+      }
+      ClearPendingDragFormation(*mWldSession);
+      return false;
+    }
 
     if (
       overHoveredCommand && (modifiers & MEM_Shift) != 0u && (modifiers & MEM_Ctrl) != 0u && !mWldSession->IsObserver()

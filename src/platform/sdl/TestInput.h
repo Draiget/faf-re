@@ -18,6 +18,14 @@ namespace platform::window::test
   // Runs the steps that are due. Once a frame, on the main thread.
   void Tick();
 
+  // While a running script has moved the mouse: the script's cursor in desktop pixels, for the
+  // places that ask the desktop for the cursor. False otherwise. Main thread.
+  [[nodiscard]] bool GetScriptMouseScreenPosition(int& x, int& y);
+
+  // True while a `hold` step holds the modifier a Windows virtual-key code names (shift, control,
+  // menu/alt, either side). Main thread.
+  [[nodiscard]] bool IsModifierHeld(int virtualKey);
+
   // A line the engine logged, for `waitlog` steps. Any thread.
   void NoteLogLine(const char* utf8Line);
 } // namespace platform::window::test

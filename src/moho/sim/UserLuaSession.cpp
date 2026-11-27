@@ -1,3 +1,4 @@
+#include "moho/ui/UserQueueReorder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/sim/UserLuaPrivate.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
@@ -2428,6 +2429,8 @@ namespace
       (void)::moho::func_GetArmiesTable_LuaFuncDef();
       (void)::moho::func_GetArmyScore_LuaFuncDef();
       (void)::moho::func_DeleteCommand_LuaFuncDef();
+      (void)::moho::func_QueueTakeFirst_LuaFuncDef();
+      (void)::moho::func_QueueMoveCommand_LuaFuncDef();
       (void)::moho::func_GetSpecialFiles_LuaFuncDef();
       (void)::moho::func_GetSpecialFilePath_LuaFuncDef();
       (void)::moho::func_GetSpecialFolder_LuaFuncDef();

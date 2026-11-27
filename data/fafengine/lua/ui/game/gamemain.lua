@@ -68,9 +68,38 @@ local function OnHologramBeat()
     end
 end
 
+-- Queue editing (ui_QueueReorder) uses Shift+Alt+right-click on an order and Alt at an order's drop.
+-- With FAF's "hold Alt to force attack-move" option on, Alt belongs to that order, so queue editing
+-- stays off for the game.
+local function QueueReorderYieldsAlt()
+    local ok, options = pcall(function()
+        return import('/lua/user/prefs.lua').GetFieldFromCurrentProfile('options')
+    end)
+    if not ok or type(options) ~= 'table' then
+        return
+    end
+    local kind = type(ConTextMatches)
+    if kind ~= 'function' and kind ~= 'cfunction' then
+        return
+    end
+    local found, matches = pcall(ConTextMatches, 'ui_QueueReorder')
+    if not found or type(matches) ~= 'table' or table.getn(matches) == 0 then
+        return
+    end
+    if options.alt_to_force_attack_move == 'On' then
+        ConExecute('ui_QueueReorder 0')
+        LOG('Queue editing is off: Alt forces attack-move in this profile')
+    else
+        -- The switch lasts for the process: a game after the Alt option went off follows the queue
+        -- editing option again.
+        ConExecute('ui_QueueReorder ' .. ((options.queue_reorder == 0) and '0' or '1'))
+    end
+end
+
 local oldCreateUI = CreateUI
 function CreateUI(isReplay)
     if oldCreateUI then oldCreateUI(isReplay) end
+    QueueReorderYieldsAlt()
     if AddBeatFunction then
         AddBeatFunction(OnHologramBeat)
     elseif rawget(_G, 'AddBeatFunction') then

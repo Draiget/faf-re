@@ -1033,7 +1033,26 @@ namespace moho
     [[nodiscard]] CmdId
     ResolveCursorHighlightCommandId(const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos) const;
 
+    /**
+     * Engine addition (`ui_QueueReorder`): the order node a dragged order is dropped on - the
+     * nearest node within the same pick tolerance `ResolveCursorHighlightCommandId` uses, leaving
+     * out `draggedCommandId`, whose node follows the cursor while it is dragged. -1 when none.
+     */
+    [[nodiscard]] CmdId ResolveDropTargetCommandId(
+      const GeomCamera3& camera,
+      const Wm3::Vector2f& cursorScreenPos,
+      CmdId draggedCommandId
+    ) const;
+
   private:
+    /// Engine addition (`ui_QueueReorder`): the per-node pick test both picks above share.
+    [[nodiscard]] static bool HitTestOrderNode(
+      const GeomCamera3& camera,
+      const UICommandGraphDrawNode& drawNode,
+      const Wm3::Vector2f& cursorScreenPos,
+      float& outScaledDistance
+    );
+
     std::uint8_t mNeedsRebuild; // +0x0000
     /// Engine addition (`ui_TransportPreOrders`), in the binary's padding: 1 on the graph built with
     /// `PreOrdersOnlyTag`.
