@@ -82,7 +82,9 @@ function Tabs(parent, entries, onPick)
         LayoutHelpers.AtVerticalCenterIn(tab.label, tab)
         tab.count.Left:Set(function() return tab.label.Right() + Scale(8) end)
         LayoutHelpers.AtVerticalCenterIn(tab.count, tab)
-        tab.Width:Set(function() return tab.count.Right() - tab.Left() end)
+        -- The tab ends where its text ends: at the label, or at the count when there is one (Set re-points it), so the
+        -- underline sits under the text and not under the count's empty slot.
+        tab.Width:Set(function() return tab.label.Right() - tab.Left() end)
         tab.Top:Set(tabs.Top)
         tab.Bottom:Set(tabs.Bottom)
         tab.Height:Set(function() return tab.Bottom() - tab.Top() end)
@@ -126,7 +128,14 @@ function Tabs(parent, entries, onPick)
     tabs.Set = function(self, chosen, counts)
         self.chosen = chosen
         for _, tab in self.items do
-            Theme.SetText(tab.count, counts[tab.key] and tostring(counts[tab.key]) or '')
+            local count = counts[tab.key] and tostring(counts[tab.key]) or ''
+            Theme.SetText(tab.count, count)
+            local this = tab
+            if count ~= '' then
+                tab.Width:Set(function() return this.count.Right() - this.Left() end)
+            else
+                tab.Width:Set(function() return this.label.Right() - this.Left() end)
+            end
         end
         self:Paint()
     end
