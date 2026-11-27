@@ -217,6 +217,25 @@ function Logo(parent, width, color)
     return logo
 end
 
+-- The game's emblem: a hexagon in three pieces (its roof, and two lower walls with gaps between) around a shield (a
+-- roof over a hollow V), filled shapes on a 110 x 100 grid, traced from the project's icon.
+local kEmblem = '<polygon fill="currentColor" stroke="none" points="55,5 100,31 100,46 55,20 10,46 10,31"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="10,51 25,59 25,69 48,82 48,96 10,74"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="100,51 85,59 85,69 62,82 62,96 100,74"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="55,34 76,46 76,50 62,50 55,46 48,50 34,50 34,46"/>' ..
+    '<polygon fill="currentColor" stroke="none" points="36,52 48,52 55,59 62,52 74,52 55,74"/>'
+
+--- The game's emblem, `size` units wide (and 100/110 of that high), in `color`; a hexagon drawn as a square when this
+--- build can't draw pictures.
+function Emblem(parent, size, color)
+    local px = Scale(size)
+    local emblem = Bitmap(parent)
+    emblem:DisableHitTest()
+    local path = rawget(_G, 'FafUi_Icon') and FafUi_Icon(kEmblem, px, color or Colors.accent, 1, 110) or nil
+    Picture(emblem, path, px, color or Colors.accent)
+    return emblem
+end
+
 --- A filled circle, `size` units across. :SetDotColor(color) changes it.
 function Dot(parent, size, color)
     local px = Scale(size)

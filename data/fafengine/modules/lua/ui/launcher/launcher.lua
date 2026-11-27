@@ -2413,14 +2413,22 @@ local function BuildRail(launcher, body)
     edge.Height:Set(function() return edge.Bottom() - edge.Top() end)
     edge:DisableHitTest()
 
-    local brand = Theme.Logo(rail, 92, C.accent)
-    LayoutHelpers.AtLeftTopIn(brand, rail, 22, 20)
-    local subtitle = Theme.Text(rail, 'Forged Alliance Forever', 12, C.muted)
-    subtitle.Left:Set(function() return rail.Left() + Scale(24) end)
-    subtitle.Top:Set(function() return brand:LogoBottom() + Scale(8) end)
+    -- The emblem, and the game's name under it: "Supreme Commander:" over "Forged Alliance" in the title font, then
+    -- what this is and the game version.
+    local brand = Theme.Emblem(rail, 52, C.accent)
+    LayoutHelpers.AtLeftTopIn(brand, rail, 24, 20)
+    local nameTop = Theme.Text(rail, 'Supreme Commander:', 12, C.muted)
+    nameTop.Left:Set(function() return rail.Left() + Scale(24) end)
+    nameTop.Top:Set(function() return brand.Bottom() + Scale(8) end)
+    local name = Theme.Title(rail, 'Forged Alliance', 14, C.text)
+    name.Left:Set(nameTop.Left)
+    name.Top:Set(function() return nameTop.Bottom() + Scale(2) end)
     local versionOk, version = pcall(function() return import('/lua/version.lua').GetVersion() end)
+    local subtitle = Theme.Text(rail, 'Reconstructed Engine', 12, C.accent)
+    subtitle.Left:Set(nameTop.Left)
+    subtitle.Top:Set(function() return name.Bottom() + Scale(4) end)
     local versionText = Theme.Text(rail, 'Game version ' .. (versionOk and tostring(version) or '?'), 11, C.subtle)
-    versionText.Left:Set(subtitle.Left)
+    versionText.Left:Set(nameTop.Left)
     versionText.Top:Set(function() return subtitle.Bottom() + Scale(2) end)
 
     local entries = {
@@ -2439,7 +2447,7 @@ local function BuildRail(launcher, body)
         { 'logout', 'Exit', function() launcher:Exit() end },
     }
     launcher.navItems = {}
-    local top = 112
+    local top = 178 -- under the emblem and the name
     for _, entry in entries do
         if type(entry) == 'string' then
             local caption = Theme.Caption(rail, entry)
