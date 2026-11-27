@@ -193,6 +193,55 @@ int moho::cfunc_CUIWorldViewProjectMultipleL(
   return 1;
 }
 
+// --- Engine addition (`ui_TransportPreOrders`): WorldView:IsInView(position). No `Address:`.
+// `Project` divides by the point's depth, so a point behind the camera lands mirrored on the
+// screen; the hologram click uses this to skip points outside the camera's view volume, with the
+// same unit-sized sphere as the band-box hologram test.
+
+namespace
+{
+  constexpr const char* kCUIWorldViewIsInViewHelpText = "WorldView:IsInView(position)";
+}
+
+int moho::cfunc_CUIWorldViewIsInView(
+  lua_State* const luaContext
+)
+{
+  return cfunc_CUIWorldViewIsInViewL(ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_CUIWorldViewIsInView_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "IsInView",
+    &moho::cfunc_CUIWorldViewIsInView,
+    &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+    "CUIWorldView",
+    kCUIWorldViewIsInViewHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_CUIWorldViewIsInViewL(
+  LuaPlus::LuaState* const state
+)
+{
+  moho::SCR_ExpectExactArgs(state, 2, kCUIWorldViewIsInViewHelpText);
+
+  const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
+  moho::CameraImpl* const camera = worldView != nullptr ? worldView->GetCamera() : nullptr;
+  bool inView = false;
+  if (camera != nullptr) {
+    const LuaPlus::LuaObject worldPointObject(LuaPlus::LuaStackObject(state, 2));
+    const Wm3::Vector3f worldPoint = SCR_FromLuaCopy<Wm3::Vector3f>(worldPointObject);
+    inView = camera->CameraGetView().solid2.Intersects(Wm3::Sphere3f(worldPoint, 1.0f));
+  }
+  lua_pushboolean(state->m_state, inView ? 1 : 0);
+  return 1;
+}
+
 /**
  * Address: 0x00822FA0 (FUN_00822FA0, ??0UIBuildDragger@Moho@@QAE@@Z)
  *

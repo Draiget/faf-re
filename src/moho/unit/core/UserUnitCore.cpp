@@ -823,6 +823,7 @@ UserUnit::UserUnit(
 UserUnit::~UserUnit()
 {
   ClearTransportPreOrders();
+  ClearSelectionBracketPositionOverride();
 
   UserEntity* const entityView = this;
   UserArmy* const army = this->mArmy;

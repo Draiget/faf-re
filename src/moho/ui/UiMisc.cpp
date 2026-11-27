@@ -2436,6 +2436,7 @@ namespace
       // registration sequence -- see cfunc_CUIWorldViewSetCustomRender.
       (void)::moho::func_CUIWorldViewSetCustomRender_LuaFuncDef();
       (void)::moho::func_CUIWorldViewProjectMultiple_LuaFuncDef();
+      (void)::moho::func_CUIWorldViewIsInView_LuaFuncDef(); // engine addition: ui_TransportPreOrders
       (void)::moho::func_CMauiBitmapSetColorMask_LuaFuncDef();
       (void)::moho::func_CMauiControlGetName_LuaFuncDef();
       (void)::moho::func_CMauiControlSetName_LuaFuncDef();

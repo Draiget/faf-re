@@ -417,6 +417,11 @@ namespace moho
   {
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
 
+    // Engine addition (`ui_TransportPreOrders`): pre-order state is keyed by entity ids, which the
+    // next game hands out again, and the pre-order graph and its ghost meshes point at this session.
+    UserUnit::ClearAllTransportPreOrderState();
+    ReleasePreOrderGraph();
+
     // 0x00893A88..0x00893A99: viewport-owned border meshes borrow the
     // session's blueprints and must be retired before any session owners.
     if (ren_Viewport != nullptr) {

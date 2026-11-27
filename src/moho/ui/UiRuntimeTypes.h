@@ -5138,6 +5138,17 @@ namespace moho
   int cfunc_CUIWorldViewProjectMultipleL(LuaPlus::LuaState* state);
 
   /**
+   * Engine addition (`ui_TransportPreOrders`), no `Address:`.
+   *
+   * What it does:
+   * `WorldView:IsInView(position)`: true when a unit-sized sphere at the point touches the
+   * camera's view volume; false for points behind the camera, which `Project` mirrors.
+   */
+  int cfunc_CUIWorldViewIsInView(lua_State* luaContext);
+  CScrLuaInitForm* func_CUIWorldViewIsInView_LuaFuncDef();
+  int cfunc_CUIWorldViewIsInViewL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00788B90 (FUN_00788B90, cfunc_CMauiControlGetName)
    *
    * What it does:

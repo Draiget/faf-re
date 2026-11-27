@@ -370,8 +370,10 @@ function TransportHolograms:HandleWorldClick(view, event)
     local bestHolo = nil
     local bestDistSq = 1600 -- 40 pixels radius squared
 
+    -- Project mirrors a point behind the camera onto the screen; IsInView skips it.
+    local isInView = view.IsInView
     for _, holo in pairs(self._activeHolograms) do
-        if holo.position then
+        if holo.position and (not isInView or isInView(view, holo.position)) then
             local ok, screenPos = pcall(view.Project, view, holo.position)
             if ok and screenPos and screenPos[1] and screenPos[2] then
                 local sx = screenPos[1]
