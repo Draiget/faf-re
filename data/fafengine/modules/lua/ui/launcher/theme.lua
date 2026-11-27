@@ -577,6 +577,7 @@ function Choice(parent, label, width, onPick)
     LayoutHelpers.AtCenterIn(text, choice)
     choice.selected = false
     choice.enabled = true
+    choice.onPick = onPick -- what a click runs (the launcher's test walk picks with it)
     choice.Paint = function(self, over)
         if self.selected then
             self:SetColors(Colors.selected, Colors.accent)
@@ -591,6 +592,12 @@ function Choice(parent, label, width, onPick)
     end
     HitArea(choice, function(self, event)
         if not choice.enabled then
+            -- A greyed choice can still say why (onDisabledHover(true) on enter, (false) on exit).
+            if choice.onDisabledHover and event.Type == 'MouseEnter' then
+                choice.onDisabledHover(true)
+            elseif choice.onDisabledHover and event.Type == 'MouseExit' then
+                choice.onDisabledHover(false)
+            end
             return false
         end
         if event.Type == 'MouseEnter' then

@@ -953,6 +953,51 @@ TEST(
   EXPECT_FALSE(platform::process::Run(missing, {}, std::chrono::seconds(5)));
 }
 
+// The game starting itself again on another featured mod: its own path and switches, and a start that doesn't wait.
+TEST(
+  OnlinePlatformProcess,
+  StartsAProgramWithoutWaitingAndKnowsItsOwnPath
+)
+{
+  const auto self = platform::process::CurrentProgram();
+  ASSERT_TRUE(self) << self.error();
+  EXPECT_TRUE(std::filesystem::exists(*self)) << *self;
+  EXPECT_NE(std::filesystem::path(*self).filename().string().find("faf_online_tests"), std::string::npos) << *self;
+  for (const std::string& argument : platform::process::CurrentArgs()) {
+    EXPECT_NE(argument, *self); // the program itself isn't among its arguments
+  }
+
+  const std::filesystem::path marker =
+    std::filesystem::temp_directory_path() / ("faf-online-start-" + std::to_string(std::rand()) + ".txt");
+  std::error_code ignored;
+  std::filesystem::remove(marker, ignored);
+#if FAFRE_PLATFORM_WINDOWS
+  const char* const comspec = std::getenv("ComSpec");
+  const std::string shell = comspec != nullptr ? comspec : "C:\\Windows\\System32\\cmd.exe";
+  // cmd takes the rest of its line as it is: no quotes around the path (the temp folder has no spaces on the runners).
+  const std::vector<std::string> write{"/c", "ping -n 2 127.0.0.1 >nul & echo started>" + marker.string()};
+  const std::string missing = "C:\\no\\such\\program.exe";
+#else
+  const std::string shell = "/bin/sh";
+  const std::vector<std::string> write{"-c", "sleep 1; echo started > '" + marker.string() + "'"};
+  const std::string missing = "/no/such/program";
+#endif
+  const auto began = std::chrono::steady_clock::now();
+  const auto started = platform::process::Start(shell, write);
+  ASSERT_TRUE(started) << started.error();
+  // Back before the program's one-second pause is over: it didn't wait.
+  EXPECT_LT(std::chrono::steady_clock::now() - began, std::chrono::milliseconds(800));
+  bool written = false;
+  for (int i = 0; i < 100 && !written; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    written = std::filesystem::exists(marker);
+  }
+  EXPECT_TRUE(written) << marker.string();
+  std::this_thread::sleep_for(std::chrono::milliseconds(200)); // the shell finishes its write
+  std::filesystem::remove(marker, ignored);
+  EXPECT_FALSE(platform::process::Start(missing, {}));
+}
+
 namespace
 {
   template <class Done>

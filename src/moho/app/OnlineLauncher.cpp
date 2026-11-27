@@ -711,8 +711,8 @@ namespace
     }
     if (!featuredMod.empty() && Lower(featuredMod) != loaded) {
       return std::unexpected(
-        "this needs FAF's " + featuredMod + " files; the game runs " + loaded + ". Start it with /init init_" +
-        Lower(featuredMod) + ".lua"
+        "this needs FAF's " + featuredMod + " files; the game runs " + loaded +
+        " (the launcher starts the game again on them)"
       );
     }
     return {};
@@ -957,6 +957,221 @@ namespace
 
   void PushResult(lua_State* L, const std::expected<void, std::string>& result);
 
+  /** The switch a restart on another featured mod adds, so the new start takes up what the launcher was doing. */
+  constexpr const char* kResumeArg = "/fafre_resume";
+
+  /** What the launcher was doing when it restarted the game (DataFolder, next to the sign-in). */
+  std::filesystem::path ResumeFile()
+  {
+    return DataFolder() / "resume.json";
+  }
+
+  /** The init file of `featuredMod` next to the one this game runs on, where FAF's client keeps them. */
+  std::filesystem::path FeaturedModInit(
+    const Service& s,
+    const std::string& featuredMod
+  )
+  {
+    return std::filesystem::path(s.realInit).parent_path() / ("init_" + Lower(featuredMod) + ".lua");
+  }
+
+  /**
+   * Whether the game can play on `featuredMod`: the one it runs on now, or one whose init file sits next to it, which
+   * a restart loads (FAF's client writes it the first time it starts a game on that featured mod).
+   */
+  std::expected<void, std::string> FeaturedModFiles(
+    const Service& s,
+    const std::string& featuredMod
+  )
+  {
+    const std::string mod = Lower(featuredMod);
+    if (mod.empty() || mod.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_") != std::string::npos) {
+      return std::unexpected("not a featured mod: " + featuredMod);
+    }
+    const std::string loaded = LoadedFeaturedMod(s);
+    if (loaded.empty()) {
+      return std::unexpected(std::string("this game wasn't started on FAF's game files (/init init_faf.lua)"));
+    }
+    if (mod == loaded) {
+      return {};
+    }
+    std::error_code missing;
+    if (!std::filesystem::exists(FeaturedModInit(s, mod), missing)) {
+      return std::unexpected(
+        std::string(
+          "its game files aren't on this computer yet (FAF's client gets them the first time it starts a "
+          "game on it)"
+        )
+      );
+    }
+    return {};
+  }
+
+  /** ok, why = FafOnline_FeaturedModFiles(mod): whether the game can play on that featured mod (a restart, or none). */
+  int FeaturedModFilesBody(
+    lua_State* const L
+  )
+  {
+    const std::string mod = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    PushResult(L, FeaturedModFiles(TheService(), mod));
+    return 2;
+  }
+
+  /**
+   * ok, why = FafOnline_RestartOn(mod, action): starts the game again on `mod`'s files, with what the launcher does
+   * next (`action`: its string, number and boolean fields, such as a host request) kept for the new start; the
+   * launcher then quits this one. Until the game swaps its files while running (plan WP8), this is how it changes
+   * featured mod.
+   */
+  int RestartOnBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string mod = lua_isstring(L, 1) ? Lower(lua_tostring(L, 1)) : std::string();
+    if (!lua_istable(L, 2)) {
+      PushResult(L, std::unexpected(std::string("FafOnline_RestartOn takes the featured mod and a table")));
+      return 2;
+    }
+    if (const auto files = FeaturedModFiles(s, mod); !files) {
+      PushResult(L, files);
+      return 2;
+    }
+    if (s.match != MatchState::Idle && s.match != MatchState::Failed) {
+      PushResult(L, std::unexpected(std::string("a match is starting or running")));
+      return 2;
+    }
+    std::vector<std::pair<std::string, JsonNode>> fields;
+    lua_pushnil(L);
+    while (lua_next(L, 2) != 0) {
+      if (lua_type(L, -2) == LUA_TSTRING) { // a number key would be turned into a string in place and break lua_next
+        const std::string key = lua_tostring(L, -2);
+        switch (lua_type(L, -1)) {
+        case LUA_TSTRING:
+          fields.emplace_back(key, JsonString(lua_tostring(L, -1)));
+          break;
+        case LUA_TNUMBER:
+          fields.emplace_back(key, JsonNumber(lua_tonumber(L, -1)));
+          break;
+        case LUA_TBOOLEAN:
+          fields.emplace_back(key, JsonBool(lua_toboolean(L, -1) != 0));
+          break;
+        default:
+          break;
+        }
+      }
+      lua_pop(L, 1);
+    }
+    const double written = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const std::string text = ToJson(JsonObject({
+      {"mod", JsonString(mod)},
+      {"written", JsonNumber(written)},
+      {"action", JsonObject(std::move(fields))},
+    }));
+    {
+      std::ofstream out(ResumeFile(), std::ios::binary | std::ios::trunc);
+      out << text;
+      if (!out) {
+        PushResult(L, std::unexpected("can't write " + ResumeFile().string()));
+        return 2;
+      }
+    }
+    const auto program = platform::process::CurrentProgram();
+    if (!program) {
+      std::error_code ignored;
+      std::filesystem::remove(ResumeFile(), ignored);
+      PushResult(L, std::unexpected(program.error()));
+      return 2;
+    }
+    // The same switches, with the other init file, and the resume switch once.
+    std::vector<std::string> args;
+    const std::vector<std::string> current = platform::process::CurrentArgs();
+    for (std::size_t i = 0; i < current.size(); ++i) {
+      const std::string name = Lower(current[i]);
+      if (name == "/init") {
+        ++i; // and its file
+      } else if (name == "/log" && i + 1 < current.size()) {
+        // Its own log beside this one's (game.log -> game.fafdevelop.log): the same file would be emptied.
+        std::filesystem::path log = current[++i];
+        log.replace_extension("." + mod + log.extension().string());
+        args.push_back(current[i - 1]);
+        args.push_back(log.string());
+      } else if (name != kResumeArg) {
+        args.push_back(current[i]);
+      }
+    }
+    const std::string init = FeaturedModInit(s, mod).string();
+    args.push_back("/init");
+    args.push_back(init);
+    args.push_back(kResumeArg);
+    LogLine(("starting the game again on " + mod + "'s files (" + init + ")").c_str());
+    if (const auto started = platform::process::Start(*program, args); !started) {
+      std::error_code ignored;
+      std::filesystem::remove(ResumeFile(), ignored);
+      PushResult(L, started);
+      return 2;
+    }
+    PushResult(L, {});
+    return 2;
+  }
+
+  /**
+   * table|nil FafOnline_TakeResume(): what the launcher was doing when it started this game again on its featured
+   * mod (RestartOn), once: the file goes. Nothing on a start without /fafre_resume, for another featured mod, or
+   * from more than 5 minutes ago.
+   */
+  int TakeResumeBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    // Once per start: the launcher is made again after each match, with nothing left to resume.
+    static bool taken = false;
+    if (taken || !moho::CFG_GetArgOption(kResumeArg, 0, nullptr)) {
+      lua_pushnil(L);
+      return 1;
+    }
+    taken = true;
+    std::string text;
+    {
+      std::ifstream in(ResumeFile(), std::ios::binary);
+      text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    std::error_code ignored;
+    std::filesystem::remove(ResumeFile(), ignored);
+    const auto resume = ParseJson(text);
+    const double now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const JsonNode* const action = resume ? resume->Get("action") : nullptr;
+    if (!resume || action == nullptr || action->kind != JsonNode::Kind::Object) {
+      LogLine("started to resume, but there is nothing to resume");
+      lua_pushnil(L);
+      return 1;
+    }
+    if (resume->String("mod") != LoadedFeaturedMod(s) || now - resume->Number("written") > 300.0) {
+      LogLine(("a resume for " + resume->String("mod") + " doesn't fit this start; dropped").c_str());
+      lua_pushnil(L);
+      return 1;
+    }
+    lua_newtable(L);
+    for (const auto& [key, value] : action->members) {
+      switch (value.kind) {
+      case JsonNode::Kind::String:
+        SetField(L, key.c_str(), value.text);
+        break;
+      case JsonNode::Kind::Number:
+        SetField(L, key.c_str(), value.number);
+        break;
+      case JsonNode::Kind::Bool:
+        SetBool(L, key.c_str(), value.boolean);
+        break;
+      default:
+        break;
+      }
+    }
+    LogLine(("resuming on " + resume->String("mod") + ": " + action->String("kind")).c_str());
+    return 1;
+  }
+
   const char* ControlStateName(
     const ControlServiceClient::State state
   )
@@ -1181,6 +1396,31 @@ namespace
       "<global>",
       "FafOnline_OpenSignInPage() - hands FAF's sign-in page to the browser (again)."
     );
+    static CScrLuaBinder featuredModFiles(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_FeaturedModFiles",
+      &Binding<&FeaturedModFilesBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_FeaturedModFiles(mod) - whether the game can play on that featured mod (with a restart)."
+    );
+    static CScrLuaBinder restartOn(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_RestartOn",
+      &Binding<&RestartOnBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_RestartOn(mod, action) - starts the game again on that featured mod's files, with "
+      "the action for the new start; quit this one after."
+    );
+    static CScrLuaBinder takeResume(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_TakeResume",
+      &Binding<&TakeResumeBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_TakeResume() - what to do after a restart on another featured mod (once), or nil."
+    );
     static CScrLuaBinder retryLobby(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_RetryLobby",
@@ -1373,6 +1613,9 @@ void moho::ONLINE_Frame()
       FafHostRequest request;
       request.title = "faf-re in-game launcher test";
       request.mapname = s.autotestMap;
+      if (const std::string loaded = LoadedFeaturedMod(s); !loaded.empty()) {
+        request.featuredMod = loaded; // on the featured mod this test client runs
+      }
       const auto sent = s.lobby.HostGame(request);
       LogLine(sent ? "autotest: game_host sent" : ("autotest: game_host failed: " + sent.error()).c_str());
       s.autotestStep = 1;

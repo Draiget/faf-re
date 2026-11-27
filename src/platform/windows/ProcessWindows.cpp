@@ -28,6 +28,22 @@ namespace platform::process
       return out;
     }
 
+    std::string Narrow(
+      const std::wstring& text
+    )
+    {
+      if (text.empty()) {
+        return {};
+      }
+      const int count =
+        ::WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+      std::string out(static_cast<std::size_t>(count), '\0');
+      (void)::WideCharToMultiByte(
+        CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count, nullptr, nullptr
+      );
+      return out;
+    }
+
     /** One argument as CommandLineToArgvW reads it back: quoted when needed, backslashes before quotes doubled. */
     void AppendQuoted(
       std::wstring& line,
@@ -148,6 +164,62 @@ namespace platform::process
       }
       return std::unexpected("Windows didn't open the browser (error " + std::to_string(error) + ")");
     }
+    return {};
+  }
+
+  std::expected<std::string, std::string> CurrentProgram()
+  {
+    std::wstring path(MAX_PATH, L'\0');
+    for (;;) {
+      const DWORD length = ::GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+      if (length == 0) {
+        return std::unexpected("no path for the running program (error " + std::to_string(::GetLastError()) + ")");
+      }
+      if (length < path.size()) {
+        path.resize(length);
+        return Narrow(path);
+      }
+      path.resize(path.size() * 2); // cut short: a longer buffer
+    }
+  }
+
+  std::vector<std::string> CurrentArgs()
+  {
+    std::vector<std::string> args;
+    int count = 0;
+    LPWSTR* const list = ::CommandLineToArgvW(::GetCommandLineW(), &count);
+    if (list == nullptr) {
+      return args;
+    }
+    for (int i = 1; i < count; ++i) {
+      args.push_back(Narrow(list[i]));
+    }
+    ::LocalFree(list);
+    return args;
+  }
+
+  std::expected<void, std::string> Start(
+    const std::string& program,
+    const std::vector<std::string>& args
+  )
+  {
+    const std::wstring wideProgram = Widen(program);
+    std::wstring line;
+    AppendQuoted(line, wideProgram);
+    for (const std::string& argument : args) {
+      line += L' ';
+      AppendQuoted(line, Widen(argument));
+    }
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION info{};
+    if (!::CreateProcessW(
+          wideProgram.c_str(), line.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &info
+        )) {
+      return std::unexpected("couldn't start " + program + " (error " + std::to_string(::GetLastError()) + ")");
+    }
+    ::CloseHandle(info.hThread);
+    ::CloseHandle(info.hProcess);
     return {};
   }
 

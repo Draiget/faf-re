@@ -34,6 +34,8 @@ local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
 local current = false
+-- What a restart on another featured mod took up in this start ('host true', 'join'), for the test walk.
+resumedThisStart = false
 -- On FAF's main menu opened from the launcher: its button back to the launcher.
 local fafMenuBack = false
 
@@ -65,6 +67,25 @@ local function ModName(id)
         end
     end
     return id or ''
+end
+
+-- Whether the game can play on a featured mod: the one loaded, or one whose game files are on this computer (the game
+-- starts again on them). Kept 10 s per mod, as the list asks for every game on each refresh.
+local modFilesCache = {}
+local function ModFiles(id, status)
+    if id == '' or id == status.loadedMod then
+        return true
+    end
+    if not rawget(_G, 'FafOnline_FeaturedModFiles') then
+        return false, 'this build can\'t switch featured mod'
+    end
+    local cached = modFilesCache[id]
+    if not cached or GetSystemTimeSeconds() - cached.at > 10 then
+        local ready, why = FafOnline_FeaturedModFiles(id)
+        cached = { ready = ready, why = why, at = GetSystemTimeSeconds() }
+        modFilesCache[id] = cached
+    end
+    return cached.ready, cached.why
 end
 
 local function ModShort(id)
@@ -129,9 +150,10 @@ local function WhyNotJoinable(game, status)
         return 'This game was not started on FAF\'s game files (/init init_faf.lua).'
     end
     if game.featuredMod ~= '' and game.featuredMod ~= status.loadedMod then
-        return 'It runs ' .. ModName(game.featuredMod) .. '; this game has ' .. ModName(status.loadedMod) ..
-            ' loaded. Start the game with /init init_' .. game.featuredMod .. '.lua to join it (switching inside ' ..
-            'the game comes later).'
+        local ready, why = ModFiles(game.featuredMod, status)
+        if not ready then
+            return 'It runs ' .. ModName(game.featuredMod) .. ': ' .. tostring(why) .. '.'
+        end
     end
     if game.players >= game.maxPlayers and game.maxPlayers > 0 then
         return 'The game is full.'
@@ -1323,6 +1345,7 @@ local function RefreshOnline(launcher)
     end
 
     view.hostButton:SetEnabled(status.lobby == 'signedin' and status.match ~= 'preparing' and status.match ~= 'running')
+    launcher:Resume(status)
     local filter = string.lower(view.search.edit:GetText())
     view.search:Refresh()
     local hidePrivate = view.filters.hidePrivate.on
@@ -1424,6 +1447,10 @@ local function RefreshOnline(launcher)
     elseif launcher.lastError then
         footer = launcher.lastError
         footerColor = C.bad
+    elseif launcher.resume then
+        footer = (launcher.resume.kind == 'join' and 'Joining the game' or 'Creating your game') .. ' on ' ..
+            ModName(launcher.resume.mod) .. ' once the FAF lobby answers.'
+        footerColor = C.accent
     elseif loading then
         footer = 'Connecting to the FAF lobby. Create game unlocks once it answers.'
         footerColor = C.accent
@@ -1431,6 +1458,10 @@ local function RefreshOnline(launcher)
         local why = WhyNotJoinable(selected, status)
         footer = why or (selected.title .. ' on ' .. MapTitle(selected.map) .. ', hosted by ' .. selected.host)
         footerColor = why and C.warn or C.text
+    elseif selected and selected.source == 'faf' and selected.featuredMod ~= '' and
+        selected.featuredMod ~= status.loadedMod and not WhyNotJoinable(selected, status) then
+        footer = 'Joining starts the game again on ' .. ModName(selected.featuredMod) .. '\'s files.'
+        footerColor = C.accent
     else
         footer = string.format('Showing %d of %d games. Click a game for details, double-click to join.',
             table.getn(items), shownTotal)
@@ -1484,6 +1515,7 @@ local function OpenHostDialog(launcher)
 
     Label('Featured mod', 204)
     local modChoices = {}
+    local modNoteRefresh = nil -- set once the note exists
     local chosenMod = status.loadedMod ~= '' and status.loadedMod or 'faf'
     for i, mod in FeaturedMods do
         local id = mod.id
@@ -1493,16 +1525,43 @@ local function OpenHostDialog(launcher)
                 other.selected = other.id == id
                 other:Paint(false)
             end
+            if modNoteRefresh then
+                modNoteRefresh()
+            end
         end)
         choice.id = id
-        choice.enabled = id == status.loadedMod
+        local ready, why = ModFiles(id, status)
+        choice.enabled = ready
+        choice.why = why
         choice.selected = id == chosenMod
         choice:Paint(false)
         LayoutHelpers.AtLeftTopIn(choice, panel, 26 + math.mod(i - 1, 2) * 174, 220 + math.floor((i - 1) / 2) * 38)
         modChoices[i] = choice
     end
-    local modNote = Theme.Text(panel, 'The others need the game started on their files for now.', 11, C.subtle)
+    local modNote = Theme.Cell(panel, 11, C.subtle)
     LayoutHelpers.AtLeftTopIn(modNote, panel, 26, 296)
+    modNote.Right:Set(function() return panel.Left() + Scale(366) end)
+    -- What the pick means: a restart on another featured mod's files, or why a greyed one can't be picked.
+    local function ModNote(hovered)
+        if hovered and not hovered.enabled then
+            Theme.SetText(modNote, ModName(hovered.id) .. ': ' .. tostring(hovered.why))
+            Theme.SetColor(modNote, C.warn)
+        elseif chosenMod ~= status.loadedMod then
+            Theme.SetText(modNote, 'The game starts again on ' .. ModName(chosenMod) .. '\'s files, then creates it.')
+            Theme.SetColor(modNote, C.accent)
+        else
+            Theme.SetText(modNote, '')
+        end
+    end
+    for _, choice in modChoices do
+        local this = choice
+        this.onDisabledHover = function(over)
+            ModNote(over and this or nil)
+        end
+    end
+    modNoteRefresh = function() ModNote() end
+    ModNote()
+    cover.modChoices = modChoices -- for the test walk
 
     Label('Who sees it', 322)
     local visibility = 'public'
@@ -1660,13 +1719,13 @@ local function OpenHostDialog(launcher)
             errorText:SetText('The game needs a title.')
             return
         end
-        local ok, why = FafOnline_Host(request)
-        if not ok then
-            errorText:SetText('FAF refused: ' .. tostring(why))
-            return
-        end
         Prefs.SetToCurrentProfile('fafre_host_title', request.title)
         Prefs.SetToCurrentProfile('fafre_host_map', map.path)
+        local ok, why = launcher:HostRequest(request)
+        if not ok then
+            errorText:SetText(tostring(why))
+            return
+        end
         LOG('LAUNCHER: hosting ' .. request.map .. ' on ' .. request.mod)
         Close()
         launcher:Refresh()
@@ -1753,8 +1812,91 @@ function Launcher:OpenHostDialog()
     end
 end
 
+--- Hosts `request` on FAF. On another featured mod than the loaded one, the game starts again on its files and the
+--- new start hosts it (RestartOn keeps the request for it).
+function Launcher:HostRequest(request)
+    local status = FafOnline_Status()
+    if request.mod and request.mod ~= '' and request.mod ~= status.loadedMod then
+        local action = { kind = 'host' }
+        for key, value in request do
+            action[key] = value
+        end
+        return self:RestartOn(request.mod, action)
+    end
+    local ok, why = FafOnline_Host(request)
+    if not ok then
+        return false, 'FAF refused: ' .. tostring(why)
+    end
+    return true
+end
+
+--- Starts the game again on `mod`'s files with `action` for the new start, and quits this one.
+function Launcher:RestartOn(mod, action)
+    if not rawget(_G, 'FafOnline_RestartOn') then
+        return false, 'This build can\'t switch featured mod.'
+    end
+    local ok, why = FafOnline_RestartOn(mod, action)
+    if not ok then
+        return false, 'Can\'t switch to ' .. ModName(mod) .. ': ' .. tostring(why)
+    end
+    LOG('LAUNCHER: starting again on ' .. mod .. ' to ' .. tostring(action.kind))
+    if rawget(_G, 'SavePreferences') then
+        SavePreferences()
+    end
+    self:StopSounds()
+    self.root:Destroy()
+    ExitApplication()
+    return true
+end
+
+--- After a restart on another featured mod: what the launcher was doing, once FAF's lobby answers. Given up after
+--- 5 minutes (signing in again can take a while).
+function Launcher:Resume(status)
+    local resume = self.resume
+    if not resume then
+        return
+    end
+    if GetSystemTimeSeconds() - self.resumeSince > 300 then
+        self.resume = false
+        self.lastError = 'Gave up waiting for the FAF lobby to ' .. (resume.kind == 'join' and 'join the game.' or
+            'create the game.')
+        return
+    end
+    if status.lobby ~= 'signedin' or status.match == 'preparing' or status.match == 'running' then
+        return
+    end
+    self.resume = false
+    if resume.kind == 'host' then
+        resume.kind = nil
+        local ok, why = FafOnline_Host(resume)
+        self.resumed = 'host ' .. tostring(ok)
+        resumedThisStart = self.resumed
+        if ok then
+            LOG('LAUNCHER: hosting ' .. tostring(resume.map) .. ' on ' .. tostring(resume.mod) .. ' after the restart')
+        else
+            self.lastError = 'Could not create the game on ' .. ModName(resume.mod) .. ': ' .. tostring(why)
+        end
+    elseif resume.kind == 'join' then
+        self.resumed = 'join'
+        resumedThisStart = self.resumed
+        LOG('LAUNCHER: joining game ' .. tostring(resume.uid) .. ' after the restart')
+        self:Join({ source = 'faf', uid = resume.uid, featuredMod = resume.mod }, resume.password)
+    end
+end
+
 function Launcher:Join(game, password)
     local ok, why
+    local status = FafOnline_Status()
+    if game.source ~= 'server' and game.featuredMod and game.featuredMod ~= '' and
+        game.featuredMod ~= status.loadedMod then
+        ok, why = self:RestartOn(game.featuredMod,
+            { kind = 'join', uid = game.uid, password = password or '', mod = game.featuredMod })
+        if not ok then
+            self.lastError = why
+            self:Refresh()
+        end
+        return
+    end
     if game.source == 'server' then
         ok, why = FafOnline_JoinServer(game.uid)
     else
@@ -2267,6 +2409,10 @@ function CreateUI(buildFafMenu)
     Cleanup()
     local launcher = setmetatable({ buildFafMenu = buildFafMenu, page = 'online' }, Launcher)
     current = launcher
+    if rawget(_G, 'FafOnline_TakeResume') then
+        launcher.resume = FafOnline_TakeResume() or false
+        launcher.resumeSince = GetSystemTimeSeconds()
+    end
     Build(launcher)
     launcher:ShowPage('online')
     launcher:ShowHome()
@@ -2349,6 +2495,43 @@ function TestWalk()
             ExitApplication()
             return
         end
+        -- /launchermodtest <mod> <map>: Create game on another featured mod than the loaded one. The game starts
+        -- again on that mod's files (with this switch too); the new start hosts the game by itself and quits.
+        local modTest = GetCommandLineArg('/launchermodtest', 2)
+        if modTest and modTest[2] and Online() then
+            -- The restarted game took up the host by itself (the match may already have replaced the launcher).
+            local resumed = resumedThisStart
+            local status = FafOnline_Status()
+            for i = 1, 120 do
+                status = FafOnline_Status()
+                resumed = resumedThisStart
+                if resumed or (status.lobby == 'signedin' and current and not current.resume) then
+                    break
+                end
+                Wait(0.5)
+            end
+            if resumed then
+                Step('after the restart: loaded ' .. status.loadedMod .. ', resumed ' .. resumed)
+                for i = 1, 30 do
+                    if FafOnline_Status().match ~= 'idle' then
+                        break
+                    end
+                    Wait(0.5)
+                end
+                Step('match ' .. FafOnline_Status().match .. ' on ' .. FafOnline_Status().loadedMod)
+                Wait(3)
+                ExitApplication()
+                return
+            end
+            current:ShowPage('online')
+            Step('create game on ' .. modTest[1] .. ' from ' .. status.loadedMod)
+            local ok, why = current:HostRequest({ title = 'mod switch test', map = modTest[2], mod = modTest[1],
+                visibility = 'public', password = '' })
+            Step('create game answered ' .. tostring(ok) .. ' ' .. tostring(why))
+            Wait(5)
+            ExitApplication()
+            return
+        end
         -- /launchersignintest: Sign in with FAF on the online page; the engine hands the page to the browser, Copy link
         -- puts its address on the clipboard. The test run points the sign-in at a local stand-in (FAF_ONLINE_OAUTH).
         local signInTest = GetCommandLineArg('/launchersignintest', 0)
@@ -2400,6 +2583,16 @@ function TestWalk()
                 local frame = GetFrame(0)
                 Step(string.format('host dialog at %d,%d size %dx%d in a %dx%d frame', panel.Left(), panel.Top(),
                     panel.Width(), panel.Height(), frame.Width(), frame.Height()))
+                -- Each featured mod: pickable or why not; then FAF Develop picked, when it can be.
+                for _, choice in current.hostDialog.modChoices or {} do
+                    Step('featured mod ' .. choice.id .. ': ' .. (choice.enabled and 'can be picked' or
+                        ('greyed, ' .. tostring(choice.why))))
+                    if choice.id == 'fafdevelop' and choice.enabled then
+                        choice.onPick(choice)
+                    end
+                end
+                Wait(1)
+                Step('featured mod picked')
             end
             Wait(3)
             if current.hostDialog then

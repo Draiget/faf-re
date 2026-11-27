@@ -6,15 +6,26 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <climits>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <thread>
 
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <spawn.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#if FAFRE_PLATFORM_MACOS
+#include <crt_externs.h> // _NSGetArgc, _NSGetArgv: macOS only
+#include <mach-o/dyld.h> // _NSGetExecutablePath: macOS only
+#endif
 
 extern char** environ;
 
@@ -39,6 +50,85 @@ namespace platform::process
     }
     if (result->exitCode != 0) {
       return std::unexpected(program + " ended with " + std::to_string(result->exitCode));
+    }
+    return {};
+  }
+
+  std::expected<std::string, std::string> CurrentProgram()
+  {
+#if FAFRE_PLATFORM_MACOS
+    char path[PATH_MAX];
+    std::uint32_t size = sizeof(path);
+    if (::_NSGetExecutablePath(path, &size) != 0) { // macOS only
+      return std::unexpected(std::string("the running program's path is too long"));
+    }
+    char real[PATH_MAX];
+    return std::string(::realpath(path, real) != nullptr ? real : path);
+#else
+    char path[PATH_MAX];
+    const ssize_t length = ::readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (length <= 0) {
+      return std::unexpected(std::string("no path for the running program (") + std::strerror(errno) + ")");
+    }
+    return std::string(path, static_cast<std::size_t>(length));
+#endif
+  }
+
+  std::vector<std::string> CurrentArgs()
+  {
+    std::vector<std::string> args;
+#if FAFRE_PLATFORM_MACOS
+    const int count = *::_NSGetArgc(); // macOS only
+    char** const values = *::_NSGetArgv();
+    for (int i = 1; i < count && values != nullptr && values[i] != nullptr; ++i) {
+      args.emplace_back(values[i]);
+    }
+#else
+    std::ifstream in("/proc/self/cmdline", std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::size_t at = text.find('\0'); // past the program itself
+    while (at != std::string::npos && at + 1 < text.size()) {
+      const std::size_t end = text.find('\0', at + 1);
+      args.push_back(text.substr(at + 1, (end == std::string::npos ? text.size() : end) - at - 1));
+      at = end;
+    }
+#endif
+    return args;
+  }
+
+  std::expected<void, std::string> Start(
+    const std::string& program,
+    const std::vector<std::string>& args
+  )
+  {
+    // A program that can't run is an error here: after the fork only the child would know.
+    if (::access(program.c_str(), X_OK) != 0) {
+      return std::unexpected("couldn't start " + program + " (" + std::strerror(errno) + ")");
+    }
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(program.c_str()));
+    for (const std::string& argument : args) {
+      argv.push_back(const_cast<char*>(argument.c_str()));
+    }
+    argv.push_back(nullptr);
+    // Everything the child needs is made before the fork: between fork and exec it only closes descriptors, which is
+    // safe in a copy of a program with threads. No descriptor of the game (sockets, files) reaches the new program.
+    rlimit limit{};
+    int highest = 1024;
+    if (::getrlimit(RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY) {
+      highest = static_cast<int>(std::min<rlim_t>(limit.rlim_cur, 65536));
+    }
+    const pid_t pid = ::fork();
+    if (pid < 0) {
+      return std::unexpected("couldn't start " + program + " (" + std::strerror(errno) + ")");
+    }
+    if (pid == 0) {
+      (void)::setpgid(0, 0); // its own group: not ended with this program's
+      for (int fd = 3; fd < highest; ++fd) {
+        (void)::close(fd);
+      }
+      ::execve(program.c_str(), argv.data(), environ);
+      ::_exit(127);
     }
     return {};
   }
