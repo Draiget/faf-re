@@ -640,6 +640,7 @@ function Checkbox(parent, label, onToggle)
     -- Box, gap and label: not from Left, so a caller may place the checkbox by its right edge.
     row.Width:Set(function() return Scale(28) + text.Width() end)
     row.on = false
+    row.onToggle = onToggle -- what a click runs (tests toggle with it)
     row.Paint = function(self, over)
         box:SetColors(self.on and Colors.accent or Colors.field, (self.on or over) and Colors.accent or Colors.lineStrong)
         SetVisible(check, self.on)

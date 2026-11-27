@@ -1302,7 +1302,7 @@ function LobbyView:Build()
     self.waiting.Right:Set(rightCol.Right)
     self.waiting.Bottom:Set(function() return actions.Top() - Scale(8) end)
 
-    -- Options: a heading with "only changed" (FAF's own setting, LobbyHideDefaultOptions) and FAF's full dialog.
+    -- Options: a heading with "only changed" (on by default, fafre_lobby_only_changed) and FAF's full dialog.
     local optionsCaption = Theme.Caption(rightCol, 'Game options', C.accent)
     optionsCaption.Left:Set(rightCol.Left)
     optionsCaption.Top:Set(function() return mods.Bottom() + Scale(16) end)
@@ -1317,14 +1317,20 @@ function LobbyView:Build()
     self.advanced.Right:Set(rightCol.Right)
     self.advanced.Top:Set(function() return optionsCaption.Top() - Scale(7) end)
     Theme.SetVisible(self.advanced, hostsGame)
-    self.onlyChanged = Prefs.GetFromCurrentProfile('LobbyHideDefaultOptions') == 'true'
+    -- On unless the player turned it off here (a key of its own: FAF's LobbyHideDefaultOptions is often 'false' from
+    -- FAF's own lobby), and written to disk at once, so a game that doesn't end normally keeps the choice too.
+    self.onlyChanged = Prefs.GetFromCurrentProfile('fafre_lobby_only_changed') ~= false
     local onlyChanged = Theme.Checkbox(rightCol, 'Only changed', function(box)
         view.onlyChanged = box.on
-        Prefs.SetToCurrentProfile('LobbyHideDefaultOptions', tostring(box.on))
+        Prefs.SetToCurrentProfile('fafre_lobby_only_changed', box.on and true or false)
+        if rawget(_G, 'SavePreferences') then
+            SavePreferences()
+        end
         view.options.top = 1
         view:Refresh()
     end)
     onlyChanged:SetOn(self.onlyChanged)
+    self.onlyChangedBox = onlyChanged
     onlyChanged.Left:Set(function()
         return (hostsGame and (view.advanced.Left() - Scale(12)) or rightCol.Right()) - onlyChanged.Width()
     end)
@@ -1741,8 +1747,13 @@ function TestSteps(step)
             view.onlyChanged = true
             local shown, changed = view:OptionRows()
             view.onlyChanged = saved
-            step(string.format('lobby: options %d, only changed shows %d (counted %d changed)', table.getn(all),
-                table.getn(shown), changed))
+            step(string.format('lobby: options %d, only changed shows %d (counted %d changed), only changed on: %s',
+                table.getn(all), table.getn(shown), changed, tostring(saved)))
+            -- Unticked as a click does: saved to the preferences file at once (the run checks the file after).
+            local box = view.onlyChangedBox
+            box:SetOn(false)
+            box.onToggle(box)
+            step('lobby: only changed unticked, preference ' .. tostring(Prefs.GetFromCurrentProfile('fafre_lobby_only_changed')))
             step('lobby: slot 1 cpu ' .. tostring(api.Cpu(Info().PlayerOptions[1].PlayerName)) .. ', country ' ..
                 tostring(Info().PlayerOptions[1].Country) .. ', columns ' .. tostring(view.layout) .. ', links ' .. tostring(view.links and view.links.mode) ..
                 ', mods ' .. table.getn(api.GameMods()))
