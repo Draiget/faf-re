@@ -209,6 +209,7 @@ namespace
     const char* user;
     const char* content;
     const char* replay;
+    const char* website; ///< FAF's website (its news posts)
     const char* chat;
     const char* tokenFile;
   };
@@ -221,6 +222,7 @@ namespace
      "https://user.faforever.com",
      "https://content.faforever.com",
      "https://replay.faforever.com",
+     "https://direct.faforever.com",
      "wss://chat.faforever.com",
      "game.token"},
     {"test",
@@ -230,6 +232,7 @@ namespace
      "https://user.faforever.xyz",
      "https://content.faforever.xyz",
      "https://replay.faforever.xyz",
+     "https://direct.faforever.xyz",
      "wss://chat.faforever.xyz",
      "game-test.token"},
   };
@@ -2468,6 +2471,11 @@ std::string moho::ONLINE_ContentBase()
 std::string moho::ONLINE_ReplayBase()
 {
   return CurrentServer().replay;
+}
+
+std::string moho::ONLINE_WebsiteBase()
+{
+  return CurrentServer().website;
 }
 
 std::expected<std::string, std::string> moho::ONLINE_AccessToken()

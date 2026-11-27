@@ -35,6 +35,8 @@ namespace moho
   [[nodiscard]] std::string ONLINE_ContentBase();
   /** The chosen FAF server's replay host: https://replay.faforever.com or the test one. */
   [[nodiscard]] std::string ONLINE_ReplayBase();
+  /** The chosen FAF server's website, whose news the launcher shows: https://direct.faforever.com or the test one. */
+  [[nodiscard]] std::string ONLINE_WebsiteBase();
   /** The player's FAF access token, refreshed when near its end; for a worker thread. The error when not signed in. */
   [[nodiscard]] std::expected<std::string, std::string> ONLINE_AccessToken();
   /** The FAF init file the game runs on (its folder is FAF's bin folder); empty when it isn't on FAF's files. */

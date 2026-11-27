@@ -1975,7 +1975,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2652,6 +2652,7 @@ local function BuildTopBar(launcher, body)
         end, kVaultPages },
         { 'units', 'Units', function() launcher:ShowPage('units') end, { units = true } },
         -- Utilities: icons by the account, their names in a tip.
+        { 'news', 'News', function() launcher:ShowPage('news') end, { news = true }, true },
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true }, true },
         { 'settings', 'Settings', function() launcher:Options() end, { options = true }, true },
     }
@@ -2660,7 +2661,8 @@ local function BuildTopBar(launcher, body)
     local before = nil
     for _, entry in entries do
         if (entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status')) and
-            (entry[1] ~= 'leaderboard' or rawget(_G, 'FafLibrary_Api')) then
+            (entry[1] ~= 'leaderboard' or rawget(_G, 'FafLibrary_Api')) and
+            (entry[1] ~= 'news' or rawget(_G, 'FafLibrary_News')) then
             local item = TopTab(launcher, bar, entry[1], entry[2], entry[3], entry[4])
             if entry[5] then
                 item:SetCompact(true)
@@ -3167,6 +3169,23 @@ local function Build(launcher)
             mapsPage:Destroy()
         end
     end
+    -- News: FAF's news posts and links (newspage.lua), with the engine's news reader.
+    if rawget(_G, 'FafLibrary_News') then
+        local newsPage = Group(content, 'launcher news')
+        LayoutHelpers.FillParent(newsPage, content)
+        newsPage.Width:Set(function() return newsPage.Right() - newsPage.Left() end)
+        newsPage.Height:Set(function() return newsPage.Bottom() - newsPage.Top() end)
+        local newsBuilt, newsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/newspage.lua').Build(launcher, newsPage)
+        end)
+        if newsBuilt then
+            launcher.pages.news = newsPage
+            Theme.SetVisible(newsPage, false)
+        else
+            WARN('LAUNCHER: the news page failed to build: ' .. tostring(newsWhy))
+            newsPage:Destroy()
+        end
+    end
     -- Units: every unit's blueprint through FAF's unit analyzer (unitspage.lua).
     do
         local unitsPage = Group(content, 'launcher units')
@@ -3495,6 +3514,39 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchernewstest: the News page: FAF's posts, a category, a post read, the next page.
+            if GetCommandLineArg('/launchernewstest', 0) and current.newsView then
+                local news = current.newsView
+                current:ShowPage('news')
+                local function Settle(seconds)
+                    for i = 1, seconds do
+                        current:Refresh()
+                        if not next(news.jobs) and not next(news.thumbJobs) then
+                            break
+                        end
+                        Wait(1)
+                    end
+                    Wait(1)
+                    current:Refresh()
+                end
+                Settle(20)
+                local post = news.chosen
+                Step('news: ' .. table.getn(news.posts or {}) .. ' posts, page ' .. news.pageNumber .. ', more ' ..
+                    tostring(news.more) .. ', first ' .. tostring(post and post.title) .. ' [' ..
+                    tostring(post and table.concat(post.categories, ', ')) .. '], ' .. table.getn(news.document.blocks or {}) ..
+                    ' blocks, picture ' .. tostring(post and post.large) .. (news.failure and (', failure ' .. news.failure) or ''))
+                Wait(2)
+                news.tab = 'tournament'
+                news:Paint()
+                Step('news: tournaments ' .. table.getn(news:Shown()))
+                Wait(2)
+                news.tab = 'all'
+                news:Load()
+                Settle(20)
+                Step('news: after Load more: ' .. table.getn(news.posts or {}) .. ' posts, page ' .. news.pageNumber ..
+                    ', more ' .. tostring(news.more))
+                Wait(1)
+            end
             -- /launcherunitstest: the Units page: the blueprints read, a faction's units, a filter, a unit's card.
             if GetCommandLineArg('/launcherunitstest', 0) and current.unitsView then
                 local units = current.unitsView

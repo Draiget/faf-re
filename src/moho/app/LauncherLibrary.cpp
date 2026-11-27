@@ -765,6 +765,67 @@ namespace
     return test != nullptr && test[0] != '\0' && url.rfind(test, 0) == 0;
   }
 
+  /** FAF's website for its news: the chosen server's, or FAF_ONLINE_NEWS (a test hook, unset for players). */
+  std::string NewsBase()
+  {
+    const char* const test = std::getenv("FAF_ONLINE_NEWS");
+    return test != nullptr && test[0] != '\0' ? std::string(test) : moho::ONLINE_WebsiteBase();
+  }
+
+  /** A picture the launcher may download and keep: from FAF's content server, or a news post's from FAF's website. */
+  bool AllowedPictureUrl(
+    const std::string& url
+  )
+  {
+    return AllowedModUrl(url) || url.rfind(NewsBase() + "/wp-content/uploads/", 0) == 0;
+  }
+
+  /**
+   * id = FafLibrary_News{page=}: one page of FAF's news posts (the website's WordPress API, with their authors,
+   * categories and pictures), as the job's data. No sign-in needed.
+   */
+  int NewsBody(
+    lua_State* const L
+  )
+  {
+    int page = 1;
+    if (lua_istable(L, 1)) {
+      lua_pushstring(L, "page");
+      lua_gettable(L, 1);
+      if (lua_isnumber(L, -1)) {
+        page = std::max(1, std::min(100, static_cast<int>(lua_tonumber(L, -1))));
+      }
+      lua_pop(L, 1);
+    }
+    const std::string url = NewsBase() + "/wp-json/wp/v2/posts?_embed=1&per_page=12&page=" + std::to_string(page);
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("api", [url](Job& job) {
+      platform::http::Call call;
+      call.url = url;
+      call.userAgent = UserAgent();
+      call.headers = "Accept: application/json\r\n";
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body); !sent) {
+        job.Fail("FAF's website didn't answer: " + sent.error());
+        return;
+      }
+      if (status == 400) { // WordPress answers a page past the last with 400
+        body = "[]";
+      } else if (status != 200) {
+        job.Fail("FAF's website answered HTTP " + std::to_string(status));
+        return;
+      }
+      auto parsed = ParseJson(body);
+      if (!parsed) {
+        job.Fail("FAF's website answered with something that isn't JSON");
+        return;
+      }
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.answer = std::move(*parsed);
+    })));
+    return 1;
+  }
+
   /** A mod_info.lua's `uid = "..."`, or empty. */
   std::string ModInfoUid(
     const std::string& text
@@ -1192,7 +1253,7 @@ namespace
   )
   {
     const std::string url = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
-    if (url.empty() || !AllowedModUrl(url)) {
+    if (url.empty() || !AllowedPictureUrl(url)) {
       lua_pushnil(L);
       lua_pushnil(L);
       return 2;
@@ -1559,6 +1620,14 @@ namespace
       nullptr,
       "<global>",
       "string FafLibrary_UtcDate(daysAgo) - the UTC date that many days back, as 2026-10-28T00:00:00Z."
+    );
+    static moho::CScrLuaBinder news(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_News",
+      &Binding<&NewsBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_News{page=} - one page of FAF's news posts; FafLibrary_Job(id).data holds them."
     );
     static moho::CScrLuaBinder localReplays(
       moho::SCR_UserLuaInitSet(),
