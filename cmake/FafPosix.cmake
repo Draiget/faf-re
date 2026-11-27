@@ -310,7 +310,7 @@ if(TARGET faf_mbedtls OR EXISTS "${FAF_DEPENDENCIES_DIR}/mbedtls/library/ssl_tls
   endif()
   add_subdirectory("${PROJECT_SOURCE_DIR}/src/online" "${CMAKE_BINARY_DIR}/online" EXCLUDE_FROM_ALL)
   add_executable(faf_online_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/online/OnlineTests.cpp")
-  target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main)
+  target_link_libraries(faf_online_tests PRIVATE faf_online faf_mbedtls gtest_main zlib123 faf_zstd)
   add_test(NAME online COMMAND faf_online_tests)
 else()
   message(STATUS "faf_online: left out, no Mbed TLS in ${FAF_DEPENDENCIES_DIR}/mbedtls (cmake -P cmake/FafDependencies.cmake)")

@@ -38,6 +38,8 @@
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
 #include "online/FafLobby.h"
+#include "online/FafReplay.h"
+#include "online/FafVault.h"
 #include "online/GameLink.h"
 #include "online/LaunchArgs.h"
 #include "online/ReplayRelay.h"
@@ -46,6 +48,8 @@
 #include "platform/Http.h"
 #include "platform/Process.h"
 #include "platform/SecretStore.h"
+#include "zlib.h"
+#include "zstd.h"
 
 namespace
 {
@@ -951,6 +955,168 @@ TEST(
   EXPECT_FALSE(platform::process::Run(shell, slow, std::chrono::milliseconds(500)));
   EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(3));
   EXPECT_FALSE(platform::process::Run(missing, {}, std::chrono::seconds(5)));
+}
+
+// FAF's .fafreplay: a JSON header line, then the replay stream as zstd or as base64 of a big-endian length and zlib.
+TEST(
+  OnlineFafReplay,
+  DecodesBothBodiesAndRefusesDamage
+)
+{
+  std::string stream;
+  for (int i = 0; i < 5000; ++i) {
+    stream += static_cast<char>((i * 7) % 251);
+  }
+  stream += std::string("Supreme Commander v1.50.3841\0", 29);
+
+  // Older files: base64(length, big-endian + zlib).
+  uLongf packedSize = compressBound(static_cast<uLong>(stream.size()));
+  std::string packed(packedSize, '\0');
+  ASSERT_EQ(
+    compress(
+      reinterpret_cast<Bytef*>(packed.data()),
+      &packedSize,
+      reinterpret_cast<const Bytef*>(stream.data()),
+      static_cast<uLong>(stream.size())
+    ),
+    Z_OK
+  );
+  packed.resize(packedSize);
+  const std::uint32_t length = static_cast<std::uint32_t>(stream.size());
+  std::string blob;
+  blob += static_cast<char>((length >> 24) & 0xFF);
+  blob += static_cast<char>((length >> 16) & 0xFF);
+  blob += static_cast<char>((length >> 8) & 0xFF);
+  blob += static_cast<char>(length & 0xFF);
+  blob += packed;
+  static const char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string base64;
+  for (std::size_t i = 0; i < blob.size(); i += 3) {
+    const std::uint32_t chunk = (static_cast<std::uint32_t>(static_cast<unsigned char>(blob[i])) << 16) |
+      (i + 1 < blob.size() ? static_cast<unsigned char>(blob[i + 1]) << 8 : 0) |
+      (i + 2 < blob.size() ? static_cast<unsigned char>(blob[i + 2]) : 0);
+    base64 += kAlphabet[(chunk >> 18) & 63];
+    base64 += kAlphabet[(chunk >> 12) & 63];
+    base64 += i + 1 < blob.size() ? kAlphabet[(chunk >> 6) & 63] : '=';
+    base64 += i + 2 < blob.size() ? kAlphabet[chunk & 63] : '=';
+  }
+  const std::string zlibFile =
+    "{\"uid\": 12345, \"title\": \"test game\", \"mapname\": \"scmp_009\", \"featured_mod\": \"faf\"}\n" + base64;
+  const auto older = faf::online::DecodeFafReplay(zlibFile);
+  ASSERT_TRUE(older) << older.error();
+  EXPECT_EQ(older->header.String("title"), "test game");
+  EXPECT_EQ(older->header.String("uid"), "12345");
+  EXPECT_EQ(older->stream, stream);
+
+  // Newer files: a zstd frame, the header saying so.
+  std::string frame(ZSTD_compressBound(stream.size()), '\0');
+  const std::size_t frameSize = ZSTD_compress(frame.data(), frame.size(), stream.data(), stream.size(), 3);
+  ASSERT_EQ(ZSTD_isError(frameSize), 0u);
+  frame.resize(frameSize);
+  const std::string zstdFile = "{\"uid\": 7, \"compression\": \"zstd\", \"mapname\": \"scmp_009\"}\n" + frame;
+  const auto newer = faf::online::DecodeFafReplay(zstdFile);
+  ASSERT_TRUE(newer) << newer.error();
+  EXPECT_EQ(newer->stream, stream);
+  const auto header = faf::online::ReadFafReplayHeader(zstdFile);
+  ASSERT_TRUE(header);
+  EXPECT_EQ(header->String("mapname"), "scmp_009");
+
+  // Damage: cut short, no header, not base64.
+  EXPECT_FALSE(faf::online::DecodeFafReplay(zstdFile.substr(0, zstdFile.size() - 20)));
+  EXPECT_FALSE(faf::online::DecodeFafReplay(zlibFile.substr(0, zlibFile.size() - 40)));
+  EXPECT_FALSE(faf::online::DecodeFafReplay("Supreme Commander replay"));
+  EXPECT_FALSE(faf::online::DecodeFafReplay("{\"uid\": 1}\n!!!not base64!!!"));
+}
+
+// FAF's replay and mod vaults: the queries as the FAF clients send them, and their JSON:API answers read into rows.
+TEST(
+  OnlineFafVault,
+  BuildsQueriesAndReadsPages
+)
+{
+  faf::online::ReplayQuery replays;
+  replays.player = "Seraphim\"-Noob*";
+  replays.map = "seton";
+  replays.ratedOnly = true;
+  const std::string replayUrl = faf::online::ReplaySearchUrl("https://api.example", replays);
+  EXPECT_TRUE(replayUrl.starts_with("https://api.example/data/game?sort=-startTime&page%5Bsize%5D=30")) << replayUrl;
+  EXPECT_NE(replayUrl.find("page%5Btotals%5D&"), std::string::npos) << replayUrl;
+  // The quote and the star from the search box are gone; the clauses are joined with ';' in parentheses.
+  EXPECT_NE(replayUrl.find("playerStats.player.login%3D%3D%22%2ASeraphim-Noob%2A%22"), std::string::npos) << replayUrl;
+  EXPECT_NE(replayUrl.find("validity%3D%3D%22VALID%22"), std::string::npos) << replayUrl;
+
+  const std::string gamePage =
+    R"({"data":[{"type":"game","id":"12345","attributes":{"name":"all welcome","startTime":"2026-01-01T12:00:00Z",)"
+    R"("endTime":"2026-01-01T12:30:00Z","replayTicks":12345,"replayAvailable":true,"validity":"VALID"},)"
+    R"("relationships":{"mapVersion":{"data":{"type":"mapVersion","id":"9"}},"featuredMod":{"data":{"type":)"
+    R"("featuredMod","id":"1"}},"playerStats":{"data":[{"type":"gamePlayerStats","id":"100"},{"type":)"
+    R"("gamePlayerStats","id":"101"}]},"reviewsSummary":{"data":{"type":"gameReviewsSummary","id":"12345"}}}}],)"
+    R"("included":[{"type":"mapVersion","id":"9","attributes":{"folderName":"scmp_009"},"relationships":{"map":)"
+    R"({"data":{"type":"map","id":"77"}}}},{"type":"map","id":"77","attributes":{"displayName":"Seton's Clutch"}},)"
+    R"({"type":"featuredMod","id":"1","attributes":{"technicalName":"faf"}},{"type":"gamePlayerStats","id":"100",)"
+    R"("attributes":{"team":2,"faction":1,"result":"VICTORY","score":3210},"relationships":{"player":{"data":)"
+    R"({"type":"player","id":"500"}},"ratingChanges":{"data":[{"type":"leaderboardRatingJournal","id":"700"}]}}},)"
+    R"({"type":"gamePlayerStats","id":"101","attributes":{"team":3,"faction":"CYBRAN","beforeMean":1500.0,)"
+    R"("beforeDeviation":200.0},"relationships":{"player":{"data":{"type":"player","id":"501"}}}},)"
+    R"({"type":"player","id":"500","attributes":{"login":"Seraphim-Noob"}},{"type":"player","id":"501",)"
+    R"("attributes":{"login":"Other"}},{"type":"leaderboardRatingJournal","id":"700","attributes":{"meanBefore":)"
+    R"(1600.0,"deviationBefore":100.0,"meanAfter":1615.0,"deviationAfter":98.0}},{"type":"gameReviewsSummary",)"
+    R"("id":"12345","attributes":{"averageScore":4.5,"reviews":2}}],"meta":{"page":{"number":1,"totalPages":7,)"
+    R"("totalRecords":201}}})";
+  faf::online::VaultPage page;
+  const auto games = faf::online::ReadReplayPage(gamePage, &page);
+  ASSERT_TRUE(games) << games.error();
+  ASSERT_EQ(games->size(), 1u);
+  const auto& game = games->front();
+  EXPECT_EQ(game.id, "12345");
+  EXPECT_EQ(game.title, "all welcome");
+  EXPECT_EQ(game.mapFolder, "scmp_009");
+  EXPECT_EQ(game.mapName, "Seton's Clutch");
+  EXPECT_EQ(game.featuredMod, "faf");
+  EXPECT_NEAR(game.seconds, 1234.5, 0.01);
+  EXPECT_TRUE(game.replayAvailable);
+  EXPECT_NEAR(game.reviewScore, 4.5, 0.01);
+  ASSERT_EQ(game.players.size(), 2u);
+  EXPECT_EQ(game.players[0].login, "Seraphim-Noob");
+  EXPECT_EQ(game.players[0].team, 2);
+  EXPECT_EQ(game.players[0].rating, 1300); // the journal: 1600 - 3 * 100
+  EXPECT_EQ(game.players[1].rating, 900);  // the stat's own: 1500 - 3 * 200
+  EXPECT_EQ(game.players[1].faction, "CYBRAN");
+  EXPECT_EQ(page.totalPages, 7);
+  EXPECT_EQ(page.totalRecords, 201);
+  EXPECT_EQ(faf::online::ReplayDownloadUrl("https://replay.example", "12345"), "https://replay.example/12345");
+
+  faf::online::ModQuery mods;
+  mods.name = "supreme economy";
+  mods.type = "UI";
+  const std::string modUrl = faf::online::ModSearchUrl("https://api.example", mods);
+  EXPECT_NE(modUrl.find("latestVersion.hidden%3D%3D%22false%22"), std::string::npos) << modUrl;
+  EXPECT_NE(modUrl.find("displayName%3D%3D%22%2Asupreme%2A%22"), std::string::npos) << modUrl;
+  EXPECT_NE(modUrl.find("displayName%3D%3D%22%2Aeconomy%2A%22"), std::string::npos) << modUrl;
+  EXPECT_NE(modUrl.find("latestVersion.type%3D%3D%22UI%22"), std::string::npos) << modUrl;
+
+  const std::string modPage =
+    R"({"data":[{"type":"mod","id":"3","attributes":{"displayName":"Supreme Economy","author":"Crotalus",)"
+    R"("recommended":true},"relationships":{"latestVersion":{"data":{"type":"modVersion","id":"30"}},)"
+    R"("uploader":{"data":{"type":"player","id":"9"}},"reviewsSummary":{"data":{"type":"modReviewsSummary",)"
+    R"("id":"3"}}}}],"included":[{"type":"modVersion","id":"30","attributes":{"uid":"89BF1572-9EA8-11DC-1313-)"
+    R"(635F56D89591","version":"4","description":"Economy at a glance","type":"UI","ranked":true,"downloadUrl":)"
+    R"("https://content.example/mods/supreme_economy.v0004.zip","thumbnailUrl":"https://content.example/t.png"}},)"
+    R"({"type":"player","id":"9","attributes":{"login":"uploader1"}},{"type":"modReviewsSummary","id":"3",)"
+    R"("attributes":{"averageScore":4.8,"reviews":40}}]})";
+  const auto found = faf::online::ReadModPage(modPage);
+  ASSERT_TRUE(found) << found.error();
+  ASSERT_EQ(found->size(), 1u);
+  EXPECT_EQ(found->front().name, "Supreme Economy");
+  EXPECT_EQ(found->front().uploader, "uploader1");
+  EXPECT_EQ(found->front().uid, "89BF1572-9EA8-11DC-1313-635F56D89591");
+  EXPECT_EQ(found->front().type, "UI");
+  EXPECT_TRUE(found->front().recommended);
+  EXPECT_EQ(found->front().reviews, 40);
+  EXPECT_EQ(found->front().downloadUrl, "https://content.example/mods/supreme_economy.v0004.zip");
+
+  EXPECT_FALSE(faf::online::ReadModPage("not json"));
+  EXPECT_FALSE(faf::online::ReadReplayPage(R"({"errors":[{"detail":"bad filter"}]})"));
 }
 
 // The game starting itself again on another featured mod: its own path and switches, and a start that doesn't wait.

@@ -7,6 +7,8 @@ add_library(faf_online STATIC
   ControlService.cpp
   FafAuth.cpp
   FafLobby.cpp
+  FafReplay.cpp
+  FafVault.cpp
   GameLink.cpp
   Json.cpp
   LaunchArgs.cpp
@@ -29,7 +31,8 @@ else()
   find_package(Threads REQUIRED)
   target_link_libraries(faf_online PUBLIC faf_mbedtls Threads::Threads)
 endif()
-target_link_libraries(faf_online PRIVATE faf_codegen)
+# zlib and zstd: the replay vault's .fafreplay files (FafReplay.cpp).
+target_link_libraries(faf_online PRIVATE faf_codegen zlib123 faf_zstd)
 set_target_properties(faf_online PROPERTIES FOLDER "net")
 
 # faf-online-probe: signs in to FAF's lobby and prints what it sees (WP2's check, local stacks and the live server).
