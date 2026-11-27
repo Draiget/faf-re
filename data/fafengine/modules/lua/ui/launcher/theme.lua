@@ -421,6 +421,13 @@ function Button(parent, label, onClick, kind, opts)
             SetText(text, caps and string.upper(newLabel) or newLabel)
         end
     end
+    --- Another icon of the set (a button made with one).
+    button.SetIconName = function(self, name)
+        if icon and opts.icon ~= name then
+            opts.icon = name
+            Paint(false)
+        end
+    end
     button.onClick = onClick -- what a click runs (the launcher's test walk presses buttons with it)
     HitArea(button, function(self, event)
         if not button.enabled then

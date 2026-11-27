@@ -3990,6 +3990,52 @@ bool moho::DISK_MountDirectoriesNow(
   return true;
 }
 
+int moho::DISK_UnmountNow(
+  const char* const mountpoint
+)
+{
+  const auto normal = [](std::string text) {
+    for (char& c : text) {
+      c = c == '\\' ? '/' : static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    while (text.size() > 1 && text.back() == '/') {
+      text.pop_back();
+    }
+    return text;
+  };
+  const std::string wanted = normal(mountpoint != nullptr ? mountpoint : "");
+  fa::vector<moho::SVFSMountPoint> mountPoints;
+  std::filesystem::path launchDirectory;
+  int removed = 0;
+  {
+    std::lock_guard<std::mutex> lock(gDiskPathStateLock);
+    if (!gMountTableKnown || wanted.empty() || wanted == "/") {
+      return 0;
+    }
+    fa::vector<moho::SVFSMountPoint> kept;
+    for (const moho::SVFSMountPoint& point : gMountedPoints) {
+      if (normal(point.mMountpoint.c_str()) == wanted) {
+        ++removed;
+      } else {
+        kept.push_back(point);
+      }
+    }
+    if (removed == 0) {
+      return 0;
+    }
+    gMountedPoints = kept;
+    mountPoints = gMountedPoints;
+    launchDirectory = gLaunchDirectory;
+  }
+  moho::CVirtualFileSystem* const previous =
+    moho::DISK_ExchangeVFS(CreateEngineFileSystem(mountPoints, launchDirectory));
+  if (previous != nullptr) {
+    std::lock_guard<std::mutex> lock(gDiskPathStateLock);
+    gRetiredFileSystems.push_back(previous);
+  }
+  return removed;
+}
+
 /**
  * Address: 0x00459DA0 (FUN_00459DA0,
  * ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)

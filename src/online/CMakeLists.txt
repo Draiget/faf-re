@@ -14,7 +14,8 @@ add_library(faf_online STATIC
   LaunchArgs.cpp
   ReplayRelay.cpp
   "${PROJECT_SOURCE_DIR}/src/netbridge/GpgNet.cpp"
-  Url.cpp)
+  Url.cpp
+  Zip.cpp)
 target_include_directories(faf_online PUBLIC "${PROJECT_SOURCE_DIR}/src")
 if(FAFRE_PLATFORM_WINDOWS)
   target_sources(faf_online PRIVATE

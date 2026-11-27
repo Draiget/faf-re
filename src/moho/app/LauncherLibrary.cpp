@@ -4,6 +4,7 @@
 // which the pages ask after each frame (FafLibrary_Job). Nothing here runs until the launcher's Lua calls it.
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -31,6 +32,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "online/FafReplay.h"
 #include "online/FafVault.h"
+#include "online/Zip.h"
 #include "platform/Http.h"
 #include "platform/PlatformDefines.h"
 
@@ -231,7 +233,8 @@ namespace
     std::mutex lock;
     bool failed = false;
     std::string message;
-    std::string path; ///< a download's file
+    std::string path;     ///< a download's file (a mod's folder)
+    bool mounted = false; ///< a mod's folder is in the game's file system
     VaultPage page;
     std::vector<VaultReplay> replays;
     std::vector<VaultMod> mods;
@@ -651,6 +654,251 @@ namespace
     return 1;
   }
 
+  // ---------------------------------------------------------------------------------------------------------------
+  // Mods.
+
+  /**
+   * The vault folder FAF's game files use (maps, mods): `custom_vault_path` in FAF's fa_path.lua beside the bin folder
+   * the game runs from, as its init file reads it; else the folder the game's replay folder is in (Documents\My
+   * Games\Gas Powered Games\Supreme Commander Forged Alliance).
+   */
+  std::filesystem::path VaultFolder()
+  {
+    if (const char* const test = std::getenv("FAF_ONLINE_VAULT"); test != nullptr && test[0] != '\0') {
+      return test; // a test hook, unset for players
+    }
+    if (const std::filesystem::path init = moho::ONLINE_InitFile(); !init.empty()) {
+      std::error_code error;
+      const std::filesystem::path paths =
+        std::filesystem::absolute(init, error).parent_path().parent_path() / "fa_path.lua";
+      const std::string text = ReadFile(paths, 64 * 1024);
+      const std::size_t key = text.find("custom_vault_path");
+      const std::size_t open = key == std::string::npos ? std::string::npos : text.find('"', key);
+      const std::size_t close = open == std::string::npos ? std::string::npos : text.find('"', open + 1);
+      if (close != std::string::npos && close > open + 1) {
+        return std::filesystem::path(text.substr(open + 1, close - open - 1));
+      }
+    }
+    std::string replays = moho::USER_GetReplayDir().c_str();
+    while (!replays.empty() && (replays.back() == '/' || replays.back() == '\\')) {
+      replays.pop_back();
+    }
+    return std::filesystem::path(replays).parent_path();
+  }
+
+  std::filesystem::path ModsFolder()
+  {
+    return VaultFolder() / "mods";
+  }
+
+  /** Where mods may download from: FAF's content server (the FAF clients' rule), or a test stack's. */
+  bool AllowedModUrl(
+    const std::string& url
+  )
+  {
+    if (url.rfind("https://content.faforever.com/", 0) == 0) {
+      return true;
+    }
+    const char* const test = std::getenv("FAF_ONLINE_CONTENT"); // a test hook, unset for players
+    return test != nullptr && test[0] != '\0' && url.rfind(test, 0) == 0;
+  }
+
+  /** A mod_info.lua's `uid = "..."`, or empty. */
+  std::string ModInfoUid(
+    const std::string& text
+  )
+  {
+    for (std::size_t at = text.find("uid"); at != std::string::npos; at = text.find("uid", at + 3)) {
+      if (at > 0 && (std::isalnum(static_cast<unsigned char>(text[at - 1])) != 0 || text[at - 1] == '_')) {
+        continue; // part of another name
+      }
+      std::size_t next = text.find_first_not_of(" \t", at + 3);
+      if (next == std::string::npos || text[next] != '=') {
+        continue;
+      }
+      next = text.find_first_not_of(" \t", next + 1);
+      if (next == std::string::npos || (text[next] != '"' && text[next] != '\'')) {
+        continue;
+      }
+      const std::size_t end = text.find(text[next], next + 1);
+      if (end != std::string::npos) {
+        return text.substr(next + 1, end - next - 1);
+      }
+    }
+    return {};
+  }
+
+  /** A folder name a mod may have: no path parts, no dots alone. */
+  bool SafeFolderName(
+    const std::string& name
+  )
+  {
+    return !name.empty() && name != "." && name != ".." && name.find_first_of("/\\:") == std::string::npos;
+  }
+
+  /**
+   * The mod archive's files written into `modsFolder/<its one top folder>`, replacing what an older version left
+   * there; the folder's name, or why not: not exactly one top folder, a path that would leave it, no mod_info.lua, or
+   * another uid than `uid` (when given).
+   */
+  std::expected<std::string, std::string> InstallModZip(
+    const std::string& zip,
+    const std::string& uid,
+    const std::filesystem::path& modsFolder
+  )
+  {
+    auto entries = ReadZip(zip);
+    if (!entries) {
+      return std::unexpected(entries.error());
+    }
+    std::string root;
+    for (const ZipEntry& entry : *entries) {
+      std::string name = entry.name;
+      for (char& c : name) {
+        c = c == '\\' ? '/' : c;
+      }
+      const std::string top = name.substr(0, name.find('/'));
+      if (top.empty() || top == name) {
+        return std::unexpected("the archive's files aren't in one folder (" + entry.name + ")");
+      }
+      if (root.empty()) {
+        root = top;
+      } else if (Lower(top) != Lower(root)) {
+        return std::unexpected("the archive holds more than one folder (" + root + ", " + top + ")");
+      }
+      if (name.find("/../") != std::string::npos || name.ends_with("/..") || name.find(':') != std::string::npos) {
+        return std::unexpected("the archive's entry " + entry.name + " would leave the mod's folder");
+      }
+    }
+    if (!SafeFolderName(root)) {
+      return std::unexpected(std::string("the archive's folder has no usable name"));
+    }
+    const ZipEntry* info = nullptr;
+    for (const ZipEntry& entry : *entries) {
+      if (Lower(entry.name) == Lower(root + "/mod_info.lua")) {
+        info = &entry;
+      }
+    }
+    if (info == nullptr) {
+      return std::unexpected("the archive has no " + root + "/mod_info.lua");
+    }
+    if (const std::string found = ModInfoUid(info->data); !uid.empty() && found != uid) {
+      return std::unexpected("the archive is another version of the mod (uid " + found + ", wanted " + uid + ")");
+    }
+    std::error_code error;
+    std::filesystem::create_directories(modsFolder, error);
+    const std::filesystem::path part = modsFolder / (root + ".part");
+    std::filesystem::remove_all(part, error);
+    for (const ZipEntry& entry : *entries) {
+      std::string name = entry.name;
+      for (char& c : name) {
+        c = c == '\\' ? '/' : c;
+      }
+      if (name.ends_with("/")) {
+        continue; // a folder
+      }
+      const std::filesystem::path file = part / std::filesystem::path(name.substr(root.size() + 1));
+      std::filesystem::create_directories(file.parent_path(), error);
+      std::ofstream out(file, std::ios::binary | std::ios::trunc);
+      out.write(entry.data.data(), static_cast<std::streamsize>(entry.data.size()));
+      if (!out) {
+        std::filesystem::remove_all(part, error);
+        return std::unexpected("can't write " + file.string());
+      }
+    }
+    const std::filesystem::path target = modsFolder / root;
+    std::filesystem::remove_all(target, error); // an older version
+    std::filesystem::rename(part, target, error);
+    if (error) {
+      std::filesystem::remove_all(part, error);
+      return std::unexpected("can't write " + target.string());
+    }
+    return root;
+  }
+
+  /** id = FafLibrary_InstallMod{url=, uid=}: the mod into the vault's mods folder, usable at once (mounted). */
+  int InstallModBody(
+    lua_State* const L
+  )
+  {
+    const std::string url = lua_istable(L, 1) ? TableString(L, 1, "url") : "";
+    const std::string uid = lua_istable(L, 1) ? TableString(L, 1, "uid") : "";
+    if (!AllowedModUrl(url)) {
+      lua_pushnil(L);
+      lua_pushstring(L, "mods download only from FAF's content server");
+      return 2;
+    }
+    const std::filesystem::path mods = ModsFolder();
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("mod", [url, uid, mods](Job& job) {
+      platform::http::Call call;
+      call.url = url;
+      call.userAgent = UserAgent();
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body, &job.received, &job.total); !sent) {
+        job.Fail("the mod didn't download: " + sent.error());
+        return;
+      }
+      if (status != 200) {
+        job.Fail("FAF's content server answered HTTP " + std::to_string(status));
+        return;
+      }
+      const auto installed = InstallModZip(body, uid, mods);
+      if (!installed) {
+        job.Fail(installed.error());
+        return;
+      }
+      LogLine("installed the mod " + *installed + " into " + mods.string());
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.path = (mods / *installed).string();
+      job.message = *installed;
+    })));
+    return 1;
+  }
+
+  /**
+   * ok, why = FafLibrary_RemoveMod(folder): the mod's folder (its name under the vault's mods folder) out of the file
+   * system and off the disk.
+   */
+  int RemoveModBody(
+    lua_State* const L
+  )
+  {
+    const std::string folder = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    if (!SafeFolderName(folder)) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, "not a mod's folder");
+      return 2;
+    }
+    const std::filesystem::path path = ModsFolder() / folder;
+    std::error_code error;
+    if (!std::filesystem::is_directory(path, error)) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, ("no mod folder " + path.string()).c_str());
+      return 2;
+    }
+    (void)moho::DISK_UnmountNow(("/mods/" + folder).c_str());
+    std::filesystem::remove_all(path, error);
+    if (error) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, ("can't delete " + path.string() + ": " + error.message()).c_str());
+      return 2;
+    }
+    LogLine("removed the mod " + path.string());
+    lua_pushboolean(L, 1);
+    lua_pushnil(L);
+    return 2;
+  }
+
+  /** text FafLibrary_ModsFolder(): the vault's mods folder on disk. */
+  int ModsFolderBody(
+    lua_State* const L
+  )
+  {
+    lua_pushstring(L, ModsFolder().string().c_str());
+    return 1;
+  }
+
   /** id = FafLibrary_SearchMods{name=, author=, type=, recommended=, sort=, page=, pageSize=}. */
   int SearchModsBody(
     lua_State* const L
@@ -790,6 +1038,14 @@ namespace
     if (job->thread.joinable()) {
       job->thread.join();
     }
+    if (job->kind == "mod" && !job->failed && !job->mounted) {
+      job->mounted = true;
+      const std::string folder = job->message;
+      (void)moho::DISK_UnmountNow(("/mods/" + folder).c_str()); // an older version's
+      if (!moho::DISK_MountDirectoryNow(std::filesystem::path(job->path), ("/mods/" + folder).c_str())) {
+        job->Fail("installed, but the game couldn't read it yet: it is there after a restart");
+      }
+    }
     {
       std::lock_guard<std::mutex> guard(job->lock);
       SetField(L, "state", job->failed ? "failed" : "done");
@@ -874,6 +1130,30 @@ namespace
       nullptr,
       "<global>",
       "number FafLibrary_SearchMods(query) - searches FAF's mod vault; FafLibrary_Job(id) has the answer."
+    );
+    static moho::CScrLuaBinder installMod(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_InstallMod",
+      &Binding<&InstallModBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_InstallMod{url=, uid=} - downloads a mod from FAF's vault and makes it usable at once."
+    );
+    static moho::CScrLuaBinder removeMod(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_RemoveMod",
+      &Binding<&RemoveModBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafLibrary_RemoveMod(folder) - takes a mod out of the game and off the disk."
+    );
+    static moho::CScrLuaBinder modsFolder(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_ModsFolder",
+      &Binding<&ModsFolderBody>,
+      nullptr,
+      "<global>",
+      "string FafLibrary_ModsFolder() - the vault's mods folder on disk."
     );
     static moho::CScrLuaBinder job(
       moho::SCR_UserLuaInitSet(),

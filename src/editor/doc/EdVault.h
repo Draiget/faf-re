@@ -29,8 +29,8 @@ namespace faf::editor
    */
   [[nodiscard]] std::expected<VaultMapName, std::string> ParseVaultMapName(const std::string& text);
 
-  /** The entries of a zip archive in memory (stored or deflated; sizes from the central directory). */
-  [[nodiscard]] std::expected<std::vector<ZipEntry>, std::string> ReadZip(const std::string& zip);
+  /** The zip reader, from faf_online since the in-game launcher's mods page (src/online/Zip.h). */
+  using online::ReadZip;
 
   /**
    * Where a zip entry goes inside the map's folder: its path below the archive's top folder, which must be `folder`

@@ -4,14 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "online/Zip.h"
+
 namespace faf::editor
 {
   /** A file to put in a zip: its name inside the zip (with '/' between folders) and its bytes. */
-  struct ZipEntry
-  {
-    std::string name;
-    std::string data;
-  };
+  /** A file in a zip archive (src/online/Zip.h, shared with the in-game launcher). */
+  using online::ZipEntry;
 
   /**
    * A zip archive of the entries, each deflated (zlib, raw) or stored when deflating doesn't make it smaller, with

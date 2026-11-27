@@ -1368,6 +1368,13 @@ namespace moho
   bool DISK_MountDirectoriesNow(const std::vector<std::pair<std::filesystem::path, std::string>>& folders);
 
   /**
+   * Engine addition (in-game launcher plan, WP6, removing a mod): takes every folder mounted at `mountpoint` (as
+   * DISK_MountDirectoryNow or the init file mounted it; case and a trailing '/' aside) out of the file system, rebuilt
+   * as DISK_MountDirectoryNow does. The number taken out; 0 changes nothing.
+   */
+  int DISK_UnmountNow(const char* mountpoint);
+
+  /**
    * Address: 0x00459DA0 (FUN_00459DA0,
    * ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
    *

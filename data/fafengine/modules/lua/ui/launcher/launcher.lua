@@ -1730,12 +1730,12 @@ function Launcher:Refresh()
         self.refreshFailed = true
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
     end
-    if self.page == 'replays' and self.replaysView then
-        local view = self.replaysView
-        local done, why = pcall(view.Refresh, view)
-        if not done and not self.replaysFailed then
-            self.replaysFailed = true
-            WARN('LAUNCHER: the replays page failed to update: ' .. tostring(why))
+    local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or nil
+    if pageView then
+        local done, why = pcall(pageView.Refresh, pageView)
+        if not done and not self.pageFailed then
+            self.pageFailed = true
+            WARN('LAUNCHER: the ' .. self.page .. ' page failed to update: ' .. tostring(why))
         end
     end
     if self.status then
@@ -2057,7 +2057,13 @@ function Launcher:WatchReplay(path)
     return true
 end
 
+--- The Mods page (modspage.lua): installed mods and FAF's mod vault. FAF's own mod manager is still there for a build
+--- without the engine's mod library.
 function Launcher:Mods()
+    if self.pages.mods then
+        self:ShowPage('mods')
+        return
+    end
     self:OpenScreen('Mods', function(host, back)
         -- FAF's own main menu goes through /lua/ui/dialogs/modmanager.lua, which hands its callback to the mod
         -- manager as `availableMods`; the manager loops over that table (`for _, peerMods in mods.availableToAll`),
@@ -2232,7 +2238,7 @@ local function BuildRail(launcher, body)
         { 'users', 'LAN', function() launcher:Lan() end },
         'Library',
         { 'replays', 'Replays', function() launcher:Replays() end, 'replays' },
-        { 'mods', 'Mods', function() launcher:Mods() end },
+        { 'mods', 'Mods', function() launcher:Mods() end, 'mods' },
         'Game',
         { 'settings', 'Options', function() launcher:Options() end },
         { 'home', 'FAF main menu', function() launcher:FafMenu() end },
@@ -2370,6 +2376,16 @@ local function Build(launcher)
         import('/fafengine/modules/lua/ui/launcher/replays.lua').Build(launcher, replaysPage)
         Theme.SetVisible(replaysPage, false)
     end
+    -- Mods: installed and FAF's vault (modspage.lua), with the engine's mod library.
+    if rawget(_G, 'FafLibrary_InstallMod') then
+        local modsPage = Group(content, 'launcher mods')
+        LayoutHelpers.FillParent(modsPage, content)
+        modsPage.Width:Set(function() return modsPage.Right() - modsPage.Left() end)
+        modsPage.Height:Set(function() return modsPage.Bottom() - modsPage.Top() end)
+        launcher.pages.mods = modsPage
+        import('/fafengine/modules/lua/ui/launcher/modspage.lua').Build(launcher, modsPage)
+        Theme.SetVisible(modsPage, false)
+    end
 
     -- Updates the page while the launcher shows.
     local ticker = Group(body, 'launcher ticker')
@@ -2482,6 +2498,7 @@ function TestWalk()
         end
         Prefs.SetToCurrentProfile('MenuTutorialPrompt', true)
         local watchAtStart = GetCommandLineArg('/launcherreplaywatch', 0)
+        local installTest = GetCommandLineArg('/launchermodinstall', 0)
         Step('home')
         Wait(4)
         -- /launcherreplaytest <file>: a replay of a game version this engine doesn't model is refused with the
@@ -2672,7 +2689,59 @@ function TestWalk()
             end
             current:ShowPage('online')
         end
-        for _, screen in { 'Skirmish', 'Multiplayer LAN', 'Mods', 'Options' } do
+        -- The Mods page: installed mods, the vault's first page; with /launchermodinstall, the vault's first mod
+        -- installed, turned on and off, and removed again.
+        if current and current.modsView then
+            current:ShowPage('mods')
+            Wait(2)
+            local mods = current.modsView
+            local function Count()
+                local n = 0
+                for _ in mods:Installed() do
+                    n = n + 1
+                end
+                return n
+            end
+            Step('mods page: ' .. Count() .. ' installed')
+            mods:SetTab('vault')
+            for i = 1, 30 do
+                if not mods.searchJob then
+                    break
+                end
+                Wait(0.5)
+            end
+            Step('mod vault: ' .. table.getn(mods.vaultItems) .. ' mods, page ' .. mods.vaultPage .. ' of ' ..
+                mods.vaultPages .. (mods.status ~= '' and (', ' .. mods.status) or ''))
+            local first = mods.vaultItems[1]
+            if installTest and first then
+                mods.vaultList.selectedKey = first.key
+                mods.selected = first
+                mods:Act()
+                for i = 1, 40 do
+                    if not mods.installJob then
+                        break
+                    end
+                    Wait(0.5)
+                end
+                Wait(1)
+                Step('after the install: ' .. mods.status .. ', installed ' .. Count() .. ', ' .. first.uid ..
+                    (mods:Installed()[first.uid] and ' is in the game\'s mod list' or ' is NOT in the game\'s mod list'))
+                mods:Act()
+                Step('turned on: ' .. tostring(mods:IsOn(first.uid)))
+                Wait(2)
+                mods:Act()
+                Step('turned off: ' .. tostring(not mods:IsOn(first.uid)))
+                mods:SetTab('local')
+                mods.selected = mods:Installed()[first.uid]
+                mods:Remove()
+                Wait(1)
+                Step('after removing: ' .. mods.status .. ', installed ' .. Count() .. ', ' ..
+                    (mods:Installed()[first.uid] and 'still listed' or 'gone from the list'))
+            end
+            Wait(2)
+            current:ShowPage('online')
+        end
+        for _, screen in { 'Skirmish', 'Multiplayer LAN', 'Options' } do
             local launcher = current
             if not launcher then
                 Step('the launcher is gone before ' .. screen)
