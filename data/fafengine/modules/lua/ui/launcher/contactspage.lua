@@ -100,10 +100,14 @@ function Build(launcher, page)
         { icon = 'userX', width = 181 })
     view.foeButton.Left:Set(function() return view.friendButton.Right() + Scale(10) end)
     view.foeButton.Top:Set(view.friendButton.Top)
+    view.messageButton = Theme.Button(detail, 'Message', function() view:Message() end, 'secondary',
+        { icon = 'chat', width = 372 })
+    view.messageButton.Left:Set(view.who.Left)
+    view.messageButton.Top:Set(function() return view.friendButton.Bottom() + Scale(10) end)
     view.status = Theme.Paragraph(detail, 12, C.subtle)
     view.status.Left:Set(view.who.Left)
     view.status.Right:Set(function() return detail.Right() - Scale(x) end)
-    view.status.Top:Set(function() return view.friendButton.Bottom() + Scale(16) end)
+    view.status.Top:Set(function() return view.messageButton.Bottom() + Scale(16) end)
 
     ----------------------------------------------------------------------------------------------------------------
 
@@ -116,6 +120,16 @@ function Build(launcher, page)
         if login then
             launcher:ShowProfile(login)
         end
+    end
+
+    --- A private conversation with the chosen player in the chat (which signs in first when it isn't).
+    function view:Message()
+        local login = Login(self.chosen)
+        if not login or not launcher.chatView then
+            return
+        end
+        launcher:ShowPage('chat')
+        launcher.chatView:OpenPrivate(login)
     end
 
     --- Friend or foe on (when off) or off (when on), through FAF's lobby.
@@ -275,6 +289,8 @@ function Build(launcher, page)
             'Choose a player.')
         Theme.SetText(self.relation, item and ((item.friend and 'Your friend') or (item.foe and 'Your foe') or '') or '')
         self.profileButton:SetEnabled(login ~= nil)
+        local chat = rawget(_G, 'FafChat_Status') and FafChat_Status() or {}
+        self.messageButton:SetEnabled(login ~= nil and chat.state == 'joined' and item ~= nil and item.online == true)
         self.friendButton:SetLabel(item and item.friend and 'Remove friend' or 'Add friend')
         self.foeButton:SetLabel(item and item.foe and 'Remove foe' or 'Add foe')
         self.friendButton:SetEnabled(item ~= nil and signedIn)

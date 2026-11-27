@@ -1388,6 +1388,15 @@ namespace
     return 2;
   }
 
+  /** FafChat_Private(nick): a private conversation with that player among the chat's channels (Leave closes it). */
+  int ChatPrivateBody(
+    lua_State* const L
+  )
+  {
+    TheService().chat.OpenPrivate(lua_isstring(L, 1) ? lua_tostring(L, 1) : "");
+    return 0;
+  }
+
   /**
    * table FafOnline_Queues(): FAF's matchmaker: state (idle, searching, found, cancelled), matched (the queue a match
    * was found in), queues = {{name, teamSize, players, popIn (seconds), searching}, ...}.
@@ -2188,6 +2197,14 @@ namespace
       nullptr,
       "<global>",
       "bool, string FafChat_Leave(channel) - leaves a channel."
+    );
+    static CScrLuaBinder chatPrivate(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Private",
+      &Binding<&ChatPrivateBody>,
+      nullptr,
+      "<global>",
+      "FafChat_Private(nick) - a private conversation with that player among the channels."
     );
     static CScrLuaBinder queues(
       moho::SCR_UserLuaInitSet(),

@@ -88,6 +88,8 @@ namespace faf::online
     std::expected<void, std::string> Say(const std::string& channel, const std::string& text);
     std::expected<void, std::string> Join(const std::string& channel);
     std::expected<void, std::string> Part(const std::string& channel);
+    /** A private conversation with `nick` among the channels (named after them), with nothing said yet. */
+    void OpenPrivate(const std::string& nick);
 
     /** One IRC line taken apart: tags, the sender's nick, the command and its parameters (the trailing one last). */
     struct IrcMessage
@@ -112,6 +114,7 @@ namespace faf::online
     void Run(TokenSource token, std::string nick);
     void Handle(const IrcMessage& message);
     void Add(const std::string& channel, FafChatLine line);
+    void OpenConversation(const std::string& nick); ///< with mLock held
     std::expected<void, std::string> SendLine(const std::string& line);
     void Fail(std::string why);
     void Log(const std::string& text) const;

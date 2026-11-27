@@ -68,7 +68,9 @@ function Build(launcher, page)
     channels.Height:Set(function() return channels.Bottom() - channels.Top() end)
     view.channelList = Widgets.VirtualList(channels, {
         { 'Channels', 1.0, function(item)
-            return item.key .. ((view.unread[item.key] or 0) > 0 and ('  (' .. view.unread[item.key] .. ')') or '')
+            local private = string.sub(item.key, 1, 1) ~= '#' and string.sub(item.key, 1, 1) ~= '&'
+            return item.key .. (private and '  - private' or '') ..
+                ((view.unread[item.key] or 0) > 0 and ('  (' .. view.unread[item.key] .. ')') or '')
         end },
     }, function(item)
         view:Choose(item.key)
@@ -183,6 +185,14 @@ function Build(launcher, page)
             self.notice = tostring(why)
         end
         self:Refresh()
+    end
+
+    --- A private conversation with `nick`, opened and shown (FafChat_Private; Leave closes it).
+    function view:OpenPrivate(nick)
+        if rawget(_G, 'FafChat_Private') and nick and nick ~= '' then
+            FafChat_Private(nick)
+            self:Choose(nick)
+        end
     end
 
     function view:Choose(channel)

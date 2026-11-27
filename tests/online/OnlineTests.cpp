@@ -2117,6 +2117,11 @@ TEST(
     if (received.rfind("PRIVMSG #aeolus :", 0) == 0) {
       return {"@time=2026-11-27T10:02:00.000Z :Other!u@h PRIVMSG #aeolus :welcome back", "PING :keepalive"};
     }
+    if (received == "PRIVMSG Other :psst") {
+      return {
+        ":Other!u@h PRIVMSG Tester :hi back", ":NickServ!s@services.faforever.com NOTICE Tester :you are identified"
+      };
+    }
     return {};
   }, {}, true);
   FafChatSettings settings;
@@ -2169,6 +2174,25 @@ TEST(
     const auto received = server.Received();
     return std::find(received.begin(), received.end(), "PONG :keepalive") != received.end();
   }));
+
+  // A private message: a conversation named after the other player, both sides in it; the services' notice opens none.
+  ASSERT_TRUE(chat.Say("Other", "psst"));
+  ASSERT_TRUE(waitFor([&] {
+    (void)chat.Lines("Other", 0, total);
+    return total >= 2;
+  }));
+  lines = chat.Lines("Other", 0, total);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0].text, "psst");
+  EXPECT_TRUE(lines[0].self);
+  EXPECT_EQ(lines[1].from, "Other");
+  EXPECT_EQ(lines[1].text, "hi back");
+  EXPECT_EQ(chat.Channels(), (std::vector<std::string>{"#aeolus", "Other"}));
+  // Closing it sends nothing: there is nothing to leave on the server.
+  ASSERT_TRUE(chat.Part("Other"));
+  EXPECT_EQ(chat.Channels(), std::vector<std::string>{"#aeolus"});
+  const auto afterPart = server.Received();
+  EXPECT_EQ(std::find(afterPart.begin(), afterPart.end(), "PART Other"), afterPart.end());
 
   // SASL PLAIN as FAF's clients send it: nick, nick, "token:" and the chat's token.
   const auto received = server.Received();

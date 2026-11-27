@@ -522,8 +522,18 @@ namespace faf::online
       mChannels[Lower(param(1))].topic = message.params.empty() ? std::string() : message.params.back();
     } else if (command == "PRIVMSG" || command == "NOTICE") {
       const std::string target = param(0);
-      if (target.empty() || (target[0] != '#' && target[0] != '&')) {
-        return; // private messages: not shown yet
+      if (target.empty()) {
+        return;
+      }
+      // A private message: a conversation named after the other player (the services' notices stay out).
+      const bool isPrivate = target[0] != '#' && target[0] != '&';
+      if (isPrivate && (command == "NOTICE" || message.nick.empty() || message.nick.find('.') != std::string::npos)) {
+        return;
+      }
+      const std::string conversation = isPrivate ? (message.nick == Nick() ? target : message.nick) : target;
+      if (isPrivate) {
+        std::lock_guard<std::mutex> lock(mLock);
+        OpenConversation(conversation);
       }
       std::string text = message.params.size() >= 2 ? message.params.back() : std::string();
       bool action = false;
@@ -548,7 +558,7 @@ namespace faf::online
       line.action = action;
       line.event = command == "NOTICE";
       line.history = message.tags.contains("batch");
-      Add(target, std::move(line));
+      Add(conversation, std::move(line));
     } else if (command == "ERROR") {
       Fail("FAF's chat: " + (message.params.empty() ? std::string("error") : message.params.back()));
     }
@@ -579,6 +589,10 @@ namespace faf::online
     if (const auto sent = SendLine("PRIVMSG " + channel + " :" + body); !sent) {
       return sent;
     }
+    if (!channel.empty() && channel[0] != '#' && channel[0] != '&') {
+      std::lock_guard<std::mutex> lock(mLock);
+      OpenConversation(channel);
+    }
     // The server doesn't send one's own lines back (no echo-message): kept here as they were sent.
     FafChatLine line;
     line.from = Nick();
@@ -604,10 +618,44 @@ namespace faf::online
     const std::string& channel
   )
   {
+    // A private conversation closes here: there is nothing to leave on the server.
+    if (!channel.empty() && channel[0] != '#' && channel[0] != '&') {
+      std::lock_guard<std::mutex> lock(mLock);
+      if (const auto found = mChannels.find(Lower(channel)); found != mChannels.end()) {
+        found->second.joined = false;
+      }
+      std::erase(mOrder, channel);
+      return {};
+    }
     const std::string name = ChannelName(channel);
     if (name.empty()) {
       return std::unexpected(std::string("not a channel's name"));
     }
     return SendLine("PART " + name);
+  }
+
+  void FafChat::OpenPrivate(
+    const std::string& nick
+  )
+  {
+    if (nick.empty() || nick[0] == '#' || nick[0] == '&' || nick.find_first_of(" ,\a\r\n") != std::string::npos) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(mLock);
+    OpenConversation(nick);
+  }
+
+  void FafChat::OpenConversation(
+    const std::string& nick
+  )
+  {
+    Channel& kept = mChannels[Lower(nick)];
+    if (!kept.joined) {
+      kept.joined = true;
+      kept.users.insert(nick);
+    }
+    if (std::find(mOrder.begin(), mOrder.end(), nick) == mOrder.end()) {
+      mOrder.push_back(nick);
+    }
   }
 } // namespace faf::online

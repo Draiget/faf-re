@@ -1992,6 +1992,9 @@ function Launcher:Refresh()
     if self.topBar then
         self.topBar:Update(self.lastStatus)
     end
+    if self.notify then
+        self.notify:Poll()
+    end
 end
 
 function Launcher:SelectGame(key)
@@ -2600,8 +2603,9 @@ local function TopTab(launcher, bar, iconName, label, action, pages)
     --- Compact: the icon only (its name in a tip on hover), for a bar too narrow for every name.
     item.SetCompact = function(self, compact)
         self.compact = compact and true or false
+        LayoutHelpers.AtLeftIn(icon, self, self.compact and 10 or 14)
         if self.compact then
-            self.Width:Set(function() return Scale(14 + 18 + 14) end) -- margins and the icon: placed from either edge
+            self.Width:Set(function() return Scale(10 + 18 + 10) end) -- margins and the icon: placed from either edge
             underline.Right:Set(function() return icon.Right() + Scale(6) end)
         else
             self.Width:Set(function() return self:FullWidth() end)
@@ -2694,6 +2698,7 @@ local function BuildTopBar(launcher, body)
         end, kVaultPages },
         { 'units', 'Units', function() launcher:ShowPage('units') end, { units = true } },
         -- Utilities: icons by the account, their names in a tip.
+        { 'bell', 'Notifications', function() launcher.notify:OpenList() end, {}, true },
         { 'news', 'News', function() launcher:ShowPage('news') end, { news = true }, true },
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true }, true },
         { 'settings', 'Settings', function() launcher:Options() end, { options = true }, true },
@@ -2712,7 +2717,7 @@ local function BuildTopBar(launcher, body)
             else
                 local after = before
                 item.Left:Set(function()
-                    return after and after.Right() or math.max(subtitle.Right(), name.Right()) + Scale(36)
+                    return after and after.Right() or math.max(subtitle.Right(), name.Right()) + Scale(28)
                 end)
                 table.insert(launcher.navItems, item)
                 before = item
@@ -2740,11 +2745,16 @@ local function BuildTopBar(launcher, body)
     LayoutHelpers.AtTopIn(note, account, 24)
     -- The utilities right of the tabs, left of the account's name (which grows with the login).
     local utilities = launcher.utilityItems
+    for _, item in utilities do
+        if item.label == 'Notifications' and launcher.notify then
+            launcher.notify:AttachBell(item)
+        end
+    end
     for i = table.getn(utilities), 1, -1 do
         local item = utilities[i]
         local after = utilities[i + 1]
         item.Right:Set(function()
-            return after and after.Left() or (math.min(who.Left(), note.Left()) - Scale(20))
+            return after and after.Left() or (math.min(who.Left(), note.Left()) - Scale(12))
         end)
         item.Left:Set(function() return item.Right() - item.Width() end)
     end
@@ -2778,6 +2788,8 @@ local function BuildTopBar(launcher, body)
             end
             local room = TabsEnd() - Scale(24) - items[1].Left()
             local compact = need > room
+            launcher.topFit = { need = need, room = room, ends = TabsEnd(), first = items[1].Left(),
+                who = math.min(who.Left(), note.Left()) }
             if compact ~= launcher.compactTabs then
                 launcher.compactTabs = compact
                 for _, item in items do
@@ -3168,6 +3180,7 @@ local function Build(launcher)
     body.Depth:Set(function() return root.Depth() + 10 end)
     launcher.body = body
 
+    launcher.notify = import('/fafengine/modules/lua/ui/launcher/notify.lua').Create(launcher)
     local bar = BuildTopBar(launcher, body)
     launcher.topBar = bar
     launcher.status = BuildStatusBar(launcher, body)
@@ -3965,6 +3978,47 @@ function TestWalk()
                     Wait(3)
                     Step('matchmaking: after Stop, state ' .. FafOnline_Queues().state)
                 end
+            end
+            -- /launchernotifytest: notifications away from the chat: a line naming the player, a private message
+            -- (each a toast and a notice), the bell's list, a notice's click opening its conversation.
+            if GetCommandLineArg('/launchernotifytest', 0) and current.chatView and current.notify then
+                current:ShowPage('chat')
+                current.chatView:Start()
+                for i = 1, 20 do
+                    if FafChat_Status().state == 'joined' and table.getn(FafChat_Status().channels) > 0 then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                current:ShowPage('units')
+                Wait(2)
+                FafChat_Say('#aeolus', 'ping from the walk')
+                Wait(3)
+                FafChat_Say('Nadir', 'psst')
+                Wait(3)
+                current:Refresh()
+                local titles = {}
+                for _, notice in current.notify.notices do
+                    table.insert(titles, notice.kind .. ': ' .. notice.title .. ' / ' .. notice.text)
+                end
+                Step('notify: ' .. table.getn(current.notify.notices) .. ' notices, ' .. current.notify.unseen ..
+                    ' unseen, ' .. table.getn(current.notify.toasts) .. ' toasts: ' .. table.concat(titles, '; '))
+                Wait(1)
+                current.notify:OpenList()
+                Wait(2)
+                local fit = current.topFit or {}
+                Step('notify: list open, unseen ' .. current.notify.unseen .. ', top bar need ' .. tostring(fit.need) ..
+                    ' room ' .. tostring(fit.room) .. ' ends ' .. tostring(fit.ends) .. ' first ' .. tostring(fit.first) ..
+                    ' who ' .. tostring(fit.who))
+                if current.notify.list and current.notify.list.Close then
+                    current.notify.list.Close()
+                end
+                current.notify:Act(current.notify.notices[1])
+                Wait(2)
+                Step('notify: after the newest notice: page ' .. tostring(current.page) .. ', channel ' ..
+                    tostring(current.chatView.channel) .. ', channels ' .. table.concat(FafChat_Status().channels, ', '))
+                Wait(1)
             end
             -- /launcherchattest: the Chat page: the chat started, a line said, a second channel joined.
             if GetCommandLineArg('/launcherchattest', 0) and current.chatView then
