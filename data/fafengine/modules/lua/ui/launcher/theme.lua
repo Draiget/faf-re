@@ -51,7 +51,9 @@ end
 -- shows every piece. Weak, so destroyed controls drop out.
 local paintables = setmetatable({}, { __mode = 'k' })
 
-local function Paintable(control)
+--- Registers a control whose :Paint(false) hides again the pieces it keeps hidden; RepaintAll calls it after a Show
+--- on an ancestor showed them.
+function Paintable(control)
     paintables[control] = true
 end
 
@@ -436,6 +438,31 @@ function Button(parent, label, onClick, kind, opts)
         return false
     end)
     return button
+end
+
+--- Three dots that pulse one after the other: something is on its way. They only move while shown.
+function Loader(parent, color)
+    local loader = Group(parent)
+    loader:DisableHitTest()
+    LayoutHelpers.SetDimensions(loader, 44, 10)
+    local dots = {}
+    for i = 1, 3 do
+        local dot = Dot(loader, 8, color or Colors.accent)
+        LayoutHelpers.AtLeftIn(dot, loader, (i - 1) * 18)
+        LayoutHelpers.AtVerticalCenterIn(dot, loader)
+        dots[i] = dot
+    end
+    loader.time = 0
+    loader:SetNeedsFrameUpdate(true)
+    loader.OnFrame = function(self, delta)
+        self.time = self.time + delta
+        for i, dot in dots do
+            -- Each dot brightens for a third of a 1.2 s cycle, the next one a third later.
+            local phase = math.mod(self.time / 1.2 - (i - 1) / 3 + 1, 1)
+            dot:SetAlpha(phase < 0.5 and (0.3 + 1.4 * phase) or (1.0 - 1.4 * (phase - 0.5)))
+        end
+    end
+    return loader
 end
 
 --- A small tag: square, bordered and lettered in one colour.

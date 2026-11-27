@@ -759,6 +759,13 @@ local function HoverCard(parent, launcher)
     LayoutHelpers.AtLeftTopIn(card, parent, 0, 0)
     card:DisableHitTest(true)
     Theme.SetVisible(card, false)
+    -- A Show on the page shows every child, this card too: hidden again unless it shows a game now.
+    card.Paint = function(self)
+        if not (self.shown and self.content) then
+            Theme.SetVisible(self, false)
+        end
+    end
+    Theme.Paintable(card)
 
     -- The pause before it shows, counted on a control of its own (a hidden one gets no frames).
     local ticker = Group(parent)
@@ -1219,6 +1226,21 @@ local function BuildOnlinePage(launcher, page)
 
     view.empty = Theme.Text(listArea, '', 14, C.subtle)
     LayoutHelpers.AtCenterIn(view.empty, listArea)
+    -- While FAF's lobby connects and sends its games: dots over the message.
+    view.loader = Theme.Loader(listArea)
+    LayoutHelpers.AtHorizontalCenterIn(view.loader, listArea)
+    view.loader.Bottom:Set(function() return view.empty.Top() - Scale(14) end)
+    Theme.SetVisible(view.loader, false)
+    -- FAF's lobby failed: the engine tries again by itself; this tries now.
+    view.retryLobby = Theme.Button(listArea, 'Try again', function()
+        if rawget(_G, 'FafOnline_RetryLobby') then
+            FafOnline_RetryLobby()
+        end
+        launcher:Refresh()
+    end, 'secondary', { width = 150, icon = 'refresh' })
+    LayoutHelpers.AtHorizontalCenterIn(view.retryLobby, listArea)
+    view.retryLobby.Top:Set(function() return view.empty.Bottom() + Scale(18) end)
+    Theme.SetVisible(view.retryLobby, false)
 
     view.footer = Theme.Cell(games, 12, C.subtle)
     view.footer.Left:Set(games.Left)
@@ -1246,7 +1268,13 @@ local function RefreshOnline(launcher)
     local signedIn = status.signIn == 'signedin'
     local waiting = status.signIn == 'waiting' or status.signIn == 'working'
     Theme.SetVisible(view.signIn, not signedIn)
-    Theme.SetVisible(view.games, signedIn)
+    if signedIn and view.games:IsHidden() then
+        Theme.SetVisible(view.games, true)
+        -- The Show showed every piece the page keeps hidden (brackets of disabled buttons, the hover card).
+        Theme.RepaintAll()
+    else
+        Theme.SetVisible(view.games, signedIn)
+    end
     view.avatar:SetLogin(signedIn and status.login or '')
     Theme.SetText(view.who, signedIn and status.login or 'Not signed in')
     local lobbyText = ({ off = 'not connected', connecting = 'connecting', signedin = 'FAF lobby connected',
@@ -1361,7 +1389,18 @@ local function RefreshOnline(launcher)
     end
 
     local empty = ''
-    if table.getn(items) == 0 then
+    -- FAF's lobby not there yet: the games are still on their way, whatever the filters say.
+    local loading = status.lobby == 'connecting' or status.lobby == 'off'
+    if loading and table.getn(items) == 0 then
+        empty = status.lobby == 'off' and 'Connecting to the FAF lobby...' or 'Loading games from the FAF lobby...'
+    elseif status.lobby == 'failed' and table.getn(items) == 0 then
+        -- The engine's message starts with its own "the lobby: ".
+        local why = string.gsub(status.lobbyMessage or '', '^the lobby: ', '')
+        empty = 'No connection to the FAF lobby' .. (why ~= '' and (': ' .. why) or '') .. '.'
+        if (status.lobbyRetryIn or 0) > 0 then
+            empty = empty .. string.format(' Trying again in %d s.', status.lobbyRetryIn)
+        end
+    elseif table.getn(items) == 0 then
         if filter ~= '' or hidePrivate or hideModded then
             empty = 'No game matches the search and filters.'
         else
@@ -1369,6 +1408,10 @@ local function RefreshOnline(launcher)
         end
     end
     Theme.SetText(view.empty, empty)
+    Theme.SetColor(view.empty, status.lobby == 'failed' and C.bad or C.subtle)
+    Theme.SetVisible(view.loader, loading and table.getn(items) == 0)
+    Theme.SetVisible(view.retryLobby, status.lobby == 'failed' and table.getn(items) == 0 and
+        rawget(_G, 'FafOnline_RetryLobby') ~= nil)
 
     local footer
     local footerColor = C.subtle
@@ -1381,6 +1424,9 @@ local function RefreshOnline(launcher)
     elseif launcher.lastError then
         footer = launcher.lastError
         footerColor = C.bad
+    elseif loading then
+        footer = 'Connecting to the FAF lobby. Create game unlocks once it answers.'
+        footerColor = C.accent
     elseif selected and not wide then
         local why = WhyNotJoinable(selected, status)
         footer = why or (selected.title .. ' on ' .. MapTitle(selected.map) .. ', hosted by ' .. selected.host)

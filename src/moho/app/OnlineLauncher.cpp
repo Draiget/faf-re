@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <exception>
 #include <expected>
@@ -263,6 +264,10 @@ namespace
     FafAuth auth{GameEndpoints()};
     FafLobby lobby{GameLobbySettings()};
     bool lobbyStarted = false;
+    /// A failed lobby connection is tried again at this time (unset: no try planned).
+    std::chrono::steady_clock::time_point lobbyRetryAt{};
+    /// Failed tries in a row; the wait before the next doubles with each, from 5 s to 80 s.
+    int lobbyFailures = 0;
     LaunchPlayer me;
     bool haveMe = false;
     /// Every player the lobby told us about (player_info), by login: ratings, country and clan for the game list.
@@ -793,6 +798,11 @@ namespace
     SetField(L, "login", s.haveMe ? s.me.login : s.auth.UserName());
     SetField(L, "lobby", LobbyStateName(s.lobby.GetState()));
     SetField(L, "lobbyMessage", s.lobby.Message());
+    double retryIn = 0;
+    if (s.lobbyRetryAt != std::chrono::steady_clock::time_point{}) {
+      retryIn = std::max(0.0, std::chrono::duration<double>(s.lobbyRetryAt - std::chrono::steady_clock::now()).count());
+    }
+    SetField(L, "lobbyRetryIn", std::ceil(retryIn)); // seconds to the next try after a failure; 0: none planned
     SetField(L, "notice", s.notice);
     SetField(L, "match", MatchStateName(s.match));
     // The FAF game the match is (its uid in FafOnline_Games), for the lobby screen's title and rules.
@@ -841,9 +851,35 @@ namespace
     Service& s = TheService();
     s.lobby.Disconnect();
     s.lobbyStarted = false;
+    s.lobbyRetryAt = {};
+    s.lobbyFailures = 0;
     s.haveMe = false;
     s.auth.Logout();
     return 0;
+  }
+
+  /** Connects to FAF's lobby again after it failed (its last message stays until the new try reports). */
+  void RetryLobby(
+    Service& s
+  )
+  {
+    s.lobbyRetryAt = {};
+    LogLine("trying FAF's lobby again");
+    s.lobby.Connect(s.Tokens());
+  }
+
+  /** ok = FafOnline_RetryLobby(): connects to FAF's lobby again now, when it failed. */
+  int RetryLobbyBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const bool retry = s.lobbyStarted && s.lobby.GetState() == FafLobby::State::Failed;
+    if (retry) {
+      RetryLobby(s);
+    }
+    lua_pushboolean(L, retry ? 1 : 0);
+    return 1;
   }
 
   /** FafOnline_OpenSignInPage(): hands the sign-in page to the browser again (the engine opens it once by itself). */
@@ -1145,6 +1181,14 @@ namespace
       "<global>",
       "FafOnline_OpenSignInPage() - hands FAF's sign-in page to the browser (again)."
     );
+    static CScrLuaBinder retryLobby(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_RetryLobby",
+      &Binding<&RetryLobbyBody>,
+      nullptr,
+      "<global>",
+      "bool FafOnline_RetryLobby() - connects to FAF's lobby again now, when the connection failed."
+    );
     static CScrLuaBinder games(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_Games",
@@ -1248,10 +1292,29 @@ void moho::ONLINE_Frame()
   } else if (!s.SignedIn() && s.auth.GetState() == FafAuth::State::LoggedOut && s.lobbyStarted) {
     s.lobby.Disconnect();
     s.lobbyStarted = false;
+    s.lobbyRetryAt = {};
+    s.lobbyFailures = 0;
     for (const auto& control : s.controls) {
       control->Stop();
     }
     s.controls.clear();
+  }
+  // FAF's lobby dropped or never answered: tried again by itself, 5 s after the first failure, the wait doubling up
+  // to 80 s, as the official client reconnects. Not while a match starts or runs: its game messages use this
+  // connection, and a new one would be a second session in FAF's eyes.
+  if (
+    s.lobbyStarted && s.lobby.GetState() == FafLobby::State::Failed &&
+    (s.match == MatchState::Idle || s.match == MatchState::Failed)
+  ) {
+    const auto now = std::chrono::steady_clock::now();
+    if (s.lobbyRetryAt == std::chrono::steady_clock::time_point{}) {
+      s.lobbyRetryAt = now + std::chrono::seconds(5 << std::min(s.lobbyFailures, 4));
+      ++s.lobbyFailures;
+    } else if (now >= s.lobbyRetryAt) {
+      RetryLobby(s);
+    }
+  } else if (s.lobby.GetState() == FafLobby::State::SignedIn) {
+    s.lobbyFailures = 0;
   }
   for (const JsonNode& message : s.lobby.TakeMessages()) {
     const std::string command = message.String("command");
