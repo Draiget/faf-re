@@ -60,6 +60,107 @@ local function Online()
     return rawget(_G, 'FafOnline_Status') ~= nil
 end
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- Profiles. A profile holds the player's options (video, sound, keys, lobby choices), so one is never swapped for a
+-- blank one: the FAF login renames the profile in use, or copies it, or switches to the one named after it.
+
+local function Profiles()
+    return GetPreference('profile.profiles') or {}
+end
+
+local function CurrentProfileIndex()
+    local current = GetPreference('profile.current')
+    local profiles = Profiles()
+    if current and current > 0 and profiles[current] then
+        return current
+    end
+    return nil
+end
+
+local function CopyTable(value)
+    if type(value) ~= 'table' then
+        return value
+    end
+    local copy = {}
+    for key, inner in value do
+        copy[key] = CopyTable(inner)
+    end
+    return copy
+end
+
+--- A first start: a profile made at once (FAF's profile dialog asked for a name first). Named after the FAF login
+--- once the player signs in.
+local function EnsureProfile()
+    if CurrentProfileIndex() then
+        return
+    end
+    local profiles = Profiles()
+    if table.getn(profiles) > 0 then
+        SetPreference('profile.current', 1) -- a damaged current index: the first profile
+        LOG('LAUNCHER: profile ' .. tostring(profiles[1].Name) .. ' in use')
+        return
+    end
+    local name = 'Player'
+    if Prefs.CreateProfile(name) then
+        Prefs.SetToCurrentProfile('fafre_profile_auto', true)
+        SavePreferences()
+        LOG('LAUNCHER: made the profile ' .. name .. ' (named after the FAF login once signed in)')
+    end
+end
+
+--- Switches to profile `index` and writes the preferences.
+local function UseProfile(index)
+    SetPreference('profile.current', index)
+    SavePreferences()
+    LOG('LAUNCHER: profile ' .. tostring(Profiles()[index] and Profiles()[index].Name) .. ' in use')
+end
+
+--- After FAF's sign-in: the profile named after the login in use. One named so already: switched to. Else the profile
+--- in use takes the login's name, unless it already belongs to another FAF login; then a copy of it does.
+local function ProfileForLogin(login)
+    if not login or login == '' then
+        return
+    end
+    local profiles = Profiles()
+    local current = CurrentProfileIndex()
+    for index, profile in profiles do
+        if profile.Name == login then
+            if index ~= current then
+                UseProfile(index)
+            end
+            Prefs.SetToCurrentProfile('fafre_profile_login', login)
+            return
+        end
+    end
+    if not current then
+        if Prefs.CreateProfile(login) then
+            Prefs.SetToCurrentProfile('fafre_profile_login', login)
+            SavePreferences()
+            LOG('LAUNCHER: made the profile ' .. login)
+        end
+        return
+    end
+    local profile = profiles[current]
+    local owner = profile.fafre_profile_login
+    if not owner or owner == login then
+        local before = profile.Name
+        profile.Name = login
+        profile.fafre_profile_login = login
+        profile.fafre_profile_auto = nil
+        SetPreference('profile.profiles', profiles)
+        SavePreferences()
+        LOG('LAUNCHER: the profile ' .. tostring(before) .. ' is now ' .. login .. ', named after the FAF login')
+        return
+    end
+    local copy = CopyTable(profile)
+    copy.Name = login
+    copy.fafre_profile_login = login
+    table.insert(profiles, copy)
+    SetPreference('profile.profiles', profiles)
+    UseProfile(table.getn(profiles))
+    LOG('LAUNCHER: made the profile ' .. login .. ' from ' .. tostring(profile.Name) .. ' (that one is ' .. owner .. '\'s)')
+end
+
 local function ModName(id)
     for _, mod in FeaturedMods do
         if mod.id == id then
@@ -1030,6 +1131,15 @@ local function BuildOnlinePage(launcher, page)
     view.whoNote = Theme.Text(account, '', 11, C.muted)
     view.whoNote.Right:Set(view.who.Right)
     LayoutHelpers.AtTopIn(view.whoNote, account, 22)
+    -- A click on the account: the profiles (each player's options) to switch to, and FAF's profile manager.
+    local accountClick = Theme.HitArea(account, function(self, event)
+        if event.Type == 'ButtonPress' and event.Modifiers.Left then
+            Theme.ClickSound()
+            launcher:ProfileMenu(view.avatar)
+            return true
+        end
+        return false
+    end)
 
     local divider = Theme.Rect(page, C.line)
     divider.Left:Set(page.Left)
@@ -1236,6 +1346,13 @@ local function RefreshOnline(launcher)
     end
     view.avatar:SetLogin(signedIn and status.login or '')
     Theme.SetText(view.who, signedIn and status.login or 'Not signed in')
+    if signedIn and status.login ~= '' and launcher.profileLogin ~= status.login then
+        launcher.profileLogin = status.login
+        local ok, why = pcall(ProfileForLogin, status.login)
+        if not ok then
+            WARN('LAUNCHER: the profile for ' .. status.login .. ' failed: ' .. tostring(why))
+        end
+    end
     local lobbyText = ({ off = 'not connected', connecting = 'connecting', signedin = 'FAF lobby connected',
         failed = 'FAF lobby failed' })[status.lobby] or status.lobby
     Theme.SetText(view.whoNote, signedIn and lobbyText or 'Sign in to play online')
@@ -2116,6 +2233,30 @@ function Launcher:Replays()
     end)
 end
 
+--- The profiles in a menu under `anchor`: each to switch to (the one in use marked), and FAF's profile manager.
+function Launcher:ProfileMenu(anchor)
+    local items = {}
+    local current = CurrentProfileIndex()
+    for index, profile in Profiles() do
+        table.insert(items, { (index == current and 'Profile: ' or 'Switch to ') .. tostring(profile.Name), key = index,
+            color = index == current and C.accent or C.text })
+    end
+    table.insert(items, { 'Manage profiles...', key = 'manage', color = C.muted })
+    local launcher = self
+    Widgets.Dropdown(anchor, items, function(item)
+        if item.key == 'manage' then
+            launcher:OpenScreen('Profiles', function(host, back)
+                import('/lua/ui/dialogs/profile.lua').CreateDialog(function()
+                    ForkThread(back)
+                end, host)
+            end)
+        elseif item.key ~= current then
+            UseProfile(item.key)
+            launcher:Refresh()
+        end
+    end, { width = 240 })
+end
+
 --- Watches a replay file (a FAF replay is decoded first), as FAF's replay screen launches one. False and why when the
 --- game can't start it.
 function Launcher:WatchReplay(path)
@@ -2490,13 +2631,8 @@ end
 function CreateUI(buildFafMenu)
     UIUtil.SetCurrentSkin('uef')
     import('/lua/ui/game/gamemain.lua').supressExitDialog = false
-    -- No profile yet: FAF's profile dialog first, as its main menu does; it comes back through main.lua's CreateUI.
-    if not GetPreference('profile.current') then
-        import('/lua/ui/dialogs/profile.lua').CreateDialog(function()
-            import('/lua/ui/menus/main.lua').CreateUI()
-        end)
-        return
-    end
+    -- No profile yet: one made at once (FAF's main menu asked for a name first), named after the FAF login later.
+    EnsureProfile()
     Cleanup()
     local launcher = setmetatable({ buildFafMenu = buildFafMenu, page = 'online' }, Launcher)
     current = launcher
