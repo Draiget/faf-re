@@ -194,11 +194,17 @@ local function TagRow(parent, count)
     return row
 end
 
+--- How a game runs: on our server (client-server) or between the players (P2P, every FAF game).
+local function NetworkKind(game)
+    if game.source == 'server' then
+        return 'SERVER', 'server', C.accent, 'Server game'
+    end
+    return 'P2P', 'p2p', C.subtle, 'P2P game'
+end
+
 local function GameTags(game, status)
     local tags = {}
-    if game.source == 'server' then
-        table.insert(tags, { 'Our server', C.accent })
-    elseif game.featuredMod ~= '' and game.featuredMod ~= 'faf' then
+    if game.source ~= 'server' and game.featuredMod ~= '' and game.featuredMod ~= 'faf' then
         table.insert(tags, { ModShort(game.featuredMod), C.violet })
     end
     if game.state ~= 'open' then
@@ -246,9 +252,20 @@ local function MakeTile(grid, launcher)
     tile.lock.Depth:Set(function() return frame.Depth() + 4 end)
 
     local left = function() return frame.Right() + Scale(14) end
+    -- P2P or server, at the top right: an icon per kind (an icon's colour is fixed) and the word.
+    tile.kindText = Theme.Text(tile, '', 10, C.subtle, true)
+    tile.kindText.Right:Set(function() return tile.Right() - Scale(12) end)
+    LayoutHelpers.AtTopIn(tile.kindText, tile, 13)
+    tile.kindIcons = {}
+    for _, name in { 'server', 'p2p' } do
+        local icon = Theme.Icon(tile, name, 13, name == 'server' and C.accent or C.subtle, 2)
+        icon.Right:Set(function() return tile.kindText.Left() - Scale(5) end)
+        LayoutHelpers.AtTopIn(icon, tile, 11)
+        tile.kindIcons[name] = icon
+    end
     tile.title = Theme.Cell(tile, 15, C.text, true)
     tile.title.Left:Set(left)
-    tile.title.Right:Set(function() return tile.Right() - Scale(12) end)
+    tile.title.Right:Set(function() return tile.kindText.Left() - Scale(26) end)
     LayoutHelpers.AtTopIn(tile.title, tile, 10)
     tile.players = StatBlock(tile, 'Players')
     tile.players.Left:Set(left)
@@ -279,6 +296,12 @@ local function MakeTile(grid, launcher)
         Theme.SetVisible(self.lock, item.password and true or false)
         Theme.SetText(self.title, item.title)
         Theme.SetColor(self.title, selected and C.accent or (dim and C.muted or C.text))
+        local kindWord, kindIcon, kindColor = NetworkKind(item)
+        Theme.SetText(self.kindText, kindWord)
+        Theme.SetColor(self.kindText, kindColor)
+        for name, icon in self.kindIcons do
+            Theme.SetVisible(icon, name == kindIcon)
+        end
         Theme.SetText(self.players.value, string.format('%d / %d', item.players, item.maxPlayers))
         local _, average = TeamFigures(item)
         Theme.SetText(self.rating.value, average and tostring(average) or '-')
@@ -318,8 +341,9 @@ local function MakeRow(grid, launcher)
             return
         end
         local _, average = TeamFigures(item)
-        Theme.SetText(self.source, item.source == 'server' and 'SERVER' or 'FAF')
-        Theme.SetColor(self.source, item.source == 'server' and C.accent or C.subtle)
+        local kindWord, _, kindColor = NetworkKind(item)
+        Theme.SetText(self.source, kindWord)
+        Theme.SetColor(self.source, kindColor)
         Theme.SetText(self.title, (item.password and '[locked] ' or '') .. item.title)
         Theme.SetColor(self.title, selected and C.accent or (item.color and C.muted or C.text))
         Theme.SetText(self.map, MapTitle(item.map))
@@ -585,7 +609,8 @@ local function DetailsPanel(parent, launcher)
             Theme.SetText(note, 'Double-click a game to join it directly.')
             return
         end
-        sourceTag:SetTag(game.source == 'server' and 'Our server' or 'FAF', game.source == 'server' and C.accent or C.subtle)
+        local _, _, kindColor, kindName = NetworkKind(game)
+        sourceTag:SetTag(kindName, kindColor)
         Theme.SetText(title, game.title)
         local metaText
         if game.source == 'server' then
@@ -914,6 +939,9 @@ end
 -- The multiplayer page.
 
 local function SortGames(a, b)
+    if (a.source == 'server') ~= (b.source == 'server') then
+        return a.source == 'server'
+    end
     if (a.state == 'open') ~= (b.state == 'open') then
         return a.state == 'open'
     end
@@ -1007,13 +1035,12 @@ end
 local function BuildOnlinePage(launcher, page)
     local view = {}
     launcher.online = view
-    view.tab = Prefs.GetFromCurrentProfile('fafre_launcher_tab') or 'faf'
+    -- One list for FAF's games and our servers' games, our servers' first; the heading counts the open ones.
+    view.tab = 'all'
 
     local title = Theme.Title(page, 'Multiplayer', 24)
     LayoutHelpers.AtLeftTopIn(title, page, 0, 6)
-    view.tabs = Tabs(page, { { 'faf', 'FAF games' }, { 'server', 'Our servers' } }, function(key)
-        view.tab = key
-        Prefs.SetToCurrentProfile('fafre_launcher_tab', key)
+    view.tabs = Tabs(page, { { 'all', 'Games' } }, function(key)
         view.grid.top = 1
         launcher:Refresh()
     end)
@@ -1266,14 +1293,14 @@ local function RefreshOnline(launcher)
             end
         end
     end
-    local counts = { faf = 0, server = 0 }
+    local counts = { all = 0 }
     local items = {}
     local shownTotal = 0
     for _, game in all do
         if game.state == 'open' then
-            counts[game.source] = counts[game.source] + 1
+            counts.all = counts.all + 1
         end
-        if game.source == view.tab then
+        do
             local visible = (showStarted or game.state == 'open') and Matches(game, filter) and
                 not (hidePrivate and (game.password or game.visibility == 'friends')) and
                 not (hideModded and game.simMods and game.simMods > 0)
@@ -1306,9 +1333,7 @@ local function RefreshOnline(launcher)
 
     local empty = ''
     if table.getn(items) == 0 then
-        if view.tab == 'server' and (status.serverCount or 0) == 0 then
-            empty = 'No servers set up: add a control service\'s address to control-services.txt in the game\'s online folder.'
-        elseif filter ~= '' or hidePrivate or hideModded then
+        if filter ~= '' or hidePrivate or hideModded then
             empty = 'No game matches the search and filters.'
         else
             empty = 'No open games right now. Create one.'
