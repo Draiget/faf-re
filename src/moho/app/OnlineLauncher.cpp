@@ -37,6 +37,7 @@
 #include "moho/ui/IUIManager.h"
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
+#include "online/FafChat.h"
 #include "online/FafLobby.h"
 #include "online/GameLink.h"
 #include "online/LaunchArgs.h"
@@ -208,6 +209,7 @@ namespace
     const char* user;
     const char* content;
     const char* replay;
+    const char* chat;
     const char* tokenFile;
   };
 
@@ -219,6 +221,7 @@ namespace
      "https://user.faforever.com",
      "https://content.faforever.com",
      "https://replay.faforever.com",
+     "wss://chat.faforever.com",
      "game.token"},
     {"test",
      "FAF test server",
@@ -227,6 +230,7 @@ namespace
      "https://user.faforever.xyz",
      "https://content.faforever.xyz",
      "https://replay.faforever.xyz",
+     "wss://chat.faforever.xyz",
      "game-test.token"},
   };
 
@@ -285,6 +289,18 @@ namespace
     return settings;
   }
 
+  /** FAF's chat on the chosen server (FAF_ONLINE_CHAT, a test hook, points it at another one). */
+  FafChatSettings GameChatSettings()
+  {
+    FafChatSettings settings;
+    settings.webSocketUrl = CurrentServer().chat;
+    if (const std::string chat = TestSetting("FAF_ONLINE_CHAT"); !chat.empty()) {
+      settings.webSocketUrl = chat;
+    }
+    settings.userAgent = "faf-re-client/" + std::string(gpg::diag::BuildVersion());
+    return settings;
+  }
+
   /** The service: made on the first FafOnline_* call, ended by ONLINE_Shutdown. */
   /**
    * The FAF init file a start without /init ran. The game then runs its default data-path script, SupComDataPath.lua;
@@ -326,6 +342,7 @@ namespace
   {
     FafAuth auth{GameEndpoints()};
     FafLobby lobby{GameLobbySettings()};
+    FafChat chat{GameChatSettings()};
     bool lobbyStarted = false;
     /// A failed lobby connection is tried again at this time (unset: no try planned).
     std::chrono::steady_clock::time_point lobbyRetryAt{};
@@ -380,6 +397,7 @@ namespace
     {
       auth.SetLog(LogLine);
       lobby.SetLog(LogLine);
+      chat.SetLog(LogLine);
       std::error_code ignored;
       std::filesystem::create_directories(DataFolder(), ignored);
       auth.SetTokenFile(DataFolder() / CurrentServer().tokenFile);
@@ -444,6 +462,7 @@ namespace
       if (iceThread.joinable()) {
         iceThread.join();
       }
+      chat.Disconnect();
       lobby.SetGameHandler({});
       lobby.Disconnect();
       if (link) {
@@ -1049,6 +1068,189 @@ namespace
     }
     lua_pushboolean(L, retry ? 1 : 0);
     return 1;
+  }
+
+  // --- FAF's chat (online/FafChat): started by the launcher's Chat page, not before
+  // -----------------------------------
+
+  const char* ChatStateName(
+    const FafChat::State state
+  )
+  {
+    switch (state) {
+    case FafChat::State::Connecting:
+      return "connecting";
+    case FafChat::State::Joined:
+      return "joined";
+    case FafChat::State::Failed:
+      return "failed";
+    case FafChat::State::Off:
+      break;
+    }
+    return "off";
+  }
+
+  /** The chat's token from the server's user service (GET /irc/ergochat/token with the FAF sign-in). */
+  FafChat::TokenSource ChatTokens(
+    Service& s
+  )
+  {
+    return
+      [bearer = s.Tokens(),
+       url = GameLobbySettings().userServiceUrl + "/irc/ergochat/token"]() -> std::expected<std::string, std::string> {
+      const auto token = bearer();
+      if (!token) {
+        return std::unexpected(token.error());
+      }
+      platform::http::Call call;
+      call.url = url;
+      call.headers = "Accept: application/json\r\nAuthorization: Bearer " + *token + "\r\n";
+      call.userAgent = "faf-re-client";
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body); !sent) {
+        return std::unexpected("FAF's user service didn't answer: " + sent.error());
+      }
+      if (status != 200) {
+        return std::unexpected("FAF's user service answered HTTP " + std::to_string(status) + " for the chat's token");
+      }
+      const auto answer = ParseJson(body);
+      if (!answer || answer->String("value").empty()) {
+        return std::unexpected(std::string("FAF's user service sent no chat token"));
+      }
+      return answer->String("value");
+    };
+  }
+
+  /** ok, why = FafChat_Start(): signs in to the FAF server's chat (once signed in to FAF); again after a failure. */
+  int ChatStartBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    std::string nick = s.haveMe ? s.me.login : s.auth.UserName();
+    if (nick.empty()) {
+      nick = s.lobby.Login();
+    }
+    if (nick.empty() && !s.fixedToken.empty()) {
+      nick = TestSetting("FAF_ONLINE_TEST_NICK"); // a test hook: a fixed token names nobody, and no lobby may answer
+    }
+    std::expected<void, std::string> result;
+    if (!s.SignedIn()) {
+      result = std::unexpected(std::string("sign in to FAF first"));
+    } else if (nick.empty()) {
+      result = std::unexpected(std::string("FAF hasn't said who you are yet"));
+    } else if (s.chat.GetState() == FafChat::State::Off || s.chat.GetState() == FafChat::State::Failed) {
+      s.chat.Connect(ChatTokens(s), nick);
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  /** table FafChat_Status(): state (off, connecting, joined, failed), message, nick, channels = {name, ...}. */
+  int ChatStatusBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    lua_newtable(L);
+    SetField(L, "state", ChatStateName(s.chat.GetState()));
+    SetField(L, "message", s.chat.Message());
+    SetField(L, "nick", s.chat.Nick());
+    lua_pushstring(L, "channels");
+    lua_newtable(L);
+    int index = 1;
+    for (const std::string& channel : s.chat.Channels()) {
+      lua_pushstring(L, channel.c_str());
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /**
+   * table FafChat_Lines(channel, from): the channel's lines from number `from` on (0: from its first kept one), at
+   * most 300: {total = lines it ever had, lines = {{from, text, time, self, action, event, history}, ...}}.
+   */
+  int ChatLinesBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string channel = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const std::size_t from =
+      lua_isnumber(L, 2) ? static_cast<std::size_t>(std::max(0.0, double(lua_tonumber(L, 2)))) : 0;
+    std::size_t total = 0;
+    std::vector<FafChatLine> lines = s.chat.Lines(channel, from, total);
+    if (lines.size() > 300) {
+      lines.erase(lines.begin(), lines.end() - 300);
+    }
+    lua_newtable(L);
+    SetField(L, "total", static_cast<double>(total));
+    lua_pushstring(L, "lines");
+    lua_newtable(L);
+    int index = 1;
+    for (const FafChatLine& line : lines) {
+      lua_newtable(L);
+      SetField(L, "from", line.from);
+      SetField(L, "text", line.text);
+      SetField(L, "time", line.time);
+      SetBool(L, "self", line.self);
+      SetBool(L, "action", line.action);
+      SetBool(L, "event", line.event);
+      SetBool(L, "history", line.history);
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /** table FafChat_Channel(channel): {topic, users = {nick, ...}} (nicks with their @ or + kept). */
+  int ChatChannelBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string channel = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    lua_newtable(L);
+    SetField(L, "topic", s.chat.Topic(channel));
+    lua_pushstring(L, "users");
+    lua_newtable(L);
+    int index = 1;
+    for (const std::string& user : s.chat.Users(channel)) {
+      lua_pushstring(L, user.c_str());
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /** ok, why = FafChat_Say(channel, text): says it ("/me ..." as an action). */
+  int ChatSayBody(
+    lua_State* const L
+  )
+  {
+    const std::string channel = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const std::string text = lua_isstring(L, 2) ? lua_tostring(L, 2) : "";
+    PushResult(L, TheService().chat.Say(channel, text));
+    return 2;
+  }
+
+  /** ok, why = FafChat_Join(channel) and FafChat_Leave(channel). */
+  int ChatJoinBody(
+    lua_State* const L
+  )
+  {
+    PushResult(L, TheService().chat.Join(lua_isstring(L, 1) ? lua_tostring(L, 1) : ""));
+    return 2;
+  }
+
+  int ChatLeaveBody(
+    lua_State* const L
+  )
+  {
+    PushResult(L, TheService().chat.Part(lua_isstring(L, 1) ? lua_tostring(L, 1) : ""));
+    return 2;
   }
 
   /** table FafOnline_Server(): the chosen server (name, title) and every server there is (servers = {{name, title}}).
@@ -1675,6 +1877,62 @@ namespace
       nullptr,
       "<global>",
       "bool, string FafOnline_SetFriend(id, on) - adds that FAF player to the friends, or removes them."
+    );
+    static CScrLuaBinder chatStart(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Start",
+      &Binding<&ChatStartBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafChat_Start() - signs in to the FAF server's chat."
+    );
+    static CScrLuaBinder chatStatus(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Status",
+      &Binding<&ChatStatusBody>,
+      nullptr,
+      "<global>",
+      "table FafChat_Status() - the chat's state, nick and channels."
+    );
+    static CScrLuaBinder chatLines(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Lines",
+      &Binding<&ChatLinesBody>,
+      nullptr,
+      "<global>",
+      "table FafChat_Lines(channel, from) - a channel's lines from a number on."
+    );
+    static CScrLuaBinder chatChannel(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Channel",
+      &Binding<&ChatChannelBody>,
+      nullptr,
+      "<global>",
+      "table FafChat_Channel(channel) - a channel's topic and users."
+    );
+    static CScrLuaBinder chatSay(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Say",
+      &Binding<&ChatSayBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafChat_Say(channel, text) - says it in the channel."
+    );
+    static CScrLuaBinder chatJoin(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Join",
+      &Binding<&ChatJoinBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafChat_Join(channel) - joins a channel."
+    );
+    static CScrLuaBinder chatLeave(
+      moho::SCR_UserLuaInitSet(),
+      "FafChat_Leave",
+      &Binding<&ChatLeaveBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafChat_Leave(channel) - leaves a channel."
     );
     static CScrLuaBinder server(
       moho::SCR_UserLuaInitSet(),

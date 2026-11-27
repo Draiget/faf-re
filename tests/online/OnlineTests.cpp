@@ -37,6 +37,7 @@
 
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
+#include "online/FafChat.h"
 #include "online/FafLobby.h"
 #include "online/FafReplay.h"
 #include "online/FafVault.h"
@@ -161,11 +162,13 @@ namespace
     explicit EchoServer(
       bool refuse = false,
       Reply reply = {},
-      std::string raw = {}
+      std::string raw = {},
+      bool binaryReplies = false
     )
       : rawAfterUpgrade(std::move(raw))
       , mRefuse(refuse)
       , mReply(std::move(reply))
+      , mBinaryReplies(binaryReplies)
     {
       (void)net::SocketsInit();
       mListener = net::ListenTcp("127.0.0.1", 0);
@@ -212,6 +215,7 @@ namespace
         return;
       }
       std::string key;
+      std::string protocol;
       for (std::size_t at = 0; at < head.size();) {
         const std::size_t end = head.find("\r\n", at);
         const std::string line = head.substr(at, end - at);
@@ -219,11 +223,16 @@ namespace
           key = line.substr(18);
           key.erase(0, key.find_first_not_of(' '));
         }
+        if (StartsWithNoCase(line, "Sec-WebSocket-Protocol:")) {
+          protocol = line.substr(23);
+          protocol.erase(0, protocol.find_first_not_of(' '));
+        }
         at = end == std::string::npos ? head.size() : end + 2;
       }
       const std::string answer = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                                  "Sec-WebSocket-Accept: " +
-        AcceptKey(key) + "\r\n\r\n";
+        AcceptKey(key) + "\r\n" + (protocol.empty() ? std::string() : "Sec-WebSocket-Protocol: " + protocol + "\r\n") +
+        "\r\n";
       (void)net::SendAll(client, answer.data(), answer.size());
       if (!rawAfterUpgrade.empty()) {
         (void)net::SendAll(client, rawAfterUpgrade.data(), rawAfterUpgrade.size());
@@ -252,6 +261,16 @@ namespace
         }
         for (std::size_t i = 0; i < payload.size(); ++i) {
           payload[i] = static_cast<char>(payload[i] ^ mask[i % 4]);
+        }
+        if (mReply && opcode == 0x2 && mBinaryReplies) {
+          {
+            std::lock_guard<std::mutex> guard(mLock);
+            mReceived.push_back(payload);
+          }
+          for (const std::string& out : mReply(payload)) {
+            SendFrame(client, 0x2, out);
+          }
+          continue;
         }
         if (mReply && opcode == 0x2) {
           std::lock_guard<std::mutex> guard(mLock);
@@ -312,6 +331,7 @@ namespace
   private:
     bool mRefuse = false;
     Reply mReply;
+    bool mBinaryReplies = false; ///< binary messages answered by `reply` with binary frames (FAF's chat)
     std::mutex mLock;
     std::vector<std::string> mReceived;
     std::string mReceivedBinary;
@@ -2031,6 +2051,132 @@ TEST(
   ASSERT_TRUE(sent) << sent.error();
   EXPECT_EQ(status, 200);
   EXPECT_EQ(body, "hello, world");
+}
+
+// --- FAF's chat: IRC over a WebSocket -----------------------------------------------------------------------------
+
+TEST(
+  FafChat,
+  ParsesTagsSenderCommandAndTrailing
+)
+{
+  using faf::online::FafChat;
+  const FafChat::IrcMessage message =
+    FafChat::Parse("@time=2026-11-27T10:00:00.000Z;label=a\\sb :Other!user@host privmsg #aeolus :hello : world\r");
+  EXPECT_EQ(message.tags.at("time"), "2026-11-27T10:00:00.000Z");
+  EXPECT_EQ(message.tags.at("label"), "a b");
+  EXPECT_EQ(message.nick, "Other");
+  EXPECT_EQ(message.command, "PRIVMSG");
+  ASSERT_EQ(message.params.size(), 2u);
+  EXPECT_EQ(message.params[0], "#aeolus");
+  EXPECT_EQ(message.params[1], "hello : world");
+  const FafChat::IrcMessage ping = FafChat::Parse("PING :keepalive");
+  EXPECT_EQ(ping.command, "PING");
+  ASSERT_EQ(ping.params.size(), 1u);
+  EXPECT_EQ(ping.params[0], "keepalive");
+}
+
+TEST(
+  FafChat,
+  SignsInWithSaslJoinsReadsHistoryAndSays
+)
+{
+  using namespace faf::online;
+  EchoServer server(false, [](const std::string& received) -> std::vector<std::string> {
+    if (received == "CAP LS 302") {
+      return {":srv CAP * LS :sasl=PLAIN server-time message-tags draft/chathistory batch"};
+    }
+    if (received.rfind("CAP REQ", 0) == 0) {
+      return {":srv CAP * ACK :sasl server-time message-tags draft/chathistory batch"};
+    }
+    if (received == "AUTHENTICATE PLAIN") {
+      return {"AUTHENTICATE +"};
+    }
+    if (received.rfind("AUTHENTICATE ", 0) == 0) {
+      return {":srv 903 Tester :SASL authentication successful"};
+    }
+    if (received.rfind("USER ", 0) == 0) {
+      return {":srv 001 Tester :Welcome to FAF's chat"};
+    }
+    if (received == "JOIN #aeolus") {
+      return {
+        ":Tester!u@h JOIN #aeolus",
+        ":srv 353 Tester = #aeolus :Tester @Mod Other",
+        ":srv 332 Tester #aeolus :Welcome to FAF"
+      };
+    }
+    if (received.rfind("CHATHISTORY LATEST #aeolus", 0) == 0) {
+      return {
+        ":srv BATCH +b1 chathistory #aeolus",
+        "@batch=b1;time=2026-11-27T10:00:00.000Z :Other!u@h PRIVMSG #aeolus :hello there",
+        "@batch=b1;time=2026-11-27T10:01:00.000Z :Mod!u@h PRIVMSG #aeolus :\x01"
+        "ACTION waves\x01",
+        ":srv BATCH -b1"
+      };
+    }
+    if (received.rfind("PRIVMSG #aeolus :", 0) == 0) {
+      return {"@time=2026-11-27T10:02:00.000Z :Other!u@h PRIVMSG #aeolus :welcome back", "PING :keepalive"};
+    }
+    return {};
+  }, {}, true);
+  FafChatSettings settings;
+  settings.webSocketUrl = server.Url();
+  FafChat chat(settings);
+  chat.Connect([] {
+    return std::expected<std::string, std::string>("chat-token");
+  }, "Tester");
+
+  const auto waitFor = [&](const std::function<bool()>& done) {
+    for (int i = 0; i < 300 && !done(); ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return done();
+  };
+  std::size_t total = 0;
+  ASSERT_TRUE(
+    waitFor([&] {
+    (void)chat.Lines("#aeolus", 0, total);
+    return chat.GetState() == FafChat::State::Joined && total >= 2;
+  })
+  ) << chat.Message();
+  auto lines = chat.Lines("#aeolus", 0, total);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0].from, "Other");
+  EXPECT_EQ(lines[0].text, "hello there");
+  EXPECT_EQ(lines[0].time, "2026-11-27T10:00:00.000Z");
+  EXPECT_TRUE(lines[0].history);
+  EXPECT_EQ(lines[1].from, "Mod");
+  EXPECT_EQ(lines[1].text, "waves");
+  EXPECT_TRUE(lines[1].action);
+  EXPECT_EQ(chat.Channels(), std::vector<std::string>{"#aeolus"});
+  EXPECT_EQ(chat.Topic("#aeolus"), "Welcome to FAF");
+  const auto users = chat.Users("#aeolus");
+  EXPECT_NE(std::find(users.begin(), users.end(), "@Mod"), users.end());
+  EXPECT_NE(std::find(users.begin(), users.end(), "Other"), users.end());
+
+  ASSERT_TRUE(chat.Say("#aeolus", "hi all"));
+  ASSERT_TRUE(waitFor([&] {
+    (void)chat.Lines("#aeolus", 0, total);
+    return total >= 4;
+  }));
+  lines = chat.Lines("#aeolus", 2, total);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0].text, "hi all");
+  EXPECT_TRUE(lines[0].self);
+  EXPECT_EQ(lines[1].text, "welcome back");
+  EXPECT_FALSE(lines[1].history);
+  EXPECT_TRUE(waitFor([&] {
+    const auto received = server.Received();
+    return std::find(received.begin(), received.end(), "PONG :keepalive") != received.end();
+  }));
+
+  // SASL PLAIN as FAF's clients send it: nick, nick, "token:" and the chat's token.
+  const auto received = server.Received();
+  EXPECT_NE(
+    std::find(received.begin(), received.end(), "AUTHENTICATE VGVzdGVyAFRlc3RlcgB0b2tlbjpjaGF0LXRva2Vu"), received.end()
+  );
+  EXPECT_NE(server.requestHead.find("Sec-WebSocket-Protocol: binary.ircv3.net"), std::string::npos);
+  chat.Disconnect();
 }
 
 #if FAFRE_PLATFORM_POSIX // our own HTTP/1.1 and WebSocket code; on Windows WinHTTP reads these

@@ -2000,7 +2000,7 @@ function Launcher:Refresh()
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
     end
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
-        (self.page == 'lan' and self.lanView) or
+        (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2556,6 +2556,7 @@ local function BuildRail(launcher, body)
     local entries = {
         'Online',
         { 'play', 'Multiplayer', function() launcher:ShowPage('online') end, 'online' },
+        { 'chat', 'Chat', function() launcher:ShowPage('chat') end, 'chat' },
         'Offline',
         { 'flag', 'Skirmish', function() launcher:Skirmish() end },
         { 'book', 'Campaign', function() launcher:Campaign() end },
@@ -2802,6 +2803,23 @@ local function Build(launcher)
     launcher.pages.changelog = changelogPage
     import('/fafengine/modules/lua/ui/launcher/changelog.lua').Build(launcher, changelogPage)
     Theme.SetVisible(changelogPage, false)
+    -- Chat: FAF's chat (chatpage.lua), with the engine's chat functions.
+    if rawget(_G, 'FafChat_Status') then
+        local chatPage = Group(content, 'launcher chat')
+        LayoutHelpers.FillParent(chatPage, content)
+        chatPage.Width:Set(function() return chatPage.Right() - chatPage.Left() end)
+        chatPage.Height:Set(function() return chatPage.Bottom() - chatPage.Top() end)
+        local chatBuilt, chatWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/chatpage.lua').Build(launcher, chatPage)
+        end)
+        if chatBuilt then
+            launcher.pages.chat = chatPage
+            Theme.SetVisible(chatPage, false)
+        else
+            WARN('LAUNCHER: the chat page failed to build: ' .. tostring(chatWhy))
+            chatPage:Destroy()
+        end
+    end
     -- LAN: games on this network, hosting one, an address (lanpage.lua).
     local lanPage = Group(content, 'launcher lan')
     LayoutHelpers.FillParent(lanPage, content)
@@ -3035,6 +3053,35 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherchattest: the Chat page: the chat started, a line said, a second channel joined.
+            if GetCommandLineArg('/launcherchattest', 0) and current.chatView then
+                current:ShowPage('chat')
+                Wait(2)
+                Step('chat: intro shown, chat ' .. FafChat_Status().state)
+                current.chatView:Start()
+                for i = 1, 20 do
+                    if FafChat_Status().state == 'joined' and table.getn(FafChat_Status().channels) > 0 then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                local chat = current.chatView
+                local status = FafChat_Status()
+                Step('chat: ' .. status.state .. ' as ' .. tostring(status.nick) .. ' in ' ..
+                    table.concat(status.channels, ', ') .. ', ' .. table.getn(chat.lines[chat.channel or ''] or {}) ..
+                    ' lines in ' .. tostring(chat.channel) .. ', ' .. table.getn(chat.userList.items or {}) .. ' people')
+                chat.input.edit:SetText('hello from the walk')
+                chat:Send(chat.input.edit:GetText())
+                Wait(3)
+                local lines = chat.lines[chat.channel] or {}
+                local last = lines[table.getn(lines)] or {}
+                Step('chat: said a line; the last line now: ' .. tostring(last.from) .. ': ' .. tostring(last.text))
+                FafChat_Join('#walk')
+                Wait(3)
+                Step('chat: channels ' .. table.concat(FafChat_Status().channels, ', '))
+                Wait(2)
+            end
             -- /launcherservertest: FAF's test server, then the main one again; the service starts again on each.
             if GetCommandLineArg('/launcherservertest', 0) then
                 current:SetServer('test')

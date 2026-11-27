@@ -6,6 +6,7 @@
 add_library(faf_online STATIC
   ControlService.cpp
   FafAuth.cpp
+  FafChat.cpp
   FafLobby.cpp
   FafReplay.cpp
   FafVault.cpp

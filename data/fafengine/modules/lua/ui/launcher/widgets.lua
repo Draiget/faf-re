@@ -144,6 +144,10 @@ local kTextStyles = {
     bullet = { size = 13, color = C.muted, indent = 18 },
     bullet2 = { size = 13, color = C.muted, indent = 36 },
     gap = { size = 6 },
+    -- The Chat page's lines: others', one's own, and what happened (joined, a notice).
+    chat = { size = 13, color = C.text },
+    chatSelf = { size = 13, color = C.accent },
+    chatEvent = { size = 12, color = C.subtle },
 }
 local kUnitIcon = 48 -- a 'units' block's icons, as large as the build bar's
 local kUnitCell = 84 -- an icon and the room for its name under it
