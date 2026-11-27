@@ -453,6 +453,13 @@ bool CLobbyPeerFeatures::Receive(
   return false;
 }
 
+std::string CLobbyPeerFeatures::CurrentStyleOf(
+  const std::int32_t uid
+)
+{
+  return sSlotStyles != nullptr ? sSlotStyles->StyleOf(uid) : std::string{};
+}
+
 std::string CLobbyPeerFeatures::StyleOf(
   const std::int32_t uid
 ) const

@@ -49,6 +49,9 @@ namespace moho
     /// "rrggbb" for a proven style, empty for none. The local player's comes from their key.
     [[nodiscard]] std::string StyleOf(std::int32_t uid) const;
 
+    /** StyleOf in the lobby that exists now (rrggbb), or empty when there is none or the player has none. */
+    [[nodiscard]] static std::string CurrentStyleOf(std::int32_t uid);
+
   private:
     struct SLobbyPeer
     {

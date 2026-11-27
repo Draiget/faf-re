@@ -41,6 +41,12 @@ local function CanFriend(api, player)
     return player and player.Human and player.OwnerID ~= api.LocalPlayerID() and
         rawget(_G, 'FafOnline_SetFriend') ~= nil and string.find(tostring(player.OwnerID), '^%d+$') ~= nil
 end
+
+--- A player's own name colour (aarrggbb), when the engine has proven one for them in this lobby.
+local function NameStyle(id)
+    local style = id ~= nil and rawget(_G, 'FafNet_PeerStyle') and FafNet_PeerStyle(tostring(id)) or nil
+    return style and ('ff' .. style) or nil
+end
 local Scale = Theme.Scale
 
 local kRefreshSeconds = 0.3
@@ -574,9 +580,10 @@ function LobbyView:PaintSlot(row)
         if player.PlayerClan and player.PlayerClan ~= '' then
             label = '[' .. player.PlayerClan .. '] ' .. label
         end
-        -- The local player's accent, then a friend's green.
+        -- The player's own proven colour first, then the local player's accent, then a friend's green.
         local friend = human and not mine and IsFriend(player.OwnerID)
-        Theme.SetColor(p.name, (mine and C.accent) or (friend and C.good) or C.text)
+        Theme.SetColor(p.name, (human and NameStyle(player.OwnerID)) or (mine and C.accent) or
+            (friend and C.good) or C.text)
         Theme.SetText(p.rating, rated and tostring(math.floor(player.PL or 0)) or '')
         if not human then
             Theme.SetVisible(p.badge, true)

@@ -3,11 +3,13 @@
 // round trip. Read only; the links stay the netlink module's.
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/net/LobbyPeerFeatures.h"
 #include "moho/net/NetlinkPeers.h"
 
 namespace
@@ -80,6 +82,21 @@ namespace
     return 1;
   }
 
+  /** string|nil FafNet_PeerStyle(id): the lobby player's own name colour (rrggbb), when they have a proven one. */
+  int PeerStyleBody(
+    lua_State* const L
+  )
+  {
+    const char* const id = lua_isstring(L, 1) ? lua_tostring(L, 1) : nullptr;
+    const std::string style = id != nullptr ? moho::CLobbyPeerFeatures::CurrentStyleOf(std::atoi(id)) : std::string{};
+    if (style.empty()) {
+      lua_pushnil(L);
+    } else {
+      lua_pushstring(L, style.c_str());
+    }
+    return 1;
+  }
+
   template <int (*Body)(lua_State*)>
   int Binding(
     lua_State* const luaContext
@@ -99,6 +116,14 @@ namespace
       "<global>",
       "table FafNet_Links() - the game's own peer links (mode, forceRelay, peers: id, login, state, connected, "
       "localType, remoteType, rttMs, lossPercent, attempts)."
+    );
+    static moho::CScrLuaBinder peerStyle(
+      moho::SCR_UserLuaInitSet(),
+      "FafNet_PeerStyle",
+      &Binding<&PeerStyleBody>,
+      nullptr,
+      "<global>",
+      "string FafNet_PeerStyle(id) - a lobby player's own name colour (rrggbb), or nil."
     );
   }
 
