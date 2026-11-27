@@ -21,11 +21,13 @@ Windows, PowerShell 7, Python 3 with Pillow. Nothing here is part of the engine.
 |---|---|
 | `ev_run.ps1` | one session: starts a staged build with a replay (or a map), runs a scenes file through `ev_camera.lua` (seek to a tick with `ReplaySeek`, pause, hide the UI, snap the camera, run console commands, hold), dumps the back buffer every second, logs which scene was on when |
 | `ev_camera.lua`, `ev_perf_camera.lua` | the UI test scripts (scenes; seek and then run for `EV_MEASURE` seconds with the profile on) |
-| `scenes_*.lua` | the scenes of each group: `sr` (Serenity Reef replay 28041625, tick 9000: ships, coasts, Water Quality levels), `astro` (28013263, tick 12000, a map without water in view), `levels` and `rivers` (scenario maps); `__OFF__` stands for the switches a PR is turned off with |
+| `scenes_*.lua` | the scenes of each group: `sr` (Serenity Reef replay 28041625, tick 9000: ships, coasts, Water Quality levels), `astro` (28013263, tick 12000, land with the edge of a lake in view), `levels` and `rivers` (scenario maps); `__OFF__` stands for the switches a PR is turned off with |
 | `matrix.ps1` | a build over groups and APIs |
-| `mkcomp.py`, `evlib.py` | the composites (master, PR defaults, PR switches off; full frame and crop) and the share of pixels that differ (any channel by more than 8 of 255) |
+| `mkcomp.py`, `evlib.py` | the composites (master, PR defaults, PR switches off, PR features on; full frame and crop) and the share of pixels that differ (any channel by more than 8 of 255) as full frame / crop / full frame after a 25 px blur, against master, against the PR below, against a repeat of the same build; written to `frames/<pr>/` |
+| `noise.ps1`, `on.ps1`, `wd0.ps1` | every PR build once more (the repeat of a build against itself), the features that are Off by default switched on (lights, shadow filter and GTAO, SMAA and render scale), and master and PR 02 with `ren_WaterDetail 0` |
+| `scenes_ts.lua` | the `ren_TerrainShadows` check of PR 07 (its default changed from 0.45 to 0) |
 | `cost.ps1`, `cost_report.py` | 75 s of the running replay with the profile on, defaults and switches off; medians and 95th percentiles of the profile windows |
 
 The pause lands on the first frame after the seek finishes (game second 900.8 for tick 9000), so two builds are compared at the same
-sim state; the water still moves while the game is paused (it runs on wall clock time), which is why two runs of master differ:
-the report always carries that noise floor.
+sim state; the water still moves while the game is paused (it runs on wall clock time), which is why two runs of the same build differ on water (more so with the water simulation, which keeps its own state):
+the report carries the repeat of the same build and the land crop as the noise floor, and water is judged by the images.
