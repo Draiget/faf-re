@@ -1541,12 +1541,16 @@ local function OpenHostDialog(launcher)
     local modNote = Theme.Cell(panel, 11, C.subtle)
     LayoutHelpers.AtLeftTopIn(modNote, panel, 26, 296)
     modNote.Right:Set(function() return panel.Left() + Scale(366) end)
-    -- What the pick means: a restart on another featured mod's files, or why a greyed one can't be picked.
+    local tip = Theme.Tip(panel, 340)
+    -- What the pick means (a restart on another featured mod's files) under the choices; why a greyed one can't be
+    -- picked in a tip by it.
     local function ModNote(hovered)
         if hovered and not hovered.enabled then
-            Theme.SetText(modNote, ModName(hovered.id) .. ': ' .. tostring(hovered.why))
-            Theme.SetColor(modNote, C.warn)
-        elseif chosenMod ~= status.loadedMod then
+            tip:Say(ModName(hovered.id) .. ': ' .. tostring(hovered.why) .. '.', C.warn, hovered)
+            return
+        end
+        tip:Quiet()
+        if chosenMod ~= status.loadedMod then
             Theme.SetText(modNote, 'The game starts again on ' .. ModName(chosenMod) .. '\'s files, then creates it.')
             Theme.SetColor(modNote, C.accent)
         else
@@ -1686,10 +1690,11 @@ local function OpenHostDialog(launcher)
         end
     end
 
-    local errorText = Theme.Cell(panel, 12, C.bad)
+    -- Why Create game didn't go: wrapped onto lines left of the buttons.
+    local errorText = Theme.Paragraph(panel, 12, C.bad)
     errorText.Left:Set(function() return panel.Left() + Scale(26) end)
-    errorText.Right:Set(function() return panel.Right() - Scale(330) end)
-    errorText.Bottom:Set(function() return panel.Bottom() - Scale(30) end)
+    errorText.Right:Set(function() return panel.Right() - Scale(340) end)
+    errorText.Top:Set(function() return panel.Bottom() - Scale(62) end)
 
     local function Close()
         launcher.hostDialog = false
@@ -2593,6 +2598,17 @@ function TestWalk()
                 end
                 Wait(1)
                 Step('featured mod picked')
+                -- The mouse over a greyed one: its reason in a tip by it.
+                for _, choice in current.hostDialog.modChoices or {} do
+                    if not choice.enabled and choice.onDisabledHover then
+                        choice.onDisabledHover(true)
+                        Wait(1)
+                        Step('tip for ' .. choice.id)
+                        Wait(2)
+                        choice.onDisabledHover(false)
+                        break
+                    end
+                end
             end
             Wait(3)
             if current.hostDialog then

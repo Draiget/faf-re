@@ -440,6 +440,95 @@ function Button(parent, label, onClick, kind, opts)
     return button
 end
 
+--- Text wrapped onto as many lines as it needs between the control's Left and Right (the caller sets both, and Top);
+--- its Height follows the lines. :SetText(text[, color]).
+function Paragraph(parent, size, color)
+    local para = Group(parent)
+    para:DisableHitTest()
+    para.Width:Set(function() return para.Right() - para.Left() end)
+    para.Height:Set(1)
+    para.lines = {}
+    para.color = color or Colors.text
+    local lineHeight = size + 4
+    para.SetText = function(self, text, newColor)
+        self.color = newColor or self.color
+        local probe = self.lines[1]
+        if not probe then
+            probe = Text(self, '', size, self.color)
+            self.lines[1] = probe
+        end
+        local wrapped = {}
+        if text and text ~= '' then
+            wrapped = import('/lua/maui/text.lua').WrapText(text, math.max(Scale(40), self.Width()), function(piece)
+                return probe:GetStringAdvance(piece)
+            end)
+        end
+        for i, line in wrapped do
+            local label = self.lines[i]
+            if not label then
+                label = Text(self, '', size, self.color)
+                self.lines[i] = label
+            end
+            local row = i - 1
+            label.Left:Set(self.Left)
+            label.Top:Set(function() return self.Top() + Scale(row * lineHeight) end)
+            SetText(label, line)
+            SetColor(label, self.color)
+        end
+        for i = table.getn(wrapped) + 1, table.getn(self.lines) do
+            SetText(self.lines[i], '')
+        end
+        self.Height:Set(Scale(math.max(1, table.getn(wrapped)) * lineHeight))
+    end
+    return para
+end
+
+--- A hint over everything else under `parent` (a dialog's panel): :Say(text, color, anchor) shows it wrapped to
+--- `width` units under the anchor (above it when there is no room below), :Hide() hides it.
+function Tip(parent, width)
+    local tip = Panel(parent, 'f60a141c', Colors.lineStrong)
+    tip.Depth:Set(function() return parent.Depth() + 400 end)
+    LayoutHelpers.SetWidth(tip, width)
+    local text = Paragraph(tip, 12, Colors.text)
+    text.Left:Set(function() return tip.Left() + Scale(10) end)
+    text.Right:Set(function() return tip.Right() - Scale(10) end)
+    text.Top:Set(function() return tip.Top() + Scale(8) end)
+    tip.Height:Set(function() return text.Height() + Scale(16) end)
+    LayoutHelpers.AtLeftTopIn(tip, parent, 0, 0)
+    tip:DisableHitTest(true)
+    tip.Say = function(self, words, color, anchor)
+        local frame = GetFrame(0)
+        local left = math.max(frame.Left(), math.min(anchor.Left(), frame.Right() - self.Width()))
+        self.Left:Set(left)
+        SetVisible(self, true)
+        text:SetText(words, color or Colors.text)
+        local top = anchor.Bottom() + Scale(6)
+        if top + self.Height() > frame.Bottom() then
+            top = anchor.Top() - Scale(6) - self.Height()
+        end
+        self.Top:Set(top)
+        self:DisableHitTest(true)
+    end
+    -- Hidden until said, also after a Show on an ancestor.
+    tip.Paint = function(self)
+        if not self.saying then
+            SetVisible(self, false)
+        end
+    end
+    local say = tip.Say
+    tip.Say = function(self, words, color, anchor)
+        self.saying = true
+        say(self, words, color, anchor)
+    end
+    tip.Quiet = function(self)
+        self.saying = false
+        SetVisible(self, false)
+    end
+    Paintable(tip)
+    SetVisible(tip, false)
+    return tip
+end
+
 --- Three dots that pulse one after the other: something is on its way. They only move while shown.
 function Loader(parent, color)
     local loader = Group(parent)
