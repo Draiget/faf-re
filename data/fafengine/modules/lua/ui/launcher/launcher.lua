@@ -32,6 +32,7 @@ local kRailWidth = 214
 local kStatusHeight = 28
 -- The pages under Play (the top bar's Play tab and its strip of modes).
 local kPlayPages = { online = true, matchmaking = true, coop = true, lan = true }
+local kVaultPages = { maps = true, mods = true } -- FAF's vault: Maps and Mods, a strip under the top bar like Play's
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1974,7 +1975,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2436,15 +2437,27 @@ end
 
 --- Play's strip on Play's pages (custom games, LAN), the content under it; the full height under the bar elsewhere.
 function Launcher:PlaceContent()
-    local bar, strip, content = self.topBar, self.playStrip, self.content
-    if not bar or not strip or not content then
+    local bar, content = self.topBar, self.content
+    if not bar or not self.playStrip or not content then
         return
     end
-    local play = kPlayPages[self.page or ''] and true or false
-    Theme.SetVisible(strip, play)
-    if play then
-        strip.tabs:Set(self.page, {})
-        content.Top:Set(function() return strip.Bottom() + Scale(14) end)
+    local shown = nil
+    for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages } } do
+        local strip, pages = entry[1], entry[2]
+        if strip then
+            local mine = pages[self.page or ''] and true or false
+            Theme.SetVisible(strip, mine)
+            if mine then
+                strip.tabs:Set(self.page, {})
+                shown = strip
+            end
+        end
+    end
+    if kVaultPages[self.page or ''] then
+        self.lastVaultPage = self.page
+    end
+    if shown then
+        content.Top:Set(function() return shown.Bottom() + Scale(14) end)
     else
         content.Top:Set(function() return bar.Bottom() + Scale(22) end)
     end
@@ -2579,8 +2592,14 @@ local function BuildTopBar(launcher, body)
         { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
         { 'leaderboard', 'Leaderboards', function() launcher:ShowPage('leaderboards') end, { leaderboards = true } },
         { 'replays', 'Replays', function() launcher:Replays() end, { replays = true } },
-        { 'maps', 'Maps', function() launcher:ShowPage('maps') end, { maps = true } },
-        { 'mods', 'Mods', function() launcher:Mods() end, { mods = true } },
+        { 'folder', 'Vault', function()
+            if launcher.lastVaultPage == 'mods' or not (launcher.pages and launcher.pages.maps) then
+                launcher:Mods()
+            else
+                launcher:ShowPage('maps')
+            end
+        end, kVaultPages },
+        { 'units', 'Units', function() launcher:ShowPage('units') end, { units = true } },
         -- Utilities: icons by the account, their names in a tip.
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true }, true },
         { 'settings', 'Settings', function() launcher:Options() end, { options = true }, true },
@@ -2705,6 +2724,31 @@ local function BuildTopBar(launcher, body)
     strip.tabs.Right:Set(strip.Right)
     launcher.playStrip = strip
     bar.strip = strip
+
+    -- The vault's parts: maps and mods.
+    local vault = Group(body)
+    vault.Left:Set(strip.Left)
+    vault.Right:Set(strip.Right)
+    vault.Top:Set(strip.Top)
+    LayoutHelpers.SetHeight(vault, 40)
+    vault.Width:Set(function() return vault.Right() - vault.Left() end)
+    local vaultEntries = {}
+    if rawget(_G, 'FafLibrary_InstallMap') then -- the maps page needs the engine's map installs
+        table.insert(vaultEntries, { 'maps', 'Maps' })
+    end
+    table.insert(vaultEntries, { 'mods', 'Mods' })
+    vault.tabs = Widgets.Tabs(vault, vaultEntries, function(key)
+        if key == 'maps' then
+            launcher:ShowPage('maps')
+        else
+            launcher:Mods()
+        end
+    end)
+    vault.tabs.Left:Set(vault.Left)
+    vault.tabs.Top:Set(vault.Top)
+    vault.tabs.Right:Set(vault.Right)
+    Theme.SetVisible(vault, false)
+    launcher.vaultStrip = vault
     return bar
 end
 
@@ -3072,6 +3116,23 @@ local function Build(launcher)
             mapsPage:Destroy()
         end
     end
+    -- Units: every unit's blueprint through FAF's unit analyzer (unitspage.lua).
+    do
+        local unitsPage = Group(content, 'launcher units')
+        LayoutHelpers.FillParent(unitsPage, content)
+        unitsPage.Width:Set(function() return unitsPage.Right() - unitsPage.Left() end)
+        unitsPage.Height:Set(function() return unitsPage.Bottom() - unitsPage.Top() end)
+        local unitsBuilt, unitsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/unitspage.lua').Build(launcher, unitsPage)
+        end)
+        if unitsBuilt then
+            launcher.pages.units = unitsPage
+            Theme.SetVisible(unitsPage, false)
+        else
+            WARN('LAUNCHER: the units page failed to build: ' .. tostring(unitsWhy))
+            unitsPage:Destroy()
+        end
+    end
     -- Leaderboards: FAF's rating ladders (leaderboards.lua), with the engine's FAF API access.
     if rawget(_G, 'FafLibrary_Api') then
         local boardsPage = Group(content, 'launcher leaderboards')
@@ -3356,6 +3417,63 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherunitstest: the Units page: the blueprints read, a faction's units, a filter, a unit's card.
+            if GetCommandLineArg('/launcherunitstest', 0) and current.unitsView then
+                local units = current.unitsView
+                current:ShowPage('units')
+                for i = 1, 60 do
+                    current:Refresh()
+                    if units.units or units.failure then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                current:Refresh()
+                local counts = {}
+                for faction, count in (units.counts or {}) do
+                    table.insert(counts, faction .. ' ' .. count)
+                end
+                table.sort(counts)
+                Step('units: ' .. tostring(units.units and table.getn(units.units)) .. ' read (' .. table.concat(counts, ', ') ..
+                    '), ' .. units.faction .. ' shows ' .. table.getn(units.shown or {}) .. (units.failure and (', failure ' ..
+                    units.failure) or ''))
+                -- The UEF T1 land units, then the Percival (uel0303, T3) by its id.
+                units.tech = 'T1'
+                units.kind = 'LAND'
+                units:Filter()
+                Wait(1)
+                local names = {}
+                for _, unit in (units.shown or {}) do
+                    table.insert(names, unit.name)
+                end
+                Step('units: UEF T1 land: ' .. table.concat(names, ', '))
+                units.tech = 'all'
+                units.kind = 'all'
+                units.search.edit:SetText('uel0303')
+                units:Filter()
+                Wait(2)
+                local unit = units.chosen
+                local facts = unit and units:Facts(unit)
+                Step('units: uel0303: ' .. tostring(unit and unit.name) .. ' / ' .. tostring(unit and unit.role) .. ', ' ..
+                    (facts and table.concat(facts.values, ' | ') or 'no facts') .. ', weapons ' ..
+                    tostring(facts and table.getn(facts.weapons)) .. ', icon ' .. tostring(unit and unit.icon) .. ', back ' ..
+                    tostring(unit and unit.back))
+                Wait(2)
+                units.search.edit:SetText('')
+                units.faction = 'SERAPHIM'
+                units:Filter()
+                Wait(2)
+                local acu = units.chosen
+                local acuFacts = acu and units:Facts(acu)
+                local acuWeapons = {}
+                for _, weapon in (acuFacts and acuFacts.weapons or {}) do
+                    table.insert(acuWeapons, weapon.name .. ' ' .. weapon.dps)
+                end
+                Step('units: Seraphim shows ' .. table.getn(units.shown or {}) .. ', first ' .. tostring(acu and acu.id) ..
+                    ' damage/s ' .. tostring(acuFacts and acuFacts.values[8]) .. ' (' .. table.concat(acuWeapons, '; ') .. ')')
+                Wait(1)
+            end
             -- /launcherboardstest: the Leaderboards page: the 1v1 ranking, the signed-in player's place and the jump to
             -- it, another ladder, a search by name.
             if GetCommandLineArg('/launcherboardstest', 0) and current.leaderboardsView then
