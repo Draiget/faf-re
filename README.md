@@ -4,32 +4,61 @@
 
 **The *Supreme Commander: Forged Alliance* engine, rebuilt as C++23**
 
-[![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
+[![Replay parity](https://img.shields.io/badge/replay%20parity-0%20desyncs%20on%203840-brightgreen)](#retail-parity)
 [![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-41%25%20less%20time-blue)](docs/PERFORMANCE.md)
 [![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20x86-0078D6?logo=windows&logoColor=white)](#build)
 [![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#linux)
 [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white)](#macos-apple-silicon)
 [![Line coverage](https://img.shields.io/badge/line%20coverage-73.2%25-yellowgreen)](tests/README.md#coverage)
 
-[Build](#build) · [Map editor](#map-editor) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
+[Install](#install-a-release) · [Map editor](#map-editor) · [Retail parity](#retail-parity) · [Performance](#performance) · [Build](#build) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++23 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays in about 40 % less time.
+> [!IMPORTANT]
+> **I've stopped working on FAF's integration. The engine itself stays supported here.**
+> This engine was offered to FAF to test and integrate. It hasn't been taken up, and I've had more complaints than bug reports, so I'm done putting my time into FAF's side of it.
+>
+> Development continues in this repository for everyone who wants to use it. The engine plays the same games as FAF's own exe, so it can see FAF's games and join them, and anyone can host their own FAF-compatible setup with it, including the client-server mode (a dedicated server that runs the game for every player), which FAF was sceptical of and never used.
+>
+> - This repository and its releases are the only official source.
+> - I don't make releases for forks, review their changes or answer for their builds.
+> - Bug reports go to the GitHub issues here, with a replay or a log.
+
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++23 so it can be maintained instead of staying frozen in a binary. The rebuild is complete: every engine function the game uses is source now, with FAF's own fixes to the exe ported, so the engine is ready to play on. It plays real games bit for bit like FAF's patched `ForgedAlliance.exe`, builds for x86 and x64, and the x64 build plays replays in about 40 % less time.
 
 > An independent preservation and interoperability effort, inspired by and indebted to the [Forged Alliance Forever](https://faforever.com) community. Not affiliated with, endorsed by, or supported by the original publisher or developer. See [LEGAL.md](LEGAL.md).
+
+## Install a release
+
+You need your own copy of Forged Alliance and an installed FAF client (it creates `C:\ProgramData\FAForever`). Releases hold only the engine: no game files, assets or maps.
+
+1. Download `faf-engine-<version>-x64.zip` from the [latest release](https://github.com/Draiget/faf-re/releases/latest).
+2. Unzip it into `C:\ProgramData\FAForever\bin_x64` (create the folder; it sits next to FAF's `bin` folder), keeping the `fafengine` folder as it is.
+3. Start it from that folder:
+
+   ```
+   main_x64.exe /init init_faf.lua /nobugreport /log C:\ProgramData\FAForever\logs\main_x64.log
+   ```
+
+The x64 install leaves FAF's own `bin` folder alone; deleting `bin_x64` removes it. Each package carries an `INSTALL.txt` with the steps:
+
+- **x86:** unzip `faf-engine-<version>-x86.zip` into FAF's `bin` folder, next to `ForgedAlliance.exe` (keep that exe), and start `main.exe` the same way.
+- **Linux x64** (glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Mint 21, RHEL 9 and later): extract `faf-engine-<version>-linux-x64.tar.gz` into a folder of its own and start `./faf-launch`, which finds Forged Alliance and FAF's game data.
+
+If the game crashes, it writes `faf_crash_<date>.txt` next to the exe. Please attach it, with the log from `/log`, to an [issue](https://github.com/Draiget/faf-re/issues).
 
 ## Status
 
 | | |
 |---|---|
 | Renderers | [![Direct3D 9](https://img.shields.io/badge/Direct3D-9-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 10](https://img.shields.io/badge/Direct3D-10-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 11](https://img.shields.io/badge/Direct3D-11-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 12](https://img.shields.io/badge/Direct3D-12-0078D6)](docs/RENDERER_BACKENDS.md) [![Vulkan 1.3](https://img.shields.io/badge/Vulkan-1.3-AC162C)](docs/RENDERER_BACKENDS.md) |
-| Replay parity | Latest nightly (04–05/11/2026): 2,127 of 2,139 vault replays played (99.4 %) match every recorded checksum, 5 more are expected desyncs that aren't this engine's, 7 were new failures of ours, fixed since, as is 27064121, which failed after them; no CI run has played those fixes yet. Largest run: 12,714 of 13,148 (96.7 %) on CI (30–31/10/2026) ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
+| Replay parity | On game version 3840, no vault replay has desynced: release 2026.11.015 passed 702 of 703 (24/11/2026), the 17/11 nightly 2,572 of 2,575; the rest are crashes ([Retail parity](#retail-parity)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 plays five vault replays in 41 % less time than retail all together (23 % to 45 % per replay), measured 10/11/2026 ([Performance](docs/PERFORMANCE.md)) |
-| Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code (its window library, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding. The window library is replaced by SDL3 and Dear ImGui on every platform (#416) |
+| Recovery | Complete: all 40,617 engine functions the game uses are source, 0 outstanding; FAF's fixes to the exe are ported ([switches](docs/SWITCHES.md)) |
 
-Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
+The rest of the shipped exe is library code (its window library, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments. The window library is replaced by SDL3 and Dear ImGui on every platform (#416). Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
 
 ## Map editor
 
@@ -49,7 +78,24 @@ Generate · Objects &nbsp;/&nbsp; Environment · Materials. [docs/MAP_EDITOR.md]
 
 ## Retail parity
 
-Real games from the FAF replay vault (stock and community maps, 1–12 human players, games against the built-in AI and M28AI) play back on the rebuilt engine checksum-identical to retail. The largest run played 13,148 replays:
+Real games from the FAF replay vault (stock and community maps, 1–12 human players, games against the built-in AI and M28AI) play back on the rebuilt engine with the same checksum as retail at every recorded beat. A replay that passes is the same game, bit for bit; a checksum mismatch is a desync.
+
+**On game version 3840, no replay has desynced.**
+
+| Run | Build | Replays with a verdict | Pass | Desyncs | Crashes |
+|---|---|---|---|---|---|
+| 24/11/2026, random sample | release 2026.11.015 | 703 | **702 (99.86 %)** | **0** | 1 |
+| 17/11/2026, nightly | master `816c37942` | 2,575 | **2,572 (99.88 %)** | **0** | 2 |
+
+- **Live game splits count as passes.** In 6 sample and 18 nightly games the live players themselves recorded different checksums at one beat. The engine matches one side; no build can match both.
+- **One more nightly replay, 28002823, is not counted as a desync.** The live players recorded another checksum, and the original `ForgedAlliance.exe` gives ours.
+- **Open:** the crashes in 27990940 (both runs) and 28044601 (nightly).
+- **Left out:** replays with sim mods or for another game version (287 in the sample, 1,368 in the nightly), and replays whose job ran out of time (10 and 1,057).
+
+<details>
+<summary><b>Earlier runs on game version 3835 (October–November 2026): 17,077 replays</b></summary>
+
+The largest run played 13,148 replays:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/parity-overview-dark.svg">
@@ -68,7 +114,9 @@ Two more CI runs bring the total to 17,077 replays with a verdict:
 
 The 315 mismatches: 143 pass on a later build (45.4 %), 122 come from maps and content (38.7 %), 44 are live game splits (14.0 %), 6 fail on retail too (1.9 %), and 0 are unexplained. Counting the 143, 16,810 (98.44 %) would pass; this too is worked out, not measured.
 
-The latest nightly run, on 04–05/11/2026, played 2,139 replays: 2,127 pass, 5 are expected desyncs whose cause isn't this engine, and 7 were new failures of ours, fixed since. 27064121, which failed once those were fixed, is fixed on master too. No CI run has played these fixes yet.
+The nightly run on 04–05/11/2026 played 2,139 replays: 2,127 pass, 5 are expected desyncs whose cause isn't this engine, and 7 were new failures of ours, fixed since, as is 27064121, which failed once those were fixed.
+
+</details>
 
 Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
@@ -233,7 +281,7 @@ Lua is part of the engine source: it carries the Lua 5.0 C API headers of LuaPlu
 
 The engine does not use or distribute the CRI Sofdec/ADX runtime. `.sfd` support is an independent implementation with FFmpeg and a bounded FAF metadata parser. The legacy `mwPly*`/`ADXM_*` names remain only as a compatibility facade for the recovered call sites. Embedded audio and optional external XACT sound/voice cues stay separate. Profile, dependency setup, validation and unsupported composition modes: [docs/FAF_SFD_COMPATIBILITY.md](docs/FAF_SFD_COMPATIBILITY.md).
 
-## Support
+## Donations
 
 This rebuild took a lot of time and paid AI compute. If it is useful to you, donations in ETH are welcome: `0x8f614802906dF231b8fbC9a6f11C6728D2A13DDF`
 
