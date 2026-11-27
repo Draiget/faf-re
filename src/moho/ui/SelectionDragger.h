@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <memory>
+#include <vector>
 
 #include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/math/Vector3f.h"
@@ -27,10 +28,11 @@ namespace moho
   extern WeakSet<UserEntity> sSelectionBrackets;
 
   /**
-   * Attempts to fallback-select transport unload cargo holograms via Lua
-   * when rubber-band drag volume contains no live units.
+   * Engine addition (`ui_TransportPreOrders`): the entity ids, ascending, of carried units whose drop
+   * hologram (`UserUnit::GetAllSelectionBracketPositionOverrides`) lies in `solid`, a band box's
+   * volume built from the dragging view's own camera. Empty while the switch is off.
    */
-  bool TryFallbackHologramSelection(CWldSession* session, float x0, float y0, float x1, float y1, bool isShift);
+  [[nodiscard]] std::vector<std::uint32_t> CargoHologramsInSolid(const CGeomSolid3& solid);
 
   /**
    * Interface layer between `IMauiDragger` and the concrete selection

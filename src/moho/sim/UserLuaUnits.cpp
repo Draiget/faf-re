@@ -1877,9 +1877,13 @@ int moho::cfunc_SelectUnitsL(
       }
 
       UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
+      // Engine addition (`ui_TransportPreOrders`): a carried unit that is already selected (picked
+      // through its drop hologram) stays selected when UI script re-applies the selection. Any other
+      // carried unit - a control group recalled, a selection hotkey - selects its transport, as retail.
       const bool preserveAttachedCargo = moho::ui_TransportPreOrders && userEntity != nullptr &&
         userEntity->mArmy == session->GetFocusUserArmy() &&
-        ResolveSelectableTransportAttachmentParent(userUnit) != nullptr;
+        ResolveSelectableTransportAttachmentParent(userUnit) != nullptr &&
+        session->mSelection.Find(userEntity) != session->mSelection.end();
       if ((userEntity != nullptr && userEntity->IsSelectable()) || preserveAttachedCargo) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (

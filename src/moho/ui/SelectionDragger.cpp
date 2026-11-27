@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/utils/Logging.h"
@@ -18,7 +19,6 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/entity/Entity.h"
-#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
@@ -297,66 +297,46 @@ namespace moho
     return this;
   }
 
-  [[nodiscard]] bool SelectionContainsOnlyTransports(
-    const WeakSet<UserEntity>& selection
+  std::vector<std::uint32_t> CargoHologramsInSolid(
+    const CGeomSolid3& solid
   )
   {
-    if (selection.Empty()) {
-      return false;
+    std::vector<std::uint32_t> entityIds;
+    if (!ui_TransportPreOrders) {
+      return entityIds;
     }
-    static const fa::string kTransportCategory("TRANSPORTATION");
-    for (UserEntity* const entity : selection) {
-      if (entity == nullptr || !entity->IsInCategory(kTransportCategory)) {
-        return false;
+    for (const auto& [entityId, hologramPosition] : UserUnit::GetAllSelectionBracketPositionOverrides()) {
+      // A unit-sized sphere at the hologram, so a box edge through its middle still takes it.
+      if (solid.Intersects(Wm3::Sphere3f(hologramPosition, 1.0f))) {
+        entityIds.push_back(entityId);
       }
     }
-    return true;
+    std::sort(entityIds.begin(), entityIds.end());
+    return entityIds;
   }
 
-  bool TryFallbackHologramSelection(
-    CWldSession* const session,
-    const float x0,
-    const float y0,
-    const float x1,
-    const float y1,
-    const bool isShift
-  )
+  namespace
   {
-    if (!ui_TransportPreOrders || session == nullptr || session->mState == nullptr) {
-      return false;
-    }
-
-    try {
-      LuaPlus::LuaObject hologramModule =
-        SCR_Import(session->mState, "/fafengine/modules/lua/ui/game/transport_holograms.lua");
-      if (!hologramModule.IsTable()) {
-        return false;
+    /// Engine addition (`ui_TransportPreOrders`): adds to `out` the focus army's living carried units
+    /// whose drop hologram lies in `solid`.
+    void AddCargoHologramUnits(
+      const CGeomSolid3& solid,
+      CWldSession& session,
+      WeakSet<UserEntity>& out
+    )
+    {
+      for (const std::uint32_t entityId : CargoHologramsInSolid(solid)) {
+        UserEntity* const entity = session.LookupEntityId(static_cast<EntId>(entityId));
+        if (
+          entity != nullptr && entity->IsUserUnit() != nullptr && entity->mVariableData.mIsDead == 0 &&
+          entity->mArmy == session.GetFocusUserArmy() &&
+          UserUnit::IsAttachmentParentRef(entity->mVariableData.mAttachmentParentRef)
+        ) {
+          (void)out.Add(entity);
+        }
       }
-
-      LuaPlus::LuaObject handleWorldDragObj = hologramModule["HandleWorldDrag"];
-      if (!handleWorldDragObj.IsFunction()) {
-        return false;
-      }
-
-      LuaPlus::LuaFunction<bool> handleWorldDragFn(handleWorldDragObj);
-      LuaPlus::LuaObject nilObject(session->mState);
-
-      const float minX = std::min(x0, x1);
-      const float minY = std::min(y0, y1);
-      const float maxX = std::max(x0, x1);
-      const float maxY = std::max(y0, y1);
-
-      return handleWorldDragFn(nilObject, minX, minY, maxX, maxY, isShift);
-    } catch (const std::exception& exception) {
-      gpg::Warnf(
-        "[SelectionDragger] Fallback hologram selection failed: %s", exception.what() != nullptr ? exception.what() : ""
-      );
-      return false;
-    } catch (...) {
-      gpg::Warnf("[SelectionDragger] Fallback hologram selection failed with unknown exception");
-      return false;
     }
-  }
+  } // namespace
 
   /**
    * Address: 0x00863870 (FUN_00863870)
@@ -410,10 +390,10 @@ namespace moho
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
-      if (draggedSelection.Empty() || SelectionContainsOnlyTransports(draggedSelection)) {
-        if (TryFallbackHologramSelection(mSess, mX0, mY0, eventData->mMousePos.x, eventData->mMousePos.y, true)) {
-          return;
-        }
+      // Engine addition (`ui_TransportPreOrders`): a box that takes no unit takes the cargo whose drop
+      // hologram it covers. A box with units in it - transports included - selects as retail does.
+      if (draggedSelection.Empty()) {
+        AddCargoHologramUnits(BuildSelectionSolid(), *mSess, draggedSelection);
       }
 
       WeakSet<UserEntity> currentSelection(mSess->GetSelection());
@@ -488,10 +468,9 @@ namespace moho
         }
       }
 
-      if (resultSelection.Empty() || SelectionContainsOnlyTransports(resultSelection)) {
-        if (TryFallbackHologramSelection(mSess, mX0, mY0, eventData->mMousePos.x, eventData->mMousePos.y, false)) {
-          return;
-        }
+      // Engine addition (`ui_TransportPreOrders`): see the shift branch above.
+      if (resultSelection.Empty()) {
+        AddCargoHologramUnits(selectionSolid, *mSess, resultSelection);
       }
 
       mSess->SetSelection(resultSelection);

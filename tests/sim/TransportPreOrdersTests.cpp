@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 
+#include "moho/collision/CGeomSolid3.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/EntityId.h"
 #include "moho/ui/SelectionDragger.h"
@@ -543,22 +544,34 @@ namespace
 
   TEST(
     TransportPreOrdersTests,
-    FallbackHologramSelectionNullSessionSafe
+    BandBoxTakesTheCargoWhoseDropHologramItCovers
   )
   {
-    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 0.0f, 0.0f, 100.0f, 100.0f, false));
-    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 0.0f, 0.0f, 100.0f, 100.0f, true));
-  }
+    // The box a drag builds from its own view's camera: 20 x 200 x 20 around (100, 10, 100).
+    const CGeomSolid3 box(
+      Wm3::Box3f(
+        Wm3::Vector3f{100.0f, 10.0f, 100.0f},
+        Wm3::Vector3f{1.0f, 0.0f, 0.0f},
+        Wm3::Vector3f{0.0f, 1.0f, 0.0f},
+        Wm3::Vector3f{0.0f, 0.0f, 1.0f},
+        10.0f,
+        100.0f,
+        10.0f
+      )
+    );
+    FakeUserUnitScope inside, outside, onEdge;
+    inside.GetUnit(1001)->SetSelectionBracketPositionOverride(Wm3::Vector3f{100.0f, 10.0f, 100.0f});
+    outside.GetUnit(1002)->SetSelectionBracketPositionOverride(Wm3::Vector3f{200.0f, 10.0f, 200.0f});
+    onEdge.GetUnit(1003)->SetSelectionBracketPositionOverride(Wm3::Vector3f{110.5f, 10.0f, 100.0f});
 
-  TEST(
-    TransportPreOrdersTests,
-    FallbackHologramSelectionGatedByConVar
-  )
-  {
-    const bool prev = moho::ui_TransportPreOrders;
+    const std::vector<std::uint32_t> taken = CargoHologramsInSolid(box);
+    ASSERT_EQ(taken.size(), 2u);
+    EXPECT_EQ(taken[0], 1001u);
+    EXPECT_EQ(taken[1], 1003u);
+
     moho::ui_TransportPreOrders = false;
-    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 10.0f, 10.0f, 50.0f, 50.0f, false));
-    moho::ui_TransportPreOrders = prev;
+    EXPECT_TRUE(CargoHologramsInSolid(box).empty());
+    moho::ui_TransportPreOrders = true;
   }
 
   TEST(
