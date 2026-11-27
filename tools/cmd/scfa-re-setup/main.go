@@ -1,4 +1,4 @@
-// faf-re-setup installs the rebuilt engine from a GitHub release in one step. It checks that FAF's
+// scfa-re-setup installs the rebuilt engine from a GitHub release in one step. It checks that FAF's
 // client and Forged Alliance are installed and that the engine isn't running, downloads the release
 // package for this system, checks it against the release's SHA256SUMS.txt, unpacks it where the engine
 // runs from and adds a shortcut. Windows (x64, x86) and Linux (x64). Standard library and x/sys only.
@@ -16,9 +16,9 @@ import (
 // version is set at build time (-ldflags "-X main.version=<tag>").
 var version = "dev"
 
-const usage = `faf-re-setup: installs the rebuilt Forged Alliance engine from its GitHub releases.
+const usage = `scfa-re-setup: installs the rebuilt Forged Alliance engine from its GitHub releases.
 
-usage: faf-re-setup [options]
+usage: scfa-re-setup [options]
 
   --check          run the checks only; install nothing
   --version TAG    install this release instead of the latest one (e.g. 2026.11.015)
@@ -48,7 +48,7 @@ type options struct {
 
 func main() {
 	var o options
-	fs := flag.NewFlagSet("faf-re-setup", flag.ContinueOnError)
+	fs := flag.NewFlagSet("scfa-re-setup", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	fs.BoolVar(&o.check, "check", false, "")
 	fs.StringVar(&o.tag, "version", "", "")
@@ -78,7 +78,7 @@ func main() {
 }
 
 func run(o options) int {
-	fmt.Printf("faf-re setup %s\n\n", version)
+	fmt.Printf("scfa-re setup %s\n\n", version)
 	sys, err := newSystem(o)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

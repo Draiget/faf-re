@@ -154,7 +154,7 @@ func fetchPackage(p *pkgSource, dir string) (path string, temp bool, err error) 
 		}
 		return p.file, false, nil
 	}
-	f, err := os.CreateTemp(dir, ".faf-re-setup-download-*")
+	f, err := os.CreateTemp(dir, ".scfa-re-setup-download-*")
 	if err != nil {
 		return "", false, err
 	}
@@ -211,7 +211,7 @@ func getContext(ctx context.Context, url string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "faf-re-setup/"+version)
+	req.Header.Set("User-Agent", "scfa-re-setup/"+version)
 	if strings.HasPrefix(url, apiBase) {
 		req.Header.Set("Accept", "application/vnd.github+json")
 	}

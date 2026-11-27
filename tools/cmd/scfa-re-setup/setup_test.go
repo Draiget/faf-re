@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -365,6 +366,59 @@ func TestOriginalsKeptAndRestored(t *testing.T) {
 	}
 }
 
+// An install made by the installer under its old name (faf-re-setup.json, .faf-re-setup-originals)
+// is taken over: the update keeps its originals and --uninstall still puts them back.
+func TestLegacyStateAdopted(t *testing.T) {
+	s := fakeSystem(t, "-x86.zip", "main.exe")
+	o := options{noShortcut: true, yes: true}
+	if err := os.MkdirAll(s.installDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.installDir, "main.exe"), []byte("original main"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := readAll(t, s.installDir)
+
+	src := t.TempDir()
+	installVersion := func(body string) {
+		pkg := filepath.Join(src, "faf-engine-"+body+"-x86.zip")
+		makeZip(t, pkg, []entry{{name: "main.exe", body: body}})
+		os.Remove(filepath.Join(src, sumsName))
+		p, err := localPackage(s, pkg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := install(s, o, p); err != nil {
+			t.Fatalf("install %s: %v", body, err)
+		}
+	}
+	installVersion("v1")
+	// Put the state where the old installer kept it.
+	if err := os.Rename(filepath.Join(s.installDir, manifestName), filepath.Join(s.installDir, legacyManifestName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(s.installDir, originalsName), filepath.Join(s.installDir, legacyOriginalsName)); err != nil {
+		t.Fatal(err)
+	}
+
+	installVersion("v2")
+	for _, legacy := range []string{legacyManifestName, legacyOriginalsName} {
+		if _, err := os.Stat(filepath.Join(s.installDir, legacy)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s is still there after the update (%v)", legacy, err)
+		}
+	}
+	m, _ := readManifest(s.installDir)
+	if m == nil || m.Version != "v2" || !reflect.DeepEqual(m.Originals, []string{"main.exe"}) {
+		t.Fatalf("manifest %+v", m)
+	}
+	if err := uninstall(s, o); err != nil {
+		t.Fatal(err)
+	}
+	if after := readAll(t, s.installDir); !reflect.DeepEqual(after, before) {
+		t.Errorf("after uninstall: %v, want the folder as it was: %v", after, before)
+	}
+}
+
 func TestInstallRefusesBadChecksum(t *testing.T) {
 	s := fakeSystem(t, "-x64.zip", "main_x64.exe")
 	src := t.TempDir()
@@ -425,7 +479,7 @@ func TestResolveAndDownload(t *testing.T) {
 	// No leftovers from the download or the staging.
 	entries, _ := os.ReadDir(s.installDir)
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".faf-re-setup") {
+		if strings.HasPrefix(e.Name(), ".scfa-re-setup") {
 			t.Errorf("leftover %s", e.Name())
 		}
 	}

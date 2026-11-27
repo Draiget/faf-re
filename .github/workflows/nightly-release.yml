@@ -342,16 +342,16 @@ jobs:
           pattern: zip-*
           path: zips
           merge-multiple: true
-      # The one-step installers (tools/cmd/faf-re-setup): they download this release's package for
+      # The one-step installers (tools/cmd/scfa-re-setup): they download this release's package for
       # the player's system, check it against SHA256SUMS.txt and install it.
       - env:
           TAG: ${{ needs.plan.outputs.tag }}
         working-directory: tools
         run: |
           export CGO_ENABLED=0
-          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o ../zips/faf-re-setup.exe ./cmd/faf-re-setup
-          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o ../zips/faf-re-setup-linux ./cmd/faf-re-setup
-          go test ./cmd/faf-re-setup
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o ../zips/scfa-re-setup.exe ./cmd/scfa-re-setup
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o ../zips/scfa-re-setup-linux ./cmd/scfa-re-setup
+          go test ./cmd/scfa-re-setup
       - if: github.event_name == 'workflow_run' || inputs.parity_run != ''
         uses: actions/download-artifact@v8
         with:
@@ -369,7 +369,7 @@ jobs:
           PARITY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || inputs.parity_run }}
         run: |
           # The exes also ship on their own, for replacing one that is already installed.
-          (cd zips && for z in faf-engine-*.zip; do unzip -j -o "$z" 'main*.exe'; done && sha256sum faf-engine-*.zip faf-engine-*.tar.gz main*.exe faf-re-setup* > SHA256SUMS.txt)
+          (cd zips && for z in faf-engine-*.zip; do unzip -j -o "$z" 'main*.exe'; done && sha256sum faf-engine-*.zip faf-engine-*.tar.gz main*.exe scfa-re-setup* > SHA256SUMS.txt)
           python tools/release/nightly_notes.py --out notes.md --player-notes player-notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
@@ -385,7 +385,7 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$TAG" zips/faf-engine-*.zip zips/faf-engine-*.tar.gz zips/main*.exe zips/faf-re-setup* zips/SHA256SUMS.txt player-notes.md --target "$SHA" --latest \
+          gh release create "$TAG" zips/faf-engine-*.zip zips/faf-engine-*.tar.gz zips/main*.exe zips/scfa-re-setup* zips/SHA256SUMS.txt player-notes.md --target "$SHA" --latest \
             --title "$TAG x64\\x86\\Linux" --notes-file notes.md
           gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"
 

@@ -307,7 +307,7 @@ func checkWritable(dir string) error {
 	if st, err := os.Stat(target); err != nil || !st.IsDir() {
 		return fmt.Errorf("%s is not a folder", target)
 	}
-	f, err := os.CreateTemp(target, ".faf-re-setup-*")
+	f, err := os.CreateTemp(target, ".scfa-re-setup-*")
 	if err != nil {
 		return fmt.Errorf("can't write into %s: %w", target, err)
 	}

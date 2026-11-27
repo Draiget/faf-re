@@ -17,11 +17,30 @@ import (
 )
 
 const (
-	manifestName  = "faf-re-setup.json"
-	stageName     = ".faf-re-setup-new"
-	backupName    = ".faf-re-setup-old"
-	originalsName = ".faf-re-setup-originals"
+	manifestName  = "scfa-re-setup.json"
+	stageName     = ".scfa-re-setup-new"
+	backupName    = ".scfa-re-setup-old"
+	originalsName = ".scfa-re-setup-originals"
+
+	// The names releases before the repository's rename used, when the installer was faf-re-setup.
+	legacyManifestName  = "faf-re-setup.json"
+	legacyOriginalsName = ".faf-re-setup-originals"
 )
+
+// adoptLegacyState renames an install's state from the installer's old name to the current one, so
+// an install made by faf-re-setup updates and uninstalls like any other.
+func adoptLegacyState(dir string) {
+	if _, err := os.Stat(filepath.Join(dir, manifestName)); !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	if os.Rename(filepath.Join(dir, legacyManifestName), filepath.Join(dir, manifestName)) != nil {
+		return
+	}
+	legacy := filepath.Join(dir, legacyOriginalsName)
+	if _, err := os.Stat(legacy); err == nil {
+		os.Rename(legacy, filepath.Join(dir, originalsName))
+	}
+}
 
 // manifest records what setup installed, so a later run can update or remove exactly that.
 type manifest struct {
@@ -35,6 +54,7 @@ type manifest struct {
 }
 
 func readManifest(dir string) (*manifest, error) {
+	adoptLegacyState(dir)
 	data, err := os.ReadFile(filepath.Join(dir, manifestName))
 	if err != nil {
 		return nil, err

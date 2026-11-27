@@ -33,8 +33,8 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 
 You need your own copy of Forged Alliance and an installed FAF client that has started at least one game or replay (that's when it downloads FAF's game data). Releases hold only the engine: no game files, assets or maps.
 
-**Windows:** download `faf-re-setup.exe` from the [latest release](https://github.com/Draiget/scfa-re/releases/latest) and run it. It isn't code-signed, so Windows may say it "protected your PC": choose **More info**, then **Run anyway**. Its SHA-256 is in the release's `SHA256SUMS.txt`.
-**Linux x64:** download `faf-re-setup-linux`, then `chmod +x faf-re-setup-linux && ./faf-re-setup-linux`.
+**Windows:** download `scfa-re-setup.exe` from the [latest release](https://github.com/Draiget/scfa-re/releases/latest) and run it. It isn't code-signed, so Windows may say it "protected your PC": choose **More info**, then **Run anyway**. Its SHA-256 is in the release's `SHA256SUMS.txt`.
+**Linux x64:** download `scfa-re-setup-linux`, then `chmod +x scfa-re-setup-linux && ./scfa-re-setup-linux`.
 
 Setup checks that FAF's client and Forged Alliance are installed, that there's room and that the game isn't running, then downloads the release's package for your system, checks it against the release's SHA-256 list, installs it and adds a shortcut. Run it again to update; `--uninstall` removes exactly what it installed, `--check` only runs the checks, and `--help` lists the rest. The setup files ship with releases after 2026.11.015; for that one, install by hand.
 
