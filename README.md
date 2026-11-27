@@ -1,6 +1,6 @@
 <div align="center">
 
-# faf-re
+# scfa-re
 
 **The *Supreme Commander: Forged Alliance* engine, rebuilt as C++23**
 
