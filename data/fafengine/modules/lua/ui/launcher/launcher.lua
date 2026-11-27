@@ -31,7 +31,7 @@ FeaturedMods = {
 local kRailWidth = 214
 local kStatusHeight = 28
 -- The pages under Play (the top bar's Play tab and its strip of modes).
-local kPlayPages = { online = true, matchmaking = true, lan = true }
+local kPlayPages = { online = true, matchmaking = true, coop = true, lan = true }
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1973,7 +1973,7 @@ function Launcher:Refresh()
     end
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
-        (self.page == 'matchmaking' and self.matchView) or
+        (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2614,11 +2614,11 @@ local function BuildTopBar(launcher, body)
     LayoutHelpers.SetHeight(strip, 40)
     strip.Width:Set(function() return strip.Right() - strip.Left() end)
     strip.tabs = Widgets.Tabs(strip, {
-        { 'online', 'Custom games' }, { 'matchmaking', 'Matchmaking' }, { 'skirmish', 'Skirmish' },
+        { 'online', 'Custom games' }, { 'matchmaking', 'Matchmaking' }, { 'coop', 'Co-op' }, { 'skirmish', 'Skirmish' },
         { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
     }, function(key)
-        if key == 'matchmaking' then
-            launcher:ShowPage('matchmaking')
+        if key == 'matchmaking' or key == 'coop' then
+            launcher:ShowPage(key)
         elseif key == 'skirmish' then
             launcher:Skirmish()
         elseif key == 'campaign' then
@@ -2984,6 +2984,23 @@ local function Build(launcher)
             matchPage:Destroy()
         end
     end
+    -- Co-op: FAF's co-op missions (coop.lua), with the engine's FAF API access.
+    if rawget(_G, 'FafLibrary_Api') then
+        local coopPage = Group(content, 'launcher coop')
+        LayoutHelpers.FillParent(coopPage, content)
+        coopPage.Width:Set(function() return coopPage.Right() - coopPage.Left() end)
+        coopPage.Height:Set(function() return coopPage.Bottom() - coopPage.Top() end)
+        local coopBuilt, coopWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/coop.lua').Build(launcher, coopPage)
+        end)
+        if coopBuilt then
+            launcher.pages.coop = coopPage
+            Theme.SetVisible(coopPage, false)
+        else
+            WARN('LAUNCHER: the co-op page failed to build: ' .. tostring(coopWhy))
+            coopPage:Destroy()
+        end
+    end
     -- Chat: FAF's chat (chatpage.lua), with the engine's chat functions.
     if rawget(_G, 'FafChat_Status') then
         local chatPage = Group(content, 'launcher chat')
@@ -3234,6 +3251,24 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchercooptest: the Co-op page: FAF's missions, the first one's fastest completions.
+            if GetCommandLineArg('/launchercooptest', 0) and current.coopView then
+                current:ShowPage('coop')
+                for i = 1, 15 do
+                    local coop = current.coopView
+                    if coop.missions and coop.chosen and coop.results[coop.chosen.id] then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                local coop = current.coopView
+                Step('co-op: ' .. table.getn(coop.missions or {}) .. ' missions, first ' ..
+                    tostring(coop.chosen and coop.chosen.name) .. ' (' .. tostring(coop.chosen and coop.chosen.folder) ..
+                    '), ' .. table.getn(coop.chosen and coop.results[coop.chosen.id] or {}) .. ' completions' ..
+                    (coop.failure and (', failure ' .. coop.failure) or ''))
+                Wait(2)
+            end
             -- /launchermatchtest: the Matchmaking page: the queues FAF's lobby lists, a search started and stopped.
             if GetCommandLineArg('/launchermatchtest', 0) and current.matchView then
                 current:ShowPage('matchmaking')
