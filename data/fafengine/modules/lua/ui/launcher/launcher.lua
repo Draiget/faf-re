@@ -2238,6 +2238,57 @@ function Launcher:TutorialPrompt(callback)
         nil, nil, true, { worldCover = true, enterButton = 1, escapeButton = 2 })
 end
 
+--- The changelog's game preview of one unit card (changelog.lua): a sandbox skirmish on a small map (no fog, no
+--- victory) where the unit as it is now stands beside a copy with the card's changed values put back, both shooting at
+--- targets, their ranges drawn on the ground (/fafengine/modules/lua/sim/unitpreview.lua). The game's own Exit, the
+--- overlay's Back or Esc come back to the launcher, on the changelog.
+local kPreviewMap = '/maps/SCMP_013/SCMP_013_scenario.lua' -- Winter Duel: 5 km, two armies, land in the middle
+local kFactionOfLetter = { e = 1, a = 2, r = 3, s = 4 }
+
+function Launcher:PreviewUnit(head, version)
+    local ok, why = pcall(function()
+        local id = string.lower(head.id or '')
+        local scenario = import('/lua/ui/maputil.lua').LoadScenario(kPreviewMap)
+        if not scenario then
+            error('the map ' .. kPreviewMap .. ' is missing')
+        end
+        local changes = {}
+        for _, stat in (head.stats or {}) do
+            table.insert(changes, { label = stat.label, old = stat.old, new = stat.new, oldText = stat.oldText,
+                newText = stat.newText })
+        end
+        scenario.Options = {
+            FogOfWar = 'none', NoRushOption = 'Off', PrebuiltUnits = 'Off', Difficulty = 2, DoNotShareUnitCap = true,
+            Timeouts = -1, GameSpeed = 'normal', UnitCap = '1000', Victory = 'sandbox', CheatsEnabled = 'true',
+            CivilianAlliance = 'enemy', TeamShareOverflow = 'enabled', Share = 'ShareUntilDeath',
+            FafrePreview = { unit = id, name = head.name, version = version and tostring(version) or nil, changes = changes },
+        }
+        local GetDefaultPlayerOptions = import('/lua/ui/lobby/lobbycomm.lua').GetDefaultPlayerOptions
+        local playerName = Prefs.GetFromCurrentProfile('Name') or 'Player'
+        local player = GetDefaultPlayerOptions(playerName)
+        player.PlayerName = playerName
+        player.Human = true
+        player.ArmyName = 'ARMY_1'
+        player.Faction = kFactionOfLetter[string.sub(id, 2, 2)] or 1
+        player.PlayerColor = 1
+        player.ArmyColor = 1
+        local targets = GetDefaultPlayerOptions('Targets')
+        targets.PlayerName = 'Targets'
+        targets.Human = false
+        targets.Civilian = true
+        targets.ArmyName = 'ARMY_2'
+        targets.PlayerColor = 2
+        targets.ArmyColor = 2
+        LOG('LAUNCHER: previewing ' .. id .. ' with ' .. table.getn(changes) .. ' changed values')
+        LaunchSinglePlayerSession({ playerName = playerName, createReplay = false, scenarioInfo = scenario,
+            teamInfo = { player, targets }, scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario) })
+    end)
+    if not ok then
+        WARN('LAUNCHER: the preview did not start: ' .. tostring(why))
+        Message(self.root, 'Preview in game', 'The preview did not start: ' .. tostring(why))
+    end
+end
+
 function Launcher:Skirmish()
     local launcher = self
     self:TutorialPrompt(function()
@@ -3247,6 +3298,16 @@ function CreateUI(buildFafMenu)
     Build(launcher)
     -- Back on the page shown before the front end was built again (Options after a UI scale change).
     launcher:ShowPage((lastShownPage and launcher.pages[lastShownPage]) and lastShownPage or 'online')
+    -- The preview walk's way back: the launcher is here again; which page it opened on, then the walk ends.
+    if Prefs.GetFromCurrentProfile('fafre_preview_test') then
+        Prefs.SetToCurrentProfile('fafre_preview_test', nil)
+        ForkThread(function()
+            WaitSeconds(3)
+            LOG('LAUNCHER TEST: preview: back on the launcher, page ' .. tostring(launcher.page))
+            WaitSeconds(2)
+            ExitApplication()
+        end)
+    end
     launcher:ShowHome()
     LOG('LAUNCHER: shown')
 end
@@ -3319,6 +3380,23 @@ function TestWalk()
             WaitSeconds(seconds)
         end
         Prefs.SetToCurrentProfile('MenuTutorialPrompt', true)
+        -- /launcherpreviewtest: the changelog's game preview of a made-up Titan card (four values the preview puts
+        -- back, a cost, one changed again since). The game's overlay walks on by itself and comes back here.
+        if GetCommandLineArg('/launcherpreviewtest', 0) then
+            current:ShowPage('changelog')
+            Wait(3)
+            Step('preview: starting from ' .. tostring(current.page))
+            Prefs.SetToCurrentProfile('fafre_preview_test', true)
+            current:PreviewUnit({ id = 'uel0303', name = 'Titan', stats = {
+                { label = 'Range', old = 30, new = 24, oldText = '30', newText = '24' },
+                { label = 'Damage', old = 30, new = 45, oldText = '30', newText = '45' },
+                { label = 'Speed', old = 3, new = 3.8, oldText = '3', newText = '3.8' },
+                { label = 'Health', old = 2000, new = 2400, oldText = '2000', newText = '2400' },
+                { label = 'Mass cost', old = 400, new = 480, oldText = '400', newText = '480' },
+                { label = 'Rate of fire', old = 1, new = 2, oldText = '1', newText = '2' },
+            } }, 'test')
+            return
+        end
         local watchAtStart = GetCommandLineArg('/launcherreplaywatch', 0)
         local installTest = GetCommandLineArg('/launchermodinstall', 0)
         Step('home')

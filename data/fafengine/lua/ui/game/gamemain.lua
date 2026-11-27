@@ -124,3 +124,22 @@ function OnSelectionChanged(oldSelection, newSelection, added, removed)
         oldOnSelectionChanged(oldSelection, newSelection, added, removed)
     end
 end
+
+-- ============================================================================
+-- The launcher's changelog preview (game option FafrePreview): the overlay that names the two copies, lists what the
+-- preview shows, restarts the fight and goes back to the launcher (Esc too).
+-- ============================================================================
+
+local previewCreateUI = CreateUI
+function CreateUI(isReplay)
+    previewCreateUI(isReplay)
+    local options = SessionGetScenarioInfo().Options or {}
+    if not isReplay and type(options.FafrePreview) == 'table' then
+        local ok, why = pcall(function()
+            import('/fafengine/modules/lua/ui/game/unitpreview.lua').Open(options.FafrePreview)
+        end)
+        if not ok then
+            WARN('UNIT PREVIEW: the overlay failed: ' .. tostring(why))
+        end
+    end
+end

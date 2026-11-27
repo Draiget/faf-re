@@ -169,6 +169,16 @@ local function Cards(blocks)
             table.insert(out, block)
         end
     end
+    -- A card offers the game preview when one of its values is one the preview can show (range, damage, speed...).
+    local Showable = import('/fafengine/modules/lua/sim/unitpreview.lua').Showable
+    for _, block in out do
+        if block.style == 'unitHead' then
+            block.preview = false
+            for _, stat in block.stats do
+                block.preview = block.preview or Showable(stat.label)
+            end
+        end
+    end
     return out
 end
 
@@ -335,6 +345,12 @@ function Build(launcher, page)
     view.document.Bottom:Set(function() return panel.Bottom() - Scale(16) end)
     view.document.Width:Set(function() return view.document.Right() - view.document.Left() end)
     view.document.Height:Set(function() return view.document.Bottom() - view.document.Top() end)
+    -- A unit card's "Preview in game": the unit and its changed values in a sandbox skirmish (Launcher:PreviewUnit).
+    view.document.onAction = function(action, head)
+        if action == 'preview' and head then
+            launcher:PreviewUnit(head, view.shown and view.shown.patch and view.shown.patch.version)
+        end
+    end
 
     function view:Show(item)
         self.shown = item
