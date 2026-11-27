@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <vector>
 
 #include "moho/command/SSTICommandIssueData.h"
@@ -860,5 +862,262 @@ namespace
     EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
     EXPECT_TRUE(UserUnit::GetAllTransportPreOrders().empty());
     EXPECT_TRUE(UserUnit::GetAllSelectionBracketPositionOverrides().empty());
+  }
+  // ---- Dispatch planning: grouping, waiting and builder handover, with units described by a table ----
+
+  struct FakeWorld
+  {
+    std::map<std::uint32_t, UserUnit::SPreOrderUnitState> units;
+
+    void Add(
+      const std::uint32_t entityId,
+      const bool attached,
+      const bool dead = false,
+      const bool sameArmy = true
+    )
+    {
+      units[entityId] = UserUnit::SPreOrderUnitState{true, dead, attached, sameArmy};
+    }
+
+    [[nodiscard]] UserUnit::PreOrderUnitLookup Lookup() const
+    {
+      return [this](const std::uint32_t entityId) {
+        const auto it = units.find(entityId);
+        return it != units.end() ? it->second : UserUnit::SPreOrderUnitState{};
+      };
+    }
+  };
+
+  [[nodiscard]] SSTICommandIssueData GroundOrder(
+    const EUnitCommandType type,
+    const float x,
+    const float z
+  )
+  {
+    SSTICommandIssueData order(type);
+    order.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    order.mTarget.mPos = Wm3::Vector3f{x, 10.0f, z};
+    return order;
+  }
+
+  [[nodiscard]] bool GroupHas(
+    const UserUnit::SPreOrderDispatchPlan& plan,
+    const std::uint32_t entityId
+  )
+  {
+    return std::find(plan.mGroup.begin(), plan.mGroup.end(), entityId) != plan.mGroup.end();
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanSendsOneGroupCommandToADetachedSquadWithTheSameOrders
+  )
+  {
+    FakeUserUnitScope a, b, c;
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(a.GetUnit(901));
+    squad.push_back(b.GetUnit(902));
+    squad.push_back(c.GetUnit(903));
+    UserUnit::QueueTransportPreOrders(squad, GroundOrder(EUnitCommandType::UNITCOMMAND_Move, 100.0f, 100.0f), false);
+
+    FakeWorld world;
+    world.Add(901, false);
+    world.Add(902, false);
+    world.Add(903, false);
+    const auto plan = UserUnit::PlanTransportPreOrderDispatch(901, true, 100, world.Lookup());
+
+    EXPECT_FALSE(plan.mWait);
+    EXPECT_FALSE(plan.mDrop);
+    ASSERT_EQ(plan.mGroup.size(), 3u);
+    EXPECT_EQ(plan.mGroup.back(), 901u);
+    EXPECT_TRUE(GroupHas(plan, 902u));
+    EXPECT_TRUE(GroupHas(plan, 903u));
+    ASSERT_EQ(plan.mOrders.size(), 1u);
+    EXPECT_EQ(plan.mOrders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Move);
+    EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanKeepsAUnitWithAnExtraOrderOutOfTheGroupAndGivesItItsOwnQueue
+  )
+  {
+    FakeUserUnitScope a, b, c;
+    UserUnit* unitA = a.GetUnit(911);
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(unitA);
+    squad.push_back(b.GetUnit(912));
+    squad.push_back(c.GetUnit(913));
+    UserUnit::QueueTransportPreOrders(squad, GroundOrder(EUnitCommandType::UNITCOMMAND_Move, 100.0f, 100.0f), false);
+    gpg::fastvector<UserUnit*> onlyA;
+    onlyA.push_back(unitA);
+    UserUnit::QueueTransportPreOrders(
+      onlyA, GroundOrder(EUnitCommandType::UNITCOMMAND_AggressiveMove, 200.0f, 200.0f), false
+    );
+
+    FakeWorld world;
+    world.Add(911, false);
+    world.Add(912, false);
+    world.Add(913, false);
+
+    // B lands first: B and C get the one move, A is not in that command.
+    const auto planB = UserUnit::PlanTransportPreOrderDispatch(912, true, 100, world.Lookup());
+    ASSERT_EQ(planB.mGroup.size(), 2u);
+    EXPECT_TRUE(GroupHas(planB, 913u));
+    EXPECT_FALSE(GroupHas(planB, 911u));
+    ASSERT_EQ(planB.mOrders.size(), 1u);
+    ASSERT_EQ(unitA->GetTransportPreOrders().size(), 2u);
+
+    // A then gets both of its own orders, alone.
+    const auto planA = UserUnit::PlanTransportPreOrderDispatch(911, true, 101, world.Lookup());
+    ASSERT_EQ(planA.mGroup.size(), 1u);
+    ASSERT_EQ(planA.mOrders.size(), 2u);
+    EXPECT_EQ(planA.mOrders[1].mCommandType, EUnitCommandType::UNITCOMMAND_AggressiveMove);
+    EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanWaitsForACarriedSquadMateForThirtyTicksThenSendsWithoutIt
+  )
+  {
+    FakeUserUnitScope a, b;
+    UserUnit* unitB = b.GetUnit(922);
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(a.GetUnit(921));
+    squad.push_back(unitB);
+    UserUnit::QueueTransportPreOrders(squad, GroundOrder(EUnitCommandType::UNITCOMMAND_Move, 50.0f, 50.0f), false);
+
+    FakeWorld world;
+    world.Add(921, false);
+    world.Add(922, true); // still in the transport
+
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(921, true, 100, world.Lookup()).mWait);
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(921, true, 100, world.Lookup()).mWait); // same beat again
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(921, true, 129, world.Lookup()).mWait);
+
+    const auto plan = UserUnit::PlanTransportPreOrderDispatch(921, true, 130, world.Lookup());
+    EXPECT_FALSE(plan.mWait);
+    ASSERT_EQ(plan.mGroup.size(), 1u);
+    EXPECT_EQ(plan.mGroup[0], 921u);
+    EXPECT_TRUE(unitB->HasTransportPreOrders()); // the carried one keeps its orders for its own landing
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanWaitsWhileAGuardTargetIsCarried
+  )
+  {
+    FakeUserUnitScope a;
+    UserUnit* unitA = a.GetUnit(931);
+    SSTICommandIssueData guard(EUnitCommandType::UNITCOMMAND_Guard);
+    guard.mTarget.mType = EAiTargetType::AITARGET_Entity;
+    guard.mTarget.mEnt = 932;
+    guard.mTarget.mEntityId = 932;
+    unitA->QueueTransportPreOrder(guard, false);
+
+    FakeWorld world;
+    world.Add(931, false);
+    world.Add(932, true);
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(931, true, 10, world.Lookup()).mWait);
+
+    world.Add(932, false);
+    const auto plan = UserUnit::PlanTransportPreOrderDispatch(931, true, 11, world.Lookup());
+    EXPECT_FALSE(plan.mWait);
+    ASSERT_EQ(plan.mOrders.size(), 1u);
+    EXPECT_EQ(plan.mOrders[0].mTarget.mEntityId, 932u);
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanIgnoresDeadSquadMatesAndLeavesOtherArmiesOut
+  )
+  {
+    FakeUserUnitScope a, b, c;
+    UserUnit* unitC = c.GetUnit(943);
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(a.GetUnit(941));
+    squad.push_back(b.GetUnit(942));
+    squad.push_back(unitC);
+    UserUnit::QueueTransportPreOrders(squad, GroundOrder(EUnitCommandType::UNITCOMMAND_Move, 70.0f, 70.0f), false);
+
+    FakeWorld world;
+    world.Add(941, false);
+    world.Add(942, true, /*dead=*/true);              // died in the transport: no reason to wait
+    world.Add(943, false, false, /*sameArmy=*/false); // given away: not commanded by this player
+
+    const auto plan = UserUnit::PlanTransportPreOrderDispatch(941, true, 5, world.Lookup());
+    EXPECT_FALSE(plan.mWait);
+    ASSERT_EQ(plan.mGroup.size(), 1u);
+    EXPECT_EQ(plan.mGroup[0], 941u);
+    EXPECT_TRUE(unitC->HasTransportPreOrders());
+
+    // When the given-away unit itself comes to dispatch, its owner check fails and the orders go.
+    const auto planC = UserUnit::PlanTransportPreOrderDispatch(943, false, 6, world.Lookup());
+    EXPECT_TRUE(planC.mDrop);
+    EXPECT_FALSE(unitC->HasTransportPreOrders());
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanTurnsLateBuildersIntoAssistsOnlyWhileTheFirstBuilderLives
+  )
+  {
+    FakeUserUnitScope a, b, c;
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(a.GetUnit(951));
+    squad.push_back(b.GetUnit(952));
+    squad.push_back(c.GetUnit(953));
+    SSTICommandIssueData build(EUnitCommandType::UNITCOMMAND_BuildMobile);
+    build.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    build.mTarget.mPos = Wm3::Vector3f{300.0f, 10.0f, 300.0f};
+    UserUnit::QueueTransportPreOrders(squad, build, false);
+
+    FakeWorld world;
+    world.Add(951, false);
+    world.Add(952, true);
+    world.Add(953, true);
+
+    // 951 lands, waits out its squad and builds.
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(951, true, 0, world.Lookup()).mWait);
+    const auto first = UserUnit::PlanTransportPreOrderDispatch(951, true, 30, world.Lookup());
+    ASSERT_EQ(first.mOrders.size(), 1u);
+    EXPECT_EQ(first.mOrders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
+
+    // 952 and 953 land together while 951 lives: both assist it, in one command.
+    world.Add(952, false);
+    world.Add(953, false);
+    const auto late = UserUnit::PlanTransportPreOrderDispatch(952, true, 40, world.Lookup());
+    ASSERT_EQ(late.mGroup.size(), 2u);
+    ASSERT_EQ(late.mOrders.size(), 1u);
+    EXPECT_EQ(late.mOrders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Guard);
+    EXPECT_EQ(late.mOrders[0].mTarget.mEntityId, 951u);
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    PlanLetsALateBuilderBuildWhenTheFirstBuilderDied
+  )
+  {
+    FakeUserUnitScope a, b;
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(a.GetUnit(961));
+    squad.push_back(b.GetUnit(962));
+    SSTICommandIssueData build(EUnitCommandType::UNITCOMMAND_BuildMobile);
+    build.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    build.mTarget.mPos = Wm3::Vector3f{320.0f, 10.0f, 320.0f};
+    UserUnit::QueueTransportPreOrders(squad, build, false);
+
+    FakeWorld world;
+    world.Add(961, false);
+    world.Add(962, true);
+    EXPECT_TRUE(UserUnit::PlanTransportPreOrderDispatch(961, true, 0, world.Lookup()).mWait);
+    EXPECT_FALSE(UserUnit::PlanTransportPreOrderDispatch(961, true, 30, world.Lookup()).mWait);
+
+    world.Add(961, false, /*dead=*/true);
+    world.Add(962, false);
+    const auto late = UserUnit::PlanTransportPreOrderDispatch(962, true, 50, world.Lookup());
+    ASSERT_EQ(late.mOrders.size(), 1u);
+    EXPECT_EQ(late.mOrders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
   }
 } // namespace

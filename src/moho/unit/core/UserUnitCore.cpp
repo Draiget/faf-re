@@ -1119,123 +1119,153 @@ namespace
   }
 } // namespace
 
-void UserUnit::DispatchDisembarkedPreOrders()
+UserUnit::SPreOrderDispatchPlan UserUnit::PlanTransportPreOrderDispatch(
+  const std::uint32_t ownEntityId,
+  const bool controlledByPlayer,
+  const std::int32_t gameTick,
+  const PreOrderUnitLookup& lookup
+)
 {
-  if (!ui_TransportPreOrders || !HasTransportPreOrders()) {
-    return;
+  SPreOrderDispatchPlan plan{};
+  const auto own = sTransportPreOrders.find(ownEntityId);
+  if (own == sTransportPreOrders.end() || own->second.empty()) {
+    return plan;
   }
-  const std::vector<SSTICommandIssueData> preOrders = GetTransportPreOrders();
-  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
-  const auto ownEntityId = static_cast<std::uint32_t>(this->mParams.mEntityId);
-
-  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
 
   // Orders go out from this client only for units its player controls. A unit given to another army
   // while it was in the transport, or a focus switch to another army or to observer, drops them.
-  if (session == nullptr || this->mArmy == nullptr || this->mArmy != session->GetFocusUserArmy()) {
-    ClearTransportPreOrders();
-    return;
+  if (!controlledByPlayer) {
+    sTransportPreOrders.erase(own);
+    sDisembarkedWaitStartTick.erase(ownEntityId);
+    plan.mDrop = true;
+    return plan;
   }
+
+  const std::vector<SSTICommandIssueData> preOrders = own->second;
+  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
 
   // Counted in game ticks, not calls: both `Tick` and `UpdateEntityData` come here in one beat.
   constexpr std::int32_t kMaxWaitTicks = 30; // about 3 seconds
-  const auto waitStart = sDisembarkedWaitStartTick.try_emplace(ownEntityId, session->mGameTick).first;
-  const bool timedOut = (session->mGameTick - waitStart->second) >= kMaxWaitTicks;
+  const auto waitStart = sDisembarkedWaitStartTick.try_emplace(ownEntityId, gameTick).first;
+  const bool timedOut = (gameTick - waitStart->second) >= kMaxWaitTicks;
 
   // Wait while a living unit that got exactly these orders is still in a transport, so the group gets
   // one command, or while an entity an order targets (Guard/Assist on other cargo) is still carried.
-  bool waitForPeer = false;
-  if (groupCommandId > 0 && !timedOut) {
-    for (const auto& [peerEntityId, peerOrders] : sTransportPreOrders) {
-      if (peerEntityId == ownEntityId || !SamePreOrderChain(peerOrders, preOrders)) {
-        continue;
-      }
-      UserEntity* const peer = session->LookupEntityId(static_cast<EntId>(peerEntityId));
-      if (peer != nullptr && peer->mVariableData.mIsDead == 0 && IsAttachedToSomething(*peer)) {
-        waitForPeer = true;
-        break;
+  if (!timedOut) {
+    if (groupCommandId > 0) {
+      for (const auto& [peerEntityId, peerOrders] : sTransportPreOrders) {
+        if (peerEntityId == ownEntityId || !SamePreOrderChain(peerOrders, preOrders)) {
+          continue;
+        }
+        const SPreOrderUnitState peer = lookup(peerEntityId);
+        if (peer.mKnown && !peer.mDead && peer.mAttached) {
+          plan.mWait = true;
+          return plan;
+        }
       }
     }
-  }
-
-  bool waitForTarget = false;
-  if (!waitForPeer && !timedOut) {
     for (const SSTICommandIssueData& order : preOrders) {
       if (order.mTarget.mType != EAiTargetType::AITARGET_Entity) {
         continue;
       }
-      UserEntity* const target = session->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId));
-      if (target != nullptr && target->mVariableData.mIsDead == 0 && IsAttachedToSomething(*target)) {
-        waitForTarget = true;
-        break;
+      const SPreOrderUnitState target = lookup(static_cast<std::uint32_t>(order.mTarget.mEntityId));
+      if (target.mKnown && !target.mDead && target.mAttached) {
+        plan.mWait = true;
+        return plan;
       }
     }
   }
 
-  if (waitForPeer || waitForTarget) {
-    return;
-  }
-
-  // Every detached living unit with the same order chain gets the orders as one group command. Units
-  // that only share the first order (one of them got more orders later) dispatch on their own.
-  gpg::fastvector<UserUnit*> groupUnits;
-  std::vector<std::uint32_t> dispatchedEntityIds;
+  // Every detached living unit of the same army with the same order chain gets the orders as one group
+  // command. Units that only share the first order (one of them got more orders later) dispatch alone.
   if (groupCommandId > 0) {
     for (const auto& [peerEntityId, peerOrders] : sTransportPreOrders) {
       if (peerEntityId == ownEntityId || !SamePreOrderChain(peerOrders, preOrders)) {
         continue;
       }
-      UserEntity* const peerEntity = session->LookupEntityId(static_cast<EntId>(peerEntityId));
-      UserUnit* const peer = peerEntity != nullptr ? peerEntity->IsUserUnit() : nullptr;
-      if (
-        peer == nullptr || peer->mVariableData.mIsDead != 0 || peer->mArmy != this->mArmy ||
-        IsAttachedToSomething(*peer)
-      ) {
-        continue;
+      const SPreOrderUnitState peer = lookup(peerEntityId);
+      if (peer.mKnown && !peer.mDead && peer.mSameArmy && !peer.mAttached) {
+        plan.mGroup.push_back(peerEntityId);
       }
-      groupUnits.push_back(peer);
-      dispatchedEntityIds.push_back(peerEntityId);
     }
   }
-  groupUnits.push_back(this);
-  dispatchedEntityIds.push_back(ownEntityId);
+  plan.mGroup.push_back(ownEntityId);
 
-  for (const std::uint32_t entityId : dispatchedEntityIds) {
+  for (const std::uint32_t entityId : plan.mGroup) {
     sTransportPreOrders.erase(entityId);
     sDisembarkedWaitStartTick.erase(entityId);
   }
 
-  gpg::Logf(
-    "TransportPreOrders: dispatching %zu pre-orders to %zu units (cmdId %d)",
-    preOrders.size(),
-    groupUnits.size(),
-    groupCommandId
-  );
+  plan.mOrders = preOrders;
+  for (SSTICommandIssueData& order : plan.mOrders) {
+    if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile || order.nextCommandId <= 0) {
+      continue;
+    }
+    // Units of the squad that landed late assist the one that already started this building, while
+    // that builder lives; otherwise they build it themselves and become its builder.
+    const auto builder = sDispatchedPreOrderBuilders.find(order.nextCommandId);
+    const bool builderAlive = builder != sDispatchedPreOrderBuilders.end() && builder->second != ownEntityId &&
+      lookup(builder->second).mKnown && !lookup(builder->second).mDead;
+    if (builderAlive) {
+      order.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
+      order.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      order.mTarget.mEnt = builder->second;
+      order.mTarget.mEntityId = builder->second;
+      order.mBlueprint = nullptr;
+    } else {
+      sDispatchedPreOrderBuilders[order.nextCommandId] = ownEntityId;
+    }
+  }
+  return plan;
+}
 
-  for (std::size_t i = 0; i < preOrders.size(); ++i) {
-    const bool isClear = (i == 0);
-    SSTICommandIssueData dispatchOrder = preOrders[i];
+void UserUnit::DispatchDisembarkedPreOrders()
+{
+  if (!ui_TransportPreOrders || !HasTransportPreOrders()) {
+    return;
+  }
+  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
+  const bool controlledByPlayer =
+    session != nullptr && this->mArmy != nullptr && this->mArmy == session->GetFocusUserArmy();
+  const std::int32_t gameTick = session != nullptr ? session->mGameTick : 0;
 
-    if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
-      // Units of the squad that landed late assist the one that already started this building, while
-      // that builder lives; otherwise they build it themselves.
-      const auto builder = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
-      const UserEntity* const builderEntity = builder != sDispatchedPreOrderBuilders.end()
-        ? session->LookupEntityId(static_cast<EntId>(builder->second))
-        : nullptr;
-      const bool builderAlive = builderEntity != nullptr && builderEntity->mVariableData.mIsDead == 0;
-      if (builderAlive && builder->second != ownEntityId) {
-        dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
-        dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
-        dispatchOrder.mTarget.mEnt = builder->second;
-        dispatchOrder.mTarget.mEntityId = builder->second;
-        dispatchOrder.mBlueprint = nullptr;
-      } else {
-        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = ownEntityId;
+  const PreOrderUnitLookup lookup = [session, this](const std::uint32_t entityId) {
+    SPreOrderUnitState state{};
+    UserEntity* const entity = session != nullptr ? session->LookupEntityId(static_cast<EntId>(entityId)) : nullptr;
+    if (entity != nullptr) {
+      state.mKnown = true;
+      state.mDead = entity->mVariableData.mIsDead != 0;
+      state.mAttached = IsAttachedToSomething(*entity);
+      state.mSameArmy = entity->IsUserUnit() != nullptr && entity->mArmy == this->mArmy;
+    }
+    return state;
+  };
+
+  const auto ownEntityId = static_cast<std::uint32_t>(this->mParams.mEntityId);
+  const SPreOrderDispatchPlan plan = PlanTransportPreOrderDispatch(ownEntityId, controlledByPlayer, gameTick, lookup);
+  if (plan.mDrop || plan.mWait || plan.mOrders.empty()) {
+    return;
+  }
+
+  gpg::fastvector<UserUnit*> groupUnits;
+  for (const std::uint32_t entityId : plan.mGroup) {
+    if (entityId == ownEntityId) {
+      groupUnits.push_back(this);
+    } else if (UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(entityId))) {
+      if (UserUnit* const unit = entity->IsUserUnit()) {
+        groupUnits.push_back(unit);
       }
     }
+  }
 
-    moho::ISSUE_Command(groupUnits, dispatchOrder, isClear);
+  gpg::Logf(
+    "TransportPreOrders: dispatching %zu pre-orders to %zu units (cmdId %d)",
+    plan.mOrders.size(),
+    groupUnits.size(),
+    plan.mOrders[0].nextCommandId
+  );
+  for (std::size_t i = 0; i < plan.mOrders.size(); ++i) {
+    moho::ISSUE_Command(groupUnits, plan.mOrders[i], /*clearQueue=*/i == 0);
   }
 }
 

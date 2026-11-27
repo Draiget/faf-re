@@ -23,6 +23,7 @@
 #include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
+#include <functional>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -596,6 +597,37 @@ namespace moho
     [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
     GetAllTransportPreOrders();
     void DispatchDisembarkedPreOrders();
+
+    /// One unit as the pre-order dispatch sees it: from the session in a game, from a table in tests.
+    struct SPreOrderUnitState
+    {
+      bool mKnown = false; // the session has this entity
+      bool mDead = false;
+      bool mAttached = false; // still carried (attachment parent set)
+      bool mSameArmy = false; // a unit of the dispatching unit's army
+    };
+    using PreOrderUnitLookup = std::function<SPreOrderUnitState(std::uint32_t entityId)>;
+
+    /// What one dispatch does. `mGroup` lists who gets `mOrders` as one command each, own id last.
+    struct SPreOrderDispatchPlan
+    {
+      bool mDrop = false; // no player controls the unit: its pre-orders were dropped
+      bool mWait = false; // a squad mate with the same orders, or an order's target, is still carried
+      std::vector<std::uint32_t> mGroup;
+      std::vector<SSTICommandIssueData> mOrders; // after the late-lander handover to a living builder
+    };
+
+    /**
+     * Decides a dispatch for `ownEntityId` and updates the pre-order registry the way the dispatch
+     * does (dispatched queues removed, builders recorded). `DispatchDisembarkedPreOrders` issues the
+     * plan; tests call this with their own lookup.
+     */
+    [[nodiscard]] static SPreOrderDispatchPlan PlanTransportPreOrderDispatch(
+      std::uint32_t ownEntityId,
+      bool controlledByPlayer,
+      std::int32_t gameTick,
+      const PreOrderUnitLookup& lookup
+    );
     /// Drops every unit's pre-orders, bracket overrides and dispatch bookkeeping (the switch went off).
     static void ClearAllTransportPreOrderState();
     /// True when both units hold pre-orders with the same command ids in the same order; only such
