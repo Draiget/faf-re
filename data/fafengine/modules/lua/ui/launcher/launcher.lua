@@ -1236,7 +1236,17 @@ local function BuildOnlinePage(launcher, page)
     end)
 
     view.filters = {}
+    view.filterList = {}
     local lastFilter = view.search
+    -- One row when the button, the search, the filters and the view buttons fit; else the filters go under them.
+    local function OneRow()
+        local need = view.hostButton.Width() + view.search.Width() + Scale(12 + 18 + 34 + 4 + 34)
+        for _, box in view.filterList do
+            need = need + box.Width() + Scale(18)
+        end
+        return need <= games.Width()
+    end
+    view.toolbarOneRow = OneRow
     for _, entry in { { 'hidePrivate', 'Hide private' }, { 'hideModded', 'Hide sim mods' }, { 'showStarted', 'Show started' } } do
         local key = entry[1]
         local box = Theme.Checkbox(games, entry[2], function(self)
@@ -1246,9 +1256,21 @@ local function BuildOnlinePage(launcher, page)
         end)
         box:SetOn(Prefs.GetFromCurrentProfile('fafre_launcher_' .. key) and true or false)
         local after = lastFilter
-        box.Left:Set(function() return after.Right() + Scale(18) end)
-        LayoutHelpers.AtTopIn(box, games, 0)
+        local first = after == view.search
+        box.Left:Set(function()
+            if first and not OneRow() then
+                return games.Left()
+            end
+            return after.Right() + Scale(18)
+        end)
+        box.Top:Set(function()
+            if OneRow() then
+                return games.Top() + math.floor((view.hostButton.Height() - box.Height()) / 2)
+            end
+            return view.hostButton.Bottom() + Scale(12)
+        end)
         view.filters[key] = box
+        table.insert(view.filterList, box)
         lastFilter = box
     end
 
@@ -1267,7 +1289,12 @@ local function BuildOnlinePage(launcher, page)
     -- The details panel when there is room for it beside two tiles; else Join goes into the footer.
     local listArea = Group(games)
     listArea.Left:Set(games.Left)
-    listArea.Top:Set(function() return view.hostButton.Bottom() + Scale(16) end)
+    listArea.Top:Set(function()
+        if OneRow() then
+            return view.hostButton.Bottom() + Scale(16)
+        end
+        return view.filterList[1].Bottom() + Scale(14)
+    end)
     listArea.Bottom:Set(function() return games.Bottom() - Scale(30) end)
     local wide = function() return LayoutHelpers.InvScaleNumber(games.Width()) >= 940 end
     view.details = DetailsPanel(games, launcher)
@@ -1957,6 +1984,9 @@ function Launcher:Refresh()
     if self.status then
         self.status:Update()
     end
+    if self.rail and self.rail.Paint then
+        self.rail:Paint()
+    end
 end
 
 function Launcher:SelectGame(key)
@@ -2374,7 +2404,6 @@ end
 
 local function NavItem(launcher, rail, iconName, label, action, page)
     local item = Group(rail)
-    LayoutHelpers.SetHeight(item, 38)
     local back = Theme.Fill(item, C.clear)
     back.Depth:Set(function() return item.Depth() end)
     local bar = Theme.Rect(item, C.accent)
@@ -2463,22 +2492,64 @@ local function BuildRail(launcher, body)
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, 'changelog' },
         { 'logout', 'Exit', function() launcher:Exit() end },
     }
+    -- How the rail fits the window's height (unscaled): the full rail, tighter steps, no name under the emblem, no
+    -- captions. tops[level][i] is entry i's top.
+    local levels = {
+        { top = 178, caption = 28, item = 38, name = true, captions = true },
+        { top = 178, caption = 22, item = 31, name = true, captions = true },
+        { top = 84, caption = 22, item = 30, name = false, captions = true },
+        { top = 84, caption = 6, item = 30, name = false, captions = false },
+    }
+    local tops = {}
+    for level, spec in levels do
+        tops[level] = {}
+        local top = spec.top
+        for i, entry in entries do
+            tops[level][i] = top
+            top = top + (type(entry) == 'string' and spec.caption or spec.item)
+        end
+        spec.need = top + 8
+    end
+    local function Level()
+        local height = LayoutHelpers.InvScaleNumber(rail.Height())
+        for level, spec in levels do
+            if height >= spec.need then
+                return level
+            end
+        end
+        return table.getn(levels)
+    end
+    local captions = {}
     launcher.navItems = {}
-    local top = 178 -- under the emblem and the name
-    for _, entry in entries do
+    for i, entry in entries do
+        local index = i
         if type(entry) == 'string' then
             local caption = Theme.Caption(rail, entry)
-            LayoutHelpers.AtLeftTopIn(caption, rail, 24, top + 8)
-            top = top + 28
+            caption.Left:Set(function() return rail.Left() + Scale(24) end)
+            caption.Top:Set(function() return rail.Top() + Scale(tops[Level()][index] + 8) end)
+            table.insert(captions, caption)
         else
             local item = NavItem(launcher, rail, entry[1], entry[2], entry[3], entry[4])
-            LayoutHelpers.AtLeftTopIn(item, rail, 0, top)
+            item.Left:Set(rail.Left)
+            item.Top:Set(function() return rail.Top() + Scale(tops[Level()][index]) end)
+            item.Height:Set(function() return Scale(levels[Level()].item) end)
             item.Right:Set(rail.Right)
             item.Width:Set(function() return item.Right() - item.Left() end)
             table.insert(launcher.navItems, item)
-            top = top + 38
         end
     end
+    -- Visibility follows the level; painted again after a Show on an ancestor and on every refresh.
+    rail.Paint = function(self)
+        local spec = levels[Level()]
+        for _, text in { nameTop, name, subtitle, versionText } do
+            Theme.SetVisible(text, spec.name)
+        end
+        for _, caption in captions do
+            Theme.SetVisible(caption, spec.captions)
+        end
+    end
+    Theme.Paintable(rail)
+    rail:Paint()
     return rail
 end
 
@@ -2570,6 +2641,7 @@ local function Build(launcher)
     launcher.body = body
 
     local rail = BuildRail(launcher, body)
+    launcher.rail = rail
     launcher.status = BuildStatusBar(launcher, body)
 
     local content = Group(body, 'launcher content')
