@@ -119,8 +119,60 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "$tag on $sha, changes since $previous, skip: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
 
-  build:
+  # faf-re-lua.nx2 made for FAF's files of tonight: tools/fa-lua/refresh.py merges the pull requests in
+  # data/fa-lua/sources.txt onto FAF's deploy branches again, so a FAF release that changed one of the
+  # files gets the fix rebuilt for it instead of losing it until someone runs the script. A merge that
+  # conflicts leaves that file out for that FAF version. The summary lists what differs from the commit;
+  # when the refresh itself fails, the builds use the commit's data/fa-lua.
+  fa-lua:
     needs: plan
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - name: Refresh data/fa-lua from FAForever/fa
+        continue-on-error: true
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FAForever/fa.git "$RUNNER_TEMP/fa"
+          status=0
+          python3 tools/fa-lua/refresh.py --fa "$RUNNER_TEMP/fa" > refresh.log 2>&1 || status=$?
+          cat refresh.log
+          # 3: written, with conflicts left out. Anything else failed, maybe half-way: the commit's data.
+          if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then
+            git checkout -- data/fa-lua
+            git clean -fdq -- data/fa-lua
+          fi
+          {
+            echo "### FAF Lua fixes (faf-re-lua.nx2)"
+            echo '```'
+            cat refresh.log
+            echo '```'
+            case $status in
+              0) ;;
+              3) echo "Merge conflicts: the files named above are left out for those FAF branches." ;;
+              *) echo "refresh.py failed ($status): the builds use the commit's data/fa-lua." ;;
+            esac
+            if git diff --quiet -- data/fa-lua && [ -z "$(git ls-files --others --exclude-standard data/fa-lua)" ]; then
+              echo "Same as the commit's data/fa-lua."
+            else
+              echo "Differs from the commit's data/fa-lua (run tools/fa-lua/refresh.py and commit it):"
+              echo '```'
+              git diff --stat -- data/fa-lua
+              git ls-files --others --exclude-standard data/fa-lua
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fa-lua
+          path: data/fa-lua
+          retention-days: 7
+
+  build:
+    needs: [plan, fa-lua]
     if: needs.plan.outputs.skip != 'true'
     runs-on: windows-2022
     strategy:
@@ -138,6 +190,13 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
+      # The fa-lua job's data/fa-lua in place of the commit's (CMake packs faf-re-lua.nx2 from it).
+      - shell: pwsh
+        run: Remove-Item -Recurse -Force data/fa-lua
+      - uses: actions/download-artifact@v8
+        with:
+          name: fa-lua
+          path: data/fa-lua
       - id: downloads
         uses: actions/cache/restore@v6
         with:
@@ -199,7 +258,7 @@ jobs:
   # (issue #394; tools/release/linux/package.sh checks it). A .tar.gz, as a zip would lose the
   # executable bit.
   build-linux:
-    needs: plan
+    needs: [plan, fa-lua]
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
     container: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
@@ -212,6 +271,12 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
+      # The fa-lua job's data/fa-lua in place of the commit's (CMake packs faf-re-lua.nx2 from it).
+      - run: rm -rf data/fa-lua
+      - uses: actions/download-artifact@v8
+        with:
+          name: fa-lua
+          path: data/fa-lua
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           bash tools/linux/toolchain.sh --client

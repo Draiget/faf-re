@@ -12,7 +12,7 @@ For every pull request listed in data/fa-lua/sources.txt and every FAF branch pl
 change into the branch's file (git merge-file, three-way from the pull request's merge base) and
 writes the result under data/fa-lua/files/<first 12 hex of the FAF file's hash>/<path>. A branch
 whose file already has the change, or where the merge conflicts, gets no replacement (a conflict is
-printed).
+printed, and the script ends with exit code 3 after writing everything else; other failures end with 1).
 
 Only UI Lua (lua/ui/, lua/keymap/) may be replaced: nothing the simulation loads, so a game with
 players on retail Lua cannot desync. The engine refuses other paths too.
@@ -157,7 +157,7 @@ def main():
         lines.append(f"{digest} /{path} {entry} {prs_text} {','.join(branches)}")
     (OUT / "manifest.txt").write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
     print(f"{len(variants)} replacements for {len(changes)} files from {len(prs)} pull requests")
-    return 1 if problems else 0
+    return 3 if problems else 0
 
 
 if __name__ == "__main__":
