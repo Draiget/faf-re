@@ -308,6 +308,27 @@ namespace
     return body;
   }
 
+  /** text FafLibrary_UtcDate(daysAgo): the UTC date that many days back as FAF's API compares times. */
+  int UtcDateBody(
+    lua_State* const L
+  )
+  {
+    const int back = lua_type(L, 1) == LUA_TNUMBER ? static_cast<int>(lua_tonumber(L, 1)) : 0;
+    const auto today = std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now());
+    const std::chrono::year_month_day day{today - std::chrono::days(back)};
+    char text[32];
+    std::snprintf(
+      text,
+      sizeof(text),
+      "%04d-%02u-%02uT00:00:00Z",
+      static_cast<int>(day.year()),
+      static_cast<unsigned>(day.month()),
+      static_cast<unsigned>(day.day())
+    );
+    lua_pushstring(L, text);
+    return 1;
+  }
+
   /**
    * text FafLibrary_LocalTime(when): a moment in this computer's time zone, "2026-11-27 14:05". `when` is seconds
    * since 1970 or an ISO 8601 UTC time as FAF's API writes it ("2026-11-27T10:05:00Z"); empty when it is neither.
@@ -1530,6 +1551,14 @@ namespace
       nullptr,
       "<global>",
       "string FafLibrary_LocalTime(when) - seconds since 1970 or an ISO time, as this computer's local time."
+    );
+    static moho::CScrLuaBinder utcDate(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_UtcDate",
+      &Binding<&UtcDateBody>,
+      nullptr,
+      "<global>",
+      "string FafLibrary_UtcDate(daysAgo) - the UTC date that many days back, as 2026-10-28T00:00:00Z."
     );
     static moho::CScrLuaBinder localReplays(
       moho::SCR_UserLuaInitSet(),

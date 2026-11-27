@@ -1974,7 +1974,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2174,8 +2174,10 @@ function Launcher:ShowHome()
     self:PlaceContent()
     -- Show on the body showed every piece a control keeps hidden (check marks, brackets): each paints itself again.
     Theme.RepaintAll()
-    for _, item in self.navItems do
-        item:Paint(false)
+    for _, list in { self.navItems or {}, self.utilityItems or {} } do
+        for _, item in list do
+            item:Paint(false)
+        end
     end
     self:StartSounds()
     self:SetHomeEscape()
@@ -2461,8 +2463,10 @@ function Launcher:ShowPage(name)
     self:PlaceContent()
     -- The Show showed every piece the page keeps hidden (brackets of disabled buttons, tips, the hover card).
     Theme.RepaintAll()
-    for _, item in self.navItems do
-        item:Paint(false)
+    for _, list in { self.navItems or {}, self.utilityItems or {} } do
+        for _, item in list do
+            item:Paint(false)
+        end
     end
     self:Refresh()
 end
@@ -2480,24 +2484,40 @@ local function TopTab(launcher, bar, iconName, label, action, pages)
     local back = Theme.Fill(item, C.clear)
     back.Depth:Set(function() return item.Depth() end)
     local icon = Theme.Icon(item, iconName, 18, C.muted)
-    LayoutHelpers.AtLeftIn(icon, item, 16)
+    LayoutHelpers.AtLeftIn(icon, item, 14)
     LayoutHelpers.AtVerticalCenterIn(icon, item)
     local text = Theme.Text(item, string.upper(label), 13, C.muted, true)
-    text.Left:Set(function() return icon.Right() + Scale(10) end)
+    text.Left:Set(function() return icon.Right() + Scale(8) end)
     LayoutHelpers.AtVerticalCenterIn(text, item)
-    item.Width:Set(function() return text.Right() - item.Left() + Scale(18) end)
     local underline = Theme.Rect(item, C.accent)
-    -- Under the icon and text, the same overhang each side.
+    -- Under the icon and text (the icon alone when compact), the same overhang each side.
     underline.Left:Set(function() return icon.Left() - Scale(6) end)
-    underline.Right:Set(function() return text.Right() + Scale(6) end)
     underline.Bottom:Set(item.Bottom)
     underline.Height:Set(Scale(3))
     underline.Width:Set(function() return underline.Right() - underline.Left() end)
     underline:DisableHitTest()
+    --- Compact: the icon only (its name in a tip on hover), for a bar too narrow for every name.
+    item.SetCompact = function(self, compact)
+        self.compact = compact and true or false
+        if self.compact then
+            self.Width:Set(function() return Scale(14 + 18 + 14) end) -- margins and the icon: placed from either edge
+            underline.Right:Set(function() return icon.Right() + Scale(6) end)
+        else
+            self.Width:Set(function() return self:FullWidth() end)
+            underline.Right:Set(function() return text.Right() + Scale(6) end)
+        end
+        self:Paint(false)
+    end
+    --- The width with its name shown: icon, gap, name and the margins.
+    item.FullWidth = function(self)
+        return text.Width() + Scale(14 + 18 + 8 + 14)
+    end
+    item.label = label
     item.Paint = function(self, over)
         local chosen = pages and pages[launcher.page or ''] or false
         back:SetSolidColor(chosen and Theme.WithAlpha(C.accent, 0.08) or (over and C.raised or C.clear))
         Theme.SetVisible(underline, chosen)
+        Theme.SetVisible(text, not self.compact)
         local color = chosen and C.accent or (over and C.text or C.muted)
         Theme.SetColor(text, color)
         icon:SetIcon(iconName, color)
@@ -2506,8 +2526,14 @@ local function TopTab(launcher, bar, iconName, label, action, pages)
         if event.Type == 'MouseEnter' then
             Theme.HoverSound()
             item:Paint(true)
+            if item.compact and launcher.topTip then
+                launcher.topTip:Say(label, C.text, item)
+            end
         elseif event.Type == 'MouseExit' then
             item:Paint(false)
+            if launcher.topTip then
+                launcher.topTip:Quiet()
+            end
         elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
             Theme.ClickSound()
             action()
@@ -2516,7 +2542,7 @@ local function TopTab(launcher, bar, iconName, label, action, pages)
         return false
     end)
     Theme.Paintable(item)
-    item:Paint(false)
+    item:SetCompact(false)
     return item
 end
 
@@ -2551,23 +2577,32 @@ local function BuildTopBar(launcher, body)
     local entries = {
         { 'play', 'Play', function() launcher:ShowPage('online') end, kPlayPages },
         { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
+        { 'leaderboard', 'Leaderboards', function() launcher:ShowPage('leaderboards') end, { leaderboards = true } },
         { 'replays', 'Replays', function() launcher:Replays() end, { replays = true } },
         { 'maps', 'Maps', function() launcher:ShowPage('maps') end, { maps = true } },
         { 'mods', 'Mods', function() launcher:Mods() end, { mods = true } },
-        { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true } },
-        { 'settings', 'Settings', function() launcher:Options() end, { options = true } },
+        -- Utilities: icons by the account, their names in a tip.
+        { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true }, true },
+        { 'settings', 'Settings', function() launcher:Options() end, { options = true }, true },
     }
     launcher.navItems = {}
+    launcher.utilityItems = {}
     local before = nil
     for _, entry in entries do
-        if entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status') then
+        if (entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status')) and
+            (entry[1] ~= 'leaderboard' or rawget(_G, 'FafLibrary_Api')) then
             local item = TopTab(launcher, bar, entry[1], entry[2], entry[3], entry[4])
-            local after = before
-            item.Left:Set(function()
-                return after and after.Right() or math.max(subtitle.Right(), name.Right()) + Scale(36)
-            end)
-            table.insert(launcher.navItems, item)
-            before = item
+            if entry[5] then
+                item:SetCompact(true)
+                table.insert(launcher.utilityItems, item)
+            else
+                local after = before
+                item.Left:Set(function()
+                    return after and after.Right() or math.max(subtitle.Right(), name.Right()) + Scale(36)
+                end)
+                table.insert(launcher.navItems, item)
+                before = item
+            end
         end
     end
 
@@ -2589,6 +2624,19 @@ local function BuildTopBar(launcher, body)
     local note = Theme.Text(account, '', 11, C.muted)
     note.Right:Set(who.Right)
     LayoutHelpers.AtTopIn(note, account, 24)
+    -- The utilities right of the tabs, left of the account's name (which grows with the login).
+    local utilities = launcher.utilityItems
+    for i = table.getn(utilities), 1, -1 do
+        local item = utilities[i]
+        local after = utilities[i + 1]
+        item.Right:Set(function()
+            return after and after.Left() or (math.min(who.Left(), note.Left()) - Scale(20))
+        end)
+        item.Left:Set(function() return item.Right() - item.Width() end)
+    end
+    local function TabsEnd()
+        return utilities[1] and utilities[1].Left() or math.min(who.Left(), note.Left())
+    end
     Theme.HitArea(account, function(self, event)
         if event.Type == 'ButtonPress' and event.Modifiers.Left then
             Theme.ClickSound()
@@ -2606,7 +2654,27 @@ local function BuildTopBar(launcher, body)
         local server = status and status.server == 'test' and 'FAF test server' or 'FAF'
         Theme.SetText(note, signedIn and (server .. ' ' .. lobby) or 'Sign in on Play')
         Theme.SetColor(note, status and status.lobby == 'failed' and C.bad or C.muted)
+        -- Every tab's name when they fit between the game's name and the account (whose width follows the login),
+        -- else icons only.
+        local items = launcher.navItems or {}
+        if items[1] then
+            local need = 0
+            for _, item in items do
+                need = need + item:FullWidth()
+            end
+            local room = TabsEnd() - Scale(24) - items[1].Left()
+            local compact = need > room
+            if compact ~= launcher.compactTabs then
+                launcher.compactTabs = compact
+                for _, item in items do
+                    item:SetCompact(compact)
+                end
+                LOG('LAUNCHER: top bar tabs ' .. (compact and 'as icons' or 'with their names') .. ' (' ..
+                    math.floor(need) .. ' of ' .. math.floor(room) .. ' px)')
+            end
+        end
     end
+    launcher.topTip = Theme.Tip(bar, 140)
     bar.Update(bar, nil)
 
     -- Play's modes: custom games (FAF's and our servers'), skirmish, campaign, LAN.
@@ -3004,6 +3072,23 @@ local function Build(launcher)
             mapsPage:Destroy()
         end
     end
+    -- Leaderboards: FAF's rating ladders (leaderboards.lua), with the engine's FAF API access.
+    if rawget(_G, 'FafLibrary_Api') then
+        local boardsPage = Group(content, 'launcher leaderboards')
+        LayoutHelpers.FillParent(boardsPage, content)
+        boardsPage.Width:Set(function() return boardsPage.Right() - boardsPage.Left() end)
+        boardsPage.Height:Set(function() return boardsPage.Bottom() - boardsPage.Top() end)
+        local boardsBuilt, boardsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/leaderboards.lua').Build(launcher, boardsPage)
+        end)
+        if boardsBuilt then
+            launcher.pages.leaderboards = boardsPage
+            Theme.SetVisible(boardsPage, false)
+        else
+            WARN('LAUNCHER: the leaderboards page failed to build: ' .. tostring(boardsWhy))
+            boardsPage:Destroy()
+        end
+    end
     -- Co-op: FAF's co-op missions (coop.lua), with the engine's FAF API access.
     if rawget(_G, 'FafLibrary_Api') then
         local coopPage = Group(content, 'launcher coop')
@@ -3271,6 +3356,48 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherboardstest: the Leaderboards page: the 1v1 ranking, the signed-in player's place and the jump to
+            -- it, another ladder, a search by name.
+            if GetCommandLineArg('/launcherboardstest', 0) and current.leaderboardsView then
+                local boards = current.leaderboardsView
+                current:ShowPage('leaderboards')
+                local function Settle(seconds)
+                    for i = 1, seconds do
+                        current:Refresh()
+                        if not next(boards.jobs) then
+                            break
+                        end
+                        Wait(1)
+                    end
+                    current:Refresh()
+                end
+                Settle(15)
+                local mine = boards.mine[boards.board .. ':active']
+                Step('boards: ' .. boards.board .. ' ' .. table.getn(boards.rows or {}) .. ' rows of ' ..
+                    tostring(boards.total) .. ', page ' .. boards.pageNumber .. ' of ' .. tostring(boards.pages) ..
+                    ', first ' .. tostring(boards.rows and boards.rows[1] and (boards.rows[1].login .. ' ' ..
+                    boards.rows[1].rating)) .. ', mine ' .. tostring(mine and mine.state) .. ' rank ' ..
+                    tostring(mine and mine.row and mine.row.rank) .. (boards.failure and (', failure ' .. boards.failure) or '') ..
+                    ', compact tabs ' .. tostring(current.compactTabs))
+                Wait(2)
+                boards:FindMe()
+                Settle(15)
+                Step('boards: after Show me: page ' .. boards.pageNumber .. ', chosen ' ..
+                    tostring(boards.chosen and boards.chosen.login) .. ' rank ' .. tostring(boards.chosen and boards.chosen.rank))
+                Wait(2)
+                boards:Choose('tmm_2v2')
+                Settle(15)
+                Step('boards: 2v2 ' .. table.getn(boards.rows or {}) .. ' rows, total ' .. tostring(boards.total))
+                boards.search.edit:SetText('dost')
+                boards.pageNumber = 1
+                boards:Load()
+                Settle(15)
+                Step('boards: search dost: ' .. table.getn(boards.rows or {}) .. ' rows, first ' ..
+                    tostring(boards.rows and boards.rows[1] and boards.rows[1].login) .. ', rank shown ' ..
+                    tostring(boards.rows and boards.rows[1] and boards.rows[1].rank))
+                boards.search.edit:SetText('')
+                Wait(2)
+            end
             -- /launchermapstest: the Maps page: this computer's maps, the vault's first page, a map downloaded and removed.
             if GetCommandLineArg('/launchermapstest', 0) and current.mapsView then
                 local maps = current.mapsView
