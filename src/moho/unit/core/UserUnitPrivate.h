@@ -40,6 +40,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"

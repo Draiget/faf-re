@@ -434,6 +434,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserCommandIssue.cpp
   moho/ui/UserQueueReorder.cpp
   moho/ui/QueueReorderPlan.cpp
+  moho/sim/PlannedFactoryProxy.cpp
   moho/render/CDebugCanvasRender.cpp
   moho/sim/SimArmy.cpp
   moho/sim/RRuleGameRulesTypeInfo.cpp
