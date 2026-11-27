@@ -3187,6 +3187,19 @@ function TestWalk()
                 table.insert(counts, key .. ' ' .. table.getn(options.entries))
             end
             Step('options page: ' .. table.concat(counts, ', '))
+            -- The options with no help text of FAF's (for the launcher's own texts).
+            local tooltips = import('/lua/ui/help/tooltips.lua').Tooltips
+            local missing = {}
+            for _, key in options.sections do
+                for _, item in options.data[key].items do
+                    local info = tooltips['options_' .. tostring(item.key)]
+                    if item.type ~= 'header' and not (info and info.description and info.description ~= '') and
+                        not item.tip then
+                        table.insert(missing, key .. '/' .. tostring(item.key))
+                    end
+                end
+            end
+            Step('options without help: ' .. table.getn(missing) .. ' ' .. table.concat(missing, ' '))
             options.tab = 'gameplay'
             options:Refresh()
             Wait(1)

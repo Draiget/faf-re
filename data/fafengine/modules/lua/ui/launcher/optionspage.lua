@@ -12,7 +12,7 @@ local Widgets = import('/fafengine/modules/lua/ui/launcher/widgets.lua')
 local C = Theme.Colors
 local Scale = Theme.Scale
 
-local kRowHeight = 42
+local kRowHeight = 58 -- a title and a line of help under it
 
 local function Logic()
     return import('/lua/options/optionsLogic.lua')
@@ -30,14 +30,19 @@ local function Text(value)
     return LOC(value or '')
 end
 
---- An option's help, from FAF's tooltip table (options_<key>), or its own tip.
+--- An option's help in the player's language: FAF's tooltip (options_<key>, translated by the game's own LOC), else
+--- its tip, else the launcher's own text for options FAF has none for (optionhelp.lua, per language).
 local function Help(item)
     local ok, tooltips = pcall(import, '/lua/ui/help/tooltips.lua')
     local info = ok and tooltips and tooltips.Tooltips and tooltips.Tooltips['options_' .. tostring(item.key)]
-    if info and info.description then
+    if info and info.description and info.description ~= '' then
         return Text(info.description)
     end
-    return item.tip and Text(item.tip) or ''
+    if item.tip then
+        return Text(item.tip)
+    end
+    local helpOk, own = pcall(import, '/fafengine/modules/lua/ui/launcher/optionhelp.lua')
+    return helpOk and own.Help(item.key) or ''
 end
 
 --- A slider's value as text: whole numbers unless its step is a fraction.
@@ -314,10 +319,14 @@ function Build(launcher, page)
         row.title = Theme.Cell(area, 14, C.text)
         row.title.Left:Set(function() return area.Left() + Scale(12) end)
         row.title.Right:Set(function() return area.Right() - Scale(420) end)
-        row.title.Top:Set(function() return top() + Scale(10) end)
+        row.title.Top:Set(function() return top() + Scale(6) end)
+        row.about = Theme.Cell(area, 11, C.subtle)
+        row.about.Left:Set(row.title.Left)
+        row.about.Right:Set(row.title.Right)
+        row.about.Top:Set(function() return top() + Scale(28) end)
         row.heading = Theme.Text(area, '', 12, C.accent, true)
         row.heading.Left:Set(area.Left)
-        row.heading.Top:Set(function() return top() + Scale(16) end)
+        row.heading.Top:Set(function() return top() + Scale(26) end)
         -- A toggle: a dropdown of its states.
         -- Made with a label: a button made without one has no text to change later.
         row.choice = Theme.Button(area, 'Off', function()
@@ -335,13 +344,13 @@ function Build(launcher, page)
             end, { width = 300, maxRows = 14 })
         end, 'secondary', { width = 300, icon = 'chevronDown', caps = false })
         row.choice.Right:Set(function() return area.Right() - Scale(16) end)
-        row.choice.Top:Set(function() return top() + Scale(2) end)
+        row.choice.Top:Set(function() return top() + Scale(10) end)
         -- A slider: its track (a click sets the value), its fill and its value; the wheel over it steps.
         row.track = Theme.Rect(area, C.line)
         row.track.Right:Set(function() return area.Right() - Scale(90) end)
         row.track.Width:Set(Scale(226))
         row.track.Left:Set(function() return row.track.Right() - row.track.Width() end)
-        row.track.Top:Set(function() return top() + Scale(17) end)
+        row.track.Top:Set(function() return top() + Scale(25) end)
         row.track.Height:Set(Scale(4))
         row.fill = Theme.Rect(area, C.accent)
         row.fill.Left:Set(row.track.Left)
@@ -355,7 +364,7 @@ function Build(launcher, page)
         row.knob:DisableHitTest()
         row.value = Theme.Text(area, '', 14, C.gold)
         row.value.Right:Set(function() return area.Right() - Scale(16) end)
-        row.value.Top:Set(function() return top() + Scale(10) end)
+        row.value.Top:Set(function() return top() + Scale(18) end)
         local sliderArea = Theme.Rect(area, C.clear)
         sliderArea.Left:Set(function() return row.track.Left() - Scale(6) end)
         sliderArea.Right:Set(function() return row.track.Right() + Scale(6) end)
@@ -419,7 +428,7 @@ function Build(launcher, page)
             end
         end, 'secondary', { width = 160 })
         row.use.Right:Set(function() return area.Right() - Scale(16) end)
-        row.use.Top:Set(function() return top() + Scale(2) end)
+        row.use.Top:Set(function() return top() + Scale(10) end)
         -- The mouse over the row: its help below.
         Theme.HitArea(row.back, function(self, event)
             if event.Type == 'MouseEnter' and row.entry and row.entry.item then
@@ -444,6 +453,7 @@ function Build(launcher, page)
             local item = entry and entry.item
             Theme.SetVisible(row.back, kind == 'item' or kind == 'profile' or kind == 'manage')
             Theme.SetVisible(row.title, kind == 'item' or kind == 'profile' or kind == 'manage')
+            Theme.SetVisible(row.about, kind == 'item')
             Theme.SetVisible(row.heading, kind == 'header')
             local isToggle = kind == 'item' and item.type == 'toggle'
             local isSlider = kind == 'item' and item.type == 'slider'
@@ -460,6 +470,8 @@ function Build(launcher, page)
                 local value = self.pending[item.key]
                 local changed = value ~= self.current[item.key]
                 Theme.SetText(row.title, Text(item.title))
+                local help = Help(item)
+                Theme.SetText(row.about, help ~= '' and help or 'No description yet.')
                 Theme.SetColor(row.title, changed and C.accent or C.text)
                 row.back:SetSolidColor(changed and Theme.WithAlpha(C.accent, 0.06) or C.clear)
                 if isToggle then
@@ -489,7 +501,7 @@ function Build(launcher, page)
         for i = shown + 1, table.getn(self.rows) do
             local row = self.rows[i]
             row.entry = nil
-            for _, control in { row.back, row.title, row.heading, row.choice, row.track, row.fill, row.knob, row.value,
+            for _, control in { row.back, row.title, row.about, row.heading, row.choice, row.track, row.fill, row.knob, row.value,
                 row.sliderArea, row.use } do
                 Theme.SetVisible(control, false)
             end
