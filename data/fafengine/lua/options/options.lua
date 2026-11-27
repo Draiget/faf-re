@@ -119,6 +119,59 @@ do
     end
 end
 
+-- Transport cargo pre-orders and drop ghosts (ui_TransportPreOrders):
+do
+    local command = 'ui_TransportPreOrders'
+    local function Supported()
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local gameplay = options and options.gameplay
+    if Supported() and gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'transport_preorders') then
+        local entry = {
+            title = "Transport Cargo Pre-orders",
+            key = 'transport_preorders',
+            type = 'toggle',
+            default = 0,
+            tip = "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
+            set = function(key, value, startup)
+                if value ~= 0 and value ~= 1 then
+                    value = 0
+                end
+                ConExecute("ui_TransportPreOrders " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = "<LOC _On>", key = 1 },
+                    { text = "<LOC _Off>", key = 0 },
+                },
+            },
+        }
+
+        local position = table.getn(gameplay.items) + 1
+        for index, item in ipairs(gameplay.items) do
+            if item.key == 'assist_to_upgrade' or item.title == '<LOC OPTIONS_0323>Commands' then
+                position = index + 1
+                break
+            end
+        end
+        table.insert(gameplay.items, position, entry)
+    end
+end
+
 
 -- Local rendering only. Older executables must neither show this option nor
 -- receive an unknown command when preferences are applied at startup.
