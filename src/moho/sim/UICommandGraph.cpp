@@ -1609,7 +1609,7 @@ namespace moho
             continue;
           }
 
-          if (bestScaledDistance > scaledDistance || isSelected) {
+          if (bestScaledDistance > scaledDistance) {
             bestScaledDistance = scaledDistance;
             bestCommandId = order.nextCommandId;
           }
@@ -3437,7 +3437,12 @@ namespace moho
           mSession->mGameTick, kPreviewCreateColor, meshBlueprint, previewScale, false, material
         );
         if (meshInstance != nullptr) {
-          std::shared_ptr<MeshInstance> meshPtr(meshInstance);
+          // Freed only while the renderer lives, as `CUIWorldMesh` does: the instance unregisters from it.
+          std::shared_ptr<MeshInstance> meshPtr(meshInstance, [](MeshInstance* const instance) {
+            if (MeshRenderer::GetInstance() != nullptr) {
+              delete instance;
+            }
+          });
           meshPtr->color = previewColor;
           meshPtr->SetStance(stance, stance);
           sPreOrderGhostMeshes[key] = meshPtr;

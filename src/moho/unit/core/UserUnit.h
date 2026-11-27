@@ -596,6 +596,8 @@ namespace moho
     [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
     GetAllTransportPreOrders();
     void DispatchDisembarkedPreOrders();
+    /// Drops every unit's pre-orders, bracket overrides and dispatch bookkeeping (the switch went off).
+    static void ClearAllTransportPreOrderState();
     /// True when both units hold pre-orders with the same command ids in the same order; only such
     /// units are sent their orders as one group command.
     [[nodiscard]] static bool HaveSameTransportPreOrders(std::uint32_t lhsEntityId, std::uint32_t rhsEntityId);

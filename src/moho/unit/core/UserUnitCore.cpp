@@ -16,7 +16,7 @@ namespace
   std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
   std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
   std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
-  std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitTicks;
+  std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitStartTick; // game tick the unit began to wait
 
   /// Pre-orders whose order carries no usable command id get one from here (bit 31 clear, never 0xFF......).
   std::int32_t sNextPreOrderCommandId = 0x7F000001;
@@ -937,10 +937,10 @@ void UserUnit::QueueTransportPreOrder(
 void UserUnit::ClearTransportPreOrders()
 {
   sTransportPreOrders.erase(this->mParams.mEntityId);
-  sDisembarkedWaitTicks.erase(this->mParams.mEntityId);
+  sDisembarkedWaitStartTick.erase(this->mParams.mEntityId);
   if (sTransportPreOrders.empty()) {
     sDispatchedPreOrderBuilders.clear();
-    sDisembarkedWaitTicks.clear();
+    sDisembarkedWaitStartTick.clear();
   }
 }
 
@@ -1074,6 +1074,14 @@ const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>
   return sTransportPreOrders;
 }
 
+void UserUnit::ClearAllTransportPreOrderState()
+{
+  sTransportPreOrders.clear();
+  sSelectionBracketPositionOverrides.clear();
+  sDispatchedPreOrderBuilders.clear();
+  sDisembarkedWaitStartTick.clear();
+}
+
 bool UserUnit::HaveSameTransportPreOrders(
   const std::uint32_t lhsEntityId,
   const std::uint32_t rhsEntityId
@@ -1103,7 +1111,7 @@ bool UserUnit::IsDetachTransition(
 namespace
 {
   [[nodiscard]] bool IsAttachedToSomething(
-    const moho::UserEntity& entity
+    moho::UserEntity& entity
   )
   {
     return entity.GetAttachmentParent() != nullptr ||
@@ -1129,9 +1137,10 @@ void UserUnit::DispatchDisembarkedPreOrders()
     return;
   }
 
-  auto& waitTicks = sDisembarkedWaitTicks[ownEntityId];
-  constexpr std::int32_t kMaxWaitTicks = 30; // beats: about 3 seconds
-  const bool timedOut = (waitTicks >= kMaxWaitTicks);
+  // Counted in game ticks, not calls: both `Tick` and `UpdateEntityData` come here in one beat.
+  constexpr std::int32_t kMaxWaitTicks = 30; // about 3 seconds
+  const auto waitStart = sDisembarkedWaitStartTick.try_emplace(ownEntityId, session->mGameTick).first;
+  const bool timedOut = (session->mGameTick - waitStart->second) >= kMaxWaitTicks;
 
   // Wait while a living unit that got exactly these orders is still in a transport, so the group gets
   // one command, or while an entity an order targets (Guard/Assist on other cargo) is still carried.
@@ -1164,7 +1173,6 @@ void UserUnit::DispatchDisembarkedPreOrders()
   }
 
   if (waitForPeer || waitForTarget) {
-    ++waitTicks;
     return;
   }
 
@@ -1194,7 +1202,7 @@ void UserUnit::DispatchDisembarkedPreOrders()
 
   for (const std::uint32_t entityId : dispatchedEntityIds) {
     sTransportPreOrders.erase(entityId);
-    sDisembarkedWaitTicks.erase(entityId);
+    sDisembarkedWaitStartTick.erase(entityId);
   }
 
   gpg::Logf(
@@ -1209,9 +1217,14 @@ void UserUnit::DispatchDisembarkedPreOrders()
     SSTICommandIssueData dispatchOrder = preOrders[i];
 
     if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
-      // A unit of the squad that landed late assists the one that already started this building.
+      // Units of the squad that landed late assist the one that already started this building, while
+      // that builder lives; otherwise they build it themselves.
       const auto builder = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
-      if (groupUnits.size() == 1 && builder != sDispatchedPreOrderBuilders.end() && builder->second != ownEntityId) {
+      const UserEntity* const builderEntity = builder != sDispatchedPreOrderBuilders.end()
+        ? session->LookupEntityId(static_cast<EntId>(builder->second))
+        : nullptr;
+      const bool builderAlive = builderEntity != nullptr && builderEntity->mVariableData.mIsDead == 0;
+      if (builderAlive && builder->second != ownEntityId) {
         dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
         dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
         dispatchOrder.mTarget.mEnt = builder->second;
@@ -1683,8 +1696,18 @@ void UserUnit::Tick(
 
   // The detach hook in `UpdateEntityData` is skipped for updates `wld_ParallelSync` applies on workers,
   // so the beat tick is what reliably sends the orders of a unit that has left its transport.
-  if (HasTransportPreOrders() && !IsAttachmentParentRef(mVariableData.mAttachmentParentRef)) {
-    DispatchDisembarkedPreOrders();
+  if (!ui_TransportPreOrders) {
+    // Switched off: drop every queued pre-order, so turning it on again later sends nothing stale.
+    if (!sTransportPreOrders.empty() || !sSelectionBracketPositionOverrides.empty()) {
+      ClearAllTransportPreOrderState();
+    }
+  } else if (!IsAttachmentParentRef(mVariableData.mAttachmentParentRef)) {
+    if (!sSelectionBracketPositionOverrides.empty()) {
+      ClearSelectionBracketPositionOverride();
+    }
+    if (HasTransportPreOrders()) {
+      DispatchDisembarkedPreOrders();
+    }
   }
 
   const bool isQueueEmpty = this->mUnitVarDat.mIsBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);

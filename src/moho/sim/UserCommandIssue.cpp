@@ -850,7 +850,14 @@ namespace moho
           data.mTarget.mPos.z,
           clearQueue ? 1 : 0
         );
-        UserUnit::QueueTransportPreOrders(attachedUnits, data, clearQueue);
+        // When units on the ground share the order, the cargo part gets an id of its own: with the
+        // shared id, deleting or dragging it would find the ground units' command first and never
+        // reach the pre-order.
+        SSTICommandIssueData preOrder = data;
+        if (!simUnits.empty()) {
+          preOrder.nextCommandId = 0;
+        }
+        UserUnit::QueueTransportPreOrders(attachedUnits, preOrder, clearQueue);
       }
 
       if (!attachedUnits.empty() && simUnits.empty()) {

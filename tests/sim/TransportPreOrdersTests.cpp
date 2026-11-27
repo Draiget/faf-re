@@ -840,4 +840,25 @@ namespace
     EXPECT_TRUE(UserUnit::IsDetachTransition(500u, 0u));
     EXPECT_FALSE(UserUnit::IsDetachTransition(0u, kInvalidEntityId));
   }
+
+  TEST(
+    TransportPreOrdersTests,
+    ClearAllStateDropsEveryQueueAndOverride
+  )
+  {
+    FakeUserUnitScope scopeA;
+    FakeUserUnitScope scopeB;
+    UserUnit* unitA = scopeA.GetUnit(801);
+    UserUnit* unitB = scopeB.GetUnit(802);
+    unitA->QueueTransportPreOrder(SSTICommandIssueData(EUnitCommandType::UNITCOMMAND_Move), false);
+    unitB->QueueTransportPreOrder(SSTICommandIssueData(EUnitCommandType::UNITCOMMAND_Patrol), false);
+    unitB->SetSelectionBracketPositionOverride(Wm3::Vector3f{1.0f, 2.0f, 3.0f});
+    ASSERT_TRUE(UserUnit::HasAnyTransportPreOrders());
+
+    UserUnit::ClearAllTransportPreOrderState();
+
+    EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
+    EXPECT_TRUE(UserUnit::GetAllTransportPreOrders().empty());
+    EXPECT_TRUE(UserUnit::GetAllSelectionBracketPositionOverrides().empty());
+  }
 } // namespace
