@@ -181,6 +181,12 @@ local function Blocks(patch)
                 units = fresh
             end
             if ok and table.getn(units) > 0 then
+                -- A line that is only the unit's name ("- Selen", a heading "Mercy"): the icon with its name stands
+                -- in its place instead of saying the name twice.
+                local bare = string.lower(string.gsub(string.gsub(block.text or '', '[%s:]+$', ''), '^%s+', ''))
+                if table.getn(units) == 1 and bare == string.lower(units[1].name) then
+                    table.remove(withUnits)
+                end
                 table.insert(withUnits, { style = 'units', units = units,
                     indent = (block.style == 'bullet' and 18) or (block.style == 'bullet2' and 36) or 0 })
             elseif not ok then

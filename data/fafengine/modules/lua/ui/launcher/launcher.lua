@@ -3592,6 +3592,16 @@ function TestWalk()
                     end
                 end
                 if icons > 0 then
+                    -- No line only repeats the name of the one icon right under it.
+                    local doubled = 0
+                    for index, line in changelog.document.lines do
+                        local next = changelog.document.lines[index + 1]
+                        if next and next.units and table.getn(next.units) == 1 and line.text and
+                            string.lower(string.gsub(line.text, '[%s:]+$', '')) == string.lower(next.units[1].name) then
+                            doubled = doubled + 1
+                        end
+                    end
+                    Step('changelog: name lines doubled by their icon: ' .. doubled)
                     -- Scrolled to the line with the most icons, a few lines above it.
                     local best, most = 1, 0
                     for index, line in changelog.document.lines do
