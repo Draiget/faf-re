@@ -1558,6 +1558,44 @@ local function OpenHostDialog(launcher)
     mapSearch.Right:Set(right)
     mapSearch.Width:Set(function() return mapSearch.Right() - mapSearch.Left() end)
     mapSearch.Top:Set(function() return frame.Bottom() + Scale(12) end)
+    -- Under the search: how many players, how big, in which order (remembered between dialogs).
+    local mapPlayers = Prefs.GetFromCurrentProfile('fafre_host_map_players') or 0
+    local mapSize = Prefs.GetFromCurrentProfile('fafre_host_map_size') or 0
+    local mapSort = Prefs.GetFromCurrentProfile('fafre_host_map_sort') or 'name'
+    local kPlayerChoices = { { 'Any players', 0 }, { '2 players', 2 }, { '4 players', 4 }, { '6 players', 6 },
+        { '8 players', 8 }, { '10+ players', 10 } }
+    local kSizeChoices = { { 'Any size', 0 }, { '5 km', 5 }, { '10 km', 10 }, { '20 km', 20 }, { '40 km', 40 },
+        { '81 km', 81 } }
+    local kSortChoices = { { 'By name', 'name' }, { 'By players', 'players' }, { 'By size', 'size' } }
+    local function ChoiceText(choices, value)
+        for _, choice in choices do
+            if choice[2] == value then
+                return choice[1]
+            end
+        end
+        return choices[1][1]
+    end
+    local FillMaps -- below
+    local mapList -- below
+    local function Selector(choices, get, set, key, index)
+        local button
+        button = Theme.Button(panel, ChoiceText(choices, get()), function()
+            local items = {}
+            for _, choice in choices do
+                table.insert(items, { choice[1], key = choice[2], color = choice[2] == get() and C.accent or C.text })
+            end
+            Widgets.Dropdown(button, items, function(item)
+                set(item.key)
+                Prefs.SetToCurrentProfile(key, item.key)
+                button:SetLabel(item[1])
+                mapList.top = 1
+                FillMaps()
+            end, { width = 140 })
+        end, 'secondary', { width = 106, icon = 'chevronDown', size = 12 })
+        button.Left:Set(function() return mapLeft() + Scale((index - 1) * 112) end)
+        button.Top:Set(function() return mapSearch.Bottom() + Scale(8) end)
+        return button
+    end
 
     local paths = {}
     for _, path in DiskFindFiles('/maps', '*_scenario.lua') do
@@ -1566,12 +1604,31 @@ local function OpenHostDialog(launcher)
     table.sort(paths)
     local last = Prefs.GetFromCurrentProfile('fafre_host_map') or Prefs.GetFromCurrentProfile('LastScenario') or
         UIUtil.defaultScenario
+    -- Each map's name, players and size from its scenario, read once per dialog (all of them: the filters need them).
     local names = {}
-    local function NameOf(path)
-        if names[path] == nil then
+    local facts = {}
+    local function Facts(path)
+        if facts[path] == nil then
             local ok, scenario = pcall(import('/lua/ui/maputil.lua').LoadScenario, path)
-            names[path] = ok and scenario and scenario.name and LOC(scenario.name) or false
+            local fact = { players = 0, km = 0 }
+            if ok and scenario then
+                names[path] = scenario.name and LOC(scenario.name) or false
+                if scenario.size then
+                    fact.km = math.floor(math.max(scenario.size[1], scenario.size[2]) / 51.2 + 0.5)
+                end
+                local standard = scenario.Configurations and scenario.Configurations.standard
+                if standard and standard.teams and standard.teams[1] then
+                    fact.players = table.getn(standard.teams[1].armies or {})
+                end
+            else
+                names[path] = false
+            end
+            facts[path] = fact
         end
+        return facts[path]
+    end
+    local function NameOf(path)
+        Facts(path)
         return names[path] or MapFolder(path) or path
     end
     local function ShowMap(item)
@@ -1592,29 +1649,53 @@ local function OpenHostDialog(launcher)
         end
         Theme.SetText(mapInfo, info)
     end
-    local mapList = VirtualList(panel, {
-        { 'Map', 0.64, function(item) return NameOf(item.path) end },
-        { 'Folder', 0.36, function(item) return item.folder end, C.subtle },
+    mapList = VirtualList(panel, {
+        { 'Map', 0.42, function(item) return NameOf(item.path) end },
+        { 'Players', 0.18, function(item) return Facts(item.path).players > 0 and tostring(Facts(item.path).players) or '' end,
+            C.muted },
+        { 'Size', 0.14, function(item) return Facts(item.path).km > 0 and (Facts(item.path).km .. ' km') or '' end,
+            C.muted },
+        { 'Folder', 0.26, function(item) return item.folder end, C.subtle },
     }, function(item, double)
         ShowMap(item)
     end)
     mapList.Left:Set(mapLeft)
     mapList.Right:Set(right)
-    mapList.Top:Set(function() return mapSearch.Bottom() + Scale(10) end)
+    mapList.Top:Set(function() return mapSearch.Bottom() + Scale(8 + 34 + 10) end)
     mapList.Bottom:Set(function() return panel.Bottom() - Scale(76) end)
     mapList.selectedKey = last
-    local function FillMaps()
+    FillMaps = function()
         local filter = string.lower(mapSearch.edit:GetText())
         local items = {}
         for _, path in paths do
             local folder = MapFolder(path)
-            if folder and (filter == '' or string.find(folder, filter, 1, true) or
+            local fact = Facts(path)
+            local players = mapPlayers == 0 or (mapPlayers >= 10 and fact.players >= 10) or fact.players == mapPlayers
+            local size = mapSize == 0 or fact.km == mapSize
+            if folder and players and size and (filter == '' or string.find(folder, filter, 1, true) or
                 string.find(string.lower(names[path] or ''), filter, 1, true)) then
-                table.insert(items, { key = path, path = path, folder = folder })
+                table.insert(items, { key = path, path = path, folder = folder, name = string.lower(NameOf(path)),
+                    players = fact.players, km = fact.km })
             end
         end
+        table.sort(items, function(a, b)
+            if mapSort == 'players' and a.players ~= b.players then
+                return a.players > b.players
+            elseif mapSort == 'size' and a.km ~= b.km then
+                return a.km > b.km
+            end
+            return a.name < b.name
+        end)
         mapList:SetItems(items)
     end
+    cover.mapList = mapList -- for the test walk
+    cover.FilterMaps = function(players, size, sort)
+        mapPlayers, mapSize, mapSort = players, size, sort
+        FillMaps()
+    end
+    Selector(kPlayerChoices, function() return mapPlayers end, function(v) mapPlayers = v end, 'fafre_host_map_players', 1)
+    Selector(kSizeChoices, function() return mapSize end, function(v) mapSize = v end, 'fafre_host_map_size', 2)
+    Selector(kSortChoices, function() return mapSort end, function(v) mapSort = v end, 'fafre_host_map_sort', 3)
     mapSearch:OnChange(function()
         mapList.top = 1
         FillMaps()
@@ -2613,6 +2694,16 @@ function TestWalk()
                 end
                 Wait(1)
                 Step('featured mod picked')
+                local dialog = current.hostDialog
+                Step('map list: ' .. table.getn(dialog.mapList.items) .. ' maps shown')
+                dialog.FilterMaps(8, 0, 'size')
+                local items = dialog.mapList.items
+                local first, last = items[1], items[table.getn(items)]
+                Step('map list, 8 players by size: ' .. table.getn(items) .. ' maps, first ' ..
+                    tostring(first and first.folder) .. ' (' .. tostring(first and first.km) .. ' km), last ' ..
+                    tostring(last and last.folder) .. ' (' .. tostring(last and last.km) .. ' km)')
+                Wait(1)
+                dialog.FilterMaps(0, 0, 'name')
                 -- The mouse over a greyed one: its reason in a tip by it.
                 for _, choice in current.hostDialog.modChoices or {} do
                     if not choice.enabled and choice.onDisabledHover then
