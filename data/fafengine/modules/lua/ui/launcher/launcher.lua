@@ -31,7 +31,7 @@ FeaturedMods = {
 local kRailWidth = 214
 local kStatusHeight = 28
 -- The pages under Play (the top bar's Play tab and its strip of modes).
-local kPlayPages = { online = true, matchmaking = true, coop = true, lan = true }
+local kPlayPages = { online = true, matchmaking = true, coop = true, training = true, lan = true }
 local kVaultPages = { maps = true, mods = true } -- FAF's vault: Maps and Mods, a strip under the top bar like Play's
 local kRankPages = { leaderboards = true, tournaments = true } -- Leaderboards and Tournaments, under Leaderboards
 local kRefreshSeconds = 0.5
@@ -1976,7 +1976,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or (self.page == 'training' and self.trainingView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2035,6 +2035,23 @@ function Launcher:HostRequest(request)
     return true
 end
 
+--- A FAF tutorial (trainingpage.lua): its scenario `technicalName` started offline on FAF's tutorials featured mod, as
+--- the FAF client starts it (/map); on other game files the game starts again on the tutorial's, then starts it.
+function Launcher:StartTutorial(technicalName)
+    local status = rawget(_G, 'FafOnline_Status') and FafOnline_Status() or {}
+    if status.loadedMod ~= 'tutorials' then
+        return self:RestartOn('tutorials', { kind = 'tutorial', map = technicalName, mod = 'tutorials' })
+    end
+    local ok, why = pcall(function()
+        import('/lua/singleplayerlaunch.lua').StartCommandLineSession(technicalName, false)
+    end)
+    LOG('LAUNCHER: tutorial ' .. tostring(technicalName) .. ': ' .. tostring(ok) .. (ok and '' or (' ' .. tostring(why))))
+    if not ok then
+        return false, 'The tutorial didn\'t start: ' .. tostring(why)
+    end
+    return true
+end
+
 --- Starts the game again on `mod`'s files with `action` for the new start, and quits this one.
 function Launcher:RestartOn(mod, action)
     if not rawget(_G, 'FafOnline_RestartOn') then
@@ -2065,6 +2082,17 @@ function Launcher:Resume(status)
         self.resume = false
         self.lastError = 'Gave up waiting for the FAF lobby to ' .. (resume.kind == 'join' and 'join the game.' or
             'create the game.')
+        return
+    end
+    -- A tutorial needs no FAF lobby: it starts as soon as the launcher is up on the tutorial's files.
+    if resume.kind == 'tutorial' then
+        self.resume = false
+        self.resumed = 'tutorial'
+        resumedThisStart = self.resumed
+        local ok, why = self:StartTutorial(resume.map)
+        if not ok then
+            self.lastError = why
+        end
         return
     end
     if status.lobby ~= 'signedin' or status.match == 'preparing' or status.match == 'running' then
@@ -2764,10 +2792,10 @@ local function BuildTopBar(launcher, body)
     LayoutHelpers.SetHeight(strip, 40)
     strip.Width:Set(function() return strip.Right() - strip.Left() end)
     strip.tabs = Widgets.Tabs(strip, {
-        { 'online', 'Custom games' }, { 'matchmaking', 'Matchmaking' }, { 'coop', 'Co-op' }, { 'skirmish', 'Skirmish' },
-        { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
+        { 'online', 'Custom games' }, { 'matchmaking', 'Matchmaking' }, { 'coop', 'Co-op' }, { 'training', 'Training' },
+        { 'skirmish', 'Skirmish' }, { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
     }, function(key)
-        if key == 'matchmaking' or key == 'coop' then
+        if key == 'matchmaking' or key == 'coop' or key == 'training' then
             launcher:ShowPage(key)
         elseif key == 'skirmish' then
             launcher:Skirmish()
@@ -3243,6 +3271,23 @@ local function Build(launcher)
             boardsPage:Destroy()
         end
     end
+    -- Training: FAF's tutorials (trainingpage.lua), on Play.
+    if rawget(_G, 'FafLibrary_Api') then
+        local trainingPage = Group(content, 'launcher training')
+        LayoutHelpers.FillParent(trainingPage, content)
+        trainingPage.Width:Set(function() return trainingPage.Right() - trainingPage.Left() end)
+        trainingPage.Height:Set(function() return trainingPage.Bottom() - trainingPage.Top() end)
+        local trainingBuilt, trainingWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/trainingpage.lua').Build(launcher, trainingPage)
+        end)
+        if trainingBuilt then
+            launcher.pages.training = trainingPage
+            Theme.SetVisible(trainingPage, false)
+        else
+            WARN('LAUNCHER: the training page failed to build: ' .. tostring(trainingWhy))
+            trainingPage:Destroy()
+        end
+    end
     -- Tournaments: FAF's tournaments (tournamentspage.lua), beside the leaderboards.
     if rawget(_G, 'FafLibrary_Api') then
         local tourneyPage = Group(content, 'launcher tournaments')
@@ -3554,6 +3599,31 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchertrainingtest: the Training page: FAF's tutorials, one chosen, what Start would do (not pressed:
+            -- starting one ends the walk).
+            if GetCommandLineArg('/launchertrainingtest', 0) and current.trainingView then
+                local training = current.trainingView
+                current:ShowPage('training')
+                for i = 1, 20 do
+                    current:Refresh()
+                    if training.tutorials or training.failure then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(3)
+                current:Refresh()
+                local lines = {}
+                for _, item in (training.tutorials or {}) do
+                    local plan, why = training:Plan(item)
+                    table.insert(lines, item.title .. ' (' .. item.category .. ') ' .. tostring(plan or why))
+                end
+                Step('training: ' .. table.getn(training.tutorials or {}) .. ' tutorials: ' .. table.concat(lines, '; ') ..
+                    ', chosen ' .. tostring(training.chosen and training.chosen.title) .. ', ' ..
+                    table.getn(training.document.blocks or {}) .. ' blocks' ..
+                    (training.failure and (', failure ' .. training.failure) or ''))
+                Wait(1)
+            end
             -- /launchertourneytest: the Tournaments page: FAF's tournaments by state, one chosen.
             if GetCommandLineArg('/launchertourneytest', 0) and current.tournamentsView then
                 local tourneys = current.tournamentsView

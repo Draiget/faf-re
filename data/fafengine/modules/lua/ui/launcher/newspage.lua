@@ -116,6 +116,15 @@ local function Blocks(html)
     return blocks
 end
 
+--- An HTML text (a post, a tutorial's description) as TextView blocks; its plain one-line text. For other pages.
+function HtmlBlocks(html)
+    return Blocks(html)
+end
+
+function HtmlPlain(html)
+    return Plain(html)
+end
+
 --- One post from FAF's website as the page shows it.
 local function Post(raw)
     local embedded = raw._embedded or {}
