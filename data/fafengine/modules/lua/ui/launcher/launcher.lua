@@ -34,6 +34,7 @@ local kStatusHeight = 28
 local kPlayPages = { online = true, matchmaking = true, coop = true, training = true, lan = true }
 local kVaultPages = { maps = true, mods = true } -- FAF's vault: Maps and Mods, a strip under the top bar like Play's
 local kRankPages = { leaderboards = true, tournaments = true } -- Leaderboards and Tournaments, under Leaderboards
+local kChatPages = { chat = true, contacts = true } -- Chat and Contacts, under Chat
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1976,7 +1977,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or (self.page == 'training' and self.trainingView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or (self.page == 'training' and self.trainingView) or (self.page == 'contacts' and self.contactsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2522,7 +2523,8 @@ function Launcher:PlaceContent()
         return
     end
     local shown = nil
-    for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages }, { self.rankStrip, kRankPages } } do
+    for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages }, { self.rankStrip, kRankPages },
+        { self.chatStrip, kChatPages } } do
         local strip, pages = entry[1], entry[2]
         if strip then
             local mine = pages[self.page or ''] and true or false
@@ -2538,6 +2540,9 @@ function Launcher:PlaceContent()
     end
     if kRankPages[self.page or ''] then
         self.lastRankPage = self.page
+    end
+    if kChatPages[self.page or ''] then
+        self.lastChatPage = self.page
     end
     if shown then
         content.Top:Set(function() return shown.Bottom() + Scale(14) end)
@@ -2672,7 +2677,9 @@ local function BuildTopBar(launcher, body)
 
     local entries = {
         { 'play', 'Play', function() launcher:ShowPage('online') end, kPlayPages },
-        { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
+        { 'chat', 'Chat', function()
+            launcher:ShowPage(launcher.lastChatPage == 'contacts' and launcher.pages.contacts and 'contacts' or 'chat')
+        end, kChatPages },
         { 'leaderboard', 'Leaderboards', function()
             launcher:ShowPage(launcher.lastRankPage == 'tournaments' and launcher.pages.tournaments and 'tournaments' or
                 'leaderboards')
@@ -2853,6 +2860,26 @@ local function BuildTopBar(launcher, body)
     rank.tabs.Right:Set(rank.Right)
     Theme.SetVisible(rank, false)
     launcher.rankStrip = rank
+
+    -- Chat and contacts (friends, foes, players online).
+    local chatStrip = Group(body)
+    chatStrip.Left:Set(strip.Left)
+    chatStrip.Right:Set(strip.Right)
+    chatStrip.Top:Set(strip.Top)
+    LayoutHelpers.SetHeight(chatStrip, 40)
+    chatStrip.Width:Set(function() return chatStrip.Right() - chatStrip.Left() end)
+    local chatEntries = { { 'chat', 'Chat' } }
+    if rawget(_G, 'FafOnline_Contacts') then
+        table.insert(chatEntries, { 'contacts', 'Contacts' })
+    end
+    chatStrip.tabs = Widgets.Tabs(chatStrip, chatEntries, function(key)
+        launcher:ShowPage(key)
+    end)
+    chatStrip.tabs.Left:Set(chatStrip.Left)
+    chatStrip.tabs.Top:Set(chatStrip.Top)
+    chatStrip.tabs.Right:Set(chatStrip.Right)
+    Theme.SetVisible(chatStrip, false)
+    launcher.chatStrip = chatStrip
     return bar
 end
 
@@ -3271,6 +3298,23 @@ local function Build(launcher)
             boardsPage:Destroy()
         end
     end
+    -- Contacts: friends, foes and the players online (contactspage.lua), beside Chat.
+    if rawget(_G, 'FafOnline_Contacts') then
+        local contactsPage = Group(content, 'launcher contacts')
+        LayoutHelpers.FillParent(contactsPage, content)
+        contactsPage.Width:Set(function() return contactsPage.Right() - contactsPage.Left() end)
+        contactsPage.Height:Set(function() return contactsPage.Bottom() - contactsPage.Top() end)
+        local contactsBuilt, contactsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/contactspage.lua').Build(launcher, contactsPage)
+        end)
+        if contactsBuilt then
+            launcher.pages.contacts = contactsPage
+            Theme.SetVisible(contactsPage, false)
+        else
+            WARN('LAUNCHER: the contacts page failed to build: ' .. tostring(contactsWhy))
+            contactsPage:Destroy()
+        end
+    end
     -- Training: FAF's tutorials (trainingpage.lua), on Play.
     if rawget(_G, 'FafLibrary_Api') then
         local trainingPage = Group(content, 'launcher training')
@@ -3599,6 +3643,61 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchercontactstest <id>: the Contacts page: player <id> (offline) made a friend, named through FAF's
+            -- API, made a foe, then taken off again, the players online listed.
+            local contactsTest = GetCommandLineArg('/launchercontactstest', 1)
+            if contactsTest and contactsTest[1] and current.contactsView then
+                local contacts = current.contactsView
+                local id = contactsTest[1]
+                current:ShowPage('contacts')
+                for i = 1, 30 do
+                    if FafOnline_Status().lobby == 'signedin' then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                local function Line(what)
+                    current:Refresh()
+                    local list = FafOnline_Contacts()
+                    local friends, foes = {}, {}
+                    for _, item in list.friends do
+                        table.insert(friends, (item.login or contacts.names[item.id] or ('#' .. item.id)) ..
+                            (item.online and ' online' or ' offline'))
+                    end
+                    for _, item in list.foes do
+                        table.insert(foes, item.login or contacts.names[item.id] or ('#' .. item.id))
+                    end
+                    local players, total = FafOnline_Players('', 10)
+                    Step('contacts: ' .. what .. ': friends [' .. table.concat(friends, ', ') .. '], foes [' ..
+                        table.concat(foes, ', ') .. '], ' .. tostring(total) .. ' online, page ' .. tostring(current.page) ..
+                        ', strip ' .. tostring(current.chatStrip and not current.chatStrip:IsHidden()))
+                end
+                Line('start')
+                contacts.chosen = { id = id }
+                contacts:Toggle('friend')
+                for i = 1, 6 do
+                    current:Refresh()
+                    Wait(1)
+                end
+                Line('after Add friend')
+                contacts:Toggle('foe')
+                Wait(2)
+                Line('after Add foe')
+                contacts.tab = 'foes'
+                contacts:Paint()
+                Wait(2)
+                contacts:Toggle('foe')
+                Wait(2)
+                Line('after Remove foe')
+                contacts.tab = 'players'
+                contacts:Paint()
+                Wait(2)
+                Step('contacts: players tab ' .. table.getn(contacts.list.items or {}) .. ' rows, chosen ' ..
+                    tostring(contacts.chosen and contacts.chosen.id))
+                contacts.tab = 'friends'
+                Wait(1)
+            end
             -- /launchertrainingtest: the Training page: FAF's tutorials, one chosen, what Start would do (not pressed:
             -- starting one ends the walk).
             if GetCommandLineArg('/launchertrainingtest', 0) and current.trainingView then

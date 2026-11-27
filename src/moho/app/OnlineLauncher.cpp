@@ -1040,6 +1040,125 @@ namespace
     return 1;
   }
 
+  /** One online player as the contacts and search show them: id, login, country, clan, global rating, friend, foe. */
+  void PushContact(
+    lua_State* const L,
+    const Service& s,
+    const LaunchPlayer& player
+  )
+  {
+    lua_newtable(L);
+    SetField(L, "id", player.id);
+    SetField(L, "login", player.login);
+    SetField(L, "country", Lower(player.country));
+    SetField(L, "clan", player.clan);
+    if (const auto global = player.ratings.find("global"); global != player.ratings.end()) {
+      SetField(
+        L, "rating", static_cast<double>(static_cast<long long>(global->second.mean - 3.0 * global->second.deviation))
+      );
+      SetField(L, "games", static_cast<double>(global->second.games));
+    }
+    SetBool(L, "friend", s.friends.contains(player.id));
+    SetBool(L, "foe", s.foes.contains(player.id));
+  }
+
+  /**
+   * list FafOnline_Players(text, limit): the players online in FAF's lobby whose login holds `text` (any case), by
+   * login, at most `limit` (100 when not given), each as FafOnline_Contacts lists them; the total matching second.
+   */
+  int PlayersBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string text = Lower(lua_isstring(L, 1) ? lua_tostring(L, 1) : "");
+    const int limit = lua_isnumber(L, 2) ? std::max(1, static_cast<int>(lua_tonumber(L, 2))) : 100;
+    lua_newtable(L);
+    int count = 0;
+    int matching = 0;
+    for (const auto& [login, player] : s.players) {
+      if (!text.empty() && Lower(login).find(text) == std::string::npos) {
+        continue;
+      }
+      ++matching;
+      if (count < limit) {
+        lua_pushnumber(L, static_cast<lua_Number>(++count));
+        PushContact(L, s, player);
+        lua_rawset(L, -3);
+      }
+    }
+    lua_pushnumber(L, static_cast<lua_Number>(matching));
+    return 2;
+  }
+
+  /**
+   * table FafOnline_Contacts(): {friends = list, foes = list}, each player as FafOnline_Players lists them when online
+   * (online = true), else only their id (FAF's lobby names only the players online).
+   */
+  int ContactsBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    std::map<std::string, const LaunchPlayer*> online;
+    for (const auto& [login, player] : s.players) {
+      online[player.id] = &player;
+    }
+    lua_newtable(L);
+    for (const auto& [key, ids] : {std::pair{"friends", &s.friends}, std::pair{"foes", &s.foes}}) {
+      lua_pushstring(L, key);
+      lua_newtable(L);
+      int count = 0;
+      for (const std::string& id : *ids) {
+        lua_pushnumber(L, static_cast<lua_Number>(++count));
+        if (const auto it = online.find(id); it != online.end()) {
+          PushContact(L, s, *it->second);
+          SetBool(L, "online", true);
+        } else {
+          lua_newtable(L);
+          SetField(L, "id", id);
+          SetBool(L, "online", false);
+          SetBool(L, "friend", s.friends.contains(id));
+          SetBool(L, "foe", s.foes.contains(id));
+        }
+        lua_rawset(L, -3);
+      }
+      lua_rawset(L, -3);
+    }
+    return 1;
+  }
+
+  /** ok, why = FafOnline_SetFoe(id, on): adds the player with that FAF id to the foes (on) or removes them. */
+  int SetFoeBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const bool on = lua_toboolean(L, 2) != 0;
+    if (id.empty() || id.find_first_not_of("0123456789") != std::string::npos) {
+      PushResult(L, std::unexpected(std::string("FafOnline_SetFoe needs a player's FAF id")));
+      return 2;
+    }
+    if (s.lobby.GetState() != FafLobby::State::SignedIn) {
+      PushResult(L, std::unexpected(std::string("not in FAF's lobby")));
+      return 2;
+    }
+    const auto sent =
+      s.lobby.Send(JsonObject({{"command", JsonString(on ? "social_add" : "social_remove")}, {"foe", JsonDigits(id)}}));
+    if (sent) {
+      if (on) {
+        s.foes.insert(id);
+        s.friends.erase(id);
+      } else {
+        s.foes.erase(id);
+      }
+      LogLine(((on ? "social: added foe " : "social: removed foe ") + id).c_str());
+    }
+    PushResult(L, sent);
+    return 2;
+  }
+
   /** ok, why = FafOnline_SetFriend(id, on): adds the player with that FAF id to the friends (on) or removes them. */
   int SetFriendBody(
     lua_State* const L
@@ -1974,6 +2093,30 @@ namespace
       "<global>",
       "table FafOnline_Player(login) - what FAF's lobby said about a player: id, country, clan, ratings; or nil."
     );
+    static CScrLuaBinder players(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Players",
+      &Binding<&PlayersBody>,
+      nullptr,
+      "<global>",
+      "list, number FafOnline_Players(text, limit) - the players online in FAF's lobby whose login holds the text."
+    );
+    static CScrLuaBinder contacts(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Contacts",
+      &Binding<&ContactsBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Contacts() - friends and foes: online ones with login, country, clan and rating, others by id."
+    );
+    static CScrLuaBinder setFoe(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_SetFoe",
+      &Binding<&SetFoeBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_SetFoe(id, on) - adds that FAF player to the foes, or removes them."
+    );
     static CScrLuaBinder social(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_Social",
@@ -2246,6 +2389,11 @@ void moho::ONLINE_Frame()
       ) {
         for (const JsonNode& player : players->items) {
           LaunchPlayer record = ReadLaunchPlayer(player);
+          // A player who left FAF: the lobby says so with state "offline" (Java commons' Player.State).
+          if (player.String("state") == "offline") {
+            s.players.erase(record.login);
+            continue;
+          }
           if (record.login == s.me.login) {
             s.me = record; // the ratings after a game
           }
