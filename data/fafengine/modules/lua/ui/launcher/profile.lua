@@ -653,7 +653,7 @@ local function Build(launcher)
     headLine:DisableHitTest()
 
     profile.tabs = Widgets.Tabs(panel, {
-        { 'overview', 'Overview' }, { 'history', 'Rating history' }, { 'maps', 'Maps' },
+        { 'overview', 'Overview' }, { 'history', 'Rating history' }, { 'maps', 'Maps' }, { 'stats', 'Statistics' },
         { 'names', 'Previous names' }, { 'clan', 'Clan' },
     }, function(key) profile:ShowTab(key) end)
     profile.tabs.Left:Set(function() return panel.Left() + Scale(28) end)
@@ -681,6 +681,7 @@ local function Build(launcher)
     profile:BuildOverview(body)
     profile:BuildHistory(body)
     profile:BuildMaps(body)
+    profile:BuildStats(body)
     profile:BuildNames(body)
     profile:BuildClan(body)
 
@@ -752,6 +753,7 @@ function Profile:Load(login)
     self.names = nil
     self.clan = nil
     self.members = nil
+    self.events = nil
     self.tab = 'overview'
     LOG('LAUNCHER: profile of ' .. tostring(login))
     self:AskPlayer('login=="' .. login .. '"', true)
@@ -983,11 +985,184 @@ function Profile:ShowTab(key)
             self:AskHistory(self.boards[1])
         elseif key == 'maps' then
             self:AskMaps()
+        elseif key == 'stats' then
+            self:AskEvents()
         elseif key == 'clan' then
             self:AskClan()
         end
     end
     self:Paint()
+end
+
+------------------------------------------------------------------------------------------------------------------------
+-- Statistics: FAF's player events (/data/playerEvent), the counts FAF keeps over all of a player's games. The event ids
+-- are the FAF client's (EventService).
+
+local kEvents = {
+    customGames = 'cfa449a6-655b-48d5-9a27-6044804fe35c', ladderGames = '4a929def-e347-45b4-b26d-4325a3115859',
+    lostAcus = 'd6a699b7-99bc-4a7f-b128-15e1e289a7b3', seconds = 'cc791f00-343c-48d4-b5b3-8900b83209c0',
+    builtAir = '3ebb0c4d-5e92-4446-bf52-d17ba9c5cd3c', lostAir = '225e9b2e-ae09-4ae1-a198-eca8780b0fcd',
+    builtLand = 'ea123d7f-bb2e-4a71-bd31-88859f0c3c00', lostLand = 'a1a3fd33-abe2-4e56-800a-b72f4c925825',
+    builtNaval = 'b5265b42-1747-4ba1-936c-292202637ce6', lostNaval = '3a7b3667-0f79-4ac7-be63-ba841fd5ef05',
+    builtT1 = 'a8ee4f40-1e30-447b-bc2c-b03065219795', lostT1 = '3dd3ed78-ce78-4006-81fd-10926738fbf3',
+    builtT2 = '89d4f391-ed2d-4beb-a1ca-6b93db623c04', lostT2 = 'aebd750b-770b-4869-8e37-4d4cfdc480d0',
+    builtT3 = '92617974-8c1f-494d-ab86-65c2a95d1486', lostT3 = '7f15c2be-80b7-4573-8f41-135f84773e0f',
+    builtExp = 'ed9fd79d-5ec7-4243-9ccf-f18c4f5baef1', lostExp = '701ca426-0943-4931-85af-6a08d36d9aaa',
+    builtEng = '60bb1fc0-601b-45cd-bd26-83b1a1ac979b', lostEng = 'e8e99a68-de1b-4676-860d-056ad2207119',
+    aeonPlays = '96ccc66a-c5a0-4f48-acaa-888b00778b57', aeonWins = 'a6b51c26-64e6-4e7a-bda7-ea1cfe771ebb',
+    cybranPlays = 'ad193982-e7ca-465c-80b0-5493f9739559', cybranWins = '56b06197-1890-42d0-8b59-25e1add8dc9a',
+    uefPlays = '1b900d26-90d2-43d0-a64e-ed90b74c3704', uefWins = '7be6fdc5-7867-4467-98ce-f7244a66625a',
+    seraphimPlays = 'fefcb392-848f-4836-9683-300b283bc308', seraphimWins = '15b6c19a-6084-4e82-ada9-6c30e282191f',
+}
+local kFactionRows = { { 'UEF', 'uef' }, { 'Aeon', 'aeon' }, { 'Cybran', 'cybran' }, { 'Seraphim', 'seraphim' } }
+local kUnitRows = { { 'Land', 'Land' }, { 'Air', 'Air' }, { 'Naval', 'Naval' }, { 'Tech 1', 'T1' }, { 'Tech 2', 'T2' },
+    { 'Tech 3', 'T3' }, { 'Experimentals', 'Exp' }, { 'Engineers', 'Eng' } }
+
+--- A labelled bar inside `parent`: :Set(share 0..1, text, color, second share 0..1 drawn fainter behind it).
+local function BarRow(parent)
+    local row = Group(parent)
+    row:DisableHitTest()
+    LayoutHelpers.SetHeight(row, 30)
+    row.label = Theme.Text(row, '', 13, C.text)
+    LayoutHelpers.AtLeftIn(row.label, row, 0)
+    LayoutHelpers.AtVerticalCenterIn(row.label, row)
+    row.value = Theme.Text(row, '', 12, C.muted)
+    row.value.Right:Set(row.Right)
+    LayoutHelpers.AtVerticalCenterIn(row.value, row)
+    row.track = Theme.Rect(row, C.line)
+    row.track.Left:Set(function() return row.Left() + Scale(110) end)
+    row.track.Right:Set(function() return row.Right() - Scale(190) end)
+    row.track.Height:Set(Scale(8))
+    row.track.Width:Set(function() return row.track.Right() - row.track.Left() end)
+    LayoutHelpers.AtVerticalCenterIn(row.track, row)
+    row.back = Theme.Rect(row, C.lineStrong)
+    row.back.Left:Set(row.track.Left)
+    row.back.Top:Set(row.track.Top)
+    row.back.Height:Set(row.track.Height)
+    row.fill = Theme.Rect(row, C.accent)
+    row.fill.Left:Set(row.track.Left)
+    row.fill.Top:Set(row.track.Top)
+    row.fill.Height:Set(row.track.Height)
+    row.Set = function(self, label, share, text, color, behind)
+        Theme.SetText(self.label, label)
+        Theme.SetText(self.value, text)
+        local function Width(part)
+            return function() return math.max(1, math.floor(self.track.Width() * math.max(0, math.min(1, part or 0)))) end
+        end
+        self.fill.Width:Set(Width(share))
+        self.fill:SetSolidColor(color or C.accent)
+        Theme.SetVisible(self.fill, (share or 0) > 0)
+        self.back.Width:Set(Width(behind))
+        Theme.SetVisible(self.back, (behind or 0) > 0)
+    end
+    return row
+end
+
+function Profile:BuildStats(body)
+    local page = Group(body)
+    LayoutHelpers.FillParent(page, body)
+    page:DisableHitTest()
+    self.pages.stats = page
+    page.boxes = {}
+    for i, caption in { 'Time played', 'Custom games', '1v1 games', 'ACUs lost' } do
+        page.boxes[i] = StatBox(page, caption)
+    end
+    Row(page, page.boxes, 0, 14)
+    -- Factions on the left, units on the right.
+    local left = Group(page)
+    left.Left:Set(page.Left)
+    left.Right:Set(function() return page.Left() + math.floor(page.Width() / 2) - Scale(16) end)
+    left.Top:Set(function() return page.boxes[1].Bottom() + Scale(26) end)
+    left.Bottom:Set(page.Bottom)
+    Theme.SizeFromEdges(left)
+    left:DisableHitTest()
+    local right = Group(page)
+    right.Left:Set(function() return page.Left() + math.floor(page.Width() / 2) + Scale(16) end)
+    right.Right:Set(page.Right)
+    right.Top:Set(left.Top)
+    right.Bottom:Set(page.Bottom)
+    Theme.SizeFromEdges(right)
+    right:DisableHitTest()
+    page.factionHeading = Heading(page, 'Factions')
+    page.factionHeading.Left:Set(left.Left)
+    page.factionHeading.Top:Set(left.Top)
+    page.unitHeading = Heading(page, 'Units built and lost')
+    page.unitHeading.Left:Set(right.Left)
+    page.unitHeading.Top:Set(right.Top)
+    local function Rows(column, heading, count)
+        local rows = {}
+        for i = 1, count do
+            local row = BarRow(column)
+            row.Left:Set(column.Left)
+            row.Right:Set(column.Right)
+            row.Width:Set(function() return row.Right() - row.Left() end)
+            local index = i - 1
+            row.Top:Set(function() return heading.Bottom() + Scale(12 + index * 32) end)
+            rows[i] = row
+        end
+        return rows
+    end
+    page.factions = Rows(left, page.factionHeading, table.getn(kFactionRows))
+    page.units = Rows(right, page.unitHeading, table.getn(kUnitRows))
+    page.legend = Theme.Text(page, 'Factions: wins in green over the games played.  Units: lost in orange over the units built.', 11, C.subtle)
+    page.legend.Left:Set(left.Left)
+    page.legend.Top:Set(function() return page.factions[table.getn(page.factions)].Bottom() + Scale(16) end)
+    page.empty = Theme.Text(page, '', 13, C.subtle)
+    page.empty.Left:Set(left.Left)
+    page.empty.Top:Set(function() return page.legend.Bottom() + Scale(10) end)
+end
+
+function Profile:AskEvents()
+    if self.events or self.jobs.events or not self.player then
+        return
+    end
+    Ask(self, 'events', '/data/playerEvent', {
+        filter = 'player.id==' .. self.player.id,
+        include = 'event',
+        ['page[size]'] = '200',
+    }, function(doc)
+        local counts = {}
+        for _, item in List(doc) do
+            local event = item.relationships and item.relationships.event and item.relationships.event.data
+            if event and event.id then
+                counts[event.id] = tonumber(Attr(item, 'currentCount')) or 0
+            end
+        end
+        self.events = counts
+    end)
+end
+
+function Profile:PaintStats(page)
+    local events = self.events
+    local function Count(name)
+        return events and events[kEvents[name]] or 0
+    end
+    local hours = Count('seconds') / 3600
+    page.boxes[1]:Set(events and (hours >= 10 and Thousands(hours) or string.format('%.1f', hours)) .. ' h' or nil, nil,
+        events and (Thousands(Count('customGames') + Count('ladderGames')) .. ' games') or nil)
+    page.boxes[2]:Set(events and Thousands(Count('customGames')) or nil)
+    page.boxes[3]:Set(events and Thousands(Count('ladderGames')) or nil)
+    page.boxes[4]:Set(events and Thousands(Count('lostAcus')) or nil, C.bad)
+    local most = 1
+    for _, faction in kFactionRows do
+        most = math.max(most, Count(faction[2] .. 'Plays'))
+    end
+    for i, faction in kFactionRows do
+        local plays, wins = Count(faction[2] .. 'Plays'), Count(faction[2] .. 'Wins')
+        page.factions[i]:Set(faction[1], wins / most, Thousands(plays) .. ' games  -  ' .. Percent(wins, plays) .. ' won',
+            C.good, plays / most)
+    end
+    local biggest = 1
+    for _, kind in kUnitRows do
+        biggest = math.max(biggest, Count('built' .. kind[2]), Count('lost' .. kind[2]))
+    end
+    for i, kind in kUnitRows do
+        local built, lost = Count('built' .. kind[2]), Count('lost' .. kind[2])
+        page.units[i]:Set(kind[1], lost / biggest, Thousands(built) .. ' built  -  ' .. Thousands(lost) .. ' lost',
+            C.warn, built / biggest)
+    end
+    Theme.SetText(page.empty, events and next(events) == nil and 'FAF has no statistics for this player yet.' or
+        (not events and 'Asking FAF for the statistics...' or ''))
 end
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -1595,6 +1770,8 @@ function Profile:Paint()
             self:PaintHistory(page)
         elseif self.tab == 'maps' then
             self:PaintMaps(page)
+        elseif self.tab == 'stats' then
+            self:PaintStats(page)
         elseif self.tab == 'names' then
             self:PaintNames(page)
         elseif self.tab == 'clan' then

@@ -3928,7 +3928,7 @@ function TestWalk()
                     end
                     Wait(1)
                 end
-                for _, tab in { 'overview', 'history', 'maps', 'names', 'clan' } do
+                for _, tab in { 'overview', 'history', 'maps', 'stats', 'names', 'clan' } do
                     if profile then
                         profile:ShowTab(tab)
                         for i = 1, 10 do
@@ -3957,6 +3957,9 @@ function TestWalk()
                             ', ' .. table.getn(profile.boards or {}) .. ' leaderboards, ' ..
                             table.getn(profile.maps or {}) .. ' maps, ' .. table.getn(profile.names or {}) ..
                             ' names, clan ' .. tostring(profile.clan and profile.clan.tag) ..
+                            (tab == 'stats' and (', stats: ' .. (profile.events and (table.getsize(profile.events) .. ' events, ' ..
+                                profile.pages.stats.boxes[1].value:GetText() .. ', factions ' ..
+                                profile.pages.stats.factions[1].value:GetText()) or 'none')) or '') ..
                             (table.getn(errors) > 0 and (', errors ' .. table.concat(errors, '; ')) or ''))
                         Wait(2)
                     end
