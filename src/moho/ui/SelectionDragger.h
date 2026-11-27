@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <memory>
+#include <vector>
 
 #include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/math/Vector3f.h"
@@ -25,6 +26,13 @@ namespace moho
   // SelectionDragger2D::~SelectionDragger2D() (0x00864D10) clears it as part of
   // its derived-destructor body.
   extern WeakSet<UserEntity> sSelectionBrackets;
+
+  /**
+   * Engine addition (`ui_TransportPreOrders`): the entity ids, ascending, of carried units whose drop
+   * hologram (`UserUnit::GetAllSelectionBracketPositionOverrides`) lies in `solid`, a band box's
+   * volume built from the dragging view's own camera. Empty while the switch is off.
+   */
+  [[nodiscard]] std::vector<std::uint32_t> CargoHologramsInSolid(const CGeomSolid3& solid);
 
   /**
    * Interface layer between `IMauiDragger` and the concrete selection

@@ -1,5 +1,8 @@
 #include "moho/sim/CWldSessionPrivate.h"
 #include <utility>
+#include "moho/unit/core/UserUnit.h"
+#include <unordered_map>
+#include <unordered_set>
 
 // Defined at file scope (global namespace, external linkage) in
 // CrtRuntimeExportedHelpers.cpp - shared by every legacy VC8 "<container> too
@@ -896,6 +899,7 @@ namespace moho
    */
   void UICommandGraph::CreateMeshes()
   {
+    UpdatePreOrderBuildMeshes();
     bool rebuilt = false;
     if (mNeedsRebuild != 0u) {
       mNeedsRebuild = 0u;
@@ -1454,7 +1458,7 @@ namespace moho
     const Wm3::Vector2f& cursorScreenPos
   ) const
   {
-    if (mMapAB0.empty()) {
+    if (mMapAB0.empty() && (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders())) {
       return -1;
     }
 
@@ -1539,6 +1543,77 @@ namespace moho
       if (bestScaledDistance > scaledDistance || preemptsByLiveSelection) {
         bestScaledDistance = scaledDistance;
         bestCommandId = drawNode.mCommandId;
+      }
+    }
+
+    if (UserUnit::HasAnyTransportPreOrders() && mSession != nullptr) {
+      std::unordered_set<std::int32_t> testedCommandIds;
+      const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+      for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+        const auto& orders = entry.second;
+        if (orders.empty()) {
+          continue;
+        }
+        UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+        if (entity == nullptr) {
+          continue;
+        }
+        const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+        if (!isSelected && !shiftDown) {
+          continue;
+        }
+
+        for (const SSTICommandIssueData& order : orders) {
+          if (order.nextCommandId > 0 && !testedCommandIds.insert(order.nextCommandId).second) {
+            continue;
+          }
+          Wm3::Vector3f targetPos = order.mTarget.mPos;
+          if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+            if (UserEntity* const targetEnt = mSession->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
+              const UserUnit* const targetUnit = targetEnt->IsUserUnit();
+              if (targetUnit != nullptr && targetUnit->HasSelectionBracketPositionOverride()) {
+                targetPos = targetUnit->GetSelectionBracketPositionOverride();
+              } else {
+                targetPos = targetEnt->mVariableData.mCurTransform.pos_;
+              }
+            }
+          }
+
+          bool culledByFrustum = false;
+          for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
+            const float signedDistance =
+              ((plane.Normal.x * targetPos.x) + (plane.Normal.y * targetPos.y) + (plane.Normal.z * targetPos.z)) -
+              plane.Constant;
+            if (signedDistance > 0.0f) {
+              culledByFrustum = true;
+              break;
+            }
+          }
+          if (culledByFrustum) {
+            continue;
+          }
+
+          const Wm3::Vector2f screenPos = camera.Project(targetPos);
+          const float dx = screenPos.x - cursorScreenPos.x;
+          const float dy = screenPos.y - cursorScreenPos.y;
+          const float pixelDistance = std::sqrt((dx * dx) + (dy * dy));
+
+          const float depthW = camera.viewport.ProjectViewportWidthRow2(targetPos);
+          float worldTolerance = 1.0f / depthW;
+          worldTolerance = std::clamp(worldTolerance, ui_MinWaypointSize, ui_MaxWaypointSize);
+
+          const float scaledTolerance = worldTolerance * depthW;
+          const float scaledDistance = depthW * pixelDistance;
+
+          if ((ui_WaypointLineScale * scaledTolerance) < scaledDistance) {
+            continue;
+          }
+
+          if (bestScaledDistance > scaledDistance) {
+            bestScaledDistance = scaledDistance;
+            bestCommandId = order.nextCommandId;
+          }
+        }
       }
     }
 
@@ -1918,6 +1993,7 @@ namespace moho
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/false);
       }
     }
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/false);
     batcher.Flush();
 
     // Pass B: glow overlay for the same orderlines.
@@ -1932,6 +2008,7 @@ namespace moho
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/true);
       }
     }
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/true);
     batcher.Flush();
 
     // Pass C: waypoint marker billboards.
@@ -1939,6 +2016,7 @@ namespace moho
     for (auto& entry : mMapAB0) {
       DrawWaypointMarker(camera, batcher, entry.second);
     }
+    DrawPreOrderWaypointMarkers(camera, batcher);
     batcher.Flush();
 
     // Pass D: position-node meshes/skirts, over a flat white texture.
@@ -1947,6 +2025,7 @@ namespace moho
     for (auto& entry : mMapAB0) {
       DrawPositionNodeMesh(entry.second, batcher);
     }
+    DrawPreOrderSkirts(camera, batcher);
     batcher.Flush();
 
     // Pass E: optional path-preview overlay, then switch to a screen-space
@@ -2253,7 +2332,8 @@ namespace moho
     CWldSession* const session
   )
     : mNeedsRebuild(1u)
-    , pad_0001{0, 0, 0}
+    , mPreOrdersOnly(0u)
+    , pad_0002{0, 0}
     , mNodes{}
     , mSession(session)
     , mSessionRes1(session ? session->mCommandManager : nullptr)
@@ -2285,9 +2365,38 @@ namespace moho
   /**
    * Address: 0x00824B80 (FUN_00824B80, ??1UICommandGraph@Moho@@QAE@XZ) cleanup chain.
    */
+  UICommandGraph::UICommandGraph(
+    CWldSession* const session,
+    PreOrdersOnlyTag
+  )
+    : mNeedsRebuild(0u)
+    , mPreOrdersOnly(1u)
+    , pad_0002{0, 0}
+    , mNodes{}
+    , mSession(session)
+    , mSessionRes1(session ? session->mCommandManager : nullptr)
+    , mDebugFont()
+    , mMapAB0{}
+    , mMapAB1{}
+    , mMapC{}
+    , mMapD{}
+    , mCommandGraphTree{}
+  {
+    InitTree(mCommandGraphTree);
+    try {
+      LoadWaypointParams();
+    } catch (...) {
+      DestroyTree(mCommandGraphTree);
+      throw;
+    }
+  }
+
   UICommandGraph::~UICommandGraph()
   {
-    OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
+    ClearPreOrderGhostMeshes();
+    if (mPreOrdersOnly == 0u) {
+      OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
+    }
     DestroyTree(mCommandGraphTree);
   }
   namespace
@@ -2942,6 +3051,503 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    // Engine addition (`ui_TransportPreOrders`): ghost meshes of pre-ordered buildings, keyed by command id.
+    std::unordered_map<std::uint64_t, std::shared_ptr<MeshInstance>> sPreOrderGhostMeshes;
+
+    [[nodiscard]] std::unordered_map<std::int32_t, std::uint32_t> BuildPreOrderCommandUnitCounts()
+    {
+      std::unordered_map<std::int32_t, std::uint32_t> counts;
+      for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+        for (const SSTICommandIssueData& order : entry.second) {
+          if (order.nextCommandId > 0) {
+            ++counts[order.nextCommandId];
+          }
+        }
+      }
+      return counts;
+    }
+
+    [[nodiscard]] Wm3::Vector3f ResolvePreOrderStartPosition(
+      const UserEntity& entity,
+      UserUnit& unit
+    )
+    {
+      if (unit.HasSelectionBracketPositionOverride()) {
+        return unit.GetSelectionBracketPositionOverride();
+      }
+      if (UserEntity* const parent = unit.GetAttachmentParent(); parent != nullptr) {
+        if (UserUnit* const transport = parent->IsUserUnit(); transport != nullptr) {
+          if (
+            const UserCommandIssueHelper* const anchorHelper = GetLastQueuedUserCommandAnchor(transport);
+            anchorHelper != nullptr
+          ) {
+            return ResolveCommandGraphAnchorWorldPosition(const_cast<UserCommandIssueHelper&>(*anchorHelper));
+          }
+        }
+      }
+      return entity.mVariableData.mCurTransform.pos_;
+    }
+
+    template <typename WidthMapT>
+    [[nodiscard]] float ResolvePreOrderLineBaseWidth(
+      WidthMapT& widthCache,
+      const std::uint32_t touchCount
+    )
+    {
+      const std::uint32_t clampedCount = touchCount > 0u ? touchCount : 1u;
+      const auto cached = widthCache.find(clampedCount);
+      if (cached != widthCache.end()) {
+        return cached->second;
+      }
+
+      float width = 1.0f;
+      if (g_UIManager != nullptr && g_UIManager->mLuaState != nullptr) {
+        const LuaPlus::LuaObject waypointModule =
+          SCR_Import(g_UIManager->mLuaState, "/lua/ui/game/commandwaypoint.lua");
+        if (!waypointModule.IsNil()) {
+          LuaPlus::LuaFunction<float> calculateWaypointLineWidth{waypointModule["CalculateWaypointLineWidth"]};
+          width = calculateWaypointLineWidth(clampedCount);
+          widthCache.insert(std::make_pair(clampedCount, width));
+        }
+      }
+      return width;
+    }
+  } // namespace
+
+  void UICommandGraph::ClearPreOrderGhostMeshes()
+  {
+    sPreOrderGhostMeshes.clear();
+  }
+
+  void UICommandGraph::DrawPreOrderLines(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction,
+    const bool isGlow
+  )
+  {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      return;
+    }
+
+    const std::unordered_map<std::int32_t, std::uint32_t> commandUnitCounts = BuildPreOrderCommandUnitCounts();
+    const CmdId hoveredCommandId = (mSession != nullptr) ? mSession->GetCursorInfo().mIsDragger : -1;
+    std::unordered_set<std::uint64_t> drawnChainEdges;
+
+    for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+      const auto& orders = entry.second;
+      if (orders.empty()) {
+        continue;
+      }
+      UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+      if (entity == nullptr) {
+        continue;
+      }
+      UserUnit* const unit = entity->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+      const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+      if (!isSelected && !shiftDown) {
+        continue;
+      }
+
+      Wm3::Vector3f prevPos = ResolvePreOrderStartPosition(*entity, *unit);
+      std::int32_t prevCommandId = -1;
+
+      for (std::size_t orderIndex = 0; orderIndex < orders.size(); ++orderIndex) {
+        const SSTICommandIssueData& order = orders[orderIndex];
+        const auto commandType = order.mCommandType;
+        if (static_cast<std::size_t>(commandType) >= std::size(mNodes)) {
+          continue;
+        }
+        const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
+
+        Wm3::Vector3f targetPos = order.mTarget.mPos;
+        if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+          if (UserEntity* const targetEnt = mSession->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
+            const UserUnit* const targetUnit = targetEnt->IsUserUnit();
+            if (targetUnit != nullptr && targetUnit->HasSelectionBracketPositionOverride()) {
+              targetPos = targetUnit->GetSelectionBracketPositionOverride();
+            } else {
+              targetPos = targetEnt->mVariableData.mCurTransform.pos_;
+            }
+          }
+        }
+
+        // Deduplicate shared chain segments (orderIndex > 0) across squad cargo units
+        // while keeping each unit's own first segment from its hologram to orders[0].
+        if (orderIndex > 0 && prevCommandId > 0 && order.nextCommandId > 0) {
+          const std::uint64_t edgeKey = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(prevCommandId)) << 32) |
+            static_cast<std::uint32_t>(order.nextCommandId);
+          if (!drawnChainEdges.insert(edgeKey).second) {
+            prevPos = targetPos;
+            prevCommandId = order.nextCommandId;
+            continue;
+          }
+        }
+
+        const float segmentLength = std::sqrt(
+          ((targetPos.x - prevPos.x) * (targetPos.x - prevPos.x) +
+           (targetPos.y - prevPos.y) * (targetPos.y - prevPos.y)) +
+          (targetPos.z - prevPos.z) * (targetPos.z - prevPos.z)
+        );
+        if (segmentLength < 1e-4f) {
+          prevPos = targetPos;
+          prevCommandId = order.nextCommandId;
+          continue;
+        }
+
+        const std::shared_ptr<ID3DTextureSheet>& texture = node.mOrderlineTexture;
+        if (texture) {
+          batcher.SetTexture(texture);
+        }
+
+        const bool isHighlighted = (order.nextCommandId > 0 && order.nextCommandId == hoveredCommandId);
+        std::uint32_t color;
+        float glow;
+        if (isHighlighted) {
+          color = node.mOrderlineHighlightColor;
+          glow = node.mOrderlineHighlightGlow;
+        } else if (isSelected) {
+          color = node.mOrderlineSelectedColor;
+          glow = node.mOrderlineSelectedGlow;
+        } else {
+          color = node.mOrderlineColor;
+          glow = node.mOrderlineGlow;
+        }
+        if (isGlow) {
+          color = (color & 0x00FFFFFFu) | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(glow * 255.0f)) << 24);
+        }
+
+        std::uint32_t touchCount = 1u;
+        if (orderIndex > 0 && order.nextCommandId > 0) {
+          if (const auto countIt = commandUnitCounts.find(order.nextCommandId); countIt != commandUnitCounts.end()) {
+            touchCount = countIt->second;
+          }
+        }
+        const float baseWidth = ResolvePreOrderLineBaseWidth(mMapD, touchCount);
+        const float widthFromDepth = camera.viewport.ProjectViewportWidthRow2(prevPos) * 2.0f;
+        const float widthToDepth = camera.viewport.ProjectViewportWidthRow2(targetPos) * 2.0f;
+        const float width = (baseWidth + std::max(widthFromDepth, widthToDepth)) * ui_WaypointLineScale;
+
+        Wm3::Vector3f direction{targetPos.x - prevPos.x, targetPos.y - prevPos.y, targetPos.z - prevPos.z};
+        direction.Normalize();
+
+        const float smoothRadius = std::min(segmentLength * 0.25f, ui_CurveSmoothness * width);
+
+        const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+
+        EmitHermiteRibbonSegments(
+          batcher,
+          prevPos,
+          targetPos,
+          Wm3::Vector3f{direction.x * smoothRadius, direction.y * smoothRadius, direction.z * smoothRadius},
+          Wm3::Vector3f{direction.x * smoothRadius, direction.y * smoothRadius, direction.z * smoothRadius},
+          width,
+          color,
+          uStart,
+          node.mOrderlineAspectRatio
+        );
+
+        prevPos = targetPos;
+        prevCommandId = order.nextCommandId;
+      }
+    }
+  }
+
+  void UICommandGraph::DrawPreOrderWaypointMarkers(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher
+  ) const
+  {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      return;
+    }
+
+    const std::unordered_map<std::int32_t, std::uint32_t> commandUnitCounts = BuildPreOrderCommandUnitCounts();
+    const CmdId hoveredCommandId = (mSession != nullptr) ? mSession->GetCursorInfo().mIsDragger : -1;
+    std::unordered_set<std::int32_t> drawnCommandIds;
+
+    for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+      const auto& orders = entry.second;
+      if (orders.empty()) {
+        continue;
+      }
+      UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+      if (entity == nullptr) {
+        continue;
+      }
+      const UserUnit* const unit = entity->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+      const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+      if (!isSelected && !shiftDown) {
+        continue;
+      }
+
+      for (const SSTICommandIssueData& order : orders) {
+        if (order.nextCommandId > 0 && !drawnCommandIds.insert(order.nextCommandId).second) {
+          continue;
+        }
+        const auto commandType = order.mCommandType;
+        if (static_cast<std::size_t>(commandType) >= std::size(mNodes)) {
+          continue;
+        }
+        const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
+
+        std::shared_ptr<CD3DBatchTexture> texture = node.mWaypointTexture;
+        if (!texture) {
+          texture = CD3DBatchTexture::FromSolidColor(0xFF30F030u);
+        }
+        batcher.SetTexture(texture);
+
+        Wm3::Vector3f targetPos = order.mTarget.mPos;
+        if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+          if (UserEntity* const targetEnt = mSession->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
+            const UserUnit* const targetUnit = targetEnt->IsUserUnit();
+            if (targetUnit != nullptr && targetUnit->HasSelectionBracketPositionOverride()) {
+              targetPos = targetUnit->GetSelectionBracketPositionOverride();
+            } else {
+              targetPos = targetEnt->mVariableData.mCurTransform.pos_;
+            }
+          }
+        }
+
+        const bool isHighlighted = (order.nextCommandId > 0 && order.nextCommandId == hoveredCommandId);
+        std::uint32_t color;
+        float styleScale;
+        if (isHighlighted) {
+          color = node.mWaypointHighlightColor;
+          styleScale = node.mWaypointHighlightScale;
+        } else if (isSelected) {
+          color = node.mWaypointSelectedColor;
+          styleScale = node.mWaypointSelectedScale;
+        } else {
+          color = node.mWaypointColor;
+          styleScale = node.mWaypointScale;
+        }
+
+        std::uint32_t touchCount = 1u;
+        if (order.nextCommandId > 0) {
+          if (const auto countIt = commandUnitCounts.find(order.nextCommandId); countIt != commandUnitCounts.end()) {
+            touchCount = countIt->second;
+          }
+        }
+        const std::uint32_t maxNodeUnits =
+          (ui_CommandGraphMaxNodeUnits > 0) ? static_cast<std::uint32_t>(ui_CommandGraphMaxNodeUnits) : 1u;
+        const float unitCountScale = std::sqrt(static_cast<float>(std::min(touchCount, maxNodeUnits)));
+
+        const float depthW = camera.viewport.ProjectViewportWidthRow2(targetPos);
+        const float screenSize =
+          std::clamp((unitCountScale * styleScale) / depthW, ui_MinWaypointSize, ui_MaxWaypointSize);
+        const float size = screenSize * depthW;
+
+        const CD3DPrimBatcher::Vertex topLeft{targetPos.x - size, targetPos.y, targetPos.z + size, color, 0.0f, 1.0f};
+        const CD3DPrimBatcher::Vertex topRight{targetPos.x - size, targetPos.y, targetPos.z - size, color, 0.0f, 0.0f};
+        const CD3DPrimBatcher::Vertex bottomRight{
+          targetPos.x + size, targetPos.y, targetPos.z - size, color, 1.0f, 0.0f
+        };
+        const CD3DPrimBatcher::Vertex bottomLeft{
+          targetPos.x + size, targetPos.y, targetPos.z + size, color, 1.0f, 1.0f
+        };
+        batcher.DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+      }
+    }
+  }
+
+  void UICommandGraph::UpdatePreOrderBuildMeshes()
+  {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      sPreOrderGhostMeshes.clear();
+      return;
+    }
+
+    if (mSession == nullptr || mSession->mRules == nullptr) {
+      return;
+    }
+
+    constexpr std::int32_t kPreviewCreateColor = static_cast<std::int32_t>(0xFF00FF00u);
+    constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0x8000D800u);
+    constexpr std::int32_t kPreviewTranslucentRed = static_cast<std::int32_t>(0x80D80000u);
+
+    const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+    std::unordered_set<std::uint64_t> activeKeys;
+
+    for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+      const auto& orders = entry.second;
+      if (orders.empty()) {
+        continue;
+      }
+      UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+      if (entity == nullptr) {
+        continue;
+      }
+      const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+      if (!isSelected && !shiftDown) {
+        continue;
+      }
+
+      for (std::size_t i = 0; i < orders.size(); ++i) {
+        const SSTICommandIssueData& order = orders[i];
+        if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+          continue;
+        }
+
+        const RUnitBlueprint* unitBlueprint = nullptr;
+        if (order.mBlueprint != nullptr) {
+          unitBlueprint = order.mBlueprint->IsUnitBlueprint();
+        }
+        if (unitBlueprint == nullptr) {
+          continue;
+        }
+
+        const std::uint64_t key = (order.nextCommandId > 0)
+          ? static_cast<std::uint64_t>(order.nextCommandId)
+          : ((static_cast<std::uint64_t>(entry.first) << 32) | static_cast<std::uint64_t>(i));
+
+        if (activeKeys.find(key) != activeKeys.end()) {
+          continue;
+        }
+        activeKeys.insert(key);
+
+        Wm3::Quatf orientation = order.mOri;
+        if (
+          std::abs(orientation.w) < 1e-4f && std::abs(orientation.x) < 1e-4f && std::abs(orientation.y) < 1e-4f &&
+          std::abs(orientation.z) < 1e-4f
+        ) {
+          orientation = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
+        }
+        const VTransform stance{order.mTarget.mPos, orientation};
+
+        const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
+        SOccupationResult buildInfo{};
+        const bool canBuild = USERUNIT_CanBeBuiltAt(
+          *mSession, unitBlueprint, buildPos, false, &buildInfo, nullptr, order.nextCommandId, order.nextCommandId
+        );
+        const std::int32_t previewColor = canBuild ? kPreviewTranslucentGreen : kPreviewTranslucentRed;
+
+        auto it = sPreOrderGhostMeshes.find(key);
+        if (it != sPreOrderGhostMeshes.end() && it->second != nullptr) {
+          it->second->color = previewColor;
+          it->second->SetStance(stance, stance);
+          it->second->Cull(false);
+          continue;
+        }
+
+        RMeshBlueprint* const meshBlueprint = mSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+        if (meshBlueprint == nullptr || meshBlueprint->mLods.begin() == meshBlueprint->mLods.end()) {
+          continue;
+        }
+
+        const float uniformScale = unitBlueprint->Display.UniformScale;
+        const Wm3::Vec3f previewScale{uniformScale, uniformScale, uniformScale};
+        const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
+
+        const std::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+          fa::string("UnitPlace"),
+          lod->mAlbedoName,
+          lod->mNormalsName,
+          lod->mSpecularName,
+          fa::string(),
+          fa::string(),
+          nullptr
+        );
+
+        MeshInstance* const meshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
+          mSession->mGameTick, kPreviewCreateColor, meshBlueprint, previewScale, false, material
+        );
+        if (meshInstance != nullptr) {
+          // Freed only while the renderer lives, as `CUIWorldMesh` does: the instance unregisters from it.
+          std::shared_ptr<MeshInstance> meshPtr(meshInstance, [](MeshInstance* const instance) {
+            if (MeshRenderer::GetInstance() != nullptr) {
+              delete instance;
+            }
+          });
+          meshPtr->color = previewColor;
+          meshPtr->SetStance(stance, stance);
+          sPreOrderGhostMeshes[key] = meshPtr;
+        }
+      }
+    }
+
+    for (auto it = sPreOrderGhostMeshes.begin(); it != sPreOrderGhostMeshes.end();) {
+      if (activeKeys.find(it->first) == activeKeys.end()) {
+        it = sPreOrderGhostMeshes.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  void UICommandGraph::DrawPreOrderSkirts(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher
+  )
+  {
+    UpdatePreOrderBuildMeshes();
+
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      return;
+    }
+
+    if (mSession == nullptr || mSession->mWldMap == nullptr || mSession->mWldMap->mTerrainRes == nullptr) {
+      return;
+    }
+
+    CHeightField* const heightField = mSession->mWldMap->mTerrainRes->GetHeightField();
+    const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+    std::unordered_set<std::int32_t> drawnSkirts;
+
+    for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+      const auto& orders = entry.second;
+      if (orders.empty()) {
+        continue;
+      }
+      UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+      if (entity == nullptr) {
+        continue;
+      }
+      const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+      if (!isSelected && !shiftDown) {
+        continue;
+      }
+
+      for (const SSTICommandIssueData& order : orders) {
+        if (order.nextCommandId > 0 && !drawnSkirts.insert(order.nextCommandId).second) {
+          continue;
+        }
+        if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile || order.mBlueprint == nullptr) {
+          continue;
+        }
+
+        const RUnitBlueprint* const unitBlueprint = order.mBlueprint->IsUnitBlueprint();
+        if (unitBlueprint == nullptr) {
+          continue;
+        }
+
+        constexpr std::uint32_t kPreviewSkirtGreen = 0xD800D800u;
+        constexpr std::uint32_t kPreviewSkirtRed = 0xD8D80000u;
+
+        const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
+        SOccupationResult buildInfo{};
+        const bool canBuild = USERUNIT_CanBeBuiltAt(
+          *mSession, unitBlueprint, buildPos, false, &buildInfo, nullptr, order.nextCommandId, order.nextCommandId
+        );
+        const std::uint32_t skirtColor = canBuild ? kPreviewSkirtGreen : kPreviewSkirtRed;
+        DrawUnitSkirt(heightField, unitBlueprint, camera, order.mTarget.mPos, mSession, &batcher, skirtColor);
+      }
+    }
+  }
+
   /**
    * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
    *
@@ -2960,5 +3566,84 @@ namespace moho
     if (const std::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
       graph->DrawCommandGraphMesh(camera, *batcher, gameTick, tickFraction);
     }
+  }
+
+  /**
+   * Engine addition (`ui_TransportPreOrders`): draws only the transport pre-orders - their order
+   * lines, waypoint markers and building skirts - with the passes and batcher states
+   * `DrawCommandGraphMesh` uses for them. The world view calls this while Shift is up and a
+   * pre-order exists, so the rest of the command graph keeps the original Shift-only behaviour.
+   */
+  void UICommandGraph::DrawPreOrderGraphOnly(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    batcher.Flush();
+    (void)batcher.Setup("TCommand");
+    batcher.SetViewProjMatrix(camera);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/false);
+    batcher.Flush();
+
+    (void)batcher.Setup("TCommandGlow");
+    batcher.SetViewProjMatrix(camera);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/true);
+    batcher.Flush();
+
+    (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
+    DrawPreOrderWaypointMarkers(camera, batcher);
+    batcher.Flush();
+
+    (void)batcher.Setup("TAlphaBlendLinearSample");
+    batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    DrawPreOrderSkirts(camera, batcher);
+    batcher.Flush();
+  }
+
+  namespace
+  {
+    // Engine addition (`ui_TransportPreOrders`): the pre-order-only graph, built on first use for the
+    // session that draws it and dropped once no pre-order is left.
+    std::shared_ptr<UICommandGraph> sPreOrderGraph;
+    CWldSession* sPreOrderGraphSession = nullptr;
+  } // namespace
+
+  void UICommandGraph::RenderPreOrdersAlone(
+    CWldSession& session,
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    if (!sPreOrderGraph || sPreOrderGraphSession != &session) {
+      sPreOrderGraph = std::make_shared<UICommandGraph>(&session, PreOrdersOnlyTag{});
+      sPreOrderGraphSession = &session;
+    }
+    sPreOrderGraph->DrawPreOrderGraphOnly(camera, batcher, tick, tickFraction);
+  }
+
+  void UICommandGraph::ReleasePreOrderGraph()
+  {
+    sPreOrderGraph.reset();
+    sPreOrderGraphSession = nullptr;
+  }
+
+  /** Engine addition (`ui_TransportPreOrders`): the transport pre-orders alone, without Shift. */
+  void CWldSession::RenderPreOrderGraph(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher* const batcher,
+    const std::int32_t gameTick,
+    const float tickFraction
+  )
+  {
+    UICommandGraph::RenderPreOrdersAlone(*this, camera, *batcher, gameTick, tickFraction);
+  }
+
+  void CWldSession::ReleasePreOrderGraph()
+  {
+    UICommandGraph::ReleasePreOrderGraph();
   }
 } // namespace moho

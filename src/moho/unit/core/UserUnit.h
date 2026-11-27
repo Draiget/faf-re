@@ -9,6 +9,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/command/UserTarget.h"
 #include "moho/command/UserCommandQueue.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
@@ -22,8 +23,10 @@
 #include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
+#include <functional>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 struct lua_State;
 
@@ -35,6 +38,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  extern bool ui_TransportPreOrders;
   struct SSTIEntityVariableData;
   enum class EUnitCommandType : std::int32_t;
   class UserEntity;
@@ -574,6 +578,77 @@ namespace moho
 
     [[nodiscard]] bool IsRepeatQueueEnabled() const;
 
+    /**
+     * Client-side transport cargo drop pre-orders.
+     * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
+     */
+    static void QueueTransportPreOrders(
+      const gpg::fastvector<UserUnit*>& units,
+      const SSTICommandIssueData& order,
+      bool clearQueue
+    );
+    void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
+    void ClearTransportPreOrders();
+    static bool RemoveTransportPreOrderById(std::int32_t commandId);
+    static bool UpdateTransportPreOrderPositionById(std::int32_t commandId, const Wm3::Vector3f& newPos);
+    [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
+    [[nodiscard]] bool HasTransportPreOrders() const;
+    [[nodiscard]] static bool HasAnyTransportPreOrders();
+    [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
+    GetAllTransportPreOrders();
+    void DispatchDisembarkedPreOrders();
+
+    /// One unit as the pre-order dispatch sees it: from the session in a game, from a table in tests.
+    struct SPreOrderUnitState
+    {
+      bool mKnown = false; // the session has this entity
+      bool mDead = false;
+      bool mAttached = false; // still carried (attachment parent set)
+      bool mSameArmy = false; // a unit of the dispatching unit's army
+    };
+    using PreOrderUnitLookup = std::function<SPreOrderUnitState(std::uint32_t entityId)>;
+
+    /// What one dispatch does. `mGroup` lists who gets `mOrders` as one command each, own id last.
+    struct SPreOrderDispatchPlan
+    {
+      bool mDrop = false; // no player controls the unit: its pre-orders were dropped
+      bool mWait = false; // a squad mate with the same orders, or an order's target, is still carried
+      std::vector<std::uint32_t> mGroup;
+      std::vector<SSTICommandIssueData> mOrders; // after the late-lander handover to a living builder
+    };
+
+    /**
+     * Decides a dispatch for `ownEntityId` and updates the pre-order registry the way the dispatch
+     * does (dispatched queues removed, builders recorded). `DispatchDisembarkedPreOrders` issues the
+     * plan; tests call this with their own lookup.
+     */
+    [[nodiscard]] static SPreOrderDispatchPlan PlanTransportPreOrderDispatch(
+      std::uint32_t ownEntityId,
+      bool controlledByPlayer,
+      std::int32_t gameTick,
+      const PreOrderUnitLookup& lookup
+    );
+    /// The player picked this carried unit through its drop hologram (SelectCargoUnits, a band box);
+    /// remembered until it lands, dies or the switch goes off.
+    static void MarkCargoPicked(std::uint32_t entityId);
+    [[nodiscard]] static bool IsCargoPicked(std::uint32_t entityId);
+    /// Drops every unit's pre-orders, bracket overrides and dispatch bookkeeping (the switch went off).
+    static void ClearAllTransportPreOrderState();
+    /// True when both units hold pre-orders with the same command ids in the same order; only such
+    /// units are sent their orders as one group command.
+    [[nodiscard]] static bool HaveSameTransportPreOrders(std::uint32_t lhsEntityId, std::uint32_t rhsEntityId);
+    /// True for a replicated attachment-parent id that names a parent (not 0, not the invalid sentinel).
+    [[nodiscard]] static bool IsAttachmentParentRef(std::uint32_t parentRef);
+    /// True when an entity update moves the attachment parent from a parent to none (the unit left it).
+    [[nodiscard]] static bool IsDetachTransition(std::uint32_t oldParentRef, std::uint32_t newParentRef);
+
+    void SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos);
+    void ClearSelectionBracketPositionOverride();
+    [[nodiscard]] bool HasSelectionBracketPositionOverride() const;
+    [[nodiscard]] Wm3::Vector3f GetSelectionBracketPositionOverride() const;
+    [[nodiscard]] static const std::unordered_map<std::uint32_t, Wm3::Vector3f>&
+    GetAllSelectionBracketPositionOverrides();
+
   public:
     // The three RTTI base records are real base classes: `UserEntity` is the
     // primary at +0x00 (0x148 bytes), `IUnit` the sub-object at +0x148
@@ -1111,7 +1186,9 @@ namespace moho
     const SCoordsVec2& buildPosition,
     bool allowCommandOverlap,
     SOccupationResult* buildInfo,
-    const UserCommandIssueHelper* ignoredCommand
+    const UserCommandIssueHelper* ignoredCommand = nullptr,
+    std::int32_t ignoredPreOrderId = 0,
+    std::int32_t candidateCommandId = 0
   );
 
   /**
@@ -2069,6 +2146,13 @@ namespace moho
    * Publishes the `UserUnit:GetCommandQueue()` Lua binder.
    */
   CScrLuaInitForm* func_UserUnitGetCommandQueue_LuaFuncDef();
+  int cfunc_UserUnitSetSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef();
+
+  int cfunc_UserUnitClearSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef();
 
   /**
    * Address: 0x008C5480 (FUN_008C5480, cfunc_UserUnitGetCommandQueueL)

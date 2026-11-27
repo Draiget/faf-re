@@ -42,3 +42,56 @@ if not DiskGetFileInfo('/lua/ui/game/replay_timeline.lua') then
         end
     end
 end
+
+-- ============================================================================
+-- Transport Cargo Holograms Hook
+-- ============================================================================
+
+local Holograms = nil
+local function GetHolograms()
+    if not Holograms then
+        local ok, mod = pcall(import, '/fafengine/modules/lua/ui/game/transport_holograms.lua')
+        if ok and type(mod) == 'table' then
+            Holograms = mod
+        end
+    end
+    return Holograms
+end
+
+local function OnHologramBeat()
+    local holo = GetHolograms()
+    if holo then
+        local updateFn = rawget(holo, 'Update')
+        if updateFn then
+            pcall(updateFn)
+        end
+    end
+end
+
+local oldCreateUI = CreateUI
+function CreateUI(isReplay)
+    if oldCreateUI then oldCreateUI(isReplay) end
+    if AddBeatFunction then
+        AddBeatFunction(OnHologramBeat)
+    elseif rawget(_G, 'AddBeatFunction') then
+        rawget(_G, 'AddBeatFunction')(OnHologramBeat)
+    end
+end
+
+local oldOnSelectionChanged = OnSelectionChanged
+function OnSelectionChanged(oldSelection, newSelection, added, removed)
+    if newSelection and table.getn(newSelection) > 0 then
+        local holo = GetHolograms()
+        local regFn = holo and rawget(holo, 'RegisterTransport')
+        if regFn then
+            for _, u in ipairs(newSelection) do
+                if u and u.IsInCategory and u:IsInCategory('TRANSPORTATION') then
+                    pcall(regFn, u)
+                end
+            end
+        end
+    end
+    if oldOnSelectionChanged then
+        oldOnSelectionChanged(oldSelection, newSelection, added, removed)
+    end
+end

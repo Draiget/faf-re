@@ -604,7 +604,17 @@ namespace moho
     [[maybe_unused]] const float frameSeconds
   )
   {
-    if (!mIsMiniMap && MAUI_KeyIsDown(MKEY_SHIFT)) {
+    const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+    // Engine addition (`ui_TransportPreOrders`): with Shift up, pending transport pre-orders are
+    // drawn by a graph of their own; the session's command graph stays Shift-only, as retail.
+    const bool hasPreOrders = UserUnit::HasAnyTransportPreOrders();
+    if (!mIsMiniMap && !shiftDown && hasPreOrders) {
+      mWldSession->RenderPreOrderGraph(mCamera->CameraGetView(), batcher, gameTick, tickFraction);
+    } else if (!hasPreOrders) {
+      CWldSession::ReleasePreOrderGraph();
+    }
+
+    if (!mIsMiniMap && shiftDown) {
       if (!mComGraph) {
         mComGraph = mWldSession->GetCommandGraph(/*allowCreate=*/true);
       }

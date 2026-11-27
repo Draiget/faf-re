@@ -314,7 +314,13 @@ namespace moho
     // 0x007FC8CE: dispatched through vtable slot 2, the *const* `IsUserUnit`
     // overload, so the lookup goes through a const view of the entity.
     const UserEntity& constEntity = *entity;
+    bool hasPositionOverride = false;
+    Wm3::Vector3f overridePosition{0.0f, 0.0f, 0.0f};
     if (const UserUnit* const unit = constEntity.IsUserUnit(); unit != nullptr) {
+      if (unit->HasSelectionBracketPositionOverride()) {
+        hasPositionOverride = true;
+        overridePosition = unit->GetSelectionBracketPositionOverride();
+      }
       const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
 
       if (blueprint->mSelectionSizeX > 0.0f) {
@@ -353,10 +359,20 @@ namespace moho
 
     // 0x007FCBB5..0x007FCC25: the on-screen size floor. The denominator is
     // built from the entity's *current* transform, not the interpolated one.
-    const float viewportPixelScale =
-      ProjectViewportPixelScaleRow(camera->viewport, entity->mVariableData.mCurTransform.pos_);
+    const float viewportPixelScale = ProjectViewportPixelScaleRow(
+      camera->viewport, hasPositionOverride ? overridePosition : entity->mVariableData.mCurTransform.pos_
+    );
     if (ren_SelectBracketMinPixelSize > ((maxSelectionSize * bracketThickness) / viewportPixelScale)) {
       bracketThickness = (ren_SelectBracketMinPixelSize * viewportPixelScale) / maxSelectionSize;
+    }
+
+    if (hasPositionOverride) {
+      if (selectionSizeX <= 0.0f) {
+        selectionSizeX = 1.0f;
+      }
+      if (selectionSizeZ <= 0.0f) {
+        selectionSizeZ = 1.0f;
+      }
     }
 
     // 0x007FCC2B..0x007FCCC7: flatten the box onto the ground plane at the
@@ -364,10 +380,18 @@ namespace moho
     selectionBox.Extent[0] = selectionSizeX;
     selectionBox.Extent[1] = 0.0f;
     selectionBox.Extent[2] = selectionSizeZ;
-    selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
-    selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y + ren_SelectionHeightFudge +
-      selectionCenterOffset.y;
-    selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
+    if (hasPositionOverride) {
+      selectionBox.Axis[0] = Wm3::Vector3f{1.0f, 0.0f, 0.0f};
+      selectionBox.Axis[1] = Wm3::Vector3f{0.0f, 1.0f, 0.0f};
+      selectionBox.Axis[2] = Wm3::Vector3f{0.0f, 0.0f, 1.0f};
+      selectionBox.Center = overridePosition;
+      selectionBox.Center.y += ren_SelectionHeightFudge;
+    } else {
+      selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
+      selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y +
+        ren_SelectionHeightFudge + selectionCenterOffset.y;
+      selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
+    }
 
     Wm3::Vector3f boxVertices[8]{};
     selectionBox.ComputeVertices(boxVertices);
@@ -386,7 +410,9 @@ namespace moho
       {negativeExtent, flatExtent, positiveExtent},
     };
 
-    const Wm3::Quaternionf& orientation = entity->mVariableData.mCurTransform.orient_;
+    static const Wm3::Quaternionf sIdentityQuaternion = Wm3::Quaternionf::Identity();
+    const Wm3::Quaternionf& orientation =
+      hasPositionOverride ? sIdentityQuaternion : entity->mVariableData.mCurTransform.orient_;
     Wm3::Vector3f tileCornerOffsets[4]{};
     for (std::size_t corner = 0; corner < 4u; ++corner) {
       (void)MultQuadVec(&tileCornerOffsets[corner], &localTileCorners[corner], &orientation);

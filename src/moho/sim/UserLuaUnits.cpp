@@ -1,4 +1,5 @@
 #include "moho/lua/ScrLuaUserData.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/sim/UserLuaPrivate.h"
 #include <utility>
 
@@ -1876,7 +1877,14 @@ int moho::cfunc_SelectUnitsL(
       }
 
       UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
-      if (userEntity != nullptr && userEntity->IsSelectable()) {
+      // Engine addition (`ui_TransportPreOrders`): a carried unit the player picked through its drop
+      // hologram stays selected, so FAF's UI restoring a saved selection keeps it. Any other carried
+      // unit - a control group recalled, a selection hotkey - selects its transport, as retail.
+      const bool preserveAttachedCargo = moho::ui_TransportPreOrders && userEntity != nullptr &&
+        userEntity->mArmy == session->GetFocusUserArmy() &&
+        ResolveSelectableTransportAttachmentParent(userUnit) != nullptr &&
+        UserUnit::IsCargoPicked(static_cast<std::uint32_t>(userEntity->mParams.mEntityId));
+      if ((userEntity != nullptr && userEntity->IsSelectable()) || preserveAttachedCargo) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (
         UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);
@@ -1889,6 +1897,83 @@ int moho::cfunc_SelectUnitsL(
 
   session->SetSelectionUnits(selectionUnits);
   return 0;
+}
+
+constexpr const char* kSelectCargoUnitsHelpText = "SelectCargoUnits(unitList, [addToCurSel])";
+
+int moho::cfunc_SelectCargoUnitsL(
+  LuaPlus::LuaState* const state
+)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return 0;
+  }
+
+  const int argCount = lua_gettop(state->m_state);
+  if (argCount < 1 || argCount > 2) {
+    moho::SCR_ExpectExactArgs(state, 1, kSelectCargoUnitsHelpText);
+    return 0;
+  }
+
+  const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
+  const bool addToCurSel = (argCount >= 2) ? LuaPlus::LuaStackObject(state, 2).GetBoolean() : false;
+
+  fa::vector<UserUnit*> selectionUnits{};
+  if (addToCurSel) {
+    session->GetSelectionUnits(selectionUnits);
+  }
+
+  auto addUnit = [&](UserUnit* const userUnit) {
+    if (userUnit == nullptr)
+      return;
+    IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+    if (!iunitBridge || iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
+      return;
+    }
+    UserEntity* const userEntity = userUnit;
+    if (userEntity != nullptr && userEntity->mArmy == session->GetFocusUserArmy()) {
+      AppendSelectionUnitUnique(selectionUnits, userUnit);
+      UserUnit::MarkCargoPicked(static_cast<std::uint32_t>(userEntity->mParams.mEntityId));
+    }
+  };
+
+  if (sourceUnitsObject.IsTable()) {
+    const int unitCount = sourceUnitsObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = sourceUnitsObject[unitIndex];
+      addUnit(ResolveUserUnitOptional(unitObject, state));
+    }
+  } else if (!sourceUnitsObject.IsNil()) {
+    addUnit(ResolveUserUnitOptional(sourceUnitsObject, state));
+  }
+
+  session->SetSelectionUnits(selectionUnits);
+  return 0;
+}
+
+int moho::cfunc_SelectCargoUnits(
+  lua_State* const luaContext
+)
+{
+  return cfunc_SelectCargoUnitsL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_SelectCargoUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "SelectCargoUnits",
+    &moho::cfunc_SelectCargoUnits,
+    nullptr,
+    "<global>",
+    kSelectCargoUnitsHelpText
+  );
+  return &binder;
 }
 
 /**
@@ -2097,6 +2182,9 @@ int moho::cfunc_DeleteCommandL(
 
   UserCommandIssueHelper* const commandIssue = FindCommandIssueHelper(session, commandId);
   if (!commandIssue) {
+    if (UserUnit::RemoveTransportPreOrderById(commandId)) {
+      session->DirtyCommandGraph();
+    }
     return 0;
   }
 
@@ -2162,6 +2250,12 @@ int moho::cfunc_DecreaseBuildCountInQueueL(
 
     UserCommandIssueHelper* const helper = FindCommandIssueHelper(session, commandId);
     if (helper == nullptr) {
+      if (UserUnit::RemoveTransportPreOrderById(commandId)) {
+        session->DirtyCommandGraph();
+        if (--remaining <= 0) {
+          break;
+        }
+      }
       continue;
     }
 

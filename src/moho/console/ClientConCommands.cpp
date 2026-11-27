@@ -2628,6 +2628,8 @@ namespace moho
 
   extern bool ui_ArrowKeysScrollView;
 
+  extern bool ui_TransportPreOrders;
+
   extern int ui_CommandGraphMaxNodeUnits;
 
   extern int ui_CurveSegments;
@@ -2886,6 +2888,12 @@ namespace moho
     "ui_ArrowKeysScrollView",
     kConsoleStartupUiArrowKeysScrollViewDescription,
     &moho::ui_ArrowKeysScrollView
+  );
+
+  TConVar<bool> gTConVar_ui_TransportPreOrders(
+    "ui_TransportPreOrders",
+    "Enable cargo pre-orders and drop ghosts for units inside transports",
+    &moho::ui_TransportPreOrders
   );
 
   /**

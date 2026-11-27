@@ -1017,4 +1017,27 @@ namespace moho
    * Startup thunk that forwards to `func_UIZoomTo_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UIZoomTo_LuaFuncDef();
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Publishes global Lua binder `IsTransportPreOrdersEnabled() -> bool`.
+   */
+  CScrLuaInitForm* func_IsTransportPreOrdersEnabled_LuaFuncDef();
+
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IsTransportPreOrdersEnabledL`.
+   */
+  int cfunc_IsTransportPreOrdersEnabled(lua_State* luaContext);
+
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Returns whether transport cargo pre-orders and drop ghosts are enabled.
+   */
+  int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
 } // namespace moho

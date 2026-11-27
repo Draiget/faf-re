@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/utils/Logging.h"
@@ -17,8 +18,8 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
-#include "moho/math/QuaternionMath.h"
 #include "moho/entity/Entity.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
@@ -296,6 +297,48 @@ namespace moho
     return this;
   }
 
+  std::vector<std::uint32_t> CargoHologramsInSolid(
+    const CGeomSolid3& solid
+  )
+  {
+    std::vector<std::uint32_t> entityIds;
+    if (!ui_TransportPreOrders) {
+      return entityIds;
+    }
+    for (const auto& [entityId, hologramPosition] : UserUnit::GetAllSelectionBracketPositionOverrides()) {
+      // A unit-sized sphere at the hologram, so a box edge through its middle still takes it.
+      if (solid.Intersects(Wm3::Sphere3f(hologramPosition, 1.0f))) {
+        entityIds.push_back(entityId);
+      }
+    }
+    std::sort(entityIds.begin(), entityIds.end());
+    return entityIds;
+  }
+
+  namespace
+  {
+    /// Engine addition (`ui_TransportPreOrders`): adds to `out` the focus army's living carried units
+    /// whose drop hologram lies in `solid`.
+    void AddCargoHologramUnits(
+      const CGeomSolid3& solid,
+      CWldSession& session,
+      WeakSet<UserEntity>& out
+    )
+    {
+      for (const std::uint32_t entityId : CargoHologramsInSolid(solid)) {
+        UserEntity* const entity = session.LookupEntityId(static_cast<EntId>(entityId));
+        if (
+          entity != nullptr && entity->IsUserUnit() != nullptr && entity->mVariableData.mIsDead == 0 &&
+          entity->mArmy == session.GetFocusUserArmy() &&
+          UserUnit::IsAttachmentParentRef(entity->mVariableData.mAttachmentParentRef)
+        ) {
+          (void)out.Add(entity);
+          UserUnit::MarkCargoPicked(entityId);
+        }
+      }
+    }
+  } // namespace
+
   /**
    * Address: 0x00863870 (FUN_00863870)
    *
@@ -348,6 +391,12 @@ namespace moho
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
+      // Engine addition (`ui_TransportPreOrders`): a box that takes no unit takes the cargo whose drop
+      // hologram it covers. A box with units in it - transports included - selects as retail does.
+      if (draggedSelection.Empty()) {
+        AddCargoHologramUnits(BuildSelectionSolid(), *mSess, draggedSelection);
+      }
+
       WeakSet<UserEntity> currentSelection(mSess->GetSelection());
 
       // 0x0086393D..0x00863950: every dragged entity was already selected --
@@ -418,6 +467,11 @@ namespace moho
           resultSelection.Add(bucket.begin(), bucket.end());
           break;
         }
+      }
+
+      // Engine addition (`ui_TransportPreOrders`): see the shift branch above.
+      if (resultSelection.Empty()) {
+        AddCargoHologramUnits(selectionSolid, *mSess, resultSelection);
       }
 
       mSess->SetSelection(resultSelection);

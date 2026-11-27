@@ -278,6 +278,13 @@ namespace moho
      */
     explicit UICommandGraph(CWldSession* session);
 
+    /// Engine addition (`ui_TransportPreOrders`): tag for the graph that draws transport pre-orders
+    /// alone (`RenderPreOrdersAlone`). It loads the waypoint styles only: it builds no command nodes,
+    /// no build ghosts, and never tells UI script that a command graph is shown.
+    struct PreOrdersOnlyTag
+    {};
+    UICommandGraph(CWldSession* session, PreOrdersOnlyTag);
+
     /**
      * Address: 0x00824B80 (FUN_00824B80, ??1UICommandGraph@Moho@@QAE@XZ) cleanup chain.
      */
@@ -968,6 +975,34 @@ namespace moho
      */
     void
     DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
+    void DrawPreOrderLines(
+      const GeomCamera3& camera,
+      CD3DPrimBatcher& batcher,
+      std::int32_t tick,
+      float tickFraction,
+      bool isGlow
+    );
+    void DrawPreOrderWaypointMarkers(const GeomCamera3& camera, CD3DPrimBatcher& batcher) const;
+    void UpdatePreOrderBuildMeshes();
+    void
+    DrawPreOrderGraphOnly(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
+    void DrawPreOrderSkirts(const GeomCamera3& camera, CD3DPrimBatcher& batcher);
+    static void ClearPreOrderGhostMeshes();
+
+    /**
+     * Engine addition (`ui_TransportPreOrders`): with Shift up, the world view draws pending transport
+     * pre-orders through a graph of their own that the session doesn't hold, so the session's command
+     * graph - its build ghosts, the hidden build-drag ghosts and waypoint hover - stays Shift-only, as
+     * retail. `ReleasePreOrderGraph` drops it once no pre-order is left.
+     */
+    static void RenderPreOrdersAlone(
+      CWldSession& session,
+      const GeomCamera3& camera,
+      CD3DPrimBatcher& batcher,
+      std::int32_t tick,
+      float tickFraction
+    );
+    static void ReleasePreOrderGraph();
 
     /**
      * Address: 0x00829800 (FUN_00829800, sub_829800)
@@ -1000,7 +1035,10 @@ namespace moho
 
   private:
     std::uint8_t mNeedsRebuild; // +0x0000
-    std::uint8_t pad_0001[3];
+    /// Engine addition (`ui_TransportPreOrders`), in the binary's padding: 1 on the graph built with
+    /// `PreOrdersOnlyTag`.
+    std::uint8_t mPreOrdersOnly; // +0x0001
+    std::uint8_t pad_0002[2];
     CommandGraphNode mNodes[40];        // +0x0004
     CWldSession* mSession;              // +0x0D24
     void* mSessionRes1;                 // +0x0D28

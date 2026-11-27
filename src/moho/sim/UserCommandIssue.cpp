@@ -423,6 +423,9 @@ namespace moho
   )
   {
     CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      return;
+    }
     auto* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     bool shouldRetarget = (target.targetType == UserTargetType::None);
@@ -745,6 +748,9 @@ namespace moho
   )
   {
     CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      return;
+    }
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
     CommandManager* const commandManager = session->mCommandManager;
@@ -803,11 +809,72 @@ namespace moho
       return; // No-rush rejection; the by-value `data` destructs on return.
     }
 
+    // A replay viewer can focus an army and select its units, but issues nothing: no pre-orders there.
+    const bool routePreOrders = (ui_TransportPreOrders != 0) && !session->IsReplay &&
+      (data.mCommandType != EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits) &&
+      (data.mCommandType != EUnitCommandType::UNITCOMMAND_DetachFromTransport);
+
+    gpg::fastvector<UserUnit*> simUnits{};
+    const gpg::fastvector<UserUnit*>* commandUnits = &units;
+
+    if (routePreOrders) {
+      // Engine addition: If any units are currently attached to a transport (and not PODs/Carriers),
+      // in vanilla SupCom lockstep sim (SimPrivate.h) carried units cannot receive commands.
+      // We route transport passengers into client-side pre-orders that dispatch on disembark.
+      gpg::fastvector<UserUnit*> attachedUnits{};
+      static const fa::string kTransportCategory("TRANSPORTATION");
+      static const fa::string kCarrierCategory("CARRIER");
+      static const fa::string kPodCategory("POD");
+
+      for (UserUnit* const unit : units) {
+        if (unit == nullptr) {
+          continue;
+        }
+        UserEntity* const parent = unit->GetAttachmentParent();
+        if (
+          parent != nullptr && parent->IsInCategory(kTransportCategory) && !parent->IsInCategory(kCarrierCategory) &&
+          !unit->IsInCategory(kPodCategory)
+        ) {
+          attachedUnits.push_back(unit);
+        } else {
+          simUnits.push_back(unit);
+        }
+      }
+
+      if (!attachedUnits.empty()) {
+        gpg::Logf(
+          "[TransportPreOrders] Queuing cmd=%d for %zu attached unit(s) at (%.1f, %.1f, %.1f) clear=%d",
+          static_cast<int>(data.mCommandType),
+          attachedUnits.size(),
+          data.mTarget.mPos.x,
+          data.mTarget.mPos.y,
+          data.mTarget.mPos.z,
+          clearQueue ? 1 : 0
+        );
+        // When units on the ground share the order, the cargo part gets an id of its own: with the
+        // shared id, deleting or dragging it would find the ground units' command first and never
+        // reach the pre-order.
+        SSTICommandIssueData preOrder = data;
+        if (!simUnits.empty()) {
+          preOrder.nextCommandId = 0;
+        }
+        UserUnit::QueueTransportPreOrders(attachedUnits, preOrder, clearQueue);
+      }
+
+      if (!attachedUnits.empty() && simUnits.empty()) {
+        UI_OnCommandIssued(units, data, clearQueue);
+        session->DirtyCommandGraph();
+        return;
+      }
+
+      commandUnits = &simUnits;
+    }
+
     // The driver returns the beat that acknowledges this issue. Queue edits
     // and the helper's retirement use that beat (0x008B0405/0x008B0451),
     // while the published command keeps its packed source/id identity.
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
-    func_DecodeEntIdSet(issuedEntitySet, units);
+    func_DecodeEntIdSet(issuedEntitySet, *commandUnits);
 
     const CmdId issueBeat = WLD_GetDriver()->IssueCommand(issuedEntitySet, data, clearQueue);
 
@@ -853,7 +920,7 @@ namespace moho
     // construction panel - even though this call already had the right
     // answer: the run's own log shows twenty `BuildMobile` orders issued with
     // `clear=0` while the notification said otherwise.
-    for (UserUnit* const unit : units) {
+    for (UserUnit* const unit : *commandUnits) {
       UserCommandQueue* const unitManager = unit->GetCommandQueue();
       if (unitManager == nullptr) {
         continue;

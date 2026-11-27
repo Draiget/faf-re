@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include <utility>
@@ -2815,6 +2816,36 @@ void moho::CUIWorldView::UpdateSelection(
         }
       }
     }
+
+    // Resolve hovered cargo hologram AFTER the attachmentParent->TRANSPORTATION redirect,
+    // and allow holograms on the ground to take hover priority over a transport flying overhead.
+    if (
+      (bestCandidate == nullptr || bestCandidate->IsInCategory(fa::string("TRANSPORTATION"))) &&
+      moho::ui_TransportPreOrders && mCamera != nullptr && mWldSession != nullptr
+    ) {
+      const auto& overrides = UserUnit::GetAllSelectionBracketPositionOverrides();
+      if (!overrides.empty()) {
+        const GeomCamera3& cameraView = mCamera->CameraGetView();
+        float bestHoloDistSq = 900.0f;
+        for (const auto& [entId, holoPos] : overrides) {
+          UserEntity* const candidate = mWldSession->LookupEntityId(static_cast<EntId>(entId));
+          if (candidate == nullptr || candidate->mVariableData.mIsDead != 0) {
+            continue;
+          }
+          if (candidate->mArmy != mWldSession->GetFocusUserArmy()) {
+            continue;
+          }
+          const Wm3::Vector2f projected = cameraView.Project(holoPos);
+          const float dx = projected.x - mouseScreenPos.x;
+          const float dy = projected.y - mouseScreenPos.y;
+          const float distSq = (dx * dx) + (dy * dy);
+          if (distSq < bestHoloDistSq) {
+            bestHoloDistSq = distSq;
+            bestCandidate = candidate;
+          }
+        }
+      }
+    }
   }
 
   // The rest of the frame's cursor-state update runs unconditionally,
@@ -3399,6 +3430,8 @@ bool moho::CUIWorldView::HandleEvent(
         for (UserUnit* const unit : *ResolveCommandIssueCursorEntities(*hoveredCommand)) {
           ISSUE_RemoveCommandFromUnitQueue(hoveredCommand, unit);
         }
+      } else if (UserUnit::RemoveTransportPreOrderById(cursorInfo.mIsDragger)) {
+        mWldSession->DirtyCommandGraph();
       }
     } else {
       if (mCommandData.mMode != COMMOD_None && sMouseIsScrubbing == 0u) {
