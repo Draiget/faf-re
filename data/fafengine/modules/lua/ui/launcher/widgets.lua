@@ -145,6 +145,8 @@ local kTextStyles = {
     bullet2 = { size = 13, color = C.muted, indent = 36 },
     gap = { size = 6 },
 }
+local kUnitIcon = 48 -- a 'units' block's icons, as large as the build bar's
+local kUnitCell = 84 -- an icon and the room for its name under it
 function TextView(parent)
     local view = Group(parent, 'launcher text')
     view.blocks = {}
@@ -177,6 +179,19 @@ function TextView(parent)
             end
             if block.style == 'gap' then
                 table.insert(lines, { style = 'gap', text = '', height = Scale(spec.size) })
+            elseif block.style == 'units' then
+                -- Units as the build bar shows them, as many to a line as fit: {id, name, icon} each.
+                local indent = Scale(block.indent or 18)
+                local perLine = math.max(1, math.floor((width - indent) / Scale(kUnitCell)))
+                local count = table.getn(block.units or {})
+                for first = 1, count, perLine do
+                    local units = {}
+                    for i = first, math.min(count, first + perLine - 1) do
+                        table.insert(units, block.units[i])
+                    end
+                    table.insert(lines, { style = 'units', text = '', units = units, indent = indent,
+                        height = Scale(kUnitIcon + 26) })
+                end
             else
                 local indent = Scale(spec.indent or 0)
                 local probe = Probe(block.style)
@@ -206,7 +221,7 @@ function TextView(parent)
         if not row then
             row = {}
             for style, spec in kTextStyles do
-                if style ~= 'gap' then
+                if style ~= 'gap' and style ~= 'units' then
                     local text = Theme.Text(view, '', spec.size, spec.color, spec.bold)
                     text.Left:Set(view.Left)
                     text.Top:Set(view.Top)
@@ -219,6 +234,37 @@ function TextView(parent)
             view.rows[index] = row
         end
         return row
+    end
+    -- A line's unit icons and names, kept apart from its texts (Paint hides every text of a row by walking it).
+    view.iconRows = {}
+    local function Icons(index, count)
+        local pool = view.iconRows[index]
+        if not pool then
+            pool = {}
+            view.iconRows[index] = pool
+        end
+        for i = table.getn(pool) + 1, count do
+            local cell = {}
+            cell.frame = Theme.Panel(view, 'ff08121a', C.line)
+            LayoutHelpers.SetDimensions(cell.frame, kUnitIcon + 2, kUnitIcon + 2)
+            cell.frame.Left:Set(view.Left)
+            cell.frame.Top:Set(view.Top)
+            cell.icon = Bitmap(cell.frame)
+            cell.icon:DisableHitTest()
+            LayoutHelpers.FillParentFixedBorder(cell.icon, cell.frame, 1)
+            cell.icon.Depth:Set(function() return cell.frame.Depth() + 2 end)
+            cell.name = Theme.Cell(view, 11, C.muted)
+            pool[i] = cell
+        end
+        return pool
+    end
+    local function HideIcons(index, from)
+        for i, cell in (view.iconRows[index] or {}) do
+            if i >= from then
+                Theme.SetVisible(cell.frame, false)
+                Theme.SetVisible(cell.name, false)
+            end
+        end
     end
     function view:Paint()
         if self.wrappedFor ~= self.Right() - self.Left() - Scale(14) then
@@ -250,6 +296,33 @@ function TextView(parent)
                 end
             end
             Theme.SetVisible(row.dot, line.mark and true or false)
+            if line.style == 'units' then
+                local pool = Icons(used, table.getn(line.units))
+                for i, unit in line.units do
+                    local cell = pool[i]
+                    local left = (line.indent or 0) + Scale((i - 1) * kUnitCell)
+                    cell.frame.Left:Set(function() return view.Left() + left end)
+                    cell.frame.Top:Set(function() return view.Top() + top + Scale(2) end)
+                    if cell.shownIcon ~= unit.icon then
+                        cell.shownIcon = unit.icon
+                        cell.icon:SetTexture(unit.icon)
+                    end
+                    Theme.SetText(cell.name, unit.name)
+                    -- The name under the icon, centred on it when it fits, else cut to the cell.
+                    local nameWidth = cell.name:GetStringAdvance(unit.name)
+                    local room = Scale(kUnitCell - 8)
+                    cell.name.Left:Set(function()
+                        return cell.frame.Left() + math.floor((cell.frame.Width() - math.min(nameWidth, room)) / 2)
+                    end)
+                    cell.name.Right:Set(function() return cell.name.Left() + room end)
+                    cell.name.Top:Set(function() return cell.frame.Bottom() + Scale(3) end)
+                    Theme.SetVisible(cell.frame, true)
+                    Theme.SetVisible(cell.name, true)
+                end
+                HideIcons(used, table.getn(line.units) + 1)
+            else
+                HideIcons(used, 1)
+            end
             if line.mark then
                 local markAt = line.markAt or Scale(4)
                 row.dot.Left:Set(function() return view.Left() + markAt end)
@@ -262,6 +335,7 @@ function TextView(parent)
             for _, text in self.rows[i] do
                 Theme.SetVisible(text, false)
             end
+            HideIcons(i, 1)
         end
         self.shownLines = used
         if self.mark then

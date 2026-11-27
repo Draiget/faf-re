@@ -8,8 +8,108 @@ local Widgets = import('/fafengine/modules/lua/ui/launcher/widgets.lua')
 local C = Theme.Colors
 local Scale = Theme.Scale
 
+local UIUtil = import('/lua/ui/uiutil.lua')
+
+-- Units by name, for the units a note mentions: FAF's strings name each unit as "<id>_name" (url0303_name =
+-- "Loyalist"), in English and in the player's language. Read once, when a note first needs it.
+local unitIndex = nil
+local function UnitIndex()
+    if unitIndex then
+        return unitIndex
+    end
+    unitIndex = { byName = {}, names = {} }
+    local strings = {}
+    local ok, why = pcall(doscript, '/loc/us/strings_db.lua', strings)
+    if not ok then
+        WARN('LAUNCHER: changelog: unit names unread: ' .. tostring(why))
+    end
+    local function Add(name, id)
+        -- Names of four letters and more: shorter ones are words of the notes as often as units.
+        if type(name) == 'string' and string.len(name) >= 4 and not unitIndex.byName[name] then
+            unitIndex.byName[name] = id
+            table.insert(unitIndex.names, name)
+        end
+    end
+    for key, value in strings do
+        local _, _, id = string.find(key, '^(%a%a%a%d%d%d%d)_name$')
+        if id then
+            Add(value, id)
+            Add(LOC('<LOC ' .. key .. '>' .. value), id)
+        end
+    end
+    -- Longer names first: "Submarine Hunter" before "Hunter".
+    table.sort(unitIndex.names, function(a, b) return string.len(a) > string.len(b) end)
+    return unitIndex
+end
+
+--- The build bar's icon of unit `id`, or nil when the game has none.
+local function UnitIcon(id)
+    local path = UIUtil.UIFile('/icons/units/' .. string.lower(id) .. '_icon.dds')
+    if path and DiskGetFileInfo(path) then
+        return path
+    end
+    return nil
+end
+
+--- The units `text` names (whole words, the unit's own capitals), and `markedId`'s first: {id, name, icon} each,
+--- at most eight, each once.
+local function UnitsIn(text, markedId)
+    local found = {}
+    local seen = {}
+    local function Add(id, name)
+        id = string.lower(id)
+        if seen[id] or table.getn(found) >= 8 then
+            return
+        end
+        local icon = UnitIcon(id)
+        if icon then
+            seen[id] = true
+            table.insert(found, { id = id, name = name, icon = icon })
+        end
+    end
+    if markedId then
+        -- The unit's own name from FAF's strings; the mark's text (up to a colon) for a unit they don't name (FAF's
+        -- marks are sometimes a section's title, "Interrupt Pathfinding for Engineers").
+        local name = LOC('<LOC ' .. string.lower(markedId) .. '_name>' .. markedId)
+        if name == markedId then
+            name = LOC('<LOC ' .. string.lower(markedId) .. '_desc>' .. markedId) -- "Engineer" for one with no name
+        end
+        if name == markedId then
+            name = string.gsub(text, ':.*$', '')
+        end
+        Add(markedId, name)
+    end
+    local index = UnitIndex()
+    local taken = {}
+    for _, name in index.names do
+        local from = 1
+        while true do
+            local at, to = string.find(text, name, from, true)
+            if not at then
+                break
+            end
+            local before = at > 1 and string.sub(text, at - 1, at - 1) or ' '
+            local after = string.sub(text, to + 1, to + 1)
+            local inside = false
+            for i = at, to do
+                if taken[i] then
+                    inside = true
+                end
+            end
+            if not inside and not string.find(before, '%w') and not string.find(after, '%w') then
+                for i = at, to do
+                    taken[i] = true -- "Hunter" inside "Submarine Hunter" is the longer name's
+                end
+                Add(index.byName[name], name)
+            end
+            from = to + 1
+        end
+    end
+    return found
+end
+
 --- A patch's notes as TextView blocks. FAF writes them as Markdown lines; its "{% unit X %} Name {% endunit %}"
---- marks are dropped, the name kept.
+--- marks are dropped, the name kept. Each heading, bullet or paragraph that names units is followed by their icons.
 local function Blocks(patch)
     local blocks = {}
     local paragraph = nil
@@ -26,10 +126,11 @@ local function Blocks(patch)
     end
     for _, raw in patch.description or {} do
         -- "{% unit X %} Name {% endunit %} text": the unit's name as a small heading, the text after it.
-        local _, _, unitName, afterUnit = string.find(raw, '^%s*{%%%s*unit[^%%]*%%}%s*(.-)%s*{%%%s*endunit%s*%%}%s*(.*)$')
+        local _, _, unitId, unitName, afterUnit = string.find(raw,
+            '^%s*{%%%s*unit%s*([%w_]*)%s*%%}%s*(.-)%s*{%%%s*endunit%s*%%}%s*(.*)$')
         if unitName then
             Flush()
-            table.insert(blocks, { style = 'h3', text = unitName })
+            table.insert(blocks, { style = 'h3', text = unitName, unitId = unitId ~= '' and unitId or nil })
             raw = afterUnit
         end
         local line = string.gsub(raw, '{%%%s*unit[^%%]*%%}', '')
@@ -58,7 +159,36 @@ local function Blocks(patch)
         end
     end
     Flush()
-    return blocks
+    -- The units each heading, bullet and paragraph names, as icons under it.
+    -- A unit shows once in its section (the notes under one heading), where it is first named.
+    local withUnits = {}
+    local shown = {}
+    for _, block in blocks do
+        table.insert(withUnits, block)
+        if block.style == 'h1' or block.style == 'h2' or block.style == 'h3' then
+            shown = {}
+        end
+        if block.style ~= 'gap' and block.style ~= 'h1' and block.style ~= 'h2' then
+            local ok, units = pcall(UnitsIn, block.text or '', block.unitId)
+            if ok then
+                local fresh = {}
+                for _, unit in units do
+                    if not shown[unit.id] then
+                        shown[unit.id] = true
+                        table.insert(fresh, unit)
+                    end
+                end
+                units = fresh
+            end
+            if ok and table.getn(units) > 0 then
+                table.insert(withUnits, { style = 'units', units = units,
+                    indent = (block.style == 'bullet' and 18) or (block.style == 'bullet2' and 36) or 0 })
+            elseif not ok then
+                WARN('LAUNCHER: changelog: units of a note: ' .. tostring(units))
+            end
+        end
+    end
+    return withUnits
 end
 
 function Build(launcher, page)

@@ -3468,7 +3468,33 @@ function TestWalk()
             Step('changelog: ' .. table.getn(changelog.items) .. ' versions, showing ' ..
                 tostring(changelog.shown and changelog.shown.key) .. ', ' .. table.getn(changelog.document.lines) ..
                 ' lines')
-            Wait(2)
+            -- The newest version whose notes name units: their icons under the notes.
+            for _, item in changelog.items do
+                changelog:Show(item)
+                local icons, ids = 0, {}
+                for _, line in changelog.document.lines do
+                    for _, unit in (line.units or {}) do
+                        icons = icons + 1
+                        if table.getn(ids) < 8 then
+                            table.insert(ids, unit.id .. ' ' .. unit.name)
+                        end
+                    end
+                end
+                if icons > 0 then
+                    -- Scrolled to the line with the most icons, a few lines above it.
+                    local best, most = 1, 0
+                    for index, line in changelog.document.lines do
+                        if table.getn(line.units or {}) > most then
+                            best, most = index, table.getn(line.units)
+                        end
+                    end
+                    changelog.document.top = math.max(1, best - 4)
+                    changelog.document:Paint()
+                    Step('changelog: version ' .. item.key .. ' shows ' .. icons .. ' unit icons: ' .. table.concat(ids, ', '))
+                    break
+                end
+            end
+            Wait(3)
             current:ShowPage('online')
         end
         Wait(1)
