@@ -19,6 +19,7 @@ namespace faf::online
     std::string map;    ///< a map's display name or folder, anywhere in it
     std::string title;  ///< the game's title, anywhere in it
     std::string featuredMod;
+    std::string id; ///< one game, by its id (a FAF replay's uid)
     bool ratedOnly = false;
     int page = 1;      ///< from 1
     int pageSize = 30; ///< 1 to 100 (the API caps at 100)
@@ -31,6 +32,8 @@ namespace faf::online
     std::string faction; ///< as the API names it, or its number
     int rating = 0;      ///< mean - 3 deviations before the game, 0 when unknown
     bool rated = false;  ///< a rating before the game was known
+    int ratingAfter = 0; ///< the same after the game, when the leaderboard's journal has it
+    bool changed = false; ///< ratingAfter is known
     std::string result;
     double score = 0;
   };
@@ -43,6 +46,8 @@ namespace faf::online
     std::string mapName;
     std::string featuredMod;
     std::string startTime; ///< as the API writes it (ISO 8601)
+    std::string endTime;
+    double wallSeconds = 0; ///< from start to end as the clock on the wall went (0 when unknown)
     double seconds = 0;    ///< game length from the replay's ticks
     bool replayAvailable = false;
     std::string validity;
@@ -104,6 +109,10 @@ namespace faf::online
   /** A /data/mod answer read into rows; the error when it isn't one. */
   [[nodiscard]] std::expected<std::vector<VaultMod>, std::string>
   ReadModPage(const std::string& body, VaultPage* page = nullptr);
+
+  /** An ISO 8601 UTC time as FAF's API writes it ("2026-11-27T10:05:00Z") in seconds since 1970; 0 when it isn't one.
+   */
+  [[nodiscard]] double IsoSeconds(const std::string& text);
 
   /** Text as it may go into an RSQL value: the characters that would end or widen it ("\*;(),') taken out. */
   [[nodiscard]] std::string RsqlSafe(const std::string& text);

@@ -197,7 +197,8 @@ namespace faf::online
   } // namespace
 
   std::expected<GameReplaySummary, std::string> ReadGameReplaySummary(
-    const std::string& stream
+    const std::string& stream,
+    const bool countBeats
   )
   {
     const auto refuse = [] {
@@ -259,6 +260,45 @@ namespace faf::online
       summary.players.push_back(stream.substr(at, end - at));
       at = end + 1 + 4; // the name, then its timeout count
     }
+    if (!countBeats) {
+      return summary;
+    }
+    // Then the cheats flag, the armies (each a sized block and its unit sources up to 0xFF), the random seed, and the
+    // command stream: [type][size, 16 bits][payload], an advance (type 0) carrying its beat count.
+    if (at + 2 > stream.size()) {
+      return summary;
+    }
+    const unsigned char armies = static_cast<unsigned char>(stream[at + 1]);
+    at += 2;
+    for (unsigned i = 0; i < armies; ++i) {
+      std::int32_t size = 0;
+      if (!ReadInt32(stream, at, size) || size < 0 || at + static_cast<std::size_t>(size) > stream.size()) {
+        return summary;
+      }
+      at += static_cast<std::size_t>(size);
+      const std::size_t end = stream.find('\xff', at);
+      if (end == std::string::npos) {
+        return summary;
+      }
+      at = end + 1;
+    }
+    at += 4;
+    long long beats = 0;
+    while (at + 3 <= stream.size()) {
+      const unsigned char type = static_cast<unsigned char>(stream[at]);
+      const std::size_t size = static_cast<unsigned char>(stream[at + 1]) |
+        (static_cast<std::size_t>(static_cast<unsigned char>(stream[at + 2])) << 8);
+      if (size < 3 || at + size > stream.size()) {
+        break; // a cut file: the beats so far
+      }
+      if (type == 0 && size >= 7) {
+        std::int32_t advance = 0;
+        std::memcpy(&advance, stream.data() + at + 3, 4);
+        beats += advance;
+      }
+      at += size;
+    }
+    summary.beats = beats;
     return summary;
   }
 

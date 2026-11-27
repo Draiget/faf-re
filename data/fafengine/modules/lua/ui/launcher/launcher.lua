@@ -2738,7 +2738,14 @@ function TestWalk()
                     end
                 end
             end
+            -- The first FAF replay (its teams, and its ratings and results from the vault by its game id).
             local first = replays.localList.items[1]
+            for _, item in replays.localList.items do
+                if string.find(string.lower(item.file), '%.fafreplay$') then
+                    first = item
+                    break
+                end
+            end
             if first then
                 replays.localList.selectedKey = first.key
                 replays.selected = first
@@ -2746,6 +2753,16 @@ function TestWalk()
                 local info = replays:Info(first)
                 Step('first replay: ' .. tostring(first.file) .. ', map ' .. tostring(info and info.map) .. ', ' ..
                     table.getn(info and info.players or {}) .. ' players')
+                for i = 1, 20 do
+                    if not replays.lookupJob then
+                        break
+                    end
+                    Wait(0.5)
+                end
+                replays:ShowDetails()
+                Step('local replay details: ' .. replays:TeamsText(first) .. ', game time ' ..
+                    tostring(replays:GameLength(first.path)))
+                Wait(1)
             end
             Wait(2)
             replays:SetTab('vault')
@@ -2757,6 +2774,12 @@ function TestWalk()
             end
             Step('replay vault: ' .. table.getn(replays.vaultItems) .. ' games, page ' .. replays.vaultPage .. ' of ' ..
                 replays.vaultPages .. (replays.status ~= '' and (', ' .. replays.status) or ''))
+            if replays.vaultItems[1] then
+                replays.vaultList.selectedKey = replays.vaultItems[1].key
+                replays.selected = replays.vaultItems[1]
+                replays:ShowDetails()
+                Step('vault game details shown')
+            end
             Wait(2)
             -- /launcherreplaywatch: Watch on the vault's first game: it downloads, then the replay starts.
             local watchTest = GetCommandLineArg('/launcherreplaywatch', 0)

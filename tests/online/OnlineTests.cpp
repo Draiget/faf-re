@@ -1081,6 +1081,12 @@ TEST(
   EXPECT_EQ(game.players[0].team, 2);
   EXPECT_EQ(game.players[0].rating, 1300); // the journal: 1600 - 3 * 100
   EXPECT_EQ(game.players[1].rating, 900);  // the stat's own: 1500 - 3 * 200
+  EXPECT_TRUE(game.players[0].changed);
+  EXPECT_EQ(game.players[0].ratingAfter, 1321); // the journal after the game: 1615 - 3 * 98
+  EXPECT_FALSE(game.players[1].changed);
+  EXPECT_NEAR(game.wallSeconds, 1800.0, 0.5); // 12:00 to 12:30
+  EXPECT_NEAR(faf::online::IsoSeconds("1970-01-02T00:00:10Z"), 86410.0, 0.5);
+  EXPECT_EQ(faf::online::IsoSeconds("not a time"), 0.0);
   EXPECT_EQ(game.players[1].faction, "CYBRAN");
   EXPECT_EQ(page.totalPages, 7);
   EXPECT_EQ(page.totalRecords, 201);

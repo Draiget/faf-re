@@ -3,7 +3,9 @@
 #include "online/FafVault.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <sstream>
@@ -180,6 +182,27 @@ namespace faf::online
     }
   } // namespace
 
+  double IsoSeconds(
+    const std::string& text
+  )
+  {
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    if (
+      std::sscanf(text.c_str(), "%d-%d-%dT%d:%d:%d", &year, &month, &day, &hour, &minute, &second) < 6 || month < 1 ||
+      month > 12 || day < 1 || day > 31
+    ) {
+      return 0;
+    }
+    const std::chrono::sys_days date = std::chrono::year(year) / std::chrono::month(static_cast<unsigned>(month)) /
+      std::chrono::day(static_cast<unsigned>(day));
+    return static_cast<double>(date.time_since_epoch().count()) * 86400.0 + hour * 3600 + minute * 60 + second;
+  }
+
   std::string RsqlSafe(
     const std::string& text
   )
@@ -210,6 +233,11 @@ namespace faf::online
     }
     if (const std::string title = RsqlSafe(query.title); !title.empty()) {
       clauses.push_back("name==\"*" + title + "*\"");
+    }
+    if (
+      const std::string id = RsqlSafe(query.id); !id.empty() && id.find_first_not_of("0123456789") == std::string::npos
+    ) {
+      clauses.push_back("id==\"" + id + "\"");
     }
     if (const std::string mod = RsqlSafe(query.featuredMod); !mod.empty()) {
       clauses.push_back("featuredMod.technicalName==\"" + mod + "\"");
@@ -247,6 +275,10 @@ namespace faf::online
       row.id = game.String("id");
       row.title = attributes.String("name");
       row.startTime = attributes.String("startTime");
+      row.endTime = attributes.String("endTime");
+      if (const double start = IsoSeconds(row.startTime), end = IsoSeconds(row.endTime); start > 0 && end > start) {
+        row.wallSeconds = end - start;
+      }
       row.seconds = NumberOf(attributes, "replayTicks", 0) / 10.0;
       row.replayAvailable = attributes.Bool("replayAvailable");
       row.validity = attributes.String("validity");
@@ -288,6 +320,12 @@ namespace faf::online
             mean = NumberOf(journal, "meanBefore", 0);
             deviation = NumberOf(journal, "deviationBefore", 0);
             known = true;
+            if (HasNumber(journal, "meanAfter")) {
+              player.ratingAfter = static_cast<int>(
+                std::trunc(NumberOf(journal, "meanAfter", 0) - 3.0 * NumberOf(journal, "deviationAfter", 0))
+              );
+              player.changed = true;
+            }
             break;
           }
         }

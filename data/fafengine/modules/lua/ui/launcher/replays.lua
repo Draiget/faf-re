@@ -43,6 +43,69 @@ end
 
 local kSourceNames = { game = 'This game', faf = 'FAF client', downloads = 'Downloaded' }
 
+--- Players grouped by team, in team order: {team, won, avg, players = {name, rating, rated, change, changed, won}}.
+--- Team 1 (or none) is "no team": everyone for themselves.
+local function Teams(players)
+    local byTeam, order = {}, {}
+    for _, player in players or {} do
+        local key = player.team or 0
+        if not byTeam[key] then
+            byTeam[key] = { team = key, won = false, players = {}, total = 0, rated = 0 }
+            table.insert(order, key)
+        end
+        local team = byTeam[key]
+        local won = player.result == 'VICTORY'
+        team.won = team.won or won
+        table.insert(team.players, { name = player.name or '', rating = player.rating or 0, rated = player.rated,
+            change = (player.ratingAfter or 0) - (player.rating or 0), changed = player.changed, won = won })
+        if player.rated then
+            team.total = team.total + player.rating
+            team.rated = team.rated + 1
+        end
+    end
+    table.sort(order)
+    local teams = {}
+    for _, key in order do
+        local team = byTeam[key]
+        team.avg = team.rated > 0 and math.floor(team.total / team.rated + 0.5) or nil
+        table.insert(teams, team)
+    end
+    return teams
+end
+
+--- A head's teams ({["2"] = {logins}}) as players for Teams.
+local function HeadPlayers(info)
+    local players = {}
+    for _, player in info and info.players or {} do
+        table.insert(players, { name = player.name, team = player.team })
+    end
+    return players
+end
+
+--- One line for a list: "a, b (won) vs c, d".
+local function TeamsText(teams)
+    local parts = {}
+    for _, team in teams do
+        local names = {}
+        for _, player in team.players do
+            table.insert(names, player.name)
+        end
+        table.insert(parts, table.concat(names, ', ') .. (team.won and ' (won)' or ''))
+    end
+    return table.concat(parts, '  vs  ')
+end
+
+local function AverageRating(players)
+    local total, count = 0, 0
+    for _, player in players or {} do
+        if player.rated then
+            total = total + player.rating
+            count = count + 1
+        end
+    end
+    return count > 0 and math.floor(total / count + 0.5) or nil
+end
+
 --- The page. Returns its view; view:Refresh() runs while the page shows.
 function Build(launcher, page)
     local view = { tab = 'local', infos = {}, vaultItems = {}, vaultPage = 1, vaultPages = 0, vaultTotal = 0,
@@ -127,18 +190,19 @@ function Build(launcher, page)
         end
     end
     view.localList = Widgets.VirtualList(listArea, {
-        { 'Title', 0.38, function(item) return view:Title(item) end },
-        { 'Map', 0.24, function(item) return view:MapText(item) end, C.muted },
-        { 'Players', 0.14, function(item) return view:PlayerCount(item) end, C.muted },
-        { 'Date', 0.24, function(item) return item.when end, C.subtle },
+        { 'Title', 0.24, function(item) return view:Title(item) end },
+        { 'Map', 0.19, function(item) return view:MapText(item) end, C.muted },
+        { 'Teams', 0.36, function(item) return view:TeamsText(item) end, C.muted },
+        { 'Date', 0.21, function(item) return item.when end, C.subtle },
     }, Pick)
     LayoutHelpers.FillParent(view.localList, listArea)
     view.vaultList = Widgets.VirtualList(listArea, {
-        { 'Title', 0.34, function(item) return item.title end },
-        { 'Map', 0.24, function(item) return item.mapName end, C.muted },
-        { 'Players', 0.10, function(item) return tostring(table.getn(item.players)) end, C.muted },
+        { 'Title', 0.18, function(item) return item.title end },
+        { 'Map', 0.14, function(item) return item.mapName end, C.muted },
+        { 'Teams', 0.30, function(item) return TeamsText(Teams(item.players)) end, C.muted },
+        { 'Avg', 0.09, function(item) return tostring(AverageRating(item.players) or '') end, C.gold },
         { 'Length', 0.10, function(item) return Length(item.seconds) end, C.muted },
-        { 'Date', 0.22, function(item) return item.when end, C.subtle },
+        { 'Date', 0.19, function(item) return item.when end, C.subtle },
     }, Pick)
     LayoutHelpers.FillParent(view.vaultList, listArea)
     view.empty = Theme.Text(listArea, '', 14, C.subtle)
@@ -183,10 +247,87 @@ function Build(launcher, page)
     view.detailLines.Left:Set(textLeft)
     view.detailLines.Right:Set(textRight)
     view.detailLines.Top:Set(function() return view.detailTitle.Bottom() + Scale(6) end)
-    view.teams = Theme.Paragraph(details, 13, C.text)
-    view.teams.Left:Set(function() return details.Left() + Scale(18) end)
-    view.teams.Right:Set(textRight)
-    view.teams.Top:Set(function() return math.max(frame.Bottom(), view.detailLines.Bottom()) + Scale(18) end)
+    -- The teams: a heading per team (winner, average rating), then each player with the rating before the game and
+    -- what the game changed it by. Rows made as needed and kept.
+    local teamArea = Group(details)
+    teamArea:DisableHitTest()
+    teamArea.Left:Set(function() return details.Left() + Scale(18) end)
+    teamArea.Right:Set(textRight)
+    teamArea.Top:Set(function() return math.max(frame.Bottom(), view.detailLines.Bottom()) + Scale(18) end)
+    teamArea.Width:Set(function() return teamArea.Right() - teamArea.Left() end)
+    teamArea.Height:Set(Scale(10))
+    view.teamRows = {}
+    local function TeamRow(index)
+        local row = view.teamRows[index]
+        if row then
+            return row
+        end
+        row = {}
+        local top = function() return teamArea.Top() + Scale((index - 1) * 22) end
+        row.name = Theme.Cell(teamArea, 13, C.text)
+        row.name.Left:Set(function() return teamArea.Left() + Scale(row.indent or 0) end)
+        row.name.Right:Set(function() return teamArea.Right() - Scale(120) end)
+        row.name.Top:Set(top)
+        row.tag = Theme.Text(teamArea, '', 11, C.gold, true)
+        row.tag.Left:Set(function() return teamArea.Left() + Scale(row.tagLeft or 70) end)
+        row.tag.Top:Set(function() return top() + Scale(2) end)
+        row.value = Theme.Text(teamArea, '', 13, C.gold)
+        row.value.Right:Set(function() return teamArea.Right() - Scale(48) end)
+        row.value.Top:Set(top)
+        row.change = Theme.Text(teamArea, '', 12, C.good)
+        row.change.Right:Set(teamArea.Right)
+        row.change.Top:Set(function() return top() + Scale(1) end)
+        view.teamRows[index] = row
+        return row
+    end
+    function view:ShowTeams(teams, note)
+        local index = 0
+        local function Line(name, nameColor, tag, value, valueColor, change, changeColor, indent)
+            index = index + 1
+            local row = TeamRow(index)
+            row.indent = indent
+            row.name.Left:Set(function() return teamArea.Left() + Scale(indent or 0) end)
+            Theme.SetText(row.name, name)
+            Theme.SetColor(row.name, nameColor)
+            Theme.SetText(row.tag, tag or '')
+            local advance = name ~= '' and row.name:GetStringAdvance(name) or 0
+            row.tag.Left:Set(function() return row.name.Left() + math.min(row.name.Width(), advance) + Scale(10) end)
+            Theme.SetText(row.value, value or '')
+            Theme.SetColor(row.value, valueColor or C.gold)
+            Theme.SetText(row.change, change or '')
+            Theme.SetColor(row.change, changeColor or C.good)
+        end
+        local ffa = table.getn(teams) == 1
+        for i, team in teams do
+            local heading = (ffa or team.team <= 1) and 'NO TEAM' or ('TEAM ' .. (team.team - 1))
+            Line(heading, C.accent, team.won and 'WINNER' or nil, team.avg and ('avg ' .. team.avg) or nil, C.subtle)
+            for _, player in team.players do
+                local change, color = nil, nil
+                if player.changed then
+                    change = (player.change >= 0 and '+' or '') .. player.change
+                    color = player.change >= 0 and C.good or C.bad
+                end
+                Line(player.name, C.text, (ffa and player.won) and 'WINNER' or nil,
+                    player.rated and tostring(player.rating) or nil, C.gold, change, color, 12)
+            end
+            if i < table.getn(teams) then
+                Line('', C.text)
+            end
+        end
+        if note then
+            Line(note, C.subtle)
+        end
+        if index == 0 then
+            Line('No players listed.', C.subtle)
+        end
+        for i = index + 1, table.getn(self.teamRows) do
+            local row = self.teamRows[i]
+            Theme.SetText(row.name, '')
+            Theme.SetText(row.tag, '')
+            Theme.SetText(row.value, '')
+            Theme.SetText(row.change, '')
+        end
+    end
     view.watch = Theme.Button(details, 'Watch', function()
         view:Watch()
     end, 'primary', { icon = 'play', height = 38 })
@@ -230,9 +371,36 @@ function Build(launcher, page)
         return info and Widgets.MapTitle(info.map) or ''
     end
 
-    function view:PlayerCount(item)
+    function view:TeamsText(item)
         local info = self:Info(item)
-        return info and tostring(table.getn(info.players or {})) or ''
+        if not info then
+            return ''
+        end
+        local found = info.uid and self.lookups and self.lookups[info.uid]
+        return TeamsText(Teams(found and found.players or HeadPlayers(info)))
+    end
+
+    --- A FAF replay's game in the vault (ratings, results), asked once per game while signed in.
+    function view:LookUp(uid)
+        self.lookups = self.lookups or {}
+        if not uid or uid == '' or self.lookups[uid] ~= nil or self.lookupJob then
+            return
+        end
+        if not (rawget(_G, 'FafOnline_Status') and FafOnline_Status().signIn == 'signedin') then
+            return
+        end
+        self.lookups[uid] = false
+        self.lookupJob = FafLibrary_SearchReplays({ id = uid, pageSize = 1 })
+        self.lookupFor = uid
+    end
+
+    --- A replay file's game time, read once per file (the whole file: only for the selected one).
+    function view:GameLength(path)
+        self.lengths = self.lengths or {}
+        if self.lengths[path] == nil then
+            self.lengths[path] = rawget(_G, 'FafLibrary_ReplayLength') and FafLibrary_ReplayLength(path) or false
+        end
+        return self.lengths[path]
     end
 
     function view:ScanLocal()
@@ -310,6 +478,16 @@ function Build(launcher, page)
 
     --- The answers of the searches and downloads under way.
     function view:Poll()
+        if self.lookupJob then
+            local job = FafLibrary_Job(self.lookupJob)
+            if not job or job.state ~= 'working' then
+                self.lookupJob = nil
+                local found = job and job.state == 'done' and job.items and job.items[1]
+                self.lookups[self.lookupFor] = found or false
+                LOG('LAUNCHER: replay ' .. tostring(self.lookupFor) .. (found and ' found in the vault' or
+                    ' not found in the vault'))
+            end
+        end
         if self.searchJob then
             local job = FafLibrary_Job(self.searchJob)
             if not job or job.state ~= 'working' then
@@ -375,7 +553,7 @@ function Build(launcher, page)
             self.mapFrame:SetMap(nil)
             self.detailTitle:SetText('Pick a replay to see its players.', C.subtle)
             self.detailLines:SetText('')
-            self.teams:SetText('')
+            self:ShowTeams({}, '')
             self.detailNote:SetText('')
             self.watch:SetEnabled(false)
             Theme.SetVisible(self.download, false)
@@ -383,7 +561,22 @@ function Build(launcher, page)
         end
         local lines = {}
         local players = {}
+        local teamNote = nil
         local map, title
+        -- Game time (the replay's beats) against the time on the wall clock from start to end; a game that ran slower
+        -- than real time (a slow machine, pauses) shows a longer wall time.
+        local function Times(game, wall)
+            local parts = {}
+            if game and game > 0 then
+                table.insert(parts, 'Game time ' .. Length(game))
+            end
+            if wall and wall > 0 then
+                table.insert(parts, 'real time ' .. Length(wall))
+            end
+            if table.getn(parts) > 0 then
+                table.insert(lines, table.concat(parts, '  -  '))
+            end
+        end
         if self.tab == 'local' then
             local info = self:Info(item)
             title = self:Title(item)
@@ -394,13 +587,24 @@ function Build(launcher, page)
                     table.insert(lines, 'Featured mod: ' .. info.featuredMod)
                 end
                 table.insert(lines, LocalTime(info.launchedAt ~= 0 and info.launchedAt or item.time))
-                if info.gameEnd and info.launchedAt and info.gameEnd > info.launchedAt then
-                    table.insert(lines, 'Length ' .. Length(info.gameEnd - info.launchedAt))
-                end
+                local wall = (info.gameEnd and info.launchedAt and info.gameEnd > info.launchedAt) and
+                    (info.gameEnd - info.launchedAt) or nil
+                Times(self:GameLength(item.path), wall)
                 if table.getn(info.mods or {}) > 0 then
                     table.insert(lines, 'Mods: ' .. table.concat(info.mods, ', '))
                 end
-                players = info.players or {}
+                players = HeadPlayers(info)
+                if info.kind == 'faf' and info.uid and info.uid ~= '' then
+                    self:LookUp(info.uid)
+                    local found = self.lookups and self.lookups[info.uid]
+                    if found then
+                        players = found.players
+                    elseif self.lookupJob and self.lookupFor == info.uid then
+                        teamNote = 'Asking FAF for ratings and results...'
+                    elseif found == false then
+                        teamNote = 'FAF has no ratings for this game, or you aren\'t signed in.'
+                    end
+                end
             else
                 table.insert(lines, 'Its head can\'t be read.')
             end
@@ -410,7 +614,8 @@ function Build(launcher, page)
             map = item.map
             table.insert(lines, item.mapName)
             table.insert(lines, 'Featured mod: ' .. item.featuredMod .. (item.validity == 'VALID' and ', rated' or ''))
-            table.insert(lines, item.when .. (item.seconds > 0 and ('  -  ' .. Length(item.seconds)) or ''))
+            table.insert(lines, item.when)
+            Times(item.seconds, item.wallSeconds)
             if item.reviews > 0 then
                 table.insert(lines, string.format('Reviews: %.1f of 5 (%d)', item.reviewScore, item.reviews))
             end
@@ -420,35 +625,7 @@ function Build(launcher, page)
         self.detailTitle:SetText(title or '', C.text)
         self.detailLines:SetText(table.concat(lines, '\n'), C.muted)
 
-        -- Players by team, each with the rating they had before the game when known.
-        local byTeam = {}
-        local order = {}
-        for _, player in players do
-            local key = player.team or 0
-            if not byTeam[key] then
-                byTeam[key] = {}
-                table.insert(order, key)
-            end
-            local text = player.name or ''
-            if player.rated then
-                text = text .. '  (' .. player.rating .. ')'
-            end
-            if player.result and player.result ~= '' then
-                text = text .. '  ' .. string.lower(player.result)
-            end
-            table.insert(byTeam[key], text)
-        end
-        table.sort(order)
-        local teamLines = {}
-        for _, team in order do
-            if table.getn(order) > 1 or team > 1 then
-                table.insert(teamLines, string.upper(TeamName(team)))
-            end
-            for _, text in byTeam[team] do
-                table.insert(teamLines, '  ' .. text)
-            end
-        end
-        self.teams:SetText(table.getn(teamLines) > 0 and table.concat(teamLines, '\n') or 'No players listed.', C.text)
+        self:ShowTeams(Teams(players), teamNote)
 
         local note = ''
         local canWatch = true

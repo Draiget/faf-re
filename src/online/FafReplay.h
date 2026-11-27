@@ -34,6 +34,8 @@ namespace faf::online
     std::string map;                  ///< the scenario's path, /maps/<folder>/<folder>_scenario.lua
     std::vector<std::string> mods;    ///< the sim mods' names
     std::vector<std::string> players; ///< the command sources: each player who recorded commands, observers too
+    /** The game's length in beats (10 a game second): the sum of its advance messages; -1 when not counted. */
+    long long beats = -1;
   };
 
   /**
@@ -41,7 +43,8 @@ namespace faf::online
    * replay_stream): the version line, "Replay v1.9", the map path, the sim mods' and the scenario's Lua tables (each
    * with its size), the command sources. Only the head is needed; the error when it isn't one.
    */
-  [[nodiscard]] std::expected<GameReplaySummary, std::string> ReadGameReplaySummary(const std::string& stream);
+  [[nodiscard]] std::expected<GameReplaySummary, std::string>
+  ReadGameReplaySummary(const std::string& stream, bool countBeats = false);
 
   /** Base64 (RFC 4648, padding optional, line breaks ignored) to bytes; the error on any other character. */
   [[nodiscard]] std::expected<std::string, std::string> DecodeBase64(const std::string& text);

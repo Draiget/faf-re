@@ -572,6 +572,42 @@ namespace
     return 2;
   }
 
+  /**
+   * seconds|nil, why = FafLibrary_ReplayLength(path): how long the game in a replay ran in game time (its beats, 10 a
+   * second), read from the whole file (a FAF replay decoded first). For the selected replay, not for a list.
+   */
+  int ReplayLengthBody(
+    lua_State* const L
+  )
+  {
+    const std::filesystem::path path = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    std::error_code error;
+    const auto size = std::filesystem::file_size(path, error);
+    if (error || size > 512u * 1024u * 1024u) {
+      lua_pushnil(L);
+      lua_pushstring(L, "can't read the replay");
+      return 2;
+    }
+    std::string stream = ReadFile(path, static_cast<std::size_t>(size));
+    if (Lower(path.extension().string()) == ".fafreplay") {
+      auto file = DecodeFafReplay(stream);
+      if (!file) {
+        lua_pushnil(L);
+        lua_pushstring(L, file.error().c_str());
+        return 2;
+      }
+      stream = std::move(file->stream);
+    }
+    const auto summary = ReadGameReplaySummary(stream, true);
+    if (!summary || summary->beats < 0) {
+      lua_pushnil(L);
+      lua_pushstring(L, summary ? "its commands can't be read" : summary.error().c_str());
+      return 2;
+    }
+    lua_pushnumber(L, static_cast<lua_Number>(static_cast<double>(summary->beats) / 10.0));
+    return 1;
+  }
+
   // ---------------------------------------------------------------------------------------------------------------
   // The vaults.
 
@@ -586,6 +622,7 @@ namespace
       query.map = TableString(L, 1, "map");
       query.title = TableString(L, 1, "title");
       query.featuredMod = TableString(L, 1, "mod");
+      query.id = TableString(L, 1, "id");
       query.ratedOnly = TableBool(L, 1, "rated");
       query.page = static_cast<int>(TableNumber(L, 1, "page", 1));
       query.pageSize = static_cast<int>(TableNumber(L, 1, "pageSize", 30));
@@ -952,6 +989,8 @@ namespace
       SetField(L, "mapName", row.mapName);
       SetField(L, "featuredMod", row.featuredMod);
       SetField(L, "startTime", row.startTime);
+      SetField(L, "endTime", row.endTime);
+      SetField(L, "wallSeconds", row.wallSeconds);
       SetField(L, "seconds", row.seconds);
       SetBool(L, "available", row.replayAvailable);
       SetField(L, "validity", row.validity);
@@ -967,6 +1006,8 @@ namespace
         SetField(L, "faction", player.faction);
         SetField(L, "rating", static_cast<double>(player.rating));
         SetBool(L, "rated", player.rated);
+        SetField(L, "ratingAfter", static_cast<double>(player.ratingAfter));
+        SetBool(L, "changed", player.changed);
         SetField(L, "result", player.result);
         SetField(L, "score", player.score);
         lua_rawseti(L, -2, playerIndex++);
@@ -1106,6 +1147,14 @@ namespace
       nullptr,
       "<global>",
       "bool, string FafLibrary_PrepareReplay(path) - a file LaunchReplaySession plays (a FAF replay decoded)."
+    );
+    static moho::CScrLuaBinder replayLength(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_ReplayLength",
+      &Binding<&ReplayLengthBody>,
+      nullptr,
+      "<global>",
+      "number, string FafLibrary_ReplayLength(path) - the game's length in a replay, in game seconds."
     );
     static moho::CScrLuaBinder searchReplays(
       moho::SCR_UserLuaInitSet(),
