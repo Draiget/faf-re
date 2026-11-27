@@ -115,6 +115,13 @@ namespace platform::window
   void Minimize(Handle window);
   void Restore(Handle window);
   void SetFullscreen(Handle window, bool fullscreen);
+  // Full screen at a resolution other than the display's own, as the retail game's exclusive full
+  // screen was: when the display mode closest to width x height (refreshHz, 0 = any) differs in size
+  // from the desktop mode of the window's display, the display switches to it and the window covers
+  // it. The desktop mode comes back when the window leaves it (SetFullscreen false, or this call with
+  // the desktop's size), is minimised or loses the keyboard. Otherwise the window leaves such a mode
+  // and the caller places it. True while the window holds a display mode of its own.
+  bool SetFullscreenMode(Handle window, int width, int height, int refreshHz);
   void Raise(Handle window);
   // Screen position (of the client area) and client size in pixels.
   void GetBounds(Handle window, int* x, int* y, int* width, int* height);

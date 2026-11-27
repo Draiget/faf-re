@@ -971,6 +971,68 @@ namespace platform::window
     }
   }
 
+  bool SetFullscreenMode(
+    const Handle window,
+    const int width,
+    const int height,
+    const int refreshHz
+  )
+  {
+    if (window == nullptr || sdl::IsChild(AsWindow(window))) {
+      return false;
+    }
+    SDL_Window* const sdlWindow = AsWindow(window);
+    const bool wasOwnMode = (SDL_GetWindowFlags(sdlWindow) & SDL_WINDOW_FULLSCREEN) != 0;
+
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(sdlWindow);
+    const SDL_DisplayMode* const desktop = display != 0 ? SDL_GetDesktopDisplayMode(display) : nullptr;
+    SDL_DisplayMode mode{};
+    const bool found = desktop != nullptr && width > 0 && height > 0 &&
+      SDL_GetClosestFullscreenDisplayMode(
+                         display, width, height, refreshHz > 0 ? static_cast<float>(refreshHz) : 0.0f, false, &mode
+      );
+    // Only a size of its own changes the mode: at the desktop's size the window covers the display
+    // as it is, so a refresh rate alone never costs the player a mode switch on every Alt+Tab.
+    const bool ownMode = found && (mode.w != desktop->w || mode.h != desktop->h);
+    if (width > 0 && height > 0 && !found) {
+      gpg::Warnf("display: no mode near %dx%d on the window's display (%s)", width, height, SDL_GetError());
+    }
+
+    if (!ownMode) {
+      if (wasOwnMode) {
+        (void)SDL_SetWindowFullscreen(sdlWindow, false);
+        (void)SDL_SyncWindow(sdlWindow);
+        sdl::OnWindowRectChanged(sdlWindow);
+        gpg::Logf(
+          "display: back to the desktop mode %dx%d",
+          desktop != nullptr ? desktop->w : 0,
+          desktop != nullptr ? desktop->h : 0
+        );
+      }
+      return false;
+    }
+
+    if (!SDL_SetWindowFullscreenMode(sdlWindow, &mode) || !SDL_SetWindowFullscreen(sdlWindow, true)) {
+      gpg::Warnf("display: switching to %dx%d failed (%s)", mode.w, mode.h, SDL_GetError());
+      return false;
+    }
+    (void)SDL_SyncWindow(sdlWindow);
+    sdl::OnWindowRectChanged(sdlWindow);
+    const bool holds = (SDL_GetWindowFlags(sdlWindow) & SDL_WINDOW_FULLSCREEN) != 0;
+    gpg::Logf(
+      "display: %dx%d at %.0f Hz for %dx%d asked (desktop %dx%d)%s",
+      mode.w,
+      mode.h,
+      static_cast<double>(mode.refresh_rate),
+      width,
+      height,
+      desktop->w,
+      desktop->h,
+      holds ? "" : ", not taken"
+    );
+    return holds;
+  }
+
   void Raise(
     const Handle window
   )

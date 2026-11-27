@@ -2268,6 +2268,17 @@ bool CScApp::CreateAppFrame(
     if (frame != nullptr) {
       frame->Show(true);
     }
+    // Engine change (issue #505): full screen below the display's own resolution switches the display to it,
+    // as the binary's Direct3D 9 device did, so that the frame covers the display (SC_PrimaryAdapter does the
+    // same on a switch). Two heads keep their borderless frames.
+    if (primaryHead.mWindowed && !hasSecondHead) {
+      (void)platform::window::SetFullscreenMode(
+        supcomFrame->GetPlatformWindow(),
+        static_cast<int>(primaryHead.mWidth),
+        static_cast<int>(primaryHead.mHeight),
+        static_cast<int>(primaryHead.framesPerSecond)
+      );
+    }
 
     moho::ren_Viewport = static_cast<moho::WRenViewport*>(viewport);
     viewport->SetFocus();

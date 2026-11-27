@@ -17,6 +17,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/WRenViewport.h"
+#include "platform/Window.h"
 #include "platform/shell/gdicmn.h"
 #include "platform/shell/toplevel.h"
 
@@ -172,24 +173,43 @@ namespace moho
         head.mHeight = static_cast<std::uint32_t>(parsedResolution.height);
         head.framesPerSecond = static_cast<std::uint32_t>(parsedResolution.framesPerSecond);
 
-        // Engine addition: position fullscreen window on the monitor containing the window.
-        int monitorX = 0;
-        int monitorY = 0;
+        // Engine change (issue #505): a resolution below the display's own switches the display to it, as
+        // the binary's Direct3D 9 exclusive full screen did, and the window covers the display. The flip
+        // swap chains of Direct3D 12 and Vulkan never change the mode, so the frame was left a small
+        // borderless window in the display's corner. At the display's own size the window covers it as is.
+        // Two heads keep the borderless frames: a window with a mode of its own is minimised when the
+        // other one takes the keyboard.
+        const bool ownMode = deviceContext.GetHeadCount() == 1 &&
+          platform::window::SetFullscreenMode(
+                               mainWindow->GetPlatformWindow(),
+                               static_cast<int>(head.mWidth),
+                               static_cast<int>(head.mHeight),
+                               static_cast<int>(head.framesPerSecond)
+          );
+
+        // Engine addition: position fullscreen window on the monitor containing the window. Asked after
+        // the mode call: leaving a mode of its own can move the displays.
         const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(mainWindow->GetHandle()));
-        if (windowHandle != nullptr) {
-          const HMONITOR monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
-          MONITORINFO monitorInfo{};
-          monitorInfo.cbSize = sizeof(monitorInfo);
-          if (monitor != nullptr && ::GetMonitorInfoW(monitor, &monitorInfo) != FALSE) {
-            monitorX = static_cast<int>(monitorInfo.rcMonitor.left);
-            monitorY = static_cast<int>(monitorInfo.rcMonitor.top);
+        if (!ownMode) {
+          int monitorX = 0;
+          int monitorY = 0;
+          if (windowHandle != nullptr) {
+            const HMONITOR monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO monitorInfo{};
+            monitorInfo.cbSize = sizeof(monitorInfo);
+            if (monitor != nullptr && ::GetMonitorInfoW(monitor, &monitorInfo) != FALSE) {
+              monitorX = static_cast<int>(monitorInfo.rcMonitor.left);
+              monitorY = static_cast<int>(monitorInfo.rcMonitor.top);
+            }
+          }
+          mainWindow->SetSize(monitorX, monitorY, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+          if (windowHandle != nullptr) {
+            ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
           }
         }
-        mainWindow->SetSize(monitorX, monitorY, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
-        if (windowHandle != nullptr) {
-          ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
-        }
       } else {
+        // Engine change (issue #505): give the display its desktop mode back before the frame gets its border.
+        platform::window::SetFullscreen(mainWindow->GetPlatformWindow(), false);
         mainWindow->SetWindowStyleFlag(kBorderedAdapterStyle);
 
         IUserPrefs* const preferences = USER_GetPreferences();
