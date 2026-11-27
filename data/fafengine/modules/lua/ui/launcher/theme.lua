@@ -499,7 +499,12 @@ function Paragraph(parent, size, color)
                 self.lines[i] = label
             end
             local row = i - 1
-            label.Left:Set(self.Left)
+            if self.centered then
+                local advance = label:GetStringAdvance(line)
+                label.Left:Set(function() return self.Left() + math.max(0, math.floor((self.Width() - advance) / 2)) end)
+            else
+                label.Left:Set(self.Left)
+            end
             label.Top:Set(function() return self.Top() + Scale(row * lineHeight) end)
             SetText(label, line)
             SetColor(label, self.color)

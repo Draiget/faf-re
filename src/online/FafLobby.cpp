@@ -188,6 +188,7 @@ namespace faf::online
     Disconnect();
     mStop = false;
     mAuthSent = false;
+    mKicked = false;
     mState = State::Connecting;
     {
       std::lock_guard<std::mutex> lock(mLock);
@@ -321,11 +322,21 @@ namespace faf::online
         if (mStop.load()) {
           break;
         }
-        const std::string why = received ? std::string("the lobby closed the connection") : received.error();
-        if (mState.load() == State::SignedIn) {
-          SetMessage(why);
-          mState = State::Disconnected;
-        } else {
+        // The lobby's last notice says why it closed (signed in elsewhere, an admin); a close after sign-in is a
+        // failure too, so the launcher tries again (unless it was a kick) and says why.
+        std::string notice;
+        {
+          std::lock_guard<std::mutex> lock(mLock);
+          notice = mLastNotice;
+        }
+        std::string why = received ? std::string("the lobby closed the connection") : received.error();
+        if (mKicked.load()) {
+          why = "FAF signed this session out" + (notice.empty() ? std::string() : ": " + notice);
+        } else if (!notice.empty()) {
+          why += " (" + notice + ")";
+        }
+        // A refused sign-in already said why (the lobby closes right after it): that reason stays.
+        if (mState.load() != State::Failed) {
           Fail(why);
         }
         break;
@@ -454,6 +465,13 @@ namespace faf::online
       Fail("the lobby refused the sign-in: " + message.String("text"));
     } else if (command == "notice") {
       SetMessage("notice (" + message.String("style") + "): " + message.String("text"));
+      {
+        std::lock_guard<std::mutex> lock(mLock);
+        mLastNotice = message.String("text");
+      }
+      if (message.String("style") == "kick") {
+        mKicked = true;
+      }
     }
     std::lock_guard<std::mutex> lock(mLock);
     mMessages.push_back(message);

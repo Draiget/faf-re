@@ -109,6 +109,14 @@ namespace faf::online
       return mState.load();
     }
     [[nodiscard]] std::string Message() const;
+    /**
+     * True when FAF's lobby signed this session out on purpose (a notice of style "kick" before it closed): the same
+     * account signed in elsewhere, or an admin closed it. Connecting again at once would sign the other session out.
+     */
+    [[nodiscard]] bool Kicked() const noexcept
+    {
+      return mKicked.load();
+    }
     /** The login and id `welcome` named, once signed in. */
     [[nodiscard]] std::string Login() const;
     [[nodiscard]] std::string PlayerId() const;
@@ -140,6 +148,8 @@ namespace faf::online
     platform::http::WebSocket mSocket;
     std::thread mThread;
     std::atomic<State> mState{State::Disconnected};
+    std::atomic<bool> mKicked{false};
+    std::string mLastNotice; ///< the text of the lobby's last notice, the reason it gives before it closes (mLock)
     std::atomic<bool> mStop{false};
     bool mAuthSent = false; ///< the reader thread's own
     /** One send at a time: the reader thread answers ping while the caller hosts or joins. */

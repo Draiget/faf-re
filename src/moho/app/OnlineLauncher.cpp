@@ -802,6 +802,7 @@ namespace
     SetField(L, "login", s.haveMe ? s.me.login : s.auth.UserName());
     SetField(L, "lobby", LobbyStateName(s.lobby.GetState()));
     SetField(L, "lobbyMessage", s.lobby.Message());
+    SetBool(L, "lobbyKicked", s.lobby.Kicked());
     double retryIn = 0;
     if (s.lobbyRetryAt != std::chrono::steady_clock::time_point{}) {
       retryIn = std::max(0.0, std::chrono::duration<double>(s.lobbyRetryAt - std::chrono::steady_clock::now()).count());
@@ -1616,7 +1617,9 @@ void moho::ONLINE_Frame()
   // to 80 s, as the official client reconnects. Not while a match starts or runs: its game messages use this
   // connection, and a new one would be a second session in FAF's eyes.
   if (
-    s.lobbyStarted && s.lobby.GetState() == FafLobby::State::Failed &&
+    // A kick (the same account signed in elsewhere) waits for the player's Try again: connecting at once would sign
+    // the other session out in turn.
+    s.lobbyStarted && s.lobby.GetState() == FafLobby::State::Failed && !s.lobby.Kicked() &&
     (s.match == MatchState::Idle || s.match == MatchState::Failed)
   ) {
     const auto now = std::chrono::steady_clock::now();

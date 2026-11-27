@@ -1293,8 +1293,17 @@ local function BuildOnlinePage(launcher, page)
         view.hover:Want(item, cell)
     end
 
-    view.empty = Theme.Text(listArea, '', 14, C.subtle)
-    LayoutHelpers.AtCenterIn(view.empty, listArea)
+    -- What the list says when it has no games (loading, a failure and why): wrapped and centred, at most 640 wide.
+    view.empty = Theme.Paragraph(listArea, 14, C.subtle)
+    view.empty.centered = true
+    local function Margin()
+        return math.max(0, math.floor((listArea.Right() - listArea.Left() - Scale(640)) / 2))
+    end
+    view.empty.Left:Set(function() return listArea.Left() + Margin() end)
+    view.empty.Right:Set(function() return listArea.Right() - Margin() end)
+    view.empty.Top:Set(function()
+        return listArea.Top() + math.floor((listArea.Bottom() - listArea.Top() - view.empty.Height()) / 2)
+    end)
     -- While FAF's lobby connects and sends its games: dots over the message.
     view.loader = Theme.Loader(listArea)
     LayoutHelpers.AtHorizontalCenterIn(view.loader, listArea)
@@ -1473,9 +1482,14 @@ local function RefreshOnline(launcher)
     elseif status.lobby == 'failed' and table.getn(items) == 0 then
         -- The engine's message starts with its own "the lobby: ".
         local why = string.gsub(status.lobbyMessage or '', '^the lobby: ', '')
-        empty = 'No connection to the FAF lobby' .. (why ~= '' and (': ' .. why) or '') .. '.'
-        if (status.lobbyRetryIn or 0) > 0 then
-            empty = empty .. string.format(' Trying again in %d s.', status.lobbyRetryIn)
+        if status.lobbyKicked then
+            -- Signed in elsewhere (FAF's own client, another game): Try again takes the session back.
+            empty = string.gsub(why, '%.$', '') .. '. Try again takes this game back online.'
+        else
+            empty = 'No connection to the FAF lobby' .. (why ~= '' and (': ' .. why) or '') .. '.'
+            if (status.lobbyRetryIn or 0) > 0 then
+                empty = empty .. string.format(' Trying again in %d s.', status.lobbyRetryIn)
+            end
         end
     elseif table.getn(items) == 0 then
         if filter ~= '' or hidePrivate or hideModded then
@@ -1484,8 +1498,11 @@ local function RefreshOnline(launcher)
             empty = 'No open games right now. Create one.'
         end
     end
-    Theme.SetText(view.empty, empty)
-    Theme.SetColor(view.empty, status.lobby == 'failed' and C.bad or C.subtle)
+    if view.emptyText ~= empty or view.emptyFailed ~= (status.lobby == 'failed') then
+        view.emptyText = empty
+        view.emptyFailed = status.lobby == 'failed'
+        view.empty:SetText(empty, status.lobby == 'failed' and C.bad or C.subtle)
+    end
     Theme.SetVisible(view.loader, loading and table.getn(items) == 0)
     Theme.SetVisible(view.retryLobby, status.lobby == 'failed' and table.getn(items) == 0 and
         rawget(_G, 'FafOnline_RetryLobby') ~= nil)
