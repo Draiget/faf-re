@@ -34,6 +34,8 @@ local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
 local current = false
+-- The page shown last: the launcher built again (a UI scale change rebuilds the front end) opens on it.
+local lastShownPage = false
 -- What a restart on another featured mod took up in this start ('host true', 'join'), for the test walk.
 resumedThisStart = false
 
@@ -1927,7 +1929,7 @@ function Launcher:Refresh()
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
     end
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
-        (self.page == 'changelog' and self.changelogView) or nil
+        (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
         if not done and not self.pageFailed then
@@ -2305,7 +2307,12 @@ function Launcher:Mods()
     end)
 end
 
+--- The Options page (optionspage.lua); FAF's options dialog for a launcher built without it.
 function Launcher:Options()
+    if self.pages.options then
+        self:ShowPage('options')
+        return
+    end
     local UiScale = import('/fafengine/modules/lua/ui/uiscale.lua')
     self:OpenScreen('Options', function(host, back)
         UiScale.SetOptionsFromMainMenu(true)
@@ -2333,6 +2340,7 @@ end
 
 function Launcher:ShowPage(name)
     self.page = name
+    lastShownPage = name
     for pageName, page in self.pages do
         Theme.SetVisible(page, pageName == name)
     end
@@ -2426,7 +2434,7 @@ local function BuildRail(launcher, body)
         { 'replays', 'Replays', function() launcher:Replays() end, 'replays' },
         { 'mods', 'Mods', function() launcher:Mods() end, 'mods' },
         'Game',
-        { 'settings', 'Options', function() launcher:Options() end },
+        { 'settings', 'Options', function() launcher:Options() end, 'options' },
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, 'changelog' },
         { 'logout', 'Exit', function() launcher:Exit() end },
     }
@@ -2562,6 +2570,14 @@ local function Build(launcher)
         import('/fafengine/modules/lua/ui/launcher/replays.lua').Build(launcher, replaysPage)
         Theme.SetVisible(replaysPage, false)
     end
+    -- Options: FAF's options in the launcher's look (optionspage.lua).
+    local optionsPage = Group(content, 'launcher options')
+    LayoutHelpers.FillParent(optionsPage, content)
+    optionsPage.Width:Set(function() return optionsPage.Right() - optionsPage.Left() end)
+    optionsPage.Height:Set(function() return optionsPage.Bottom() - optionsPage.Top() end)
+    launcher.pages.options = optionsPage
+    import('/fafengine/modules/lua/ui/launcher/optionspage.lua').Build(launcher, optionsPage)
+    Theme.SetVisible(optionsPage, false)
     -- Changelog: FAF's patch notes (changelog.lua).
     local changelogPage = Group(content, 'launcher changelog')
     LayoutHelpers.FillParent(changelogPage, content)
@@ -2614,7 +2630,8 @@ function CreateUI(buildFafMenu)
         launcher.resumeSince = GetSystemTimeSeconds()
     end
     Build(launcher)
-    launcher:ShowPage('online')
+    -- Back on the page shown before the front end was built again (Options after a UI scale change).
+    launcher:ShowPage((lastShownPage and launcher.pages[lastShownPage]) and lastShownPage or 'online')
     launcher:ShowHome()
     LOG('LAUNCHER: shown')
 end
@@ -2964,7 +2981,54 @@ function TestWalk()
             Wait(2)
             current:ShowPage('online')
         end
-        for _, screen in { 'Skirmish', 'Multiplayer LAN', 'Options' } do
+        -- The Options page: each tab's rows; a slider changed, applied and set back.
+        if current and current.optionsView then
+            current:ShowPage('options')
+            Wait(2)
+            local options = current.optionsView
+            local counts = {}
+            for _, key in options.sections do
+                options.tab = key
+                options:Refresh()
+                table.insert(counts, key .. ' ' .. table.getn(options.entries))
+            end
+            Step('options page: ' .. table.concat(counts, ', '))
+            options.tab = 'gameplay'
+            options:Refresh()
+            Wait(1)
+            Step('options gameplay tab shown')
+            Wait(1)
+            options.tab = 'sound'
+            options:Refresh()
+            local slider = nil
+            for _, entry in options.entries do
+                if entry.item and entry.item.type == 'slider' and not slider then
+                    slider = entry.item
+                end
+            end
+            if slider then
+                local before = options.current[slider.key]
+                local custom = slider.custom
+                local after = before == custom.min and custom.max or custom.min
+                options:Set(slider, after)
+                Step('options: ' .. slider.key .. ' ' .. tostring(before) .. ' -> ' .. tostring(after) .. ', ' ..
+                    options:Changed() .. ' change pending')
+                Wait(2)
+                options:Apply()
+                local saved = import('/lua/options/optionsLogic.lua').GetCurrent()[slider.key]
+                Step('options applied: ' .. slider.key .. ' saved as ' .. tostring(saved))
+                options:Set(slider, before)
+                options:Apply()
+                Step('options set back: ' .. slider.key .. ' ' ..
+                    tostring(import('/lua/options/optionsLogic.lua').GetCurrent()[slider.key]))
+            end
+            options.tab = 'profile'
+            options:Refresh()
+            Step('options profile tab: ' .. table.getn(options.entries) .. ' rows')
+            Wait(2)
+            current:ShowPage('online')
+        end
+        for _, screen in { 'Skirmish', 'Multiplayer LAN' } do
             local launcher = current
             if not launcher then
                 Step('the launcher is gone before ' .. screen)
