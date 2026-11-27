@@ -10,6 +10,7 @@
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/command/ClientOnlyIds.h"
 #include "moho/sim/PlannedFactoryProxy.h"
 
 #include <algorithm>
@@ -501,6 +502,17 @@ namespace moho
     // which is the same shape `ISSUE_DecreaseCommandCount` already uses for
     // its own `resultCookie`. Passing the command id instead put a command id
     // where the drain expects a beat.
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory's rally line keeps its order here; the
+    // driver call below is dropped before the stream (ClientOnlyIds.h), the local event still moves the line.
+    if (IsClientOnlyCommand(static_cast<std::int32_t>(helper->mConstantData.cmd))) {
+      const Wm3::Vector3<float> position = ResolvePositionFromTarget(target);
+      PlannedFactoryManager::Get().OnRallyHelperRetargeted(
+        static_cast<std::int32_t>(helper->mConstantData.cmd),
+        ConvertUserCommandTargetToSSTITarget(target),
+        Vector3f{position.x, position.y, position.z}
+      );
+    }
+
     CmdId resultCookie = helper->mConstantData.cmd;
     if (ISTIDriver* const simDriver = WLD_GetDriver()) {
       resultCookie =

@@ -13,7 +13,7 @@
 #include "moho/entity/EntityId.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/PlannedFactoryProxy.h"
-#include "moho/sim/SimDriver.h"
+#include "moho/command/ClientOnlyIds.h"
 
 /// The manager is process-wide; every test starts and ends with it empty and the switch on.
 class PlannedFactoryTest : public ::testing::Test
@@ -147,6 +147,53 @@ TEST(
 
   const auto plannedOnly = SetOf({planned});
   EXPECT_TRUE(IdsOf(moho::WithoutClientOnlyUnits(plannedOnly, storage)).empty());
+}
+
+TEST(
+  PlannedFactoryIds,
+  ClientOnlyCommandIdsAreRegisteredAndReleased
+)
+{
+  constexpr std::int32_t kLine = 0x01000123;
+  EXPECT_FALSE(moho::IsClientOnlyCommand(kLine));
+  moho::RegisterClientOnlyCommand(kLine);
+  moho::RegisterClientOnlyCommand(kLine);
+  EXPECT_TRUE(moho::IsClientOnlyCommand(kLine));
+  EXPECT_FALSE(moho::IsClientOnlyCommand(kLine + 1));
+  moho::ReleaseClientOnlyCommand(kLine);
+  EXPECT_FALSE(moho::IsClientOnlyCommand(kLine)) << "registered twice, one release frees it";
+}
+
+TEST(
+  PlannedFactoryIds,
+  ClientOnlyTargets
+)
+{
+  moho::SSTITarget target{};
+  target.mType = moho::EAiTargetType::AITARGET_Entity;
+  target.mEnt = moho::MakePlannedProxyUnitId(0, 3);
+  EXPECT_TRUE(moho::IsClientOnlyTarget(target));
+  target.mEnt = moho::MakeEntityId(moho::EEntityIdFamily::Unit, 0, 3);
+  EXPECT_FALSE(moho::IsClientOnlyTarget(target));
+  target.mType = moho::EAiTargetType::AITARGET_Ground;
+  target.mEnt = moho::MakePlannedProxyUnitId(0, 3);
+  EXPECT_FALSE(moho::IsClientOnlyTarget(target)) << "a ground target's entity field is not sent";
+}
+
+TEST_F(
+  PlannedFactoryTest,
+  ClearReleasesRallyLineIds
+)
+{
+  auto* const proxy = Manager().AddProxy(10, 100, &mLandFactory, {0.0f, 0.0f, 0.0f});
+  moho::RallyPointOrder order{};
+  order.helperId = 0x01000777;
+  moho::RegisterClientOnlyCommand(order.helperId);
+  proxy->AddRallyOrder(order, false);
+  ASSERT_TRUE(moho::IsClientOnlyCommand(0x01000777));
+  // The session's end: the next session hands the same command ids out to real orders.
+  Manager().ForgetAll();
+  EXPECT_FALSE(moho::IsClientOnlyCommand(0x01000777));
 }
 
 TEST_F(

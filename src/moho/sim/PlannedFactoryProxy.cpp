@@ -8,6 +8,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/command/CommandIssueHelper.h"
+#include "moho/command/ClientOnlyIds.h"
 #include "moho/command/CommandManager.h"
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandIssueData.h"
@@ -94,8 +95,11 @@ namespace moho
       if (bp == nullptr || session.mRules == nullptr) {
         return false;
       }
+      // A factory structure: mobile factories (experimentals, carriers) are units the engineer builds.
       const EntityCategorySet* const factories = session.mRules->GetEntityCategory("FACTORY");
-      return factories != nullptr && EntityCategory::HasBlueprint(bp, factories);
+      const EntityCategorySet* const structures = session.mRules->GetEntityCategory("STRUCTURE");
+      return factories != nullptr && structures != nullptr && EntityCategory::HasBlueprint(bp, factories) &&
+        EntityCategory::HasBlueprint(bp, structures);
     }
 
     /// Whether a unit of the focus army with blueprint `bp` already stands at `pos`.
@@ -194,22 +198,34 @@ namespace moho
       return unit;
     }
 
-    /// Deletes the rally-line helpers the proxy owns and returns their ids to the command id pool.
+    /// Deletes one rally-line helper and returns its id to the command id pool and out of the client-only set.
+    void DeleteRallyHelper(
+      CWldSession* const session,
+      RallyPointOrder& order
+    )
+    {
+      if (order.helperId == 0) {
+        return;
+      }
+      if (session != nullptr && session->mCommandManager != nullptr) {
+        fa::vector<CmdId> ids;
+        ids.push_back(static_cast<CmdId>(order.helperId));
+        DeleteCommandIssueHelpers(*session->mCommandManager, ids);
+      }
+      ReleaseClientOnlyCommand(order.helperId);
+      order.helperId = 0;
+    }
+
+    /// Deletes the rally-line helpers the proxy owns. Without a session (its end) only the ids are released:
+    /// the session deletes its helpers itself, and the next one hands the same ids out again.
     void DeleteRallyHelpers(
-      CWldSession& session,
+      CWldSession* const session,
       PlannedUnitProxy& proxy
     )
     {
-      if (proxy.mRallyHelperIds.empty() || session.mCommandManager == nullptr) {
-        proxy.mRallyHelperIds.clear();
-        return;
+      for (RallyPointOrder& order : proxy.mRallyOrders) {
+        DeleteRallyHelper(session, order);
       }
-      fa::vector<CmdId> ids;
-      for (const std::int32_t id : proxy.mRallyHelperIds) {
-        ids.push_back(static_cast<CmdId>(id));
-      }
-      DeleteCommandIssueHelpers(*session.mCommandManager, ids);
-      proxy.mRallyHelperIds.clear();
     }
   } // namespace
 
@@ -393,6 +409,9 @@ namespace moho
 
   void PlannedFactoryManager::Clear() noexcept
   {
+    for (const auto& proxy : mProxies) {
+      DeleteRallyHelpers(nullptr, *proxy);
+    }
     mProxies.clear();
     mNewUnitIds.clear();
   }
@@ -606,15 +625,16 @@ namespace moho
         continue;
       }
       if (clearQueue) {
-        DeleteRallyHelpers(session, *proxy);
+        DeleteRallyHelpers(&session, *proxy);
       }
-      proxy->AddRallyOrder(order, clearQueue);
+      RallyPointOrder kept = order;
 
       // The rally line: a helper of the proxy's own, never sent, drawn from the proxy's factory queue
       // like a factory's rally command. Its id comes from the same pool as every command id and goes back
       // to it when the helper is deleted.
       UserCommandQueue* const factoryQueue = unit->GetFactoryCommandQueue();
       if (factoryQueue == nullptr) {
+        proxy->AddRallyOrder(kept, clearQueue);
         continue;
       }
       std::uint32_t packedId = 0u;
@@ -622,8 +642,13 @@ namespace moho
       lineData.nextCommandId =
         static_cast<std::int32_t>(*AllocatePackedCommandIdFromManager(session.mCommandManager, &packedId));
       if ((static_cast<std::uint32_t>(lineData.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+        proxy->AddRallyOrder(kept, clearQueue);
         continue;
       }
+      // Registered before anything can reach the driver with it: a drag or removal of the line is dropped
+      // there (ClientOnlyIds.h) and lands in OnRallyHelperRetargeted / OnRallyHelperRemoved instead.
+      RegisterClientOnlyCommand(lineData.nextCommandId);
+      kept.helperId = lineData.nextCommandId;
       SSTICommandConstantData constantData{};
       InitializePublishedCommandDescriptorFromIssueData(&constantData, &lineData);
       UserCommandIssueHelper* const helper = FindOrCreateCommandIssueHelper(
@@ -638,9 +663,45 @@ namespace moho
       }
       factoryQueue->primaryLinks.push_back(WeakPtr<UserCommandIssueHelper>(helper));
       factoryQueue->resolvedLinksDirty = 1u;
-      proxy->mRallyHelperIds.push_back(lineData.nextCommandId);
+      proxy->AddRallyOrder(kept, clearQueue);
     }
     session.DirtyCommandGraph();
+  }
+
+  void PlannedFactoryManager::OnRallyHelperRetargeted(
+    const std::int32_t helperId,
+    const SSTITarget& target,
+    const Vector3f& position
+  )
+  {
+    for (const auto& proxy : mProxies) {
+      for (RallyPointOrder& order : proxy->mRallyOrders) {
+        if (order.helperId != helperId) {
+          continue;
+        }
+        order.targetType = target.mType;
+        order.targetEntityId = target.mType == EAiTargetType::AITARGET_Entity ? target.mEnt : 0u;
+        order.position = position;
+        return;
+      }
+    }
+  }
+
+  void PlannedFactoryManager::OnRallyHelperRemoved(
+    CWldSession& session,
+    const std::int32_t helperId
+  )
+  {
+    for (const auto& proxy : mProxies) {
+      for (auto it = proxy->mRallyOrders.begin(); it != proxy->mRallyOrders.end(); ++it) {
+        if (it->helperId == helperId) {
+          DeleteRallyHelper(&session, *it);
+          proxy->mRallyOrders.erase(it);
+          session.DirtyCommandGraph();
+          return;
+        }
+      }
+    }
   }
 
   void PlannedFactoryManager::QueueOrdersOnSelected(
@@ -726,16 +787,22 @@ namespace moho
     }
   }
 
-  void PlannedFactoryManager::Destroy(
-    CWldSession& session,
-    const std::size_t index,
-    UserUnit* const replacement
+  std::unique_ptr<PlannedUnitProxy> PlannedFactoryManager::Take(
+    const std::size_t index
   )
   {
     std::unique_ptr<PlannedUnitProxy> proxy = std::move(mProxies[index]);
     mProxies.erase(mProxies.begin() + static_cast<std::ptrdiff_t>(index));
+    return proxy;
+  }
 
-    DeleteRallyHelpers(session, *proxy);
+  void PlannedFactoryManager::Destroy(
+    CWldSession& session,
+    std::unique_ptr<PlannedUnitProxy> proxy,
+    UserUnit* const replacement
+  )
+  {
+    DeleteRallyHelpers(&session, *proxy);
     if (UserUnit* const unit = proxy->mUserUnit; unit != nullptr) {
       ReplaceInSelection(session, unit, replacement);
       if (replacement != nullptr) {
@@ -754,73 +821,90 @@ namespace moho
     CWldSession& session
   )
   {
-    if (mProxies.empty()) {
-      mNewUnitIds.clear();
-      return;
-    }
-
-    if (!IsFactoryPreOrdersEnabled() || session.IsReplay || session.GetFocusUserArmy() == nullptr) {
-      while (!mProxies.empty()) {
-        Destroy(session, mProxies.size() - 1, nullptr);
-      }
-      mNewUnitIds.clear();
-      return;
-    }
-
-    // 1. A new unit of the focus army with a planned factory's blueprint at its spot is that factory.
-    const UserArmy* const focusArmy = session.GetFocusUserArmy();
     std::vector<std::uint32_t> newUnitIds;
     newUnitIds.swap(mNewUnitIds);
-    for (const std::uint32_t id : newUnitIds) {
-      UserUnit* const unit = LookupUserUnit(session, id);
-      if (unit == nullptr || unit->mArmy != focusArmy || unit->mVariableData.mIsDead != 0) {
-        continue;
-      }
-      PlannedUnitProxy* const proxy = FindForNewUnit(unit->mParams.mBlueprint, PositionOf(*unit));
-      if (proxy == nullptr) {
-        continue;
-      }
-      gpg::Logf(
-        "PlannedFactory: 0x%08x started at (%.1f, %.1f): %zu build orders, %zu rally orders, repeat %d",
-        id,
-        proxy->mPosition.x,
-        proxy->mPosition.z,
-        proxy->mPreOrders.size(),
-        proxy->mRallyOrders.size(),
-        proxy->mRepeatBuild ? 1 : 0
-      );
-      Dispatch(session, *proxy, *unit);
-      const auto it = std::ranges::find_if(mProxies, [proxy](const std::unique_ptr<PlannedUnitProxy>& p) {
-        return p.get() == proxy;
-      });
-      Destroy(session, static_cast<std::size_t>(it - mProxies.begin()), unit);
+    if (mProxies.empty()) {
+      return;
     }
 
-    // 2. A builder counts while its build command is in its queue.
-    for (std::size_t index = mProxies.size(); index-- > 0;) {
-      PlannedUnitProxy& proxy = *mProxies[index];
-      std::erase_if(proxy.mBuilders, [&session](PlannedUnitProxy::Builder& builder) {
-        UserUnit* const unit = LookupUserUnit(session, builder.builderId);
-        bool present = unit != nullptr && unit->mVariableData.mIsDead == 0;
-        if (present) {
-          const UserCommandIssueHelper* const helper =
-            FindCommandIssueHelperInSession(&session, static_cast<CmdId>(builder.commandId));
-          present = helper != nullptr && UserUnitManagerContainsCommandIssueHelper(unit->GetCommandQueue(), helper);
-        }
-        if (present) {
-          builder.missedBeats = 0;
-          return false;
-        }
-        return ++builder.missedBeats >= kBuilderGraceBeats;
-      });
-      if (proxy.mBuilders.empty()) {
-        gpg::Logf(
-          "PlannedFactory: plan at (%.1f, %.1f) dropped, no engineer has its build order",
-          proxy.mPosition.x,
-          proxy.mPosition.z
-        );
-        Destroy(session, index, nullptr);
+    // Every proxy that goes is taken out of the list first, and only then are its orders sent and its unit
+    // removed: both run user Lua (UI_OnCommandIssued, the selection callbacks), which then finds the list
+    // already settled and cannot reach a proxy on its way out.
+    std::vector<std::pair<std::unique_ptr<PlannedUnitProxy>, UserUnit*>> started;
+    std::vector<std::unique_ptr<PlannedUnitProxy>> dropped;
+
+    const UserArmy* const focusArmy = session.GetFocusUserArmy();
+    if (!IsFactoryPreOrdersEnabled() || session.IsReplay || focusArmy == nullptr) {
+      while (!mProxies.empty()) {
+        dropped.push_back(Take(mProxies.size() - 1));
       }
+    } else {
+      // 1. A plan made for another army than the focus one (the focus changed) goes.
+      for (std::size_t index = mProxies.size(); index-- > 0;) {
+        if (mProxies[index]->mUserUnit != nullptr && mProxies[index]->mUserUnit->mArmy != focusArmy) {
+          dropped.push_back(Take(index));
+        }
+      }
+
+      // 2. A new unit of the focus army with a planned factory's blueprint at its spot is that factory.
+      for (const std::uint32_t id : newUnitIds) {
+        UserUnit* const unit = LookupUserUnit(session, id);
+        if (unit == nullptr || unit->mArmy != focusArmy || unit->mVariableData.mIsDead != 0) {
+          continue;
+        }
+        PlannedUnitProxy* const proxy = FindForNewUnit(unit->mParams.mBlueprint, PositionOf(*unit));
+        if (proxy == nullptr) {
+          continue;
+        }
+        gpg::Logf(
+          "PlannedFactory: 0x%08x started at (%.1f, %.1f): %zu build orders, %zu rally orders, repeat %d",
+          id,
+          proxy->mPosition.x,
+          proxy->mPosition.z,
+          proxy->mPreOrders.size(),
+          proxy->mRallyOrders.size(),
+          proxy->mRepeatBuild ? 1 : 0
+        );
+        const auto it = std::ranges::find_if(mProxies, [proxy](const std::unique_ptr<PlannedUnitProxy>& p) {
+          return p.get() == proxy;
+        });
+        started.emplace_back(Take(static_cast<std::size_t>(it - mProxies.begin())), unit);
+      }
+
+      // 3. A builder counts while its build command is in its queue.
+      for (std::size_t index = mProxies.size(); index-- > 0;) {
+        PlannedUnitProxy& proxy = *mProxies[index];
+        std::erase_if(proxy.mBuilders, [&session](PlannedUnitProxy::Builder& builder) {
+          UserUnit* const unit = LookupUserUnit(session, builder.builderId);
+          bool present = unit != nullptr && unit->mVariableData.mIsDead == 0;
+          if (present) {
+            const UserCommandIssueHelper* const helper =
+              FindCommandIssueHelperInSession(&session, static_cast<CmdId>(builder.commandId));
+            present = helper != nullptr && UserUnitManagerContainsCommandIssueHelper(unit->GetCommandQueue(), helper);
+          }
+          if (present) {
+            builder.missedBeats = 0;
+            return false;
+          }
+          return ++builder.missedBeats >= kBuilderGraceBeats;
+        });
+        if (proxy.mBuilders.empty()) {
+          gpg::Logf(
+            "PlannedFactory: plan at (%.1f, %.1f) dropped, no engineer has its build order",
+            proxy.mPosition.x,
+            proxy.mPosition.z
+          );
+          dropped.push_back(Take(index));
+        }
+      }
+    }
+
+    for (auto& [proxy, factory] : started) {
+      Dispatch(session, *proxy, *factory);
+      Destroy(session, std::move(proxy), factory);
+    }
+    for (auto& proxy : dropped) {
+      Destroy(session, std::move(proxy), nullptr);
     }
   }
 

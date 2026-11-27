@@ -1646,6 +1646,16 @@ namespace moho
       return;
     }
 
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory's rally line is its own; nothing is sent.
+    if (PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
+      if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+        PlannedFactoryManager::Get().OnRallyHelperRemoved(
+          *session, static_cast<std::int32_t>(command->mConstantData.cmd)
+        );
+      }
+      return;
+    }
+
     const CmdId removedCommandId =
       sSimDriver.get()->RemoveCommandFromUnitQueue(command->mConstantData.cmd, unit->mParams.mEntityId);
 
@@ -3030,6 +3040,12 @@ namespace moho
       return;
     }
 
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory is selected by its own click only; a double
+    // click on it leaves that selection, and a double click on a factory skips the planned ones (below).
+    if (PlannedFactoryManager::IsPlannedProxyUnit(hoveredUnit)) {
+      return;
+    }
+
     // FAF hot-patch (FA-Binary-Patches WallSelection): the stock early return for a WALL unit
     // (`jne 0x00866002` after IsInCategory("WALL")) is NOPed at 0x00865EC2, so double-clicking
     // a wall selects all walls of that type on screen. The category test itself has no effect.
@@ -3056,7 +3072,7 @@ namespace moho
         }
 
         UserUnit* const unit = entity->IsUserUnit();
-        if (unit == nullptr || unit == hoveredUnit) {
+        if (unit == nullptr || unit == hoveredUnit || PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
           continue;
         }
 

@@ -2334,6 +2334,16 @@ int moho::cfunc_IncreaseBuildCountInQueueL(
   }
   const int count = static_cast<int>(lua_tonumber(state->m_state, 2));
 
+  // Engine addition (`ui_FactoryPreOrders`): the queue on show is a planned factory's kept orders.
+  if (auto* const proxy = PlannedFactoryManager::Get().FindByUserUnit(sCurrentBuildFactory.GetObjectPtr())) {
+    if (
+      oneBasedQueueIndex >= 1 && static_cast<std::size_t>(oneBasedQueueIndex) <= proxy->mPreOrders.size() && count > 0
+    ) {
+      proxy->mPreOrders[static_cast<std::size_t>(oneBasedQueueIndex - 1)].count += count;
+    }
+    return 0;
+  }
+
   const CmdId* commandBegin = nullptr;
   const CmdId* commandEnd = nullptr;
   CurrentBuildQueueItemCommands(oneBasedQueueIndex, &commandBegin, &commandEnd);

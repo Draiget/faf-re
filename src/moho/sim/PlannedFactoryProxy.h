@@ -18,6 +18,7 @@ namespace moho
   struct REntityBlueprint;
   struct GeomCamera3;
   struct SSTICommandIssueData;
+  struct SSTITarget;
   class CWldSession;
   class UserUnit;
   enum class EUnitCommandType : std::int32_t;
@@ -33,6 +34,8 @@ namespace moho
     EAiTargetType targetType{};
     Vector3f position{Vector3f::ZERO};
     std::uint32_t targetEntityId{0};
+    /// The command id of the helper that draws this order's line (`IsClientOnlyCommand`), or 0.
+    std::int32_t helperId{0};
   };
 
   /**
@@ -70,10 +73,6 @@ namespace moho
     std::vector<RallyPointOrder> mRallyOrders{};
     bool mRepeatBuild{false};
     std::vector<Builder> mBuilders{};
-
-    /// Command ids of the helpers that draw this proxy's rally lines. They were never sent to the sim and
-    /// belong to this proxy alone; they are deleted with it.
-    std::vector<std::int32_t> mRallyHelperIds{};
 
     /// The client-only unit. The session's entity map owns it; the proxy only points at it.
     UserUnit* mUserUnit{nullptr};
@@ -160,6 +159,12 @@ namespace moho
      */
     bool RetargetFromPlannedFactory(CWldSession& session, SSTICommandIssueData& data);
 
+    /// A planned factory's rally line dragged to a new target (`ISSUE_SetCommandTarget` on its helper).
+    void OnRallyHelperRetargeted(std::int32_t helperId, const SSTITarget& target, const Vector3f& position);
+
+    /// A planned factory's rally line removed (`ISSUE_RemoveCommandFromUnitQueue` on its helper).
+    void OnRallyHelperRemoved(CWldSession& session, std::int32_t helperId);
+
     /// The proxy half of `ISSUE_FactoryCommand`: records the rally order and draws its line.
     void OnProxyFactoryCommand(
       CWldSession& session,
@@ -225,7 +230,10 @@ namespace moho
 
   private:
     void Dispatch(CWldSession& session, PlannedUnitProxy& proxy, UserUnit& factory);
-    void Destroy(CWldSession& session, std::size_t index, UserUnit* replacement);
+    /// Takes the proxy at `index` out of the list (nothing finds it after this) and returns it.
+    std::unique_ptr<PlannedUnitProxy> Take(std::size_t index);
+    /// Removes a taken proxy's unit and rally helpers from the session; `replacement` takes its selection.
+    void Destroy(CWldSession& session, std::unique_ptr<PlannedUnitProxy> proxy, UserUnit* replacement);
     [[nodiscard]] std::uint32_t FreeSlot() const noexcept;
 
     std::vector<std::unique_ptr<PlannedUnitProxy>> mProxies;

@@ -558,14 +558,6 @@ namespace moho
   };
 
   /**
-   * Engine addition: `entities` without its client-only unit ids (`IsClientOnlyUnitId`, the planned
-   * factories of `ui_FactoryPreOrders`): `entities` itself when it has none, else a filtered copy in
-   * `storage`. `CSimDriver` applies it to every entity set before the set enters the command stream.
-   */
-  [[nodiscard]] const BVSet<EntId, EntIdUniverse>&
-  WithoutClientOnlyUnits(const BVSet<EntId, EntIdUniverse>& entities, BVSet<EntId, EntIdUniverse>& storage);
-
-  /**
    * Concrete simulation-thread driver.
    *
    * VFTABLE: 0x00E3350C

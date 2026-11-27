@@ -135,8 +135,8 @@ namespace moho
    * Engine addition: unit ids the client gives to units that exist only in its own world view (the planned
    * factories of `ui_FactoryPreOrders`). The sim hands out serials per family and army from 0 upward and
    * reuses released ones first (`EntityDB::DoReserveId`, 0x00684480), so it would need about a million live
-   * units in one army to reach this range. An id in it must never enter the command stream; `CSimDriver`
-   * drops it.
+   * units in one army to reach this range. An id in it must never enter the command stream; `CMarshaller`
+   * drops it (moho/command/ClientOnlyIds.h).
    */
   inline constexpr std::uint32_t kClientOnlyUnitSerialBase = 0xFF000u;
   inline constexpr std::uint32_t kClientOnlyUnitSerialCount =
