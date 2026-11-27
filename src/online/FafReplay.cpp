@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include "zlib.h"
 #include "zstd.h"
@@ -113,6 +114,152 @@ namespace faf::online
       }
     }
     return out;
+  }
+
+  namespace
+  {
+    /** One value of the engine's Lua serialisation (replay heads): 0 float, 1 string, 2 nil, 3 bool, 4 table..5. */
+    bool ReadLuaValue(
+      const std::string& data,
+      std::size_t& at,
+      JsonNode& out,
+      const int depth
+    )
+    {
+      if (at >= data.size() || depth > 32) {
+        return false;
+      }
+      const unsigned char kind = static_cast<unsigned char>(data[at++]);
+      switch (kind) {
+      case 0: {
+        if (at + 4 > data.size()) {
+          return false;
+        }
+        float value = 0;
+        std::memcpy(&value, data.data() + at, 4);
+        at += 4;
+        out = JsonNumber(value);
+        return true;
+      }
+      case 1: {
+        const std::size_t end = data.find('\0', at);
+        if (end == std::string::npos) {
+          return false;
+        }
+        out = JsonString(data.substr(at, end - at));
+        at = end + 1;
+        return true;
+      }
+      case 2:
+        out = JsonNode{};
+        return true;
+      case 3:
+        if (at >= data.size()) {
+          return false;
+        }
+        out = JsonBool(data[at++] != 0);
+        return true;
+      case 4: {
+        std::vector<std::pair<std::string, JsonNode>> members;
+        while (at < data.size() && static_cast<unsigned char>(data[at]) != 5) {
+          JsonNode key;
+          JsonNode value;
+          if (!ReadLuaValue(data, at, key, depth + 1) || !ReadLuaValue(data, at, value, depth + 1)) {
+            return false;
+          }
+          members.emplace_back(key.kind == JsonNode::Kind::String ? key.text : ToJson(key), std::move(value));
+        }
+        if (at >= data.size()) {
+          return false;
+        }
+        ++at; // the table's end
+        out = JsonObject(std::move(members));
+        return true;
+      }
+      default:
+        return false;
+      }
+    }
+
+    bool ReadInt32(
+      const std::string& data,
+      std::size_t& at,
+      std::int32_t& out
+    )
+    {
+      if (at + 4 > data.size()) {
+        return false;
+      }
+      std::memcpy(&out, data.data() + at, 4); // little-endian, as every platform the game runs on
+      at += 4;
+      return true;
+    }
+  } // namespace
+
+  std::expected<GameReplaySummary, std::string> ReadGameReplaySummary(
+    const std::string& stream
+  )
+  {
+    const auto refuse = [] {
+      return std::unexpected(std::string("not a replay of this game (its head can't be read)"));
+    };
+    GameReplaySummary summary;
+    const std::size_t versionEnd = stream.find('\0');
+    if (versionEnd == std::string::npos || versionEnd > 256) {
+      return refuse();
+    }
+    summary.version = stream.substr(0, versionEnd);
+    const std::size_t replayLine = stream.find("Replay v", versionEnd);
+    const std::size_t lineEnd = replayLine == std::string::npos ? std::string::npos : stream.find("\r\n", replayLine);
+    if (replayLine == std::string::npos || replayLine > 1024 || lineEnd == std::string::npos) {
+      return refuse();
+    }
+    std::size_t at = lineEnd + 2;
+    const std::size_t mapEnd = stream.find('\0', at);
+    if (mapEnd == std::string::npos) {
+      return refuse();
+    }
+    summary.map = stream.substr(at, mapEnd - at);
+    // Then one more line: "\r\n\x1a" in FAF's builds, "\r\n" in older ones; the engine skips it whatever it says.
+    const std::size_t separatorEnd = stream.find('\0', mapEnd + 1);
+    if (separatorEnd == std::string::npos || separatorEnd - mapEnd > 8) {
+      return refuse();
+    }
+    at = separatorEnd + 1;
+    // The sim mods' table, then the scenario's (each after its size).
+    std::int32_t size = 0;
+    if (!ReadInt32(stream, at, size) || size < 0 || at + static_cast<std::size_t>(size) > stream.size()) {
+      return refuse();
+    }
+    {
+      std::size_t inside = at;
+      JsonNode mods;
+      if (ReadLuaValue(stream, inside, mods, 0) && mods.kind == JsonNode::Kind::Object) {
+        for (const auto& [key, mod] : mods.members) {
+          if (mod.kind == JsonNode::Kind::Object && !mod.String("name").empty()) {
+            summary.mods.push_back(mod.String("name"));
+          }
+        }
+      }
+    }
+    at += static_cast<std::size_t>(size);
+    if (!ReadInt32(stream, at, size) || size < 0 || at + static_cast<std::size_t>(size) > stream.size()) {
+      return refuse();
+    }
+    at += static_cast<std::size_t>(size);
+    if (at >= stream.size()) {
+      return refuse();
+    }
+    const unsigned char sources = static_cast<unsigned char>(stream[at++]);
+    for (unsigned i = 0; i < sources; ++i) {
+      const std::size_t end = stream.find('\0', at);
+      if (end == std::string::npos || end + 1 + 4 > stream.size()) {
+        return refuse();
+      }
+      summary.players.push_back(stream.substr(at, end - at));
+      at = end + 1 + 4; // the name, then its timeout count
+    }
+    return summary;
   }
 
   std::expected<JsonNode, std::string> ReadFafReplayHeader(

@@ -67,6 +67,72 @@ function MapPicture(frame)
     return picture
 end
 
+--- Tabs along a page's heading: {key, label} each; onPick(key). :Set(chosen, counts) marks one and writes counts.
+function Tabs(parent, entries, onPick)
+    local tabs = Group(parent)
+    tabs:DisableHitTest()
+    LayoutHelpers.SetHeight(tabs, 40)
+    tabs.items = {}
+    for i, entry in entries do
+        local key = entry[1]
+        local tab = Group(tabs)
+        tab.label = Theme.Text(tab, string.upper(entry[2]), 13, C.muted, true)
+        tab.count = Theme.Text(tab, '', 11, C.subtle, true)
+        LayoutHelpers.AtLeftIn(tab.label, tab, 0)
+        LayoutHelpers.AtVerticalCenterIn(tab.label, tab)
+        tab.count.Left:Set(function() return tab.label.Right() + Scale(8) end)
+        LayoutHelpers.AtVerticalCenterIn(tab.count, tab)
+        tab.Width:Set(function() return tab.count.Right() - tab.Left() end)
+        tab.Top:Set(tabs.Top)
+        tab.Bottom:Set(tabs.Bottom)
+        tab.Height:Set(function() return tab.Bottom() - tab.Top() end)
+        if i == 1 then
+            tab.Left:Set(tabs.Left)
+        else
+            local before = tabs.items[i - 1]
+            tab.Left:Set(function() return before.Right() + Scale(28) end)
+        end
+        tab.underline = Theme.Rect(tab, C.accent)
+        tab.underline.Left:Set(tab.Left)
+        tab.underline.Right:Set(tab.Right)
+        tab.underline.Bottom:Set(tab.Bottom)
+        tab.underline.Height:Set(Scale(2))
+        tab.underline.Width:Set(function() return tab.underline.Right() - tab.underline.Left() end)
+        tab.underline:DisableHitTest()
+        tab.key = key
+        Theme.HitArea(tab, function(self, event)
+            if event.Type == 'MouseEnter' then
+                tab.over = true
+                tabs:Paint()
+            elseif event.Type == 'MouseExit' then
+                tab.over = false
+                tabs:Paint()
+            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+                Theme.ClickSound()
+                onPick(key)
+                return true
+            end
+            return false
+        end)
+        tabs.items[i] = tab
+    end
+    tabs.Paint = function(self)
+        for _, tab in self.items do
+            local chosen = tab.key == self.chosen
+            Theme.SetColor(tab.label, chosen and C.accent or (tab.over and C.text or C.muted))
+            Theme.SetVisible(tab.underline, chosen)
+        end
+    end
+    tabs.Set = function(self, chosen, counts)
+        self.chosen = chosen
+        for _, tab in self.items do
+            Theme.SetText(tab.count, counts[tab.key] and tostring(counts[tab.key]) or '')
+        end
+        self:Paint()
+    end
+    return tabs
+end
+
 --- A dimmed cover over the whole screen that takes every click, with a bracketed panel in its middle.
 function Modal(root, width, height)
     local cover = Theme.Rect(root, 'e0020508')

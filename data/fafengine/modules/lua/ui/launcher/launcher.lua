@@ -996,70 +996,7 @@ local function Matches(game, filter)
 end
 
 --- Tabs: labels with a count each, the chosen one in cyan and underlined.
-local function Tabs(parent, entries, onPick)
-    local tabs = Group(parent)
-    tabs:DisableHitTest()
-    LayoutHelpers.SetHeight(tabs, 40)
-    tabs.items = {}
-    for i, entry in entries do
-        local key = entry[1]
-        local tab = Group(tabs)
-        tab.label = Theme.Text(tab, string.upper(entry[2]), 13, C.muted, true)
-        tab.count = Theme.Text(tab, '', 11, C.subtle, true)
-        LayoutHelpers.AtLeftIn(tab.label, tab, 0)
-        LayoutHelpers.AtVerticalCenterIn(tab.label, tab)
-        tab.count.Left:Set(function() return tab.label.Right() + Scale(8) end)
-        LayoutHelpers.AtVerticalCenterIn(tab.count, tab)
-        tab.Width:Set(function() return tab.count.Right() - tab.Left() end)
-        tab.Top:Set(tabs.Top)
-        tab.Bottom:Set(tabs.Bottom)
-        tab.Height:Set(function() return tab.Bottom() - tab.Top() end)
-        if i == 1 then
-            tab.Left:Set(tabs.Left)
-        else
-            local before = tabs.items[i - 1]
-            tab.Left:Set(function() return before.Right() + Scale(28) end)
-        end
-        tab.underline = Theme.Rect(tab, C.accent)
-        tab.underline.Left:Set(tab.Left)
-        tab.underline.Right:Set(tab.Right)
-        tab.underline.Bottom:Set(tab.Bottom)
-        tab.underline.Height:Set(Scale(2))
-        tab.underline.Width:Set(function() return tab.underline.Right() - tab.underline.Left() end)
-        tab.underline:DisableHitTest()
-        tab.key = key
-        Theme.HitArea(tab, function(self, event)
-            if event.Type == 'MouseEnter' then
-                tab.over = true
-                tabs:Paint()
-            elseif event.Type == 'MouseExit' then
-                tab.over = false
-                tabs:Paint()
-            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
-                Theme.ClickSound()
-                onPick(key)
-                return true
-            end
-            return false
-        end)
-        tabs.items[i] = tab
-    end
-    tabs.Paint = function(self)
-        for _, tab in self.items do
-            local chosen = tab.key == self.chosen
-            Theme.SetColor(tab.label, chosen and C.accent or (tab.over and C.text or C.muted))
-            Theme.SetVisible(tab.underline, chosen)
-        end
-    end
-    tabs.Set = function(self, chosen, counts)
-        self.chosen = chosen
-        for _, tab in self.items do
-            Theme.SetText(tab.count, counts[tab.key] and tostring(counts[tab.key]) or '')
-        end
-        self:Paint()
-    end
-    return tabs
-end
+local Tabs = Widgets.Tabs
 
 local function BuildOnlinePage(launcher, page)
     local view = {}
@@ -1783,10 +1720,23 @@ function Launcher:SetHomeEscape()
 end
 
 function Launcher:Refresh()
-    local ok, err = pcall(RefreshOnline, self)
+    -- Only the page on screen: a page's refresh shows its own pieces, and a piece shown under a hidden page still
+    -- draws over the one on screen.
+    local ok, err = true, nil
+    if self.page == 'online' then
+        ok, err = pcall(RefreshOnline, self)
+    end
     if not ok and not self.refreshFailed then
         self.refreshFailed = true
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
+    end
+    if self.page == 'replays' and self.replaysView then
+        local view = self.replaysView
+        local done, why = pcall(view.Refresh, view)
+        if not done and not self.replaysFailed then
+            self.replaysFailed = true
+            WARN('LAUNCHER: the replays page failed to update: ' .. tostring(why))
+        end
     end
     if self.status then
         self.status:Update()
@@ -2072,13 +2022,39 @@ function Launcher:Lan()
     end)
 end
 
+--- The Replays page (replays.lua): this computer's replays and FAF's replay vault. FAF's own replay screen is still
+--- there for a build without the engine's replay library.
 function Launcher:Replays()
-    -- Replays of any FAF game version play, with the engine patches of the nearest version this engine models
-    -- (rep_PlayAnyVersion, as /noversioncheck); their own game files at runtime come later.
+    if self.pages.replays then
+        self:ShowPage('replays')
+        return
+    end
     ConExecute('rep_PlayAnyVersion true')
     self:OpenScreen('Replays', function(host, back)
         import('/lua/ui/dialogs/replay.lua').CreateDialog(host, true, back)
     end)
+end
+
+--- Watches a replay file (a FAF replay is decoded first), as FAF's replay screen launches one. False and why when the
+--- game can't start it.
+function Launcher:WatchReplay(path)
+    -- Replays of any FAF game version play, with the engine patches of the nearest version this engine models
+    -- (rep_PlayAnyVersion, as /noversioncheck); their own game files at runtime come later.
+    ConExecute('rep_PlayAnyVersion true')
+    local ok, playable = FafLibrary_PrepareReplay(path)
+    if not ok then
+        return false, playable
+    end
+    LOG('LAUNCHER: watching ' .. tostring(playable))
+    if LaunchReplaySession(playable) ~= true then
+        return false, 'the game couldn\'t start this replay'
+    end
+    SetFrontEndData('replay_filename', playable)
+    self:StopSounds()
+    import('/fafengine/modules/lua/ui/uiscale.lua').SetMainMenuVisible(false)
+    Cleanup()
+    import('/lua/ui/menus/menucommon.lua').MenuCleanup()
+    return true
 end
 
 function Launcher:Mods()
@@ -2168,6 +2144,8 @@ function Launcher:ShowPage(name)
     for pageName, page in self.pages do
         Theme.SetVisible(page, pageName == name)
     end
+    -- The Show showed every piece the page keeps hidden (brackets of disabled buttons, tips, the hover card).
+    Theme.RepaintAll()
     for _, item in self.navItems do
         item:Paint(false)
     end
@@ -2253,7 +2231,7 @@ local function BuildRail(launcher, body)
         { 'book', 'Campaign', function() launcher:Campaign() end },
         { 'users', 'LAN', function() launcher:Lan() end },
         'Library',
-        { 'replays', 'Replays', function() launcher:Replays() end },
+        { 'replays', 'Replays', function() launcher:Replays() end, 'replays' },
         { 'mods', 'Mods', function() launcher:Mods() end },
         'Game',
         { 'settings', 'Options', function() launcher:Options() end },
@@ -2382,6 +2360,17 @@ local function Build(launcher)
     launcher.pages = { online = onlinePage }
     BuildOnlinePage(launcher, onlinePage)
 
+    -- Replays: this computer's and FAF's vault (replays.lua), with the engine's replay library.
+    if rawget(_G, 'FafLibrary_LocalReplays') then
+        local replaysPage = Group(content, 'launcher replays')
+        LayoutHelpers.FillParent(replaysPage, content)
+        replaysPage.Width:Set(function() return replaysPage.Right() - replaysPage.Left() end)
+        replaysPage.Height:Set(function() return replaysPage.Bottom() - replaysPage.Top() end)
+        launcher.pages.replays = replaysPage
+        import('/fafengine/modules/lua/ui/launcher/replays.lua').Build(launcher, replaysPage)
+        Theme.SetVisible(replaysPage, false)
+    end
+
     -- Updates the page while the launcher shows.
     local ticker = Group(body, 'launcher ticker')
     LayoutHelpers.AtLeftTopIn(ticker, body, 0, 0)
@@ -2492,6 +2481,7 @@ function TestWalk()
             WaitSeconds(seconds)
         end
         Prefs.SetToCurrentProfile('MenuTutorialPrompt', true)
+        local watchAtStart = GetCommandLineArg('/launcherreplaywatch', 0)
         Step('home')
         Wait(4)
         -- /launcherreplaytest <file>: a replay of a game version this engine doesn't model is refused with the
@@ -2625,7 +2615,64 @@ function TestWalk()
                 current:SetHomeEscape()
             end
         end
-        for _, screen in { 'Skirmish', 'Multiplayer LAN', 'Replays', 'Mods', 'Options' } do
+        -- The Replays page: this computer's replays, the first one's details, then the vault's first page.
+        if current and current.replaysView then
+            current:ShowPage('replays')
+            Wait(2)
+            local replays = current.replaysView
+            Step('replays page: ' .. table.getn(replays.localItems or {}) .. ' on this computer')
+            -- Every control of the page has its edges (a layout cycle shows as a control whose edges fail).
+            for name, control in replays do
+                if type(control) == 'table' and control.Left and control.Right and control.Top then
+                    local fine = pcall(function() return control.Left() + control.Right() + control.Top() end)
+                    if not fine then
+                        Step('replays page: the edges of ' .. tostring(name) .. ' fail')
+                    end
+                end
+            end
+            local first = replays.localList.items[1]
+            if first then
+                replays.localList.selectedKey = first.key
+                replays.selected = first
+                replays:ShowDetails()
+                local info = replays:Info(first)
+                Step('first replay: ' .. tostring(first.file) .. ', map ' .. tostring(info and info.map) .. ', ' ..
+                    table.getn(info and info.players or {}) .. ' players')
+            end
+            Wait(2)
+            replays:SetTab('vault')
+            for i = 1, 30 do
+                if not replays.searchJob then
+                    break
+                end
+                Wait(0.5)
+            end
+            Step('replay vault: ' .. table.getn(replays.vaultItems) .. ' games, page ' .. replays.vaultPage .. ' of ' ..
+                replays.vaultPages .. (replays.status ~= '' and (', ' .. replays.status) or ''))
+            Wait(2)
+            -- /launcherreplaywatch: Watch on the vault's first game: it downloads, then the replay starts.
+            local watchTest = GetCommandLineArg('/launcherreplaywatch', 0)
+            Step('watch test: ' .. tostring(watchTest) .. ' (at the start ' .. tostring(watchAtStart) .. '), first game ' ..
+                tostring(replays.vaultItems[1]))
+            watchTest = watchTest or watchAtStart
+            if watchTest and replays.vaultItems[1] then
+                local game = replays.vaultItems[1]
+                replays.vaultList.selectedKey = game.key
+                replays.selected = game
+                replays:Watch()
+                Step('watch pressed on ' .. game.title .. ': ' .. replays.status)
+                for i = 1, 40 do
+                    if not replays.downloadJob then
+                        break
+                    end
+                    Wait(0.5)
+                end
+                Step('after the download: ' .. replays.status)
+                return -- the replay runs; the run's time limit ends it
+            end
+            current:ShowPage('online')
+        end
+        for _, screen in { 'Skirmish', 'Multiplayer LAN', 'Mods', 'Options' } do
             local launcher = current
             if not launcher then
                 Step('the launcher is gone before ' .. screen)

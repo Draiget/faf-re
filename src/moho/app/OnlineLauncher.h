@@ -6,6 +6,10 @@
 // back to the launcher when the match ends. Nothing here runs, and nothing goes to the network, until the launcher's
 // Lua calls one of its functions (FafOnline_*), so a game another launcher started behaves as it always did.
 
+#include <expected>
+#include <filesystem>
+#include <string>
+
 namespace moho
 {
   /** The service's step on the main thread, each frame: the lobby's messages, a match's start and end. */
@@ -20,4 +24,18 @@ namespace moho
 
   /** Ends the service (its threads, the lobby connection), before GPGNet goes at the program's end. */
   void ONLINE_Shutdown();
+
+  // For the launcher's replays and mods (LauncherLibrary.cpp).
+
+  /** Where the launcher keeps its files: %LOCALAPPDATA%, $XDG_DATA_HOME or ~/.local/share, then faf-re/online. */
+  [[nodiscard]] std::filesystem::path ONLINE_DataFolder();
+  /** FAF's API (https://api.faforever.com, or a test stack's). */
+  [[nodiscard]] std::string ONLINE_ApiBase();
+  /** The player's FAF access token, refreshed when near its end; for a worker thread. The error when not signed in. */
+  [[nodiscard]] std::expected<std::string, std::string> ONLINE_AccessToken();
+  /** The FAF init file the game runs on (its folder is FAF's bin folder); empty when it isn't on FAF's files. */
+  [[nodiscard]] std::filesystem::path ONLINE_InitFile();
+
+  /** Stops the library's downloads and searches (LauncherLibrary.cpp), before the service they sign in with goes. */
+  void LIBRARY_Shutdown();
 } // namespace moho

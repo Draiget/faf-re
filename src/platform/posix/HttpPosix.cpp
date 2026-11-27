@@ -537,6 +537,7 @@ namespace platform::http
       long long length = -1; ///< -1: until the connection closes
       std::string extra;     ///< body bytes read with the head
       std::string headers;   ///< the raw header lines, for the WebSocket's checks
+      std::string location;  ///< a redirect's Location
     };
 
     std::string RequestText(
@@ -603,6 +604,8 @@ namespace platform::http
             head.length = std::strtoll(value.c_str(), nullptr, 10);
           } else if (name == "transfer-encoding" && Lower(value).find("chunked") != std::string::npos) {
             head.chunked = true;
+          } else if (name == "location") {
+            head.location = value;
           }
         }
         at = lineEnd;
@@ -717,6 +720,17 @@ namespace platform::http
     gDefaultAgent = std::move(agent);
   }
 
+  /** The rest of an answer once its head is read: the body, as its length or chunks say. */
+  static std::expected<void, std::string> ReadAnswer(
+    Connection& connection,
+    const Target& target,
+    ResponseHead& head,
+    long& status,
+    std::string& body,
+    std::atomic<std::uint64_t>* received,
+    std::atomic<std::uint64_t>* total
+  );
+
   std::expected<void, std::string> Request(
     const Call& call,
     long& status,
@@ -725,24 +739,62 @@ namespace platform::http
     std::atomic<std::uint64_t>* const total
   )
   {
-    status = 0;
-    body.clear();
-    Target target;
-    if (!Crack(call.url, target)) {
-      return std::unexpected("not a link: " + call.url);
+    // Redirects are followed, up to 5, as WinHTTP does on Windows: a 303 goes on as a GET without the body.
+    Call current = call;
+    for (int hop = 0;; ++hop) {
+      status = 0;
+      body.clear();
+      Target target;
+      if (!Crack(current.url, target)) {
+        return std::unexpected("not a link: " + current.url);
+      }
+      Connection connection;
+      if (auto opened = connection.Open(target); !opened) {
+        return std::unexpected(opened.error());
+      }
+      const std::string request = RequestText(current, target, {}) + current.body;
+      if (!connection.WriteAll(request.data(), request.size())) {
+        return std::unexpected("sending to " + target.host + " failed");
+      }
+      auto head = ReadHead(connection, target.host);
+      if (!head) {
+        return std::unexpected(head.error());
+      }
+      const bool redirect =
+        head->status == 301 || head->status == 302 || head->status == 303 || head->status == 307 || head->status == 308;
+      if (redirect && !head->location.empty() && hop < 5) {
+        std::string next = head->location;
+        if (next.rfind("http://", 0) != 0 && next.rfind("https://", 0) != 0) {
+          // A path on the same server.
+          const std::string host = target.bracketed ? "[" + target.host + "]" : target.host;
+          next = std::string(target.secure ? "https://" : "http://") + host + ":" + target.port +
+            (next.starts_with("/") ? next : "/" + next);
+        }
+        if (target.secure && next.rfind("http://", 0) == 0) {
+          return std::unexpected("refused a redirect from https to plain http: " + next);
+        }
+        current.url = next;
+        if (head->status == 303) {
+          current.method = "GET";
+          current.body.clear();
+        }
+        continue;
+      }
+      return ReadAnswer(connection, target, *head, status, body, received, total);
     }
-    Connection connection;
-    if (auto opened = connection.Open(target); !opened) {
-      return std::unexpected(opened.error());
-    }
-    const std::string request = RequestText(call, target, {}) + call.body;
-    if (!connection.WriteAll(request.data(), request.size())) {
-      return std::unexpected("sending to " + target.host + " failed");
-    }
-    auto head = ReadHead(connection, target.host);
-    if (!head) {
-      return std::unexpected(head.error());
-    }
+  }
+
+  static std::expected<void, std::string> ReadAnswer(
+    Connection& connection,
+    const Target& target,
+    ResponseHead& headRef,
+    long& status,
+    std::string& body,
+    std::atomic<std::uint64_t>* const received,
+    std::atomic<std::uint64_t>* const total
+  )
+  {
+    ResponseHead* const head = &headRef;
     status = head->status;
     if (total != nullptr && head->length >= 0) {
       *total = static_cast<std::uint64_t>(head->length);

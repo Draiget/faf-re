@@ -8,6 +8,7 @@
 
 #include <expected>
 #include <string>
+#include <vector>
 
 #include "online/Json.h"
 
@@ -25,6 +26,22 @@ namespace faf::online
 
   /** A .fafreplay file's bytes, header and replay stream; the error when it can't be read. */
   [[nodiscard]] std::expected<FafReplayFile, std::string> DecodeFafReplay(const std::string& raw);
+
+  /** What the head of the game's own replay stream (.SCFAReplay) says, for a list of replays. */
+  struct GameReplaySummary
+  {
+    std::string version;              ///< "Supreme Commander v1.50.3841"
+    std::string map;                  ///< the scenario's path, /maps/<folder>/<folder>_scenario.lua
+    std::vector<std::string> mods;    ///< the sim mods' names
+    std::vector<std::string> players; ///< the command sources: each player who recorded commands, observers too
+  };
+
+  /**
+   * The summary of a replay stream's head, as VCR_SetupReplaySession reads it (and tools/replay-parity's
+   * replay_stream): the version line, "Replay v1.9", the map path, the sim mods' and the scenario's Lua tables (each
+   * with its size), the command sources. Only the head is needed; the error when it isn't one.
+   */
+  [[nodiscard]] std::expected<GameReplaySummary, std::string> ReadGameReplaySummary(const std::string& stream);
 
   /** Base64 (RFC 4648, padding optional, line breaks ignored) to bytes; the error on any other character. */
   [[nodiscard]] std::expected<std::string, std::string> DecodeBase64(const std::string& text);

@@ -1804,8 +1804,33 @@ bool moho::ONLINE_ReturnToLauncherInsteadOfQuitting()
   return true;
 }
 
+std::filesystem::path moho::ONLINE_DataFolder()
+{
+  return DataFolder();
+}
+
+std::string moho::ONLINE_ApiBase()
+{
+  return GameEndpoints().apiUrl;
+}
+
+std::expected<std::string, std::string> moho::ONLINE_AccessToken()
+{
+  // Made on the game's thread by the launcher's first call; a worker only reads it.
+  if (!gService || !gService->SignedIn()) {
+    return std::unexpected(std::string("not signed in to FAF"));
+  }
+  return gService->Tokens()();
+}
+
+std::filesystem::path moho::ONLINE_InitFile()
+{
+  return TheService().realInit;
+}
+
 void moho::ONLINE_Shutdown()
 {
+  moho::LIBRARY_Shutdown();
   if (gService && gService->match != MatchState::Idle && gService->match != MatchState::Failed) {
     gService->lobby.SetGameHandler({});
     moho::CFG_ClearLaunchArgs();

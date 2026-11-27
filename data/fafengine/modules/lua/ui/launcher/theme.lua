@@ -454,7 +454,10 @@ function Paragraph(parent, size, color)
         self.color = newColor or self.color
         local probe = self.lines[1]
         if not probe then
+            -- The first line measures the text too; placed now, as an empty paragraph still draws it.
             probe = Text(self, '', size, self.color)
+            probe.Left:Set(self.Left)
+            probe.Top:Set(self.Top)
             self.lines[1] = probe
         end
         local wrapped = {}
