@@ -14,6 +14,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -38,6 +39,7 @@
 #include "online/LaunchArgs.h"
 #include "online/ReplayRelay.h"
 #include "platform/PlatformDefines.h"
+#include "platform/Process.h"
 
 namespace
 {
@@ -229,6 +231,14 @@ namespace
     /// Every player the lobby told us about (player_info), by login: ratings, country and clan for the game list.
     std::map<std::string, LaunchPlayer> players;
     std::string notice;
+    /// The last hand-off of the sign-in page to the browser: "" (none yet), "opening", "opened", or why it failed. A
+    /// thread of its own writes it, as the shell can take a moment.
+    struct PageOpen
+    {
+      std::mutex lock;
+      std::string state;
+    };
+    std::shared_ptr<PageOpen> pageOpen = std::make_shared<PageOpen>();
     std::string realInit; ///< the command line's /init: the game files this process has mounted
 
     MatchState match = MatchState::Idle;
@@ -695,8 +705,32 @@ namespace
 
   const char* ControlStateName(ControlServiceClient::State state);
 
-  /** table FafOnline_Status(): signIn, message, code, url, secondsLeft, login; lobby, lobbyMessage, notice; match,
-   * matchMessage; loadedMod; servers, serversMessage, serverCount (our control services). */
+  /** Hands the sign-in page to the browser on a thread of its own and logs how that went (the page holds the code). */
+  void OpenSignInPage(
+    Service& s
+  )
+  {
+    const std::string url = s.auth.VerifyUrl();
+    if (url.empty()) {
+      return;
+    }
+    const std::shared_ptr<Service::PageOpen> shared = s.pageOpen;
+    {
+      std::lock_guard<std::mutex> lock(shared->lock);
+      shared->state = "opening";
+    }
+    LogLine("opening FAF's sign-in page in the browser");
+    std::thread([shared, url] {
+      const auto opened = platform::process::OpenInBrowser(url);
+      const std::string state = opened ? std::string("opened") : opened.error();
+      LogLine(opened ? "the browser took FAF's sign-in page" : ("the sign-in page didn't open: " + state).c_str());
+      std::lock_guard<std::mutex> lock(shared->lock);
+      shared->state = state;
+    }).detach();
+  }
+
+  /** table FafOnline_Status(): signIn, message, code, url, pageOpen, secondsLeft, login; lobby, lobbyMessage, notice;
+   * match, matchMessage; loadedMod; servers, serversMessage, serverCount (our control services). */
   int StatusBody(
     lua_State* const L
   )
@@ -707,6 +741,10 @@ namespace
     SetField(L, "message", s.auth.Message());
     SetField(L, "code", s.auth.UserCode());
     SetField(L, "url", s.auth.VerifyUrl());
+    {
+      std::lock_guard<std::mutex> lock(s.pageOpen->lock);
+      SetField(L, "pageOpen", s.pageOpen->state);
+    }
     SetField(L, "secondsLeft", static_cast<double>(s.auth.SecondsLeft()));
     SetField(L, "login", s.haveMe ? s.me.login : s.auth.UserName());
     SetField(L, "lobby", LobbyStateName(s.lobby.GetState()));
@@ -764,18 +802,14 @@ namespace
     return 0;
   }
 
-  /** string|nil FafOnline_TakePageToOpen(): the sign-in page, once, for OpenURL. */
-  int TakePageToOpenBody(
+  /** FafOnline_OpenSignInPage(): hands the sign-in page to the browser again (the engine opens it once by itself). */
+  int OpenSignInPageBody(
     lua_State* const L
   )
   {
-    Service& s = TheService();
-    if (s.auth.TakeOpenPage() && !s.auth.VerifyUrl().empty()) {
-      lua_pushstring(L, s.auth.VerifyUrl().c_str());
-    } else {
-      lua_pushnil(L);
-    }
-    return 1;
+    (void)L;
+    OpenSignInPage(TheService());
+    return 0;
   }
 
   /** table FafOnline_Games(): FAF's open and running games, each a table. */
@@ -1061,11 +1095,11 @@ namespace
     );
     static CScrLuaBinder page(
       moho::SCR_UserLuaInitSet(),
-      "FafOnline_TakePageToOpen",
-      &Binding<&TakePageToOpenBody>,
+      "FafOnline_OpenSignInPage",
+      &Binding<&OpenSignInPageBody>,
       nullptr,
       "<global>",
-      "string|nil FafOnline_TakePageToOpen() - the sign-in page to open in the browser, once."
+      "FafOnline_OpenSignInPage() - hands FAF's sign-in page to the browser (again)."
     );
     static CScrLuaBinder games(
       moho::SCR_UserLuaInitSet(),
@@ -1149,6 +1183,11 @@ void moho::ONLINE_Frame()
     (void)TheService();
   }
   Service& s = *gService;
+  // The sign-in's code came: its page goes to the browser (not through Lua's OpenURL, which only opens what the init
+  // file's protocol list allows, from the game's thread).
+  if (s.auth.TakeOpenPage()) {
+    OpenSignInPage(s);
+  }
   // Signed in: into FAF's lobby and our control services' event streams; signed out: out of them.
   if (s.SignedIn() && !s.lobbyStarted) {
     s.lobby.Connect(s.Tokens());

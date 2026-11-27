@@ -419,6 +419,7 @@ function Button(parent, label, onClick, kind, opts)
             SetText(text, caps and string.upper(newLabel) or newLabel)
         end
     end
+    button.onClick = onClick -- what a click runs (the launcher's test walk presses buttons with it)
     HitArea(button, function(self, event)
         if not button.enabled then
             return false

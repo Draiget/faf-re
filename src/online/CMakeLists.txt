@@ -19,7 +19,7 @@ if(FAFRE_PLATFORM_WINDOWS)
     "${PROJECT_SOURCE_DIR}/src/platform/windows/HttpWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/ProcessWindows.cpp"
     "${PROJECT_SOURCE_DIR}/src/platform/windows/SecretStoreWindows.cpp")
-  target_link_libraries(faf_online PUBLIC winhttp crypt32 ws2_32)
+  target_link_libraries(faf_online PUBLIC winhttp crypt32 ws2_32 shell32 ole32)
 else()
   # Linux and macOS: BSD sockets with Mbed TLS (the build's faf_mbedtls, cmake/deps/libdatachannel).
   target_sources(faf_online PRIVATE

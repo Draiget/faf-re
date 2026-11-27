@@ -2,6 +2,7 @@
 // with both outputs through pipes, in a process group of its own, so a timeout ends the program and what it started.
 
 #include "platform/Process.h"
+#include "platform/PlatformDefines.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -19,6 +20,29 @@ extern char** environ;
 
 namespace platform::process
 {
+  std::expected<void, std::string> OpenInBrowser(
+    const std::string& url
+  )
+  {
+    if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0) {
+      return std::unexpected("not a web address: " + url);
+    }
+#if FAFRE_PLATFORM_MACOS
+    const std::string program = "open"; // macOS's opener (LaunchServices)
+#else
+    const std::string program = "xdg-open";
+#endif
+    // The opener hands the page to the browser and ends; a browser that was already running keeps its own process.
+    auto result = Run(program, {url}, std::chrono::seconds(20));
+    if (!result) {
+      return std::unexpected(result.error());
+    }
+    if (result->exitCode != 0) {
+      return std::unexpected(program + " ended with " + std::to_string(result->exitCode));
+    }
+    return {};
+  }
+
   std::expected<Output, std::string> Run(
     const std::string& program,
     const std::vector<std::string>& args,

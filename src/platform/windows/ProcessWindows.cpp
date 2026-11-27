@@ -8,6 +8,8 @@
 #define NOMINMAX
 #endif
 #include <Windows.h>
+#include <objbase.h>
+#include <shellapi.h>
 
 namespace platform::process
 {
@@ -68,7 +70,86 @@ namespace platform::process
         out.append(buffer, read);
       }
     }
+    /**
+     * Runs the command registered for https links (HKEY_CLASSES_ROOT\https\shell\open\command, the browser that
+     * registered itself) with `url` in place of its %1. False when there is none, or it doesn't start.
+     */
+    bool RunRegisteredBrowser(
+      const std::wstring& url
+    )
+    {
+      // The address goes into a command line inside quotes: one with a quote or a space in it is refused.
+      if (url.find_first_of(L"\" \t\r\n") != std::wstring::npos) {
+        return false;
+      }
+      wchar_t value[2048];
+      DWORD size = sizeof(value);
+      if (
+        ::RegGetValueW(
+          HKEY_CLASSES_ROOT,
+          L"https\\shell\\open\\command",
+          nullptr,
+          RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
+          nullptr,
+          value,
+          &size
+        ) != ERROR_SUCCESS
+      ) {
+        return false;
+      }
+      std::wstring line = value;
+      if (const std::size_t at = line.find(L"%1"); at != std::wstring::npos) {
+        line.replace(at, 2, url);
+      } else {
+        line += L" \"" + url + L"\"";
+      }
+      STARTUPINFOW startup{};
+      startup.cb = sizeof(startup);
+      PROCESS_INFORMATION info{};
+      if (!::CreateProcessW(nullptr, line.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &info)) {
+        return false;
+      }
+      ::CloseHandle(info.hThread);
+      ::CloseHandle(info.hProcess);
+      return true;
+    }
   } // namespace
+
+  std::expected<void, std::string> OpenInBrowser(
+    const std::string& url
+  )
+  {
+    if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0) {
+      return std::unexpected("not a web address: " + url);
+    }
+    const std::wstring wide = Widen(url);
+    // The shell runs its URL handlers through COM; this thread may not have it, so it is set up for the call.
+    const HRESULT com = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    SHELLEXECUTEINFOW info{};
+    info.cbSize = sizeof(info);
+    // NOASYNC: the hand-off ends before this returns (the thread may end right after); no error dialogs of its own.
+    info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    info.lpVerb = L"open";
+    info.lpFile = wide.c_str();
+    info.nShow = SW_SHOWNORMAL;
+    DWORD error = ::ShellExecuteExW(&info) ? 0 : ::GetLastError();
+    // On an account that never chose a default browser, Windows 11 answers ERROR_NO_ASSOCIATION (1155) although a
+    // browser registered its command for web links; that command takes the page then.
+    if (error == ERROR_NO_ASSOCIATION && RunRegisteredBrowser(wide)) {
+      error = 0;
+    }
+    const BOOL opened = error == 0;
+    if (SUCCEEDED(com)) {
+      ::CoUninitialize();
+    }
+    if (!opened) {
+      if (error == ERROR_NO_ASSOCIATION) {
+        return std::unexpected(std::string("Windows has no browser set for web links"));
+      }
+      return std::unexpected("Windows didn't open the browser (error " + std::to_string(error) + ")");
+    }
+    return {};
+  }
 
   std::expected<Output, std::string> Run(
     const std::string& program,

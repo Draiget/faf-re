@@ -1086,7 +1086,7 @@ local function BuildOnlinePage(launcher, page)
 
     -- Signed out or signing in: one card in the middle.
     local signIn = Theme.Panel(page, C.panel, C.line)
-    LayoutHelpers.SetDimensions(signIn, 560, 290)
+    LayoutHelpers.SetDimensions(signIn, 560, 360)
     LayoutHelpers.AtCenterIn(signIn, page, 20)
     Theme.Brackets(signIn, C.accent, true)
     view.signIn = signIn
@@ -1102,9 +1102,14 @@ local function BuildOnlinePage(launcher, page)
     view.signCode = Theme.Title(signIn, '', 30, C.accent)
     LayoutHelpers.AtHorizontalCenterIn(view.signCode, signIn)
     LayoutHelpers.AtTopIn(view.signCode, signIn, 134)
-    view.signUrl = Theme.Text(signIn, '', 12, C.subtle)
-    LayoutHelpers.AtHorizontalCenterIn(view.signUrl, signIn)
-    LayoutHelpers.AtTopIn(view.signUrl, signIn, 184)
+    -- The page's address, cut to the panel (it is long; Copy link takes all of it), and how the hand-off went.
+    view.signUrl = Theme.Cell(signIn, 12, C.subtle)
+    view.signUrl.Width:Set(function() return signIn.Width() - Scale(60) end)
+    LayoutHelpers.AtLeftIn(view.signUrl, signIn, 30)
+    LayoutHelpers.AtTopIn(view.signUrl, signIn, 186)
+    view.pageNote = Theme.Text(signIn, '', 12, C.muted)
+    LayoutHelpers.AtHorizontalCenterIn(view.pageNote, signIn)
+    LayoutHelpers.AtTopIn(view.pageNote, signIn, 208)
     view.signButton = Theme.Button(signIn, 'Sign in with FAF', function()
         local status = FafOnline_Status()
         if status.signIn == 'waiting' or status.signIn == 'working' then
@@ -1116,14 +1121,22 @@ local function BuildOnlinePage(launcher, page)
     end, 'primary', { width = 220, icon = 'external' })
     LayoutHelpers.AtHorizontalCenterIn(view.signButton, signIn)
     LayoutHelpers.AtBottomIn(view.signButton, signIn, 26)
+    -- Under the address: open it again, or copy it for a browser of the player's choosing.
     view.openPage = Theme.Button(signIn, 'Open the page again', function()
+        FafOnline_OpenSignInPage()
+        launcher:Refresh()
+    end, 'secondary', { width = 210, icon = 'external' })
+    view.openPage.Right:Set(function() return signIn.Left() + signIn.Width() / 2 - Scale(6) end)
+    LayoutHelpers.AtTopIn(view.openPage, signIn, 240)
+    view.copyLink = Theme.Button(signIn, 'Copy link', function()
         local status = FafOnline_Status()
-        if status.url ~= '' then
-            OpenURL(status.url)
+        if status.url ~= '' and CopyToClipboard(status.url) then
+            view.copiedAt = GetSystemTimeSeconds()
+            view.copyLink:SetLabel('Copied')
         end
-    end, 'ghost', { width = 200 })
-    LayoutHelpers.AtHorizontalCenterIn(view.openPage, signIn)
-    LayoutHelpers.AtBottomIn(view.openPage, signIn, 70)
+    end, 'secondary', { width = 210, icon = 'copy' })
+    view.copyLink.Left:Set(function() return signIn.Left() + signIn.Width() / 2 + Scale(6) end)
+    LayoutHelpers.AtTopIn(view.copyLink, signIn, 240)
 
     -- Signed in: the toolbar, the games, the details.
     local games = Group(page, 'online games')
@@ -1229,10 +1242,6 @@ local function RefreshOnline(launcher)
     end
     local status = FafOnline_Status()
     launcher.lastStatus = status
-    local page = FafOnline_TakePageToOpen()
-    if page then
-        OpenURL(page)
-    end
 
     local signedIn = status.signIn == 'signedin'
     local waiting = status.signIn == 'waiting' or status.signIn == 'working'
@@ -1246,14 +1255,34 @@ local function RefreshOnline(launcher)
     Theme.SetColor(view.whoNote, status.lobby == 'failed' and C.bad or C.muted)
 
     if not signedIn then
-        Theme.SetVisible(view.openPage, waiting and status.code ~= '')
-        if waiting and status.code ~= '' then
+        local haveCode = waiting and status.code ~= ''
+        Theme.SetVisible(view.openPage, haveCode)
+        Theme.SetVisible(view.copyLink, haveCode)
+        if view.copiedAt and GetSystemTimeSeconds() - view.copiedAt > 2 then
+            view.copiedAt = nil
+            view.copyLink:SetLabel('Copy link')
+        end
+        if haveCode then
             Theme.SetText(view.signHead, '')
             Theme.SetText(view.signText, 'Approve the sign-in in your browser. It shows this code:')
             Theme.SetText(view.signCode, status.code)
-            Theme.SetText(view.signUrl, string.format('%s  (%d s left)', status.url, status.secondsLeft))
+            Theme.SetText(view.signUrl, status.url)
+            -- How the hand-off to the browser went (the engine opens the page when the code comes).
+            local pageOpen = status.pageOpen or ''
+            local note, color = string.format('%d s left', status.secondsLeft), C.muted
+            if pageOpen == 'opening' then
+                note = 'Opening your browser...'
+            elseif pageOpen == 'opened' then
+                note = string.format('Opened in your browser. Not there? Copy the link.  (%d s left)',
+                    status.secondsLeft)
+            elseif pageOpen ~= '' then
+                note, color = "Your browser didn't open: " .. pageOpen .. '. Copy the link into it.', C.bad
+            end
+            Theme.SetText(view.pageNote, note)
+            Theme.SetColor(view.pageNote, color)
             view.signButton:SetLabel('Cancel')
         else
+            Theme.SetText(view.pageNote, '')
             Theme.SetText(view.signHead, waiting and 'Asking FAF' or 'Sign in to FAF')
             Theme.SetText(view.signText, status.message ~= '' and status.message or
                 'Your browser opens FAF\'s page; the game signs in once you approve.')
@@ -2274,6 +2303,38 @@ function TestWalk()
             ExitApplication()
             return
         end
+        -- /launchersignintest: Sign in with FAF on the online page; the engine hands the page to the browser, Copy link
+        -- puts its address on the clipboard. The test run points the sign-in at a local stand-in (FAF_ONLINE_OAUTH).
+        local signInTest = GetCommandLineArg('/launchersignintest', 0)
+        if signInTest and Online() then
+            current:ShowPage('online')
+            local view = current.online
+            view.signButton.onClick(view.signButton)
+            local status = FafOnline_Status()
+            for i = 1, 40 do
+                status = FafOnline_Status()
+                if status.code ~= '' and status.pageOpen ~= '' and status.pageOpen ~= 'opening' then
+                    break
+                end
+                Wait(0.5)
+            end
+            Step('sign-in code ' .. status.code .. ', page ' .. status.pageOpen)
+            Wait(2)
+            Step('sign-in panel shown')
+            Wait(3)
+            view.copyLink.onClick(view.copyLink)
+            Step('copy link pressed')
+            Wait(1)
+            Step('sign-in panel after copy')
+            Wait(2)
+            view.openPage.onClick(view.openPage)
+            Wait(3)
+            Step('page again: ' .. FafOnline_Status().pageOpen)
+            FafOnline_CancelSignIn()
+            Step('done')
+            ExitApplication()
+            return
+        end
         if Online() and FafOnline_Status().signIn == 'signedin' then
             for i = 1, 20 do
                 if FafOnline_Status().lobby == 'signedin' then
@@ -2283,6 +2344,8 @@ function TestWalk()
             end
             Step('online page, FAF lobby ' .. FafOnline_Status().lobby .. ', ' ..
                 table.getn(FafOnline_Games()) .. ' games listed')
+            Wait(8)
+            Step('online list shown')
             current:OpenHostDialog()
             Wait(2)
             Step(current.hostDialog and 'host dialog open' or 'host dialog did not open')
