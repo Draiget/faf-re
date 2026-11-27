@@ -2332,7 +2332,8 @@ namespace moho
     CWldSession* const session
   )
     : mNeedsRebuild(1u)
-    , pad_0001{0, 0, 0}
+    , mPreOrdersOnly(0u)
+    , pad_0002{0, 0}
     , mNodes{}
     , mSession(session)
     , mSessionRes1(session ? session->mCommandManager : nullptr)
@@ -2364,10 +2365,38 @@ namespace moho
   /**
    * Address: 0x00824B80 (FUN_00824B80, ??1UICommandGraph@Moho@@QAE@XZ) cleanup chain.
    */
+  UICommandGraph::UICommandGraph(
+    CWldSession* const session,
+    PreOrdersOnlyTag
+  )
+    : mNeedsRebuild(0u)
+    , mPreOrdersOnly(1u)
+    , pad_0002{0, 0}
+    , mNodes{}
+    , mSession(session)
+    , mSessionRes1(session ? session->mCommandManager : nullptr)
+    , mDebugFont()
+    , mMapAB0{}
+    , mMapAB1{}
+    , mMapC{}
+    , mMapD{}
+    , mCommandGraphTree{}
+  {
+    InitTree(mCommandGraphTree);
+    try {
+      LoadWaypointParams();
+    } catch (...) {
+      DestroyTree(mCommandGraphTree);
+      throw;
+    }
+  }
+
   UICommandGraph::~UICommandGraph()
   {
     ClearPreOrderGhostMeshes();
-    OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
+    if (mPreOrdersOnly == 0u) {
+      OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
+    }
     DestroyTree(mCommandGraphTree);
   }
   namespace
@@ -3573,7 +3602,36 @@ namespace moho
     batcher.Flush();
   }
 
-  /** Engine addition (`ui_TransportPreOrders`): `RenderCommandGraph` for the pre-orders alone. */
+  namespace
+  {
+    // Engine addition (`ui_TransportPreOrders`): the pre-order-only graph, built on first use for the
+    // session that draws it and dropped once no pre-order is left.
+    std::shared_ptr<UICommandGraph> sPreOrderGraph;
+    CWldSession* sPreOrderGraphSession = nullptr;
+  } // namespace
+
+  void UICommandGraph::RenderPreOrdersAlone(
+    CWldSession& session,
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    if (!sPreOrderGraph || sPreOrderGraphSession != &session) {
+      sPreOrderGraph = std::make_shared<UICommandGraph>(&session, PreOrdersOnlyTag{});
+      sPreOrderGraphSession = &session;
+    }
+    sPreOrderGraph->DrawPreOrderGraphOnly(camera, batcher, tick, tickFraction);
+  }
+
+  void UICommandGraph::ReleasePreOrderGraph()
+  {
+    sPreOrderGraph.reset();
+    sPreOrderGraphSession = nullptr;
+  }
+
+  /** Engine addition (`ui_TransportPreOrders`): the transport pre-orders alone, without Shift. */
   void CWldSession::RenderPreOrderGraph(
     const GeomCamera3& camera,
     CD3DPrimBatcher* const batcher,
@@ -3581,8 +3639,11 @@ namespace moho
     const float tickFraction
   )
   {
-    if (const std::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
-      graph->DrawPreOrderGraphOnly(camera, *batcher, gameTick, tickFraction);
-    }
+    UICommandGraph::RenderPreOrdersAlone(*this, camera, *batcher, gameTick, tickFraction);
+  }
+
+  void CWldSession::ReleasePreOrderGraph()
+  {
+    UICommandGraph::ReleasePreOrderGraph();
   }
 } // namespace moho

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -17,6 +18,10 @@ namespace
   std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
   std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
   std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitStartTick; // game tick the unit began to wait
+  // Carried units the player picked through their drop hologram, until they land: SelectUnits keeps
+  // these selected (FAF's UI restores a saved selection through it) and sends any other carried unit's
+  // selection to its transport, as retail.
+  std::unordered_set<std::uint32_t> sPickedCargo;
 
   /// Pre-orders whose order carries no usable command id get one from here. UI Lua numbers are floats
   /// (`LUA_NUMBER=float`), exact only up to 2^24, and `GetCommandQueue` / `DeleteCommand` pass ids
@@ -940,6 +945,7 @@ void UserUnit::QueueTransportPreOrder(
 
 void UserUnit::ClearTransportPreOrders()
 {
+  sPickedCargo.erase(this->mParams.mEntityId);
   sTransportPreOrders.erase(this->mParams.mEntityId);
   sDisembarkedWaitStartTick.erase(this->mParams.mEntityId);
   if (sTransportPreOrders.empty()) {
@@ -1078,8 +1084,23 @@ const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>
   return sTransportPreOrders;
 }
 
+void UserUnit::MarkCargoPicked(
+  const std::uint32_t entityId
+)
+{
+  sPickedCargo.insert(entityId);
+}
+
+bool UserUnit::IsCargoPicked(
+  const std::uint32_t entityId
+)
+{
+  return sPickedCargo.find(entityId) != sPickedCargo.end();
+}
+
 void UserUnit::ClearAllTransportPreOrderState()
 {
+  sPickedCargo.clear();
   sTransportPreOrders.clear();
   sSelectionBracketPositionOverrides.clear();
   sDispatchedPreOrderBuilders.clear();
@@ -1732,12 +1753,15 @@ void UserUnit::Tick(
   // so the beat tick is what reliably sends the orders of a unit that has left its transport.
   if (!ui_TransportPreOrders) {
     // Switched off: drop every queued pre-order, so turning it on again later sends nothing stale.
-    if (!sTransportPreOrders.empty() || !sSelectionBracketPositionOverrides.empty()) {
+    if (!sTransportPreOrders.empty() || !sSelectionBracketPositionOverrides.empty() || !sPickedCargo.empty()) {
       ClearAllTransportPreOrderState();
     }
   } else if (!IsAttachmentParentRef(mVariableData.mAttachmentParentRef)) {
     if (!sSelectionBracketPositionOverrides.empty()) {
       ClearSelectionBracketPositionOverride();
+    }
+    if (!sPickedCargo.empty()) {
+      sPickedCargo.erase(static_cast<std::uint32_t>(this->mParams.mEntityId));
     }
     if (HasTransportPreOrders()) {
       DispatchDisembarkedPreOrders();

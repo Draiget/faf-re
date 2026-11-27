@@ -628,6 +628,10 @@ namespace moho
       std::int32_t gameTick,
       const PreOrderUnitLookup& lookup
     );
+    /// The player picked this carried unit through its drop hologram (SelectCargoUnits, a band box);
+    /// remembered until it lands, dies or the switch goes off.
+    static void MarkCargoPicked(std::uint32_t entityId);
+    [[nodiscard]] static bool IsCargoPicked(std::uint32_t entityId);
     /// Drops every unit's pre-orders, bracket overrides and dispatch bookkeeping (the switch went off).
     static void ClearAllTransportPreOrderState();
     /// True when both units hold pre-orders with the same command ids in the same order; only such

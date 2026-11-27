@@ -1159,4 +1159,31 @@ namespace
     EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(throughLua(idA)));
     EXPECT_FALSE(unitA->HasTransportPreOrders());
   }
+
+  TEST(
+    TransportPreOrdersTests,
+    PickedCargoIsRememberedUntilItsPreOrdersAreClearedOrTheSwitchGoesOff
+  )
+  {
+    FakeUserUnitScope a;
+    FakeUserUnitScope b;
+    UserUnit* unitA = a.GetUnit(1101);
+    b.GetUnit(1102);
+    EXPECT_FALSE(UserUnit::IsCargoPicked(1101u));
+
+    // Picked through its hologram: SelectUnits keeps it selected (FAF restoring a saved selection).
+    UserUnit::MarkCargoPicked(1101u);
+    UserUnit::MarkCargoPicked(1102u);
+    EXPECT_TRUE(UserUnit::IsCargoPicked(1101u));
+    EXPECT_FALSE(UserUnit::IsCargoPicked(1103u)); // never picked: its selection goes to the transport
+
+    // Death and destruction clear a unit's pre-order state, the pick with it.
+    unitA->ClearTransportPreOrders();
+    EXPECT_FALSE(UserUnit::IsCargoPicked(1101u));
+    EXPECT_TRUE(UserUnit::IsCargoPicked(1102u));
+
+    // The switch going off drops every pick.
+    UserUnit::ClearAllTransportPreOrderState();
+    EXPECT_FALSE(UserUnit::IsCargoPicked(1102u));
+  }
 } // namespace

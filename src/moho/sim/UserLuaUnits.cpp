@@ -1877,13 +1877,13 @@ int moho::cfunc_SelectUnitsL(
       }
 
       UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
-      // Engine addition (`ui_TransportPreOrders`): a carried unit that is already selected (picked
-      // through its drop hologram) stays selected when UI script re-applies the selection. Any other
-      // carried unit - a control group recalled, a selection hotkey - selects its transport, as retail.
+      // Engine addition (`ui_TransportPreOrders`): a carried unit the player picked through its drop
+      // hologram stays selected, so FAF's UI restoring a saved selection keeps it. Any other carried
+      // unit - a control group recalled, a selection hotkey - selects its transport, as retail.
       const bool preserveAttachedCargo = moho::ui_TransportPreOrders && userEntity != nullptr &&
         userEntity->mArmy == session->GetFocusUserArmy() &&
         ResolveSelectableTransportAttachmentParent(userUnit) != nullptr &&
-        session->mSelection.Find(userEntity) != session->mSelection.end();
+        UserUnit::IsCargoPicked(static_cast<std::uint32_t>(userEntity->mParams.mEntityId));
       if ((userEntity != nullptr && userEntity->IsSelectable()) || preserveAttachedCargo) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (
@@ -1938,6 +1938,7 @@ int moho::cfunc_SelectCargoUnitsL(
     UserEntity* const userEntity = userUnit;
     if (userEntity != nullptr && userEntity->mArmy == session->GetFocusUserArmy()) {
       AppendSelectionUnitUnique(selectionUnits, userUnit);
+      UserUnit::MarkCargoPicked(static_cast<std::uint32_t>(userEntity->mParams.mEntityId));
     }
   };
 

@@ -333,6 +333,7 @@ namespace moho
           UserUnit::IsAttachmentParentRef(entity->mVariableData.mAttachmentParentRef)
         ) {
           (void)out.Add(entity);
+          UserUnit::MarkCargoPicked(entityId);
         }
       }
     }

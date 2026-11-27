@@ -997,6 +997,9 @@ namespace moho
     void
     RenderPreOrderGraph(const GeomCamera3& camera, CD3DPrimBatcher* batcher, std::int32_t gameTick, float tickFraction);
 
+    /// Engine addition (`ui_TransportPreOrders`): drops the pre-order-only graph once no pre-order is left.
+    static void ReleasePreOrderGraph();
+
   private:
     /**
      * Address: 0x008958B0 (FUN_008958B0, ?ApplyPendingSaveData@CWldSession@Moho@@AAEXXZ)

@@ -76,6 +76,11 @@ TransportHolograms = {
 }
 
 function TransportHolograms:IsEnabled()
+    -- A replay viewer issues no orders, so there are no pre-orders and no holograms to pick.
+    local isReplay = rawget(_G, 'SessionIsReplay')
+    if isReplay and isReplay() then
+        return false
+    end
     local fn = rawget(_G, 'IsTransportPreOrdersEnabled')
     if fn then
         local ok, val = pcall(fn)
@@ -396,95 +401,6 @@ function TransportHolograms:HandleWorldClick(view, event)
     return false
 end
 
-function TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
-    if not self:IsEnabled() then return false end
-    if not view or not view.Project then
-        local ok, wv = pcall(import, '/lua/ui/game/worldview.lua')
-        if ok and wv and wv.viewLeft then
-            view = wv.viewLeft
-        end
-    end
-    if not view or not view.Project then return false end
-    if not minX or not minY or not maxX or not maxY then return false end
-
-    local vLeft = view.Left and view.Left() or 0
-    local vTop = view.Top and view.Top() or 0
-    minX = minX - vLeft
-    maxX = maxX - vLeft
-    minY = minY - vTop
-    maxY = maxY - vTop
-
-    if minX > maxX then minX, maxX = maxX, minX end
-    if minY > maxY then minY, maxY = maxY, minY end
-
-    local capturedUnits = {}
-    local capturedUnitIds = {}
-    for _, holo in pairs(self._activeHolograms) do
-        if holo.position and holo.unit then
-            local ok, screenPos = pcall(view.Project, view, holo.position)
-            if ok and screenPos and screenPos[1] and screenPos[2] then
-                local sx = screenPos[1]
-                local sy = screenPos[2]
-                if sx >= minX and sx <= maxX and sy >= minY and sy <= maxY then
-                    local uid = holo.unit.GetEntityId and holo.unit:GetEntityId()
-                    if uid and not capturedUnitIds[uid] then
-                        capturedUnitIds[uid] = true
-                        table.insert(capturedUnits, holo.unit)
-                    end
-                end
-            end
-        end
-    end
-
-    if table.getn(capturedUnits) > 0 then
-        local selectCargo = rawget(_G, 'SelectCargoUnits')
-        if selectCargo then
-            if isShift then
-                local getSelected = rawget(_G, 'GetSelectedUnits')
-                local selectedUnits = getSelected and getSelected() or {}
-                local selectedSet = {}
-                if type(selectedUnits) == 'table' then
-                    for _, u in ipairs(selectedUnits) do
-                        local uid = u.GetEntityId and u:GetEntityId()
-                        if uid then selectedSet[uid] = true end
-                    end
-                end
-
-                local allAlreadySelected = true
-                for _, u in ipairs(capturedUnits) do
-                    local uid = u.GetEntityId and u:GetEntityId()
-                    if not uid or not selectedSet[uid] then
-                        allAlreadySelected = false
-                        break
-                    end
-                end
-
-                if allAlreadySelected then
-                    -- Deselect: keep only current units that are not in capturedUnits
-                    local remaining = {}
-                    if type(selectedUnits) == 'table' then
-                        for _, u in ipairs(selectedUnits) do
-                            local uid = u.GetEntityId and u:GetEntityId()
-                            if uid and not capturedUnitIds[uid] then
-                                table.insert(remaining, u)
-                            end
-                        end
-                    end
-                    selectCargo(remaining, false)
-                else
-                    -- At least one is not selected: union
-                    selectCargo(capturedUnits, true)
-                end
-            else
-                selectCargo(capturedUnits, false)
-            end
-            return true
-        end
-    end
-
-    return false
-end
-
 -- Export module functions directly to module table
 function Update()
     TransportHolograms:Update()
@@ -492,10 +408,6 @@ end
 
 function HandleWorldClick(view, event)
     return TransportHolograms:HandleWorldClick(view, event)
-end
-
-function HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
-    return TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
 end
 
 function RegisterTransport(transport)

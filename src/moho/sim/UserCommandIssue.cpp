@@ -809,7 +809,8 @@ namespace moho
       return; // No-rush rejection; the by-value `data` destructs on return.
     }
 
-    const bool routePreOrders = (ui_TransportPreOrders != 0) &&
+    // A replay viewer can focus an army and select its units, but issues nothing: no pre-orders there.
+    const bool routePreOrders = (ui_TransportPreOrders != 0) && !session->IsReplay &&
       (data.mCommandType != EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits) &&
       (data.mCommandType != EUnitCommandType::UNITCOMMAND_DetachFromTransport);
 

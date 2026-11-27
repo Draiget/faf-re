@@ -148,8 +148,9 @@ do
             default = 1,
             tip = "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
             set = function(key, value, startup)
+                -- A missing or malformed preference takes the default (on).
                 if value ~= 0 and value ~= 1 then
-                    value = 0
+                    value = 1
                 end
                 ConExecute("ui_TransportPreOrders " .. tostring(value))
             end,
