@@ -103,6 +103,16 @@ namespace faf::online
     int reviews = 0;
   };
 
+  /**
+   * <apiBase><path>?key=value&... with every key and value URL-encoded (FAF's API takes RSQL filters with quotes and
+   * page[size] with brackets); a key with an empty value stands alone.
+   */
+  [[nodiscard]] std::string ApiUrl(
+    const std::string& apiBase,
+    const std::string& path,
+    const std::vector<std::pair<std::string, std::string>>& parameters
+  );
+
   /** `/data/mod?...` for the query. */
   [[nodiscard]] std::string ModSearchUrl(const std::string& apiBase, const ModQuery& query);
 

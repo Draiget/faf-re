@@ -357,6 +357,15 @@ namespace faf::online
     return replayBase + "/" + digits;
   }
 
+  std::string ApiUrl(
+    const std::string& apiBase,
+    const std::string& path,
+    const std::vector<std::pair<std::string, std::string>>& parameters
+  )
+  {
+    return apiBase + path + Query(parameters);
+  }
+
   std::string ModSearchUrl(
     const std::string& apiBase,
     const ModQuery& query

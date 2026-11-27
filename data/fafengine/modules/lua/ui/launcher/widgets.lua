@@ -285,6 +285,80 @@ function TextView(parent)
     return view
 end
 
+--- A country's flag as FAF ships them (/countries/<code>.dds, lower case), or nil for none (or FAF's "world").
+function FlagPath(country)
+    if country and country ~= '' and string.lower(country) ~= 'world' then
+        local path = UIUtil.UIFile('/countries/' .. string.lower(country) .. '.dds')
+        if DiskGetFileInfo(path) then
+            return path
+        end
+    end
+    return nil
+end
+
+--- What FAF's lobby told us about a player (FafOnline_Player: country, clan, ratings), or an empty table.
+function PlayerFacts(login)
+    if login and login ~= '' and rawget(_G, 'FafOnline_Player') then
+        return FafOnline_Player(login) or {}
+    end
+    return {}
+end
+
+--- A player as the launcher shows one everywhere: flag, [clan] and name, the name clickable (onClick(login)) when
+--- given. :Set{login=, country=, clan=, color=} (country and clan from FAF's lobby when not given); :Width() follows.
+function PlayerTag(parent, size, onClick)
+    local tag = Group(parent)
+    tag:DisableHitTest()
+    tag.flag = Bitmap(tag)
+    tag.flag:DisableHitTest()
+    LayoutHelpers.SetDimensions(tag.flag, 20, 14)
+    LayoutHelpers.AtLeftIn(tag.flag, tag, 0)
+    LayoutHelpers.AtVerticalCenterIn(tag.flag, tag)
+    tag.clan = Theme.Text(tag, '', size or 13, C.accent)
+    LayoutHelpers.AtVerticalCenterIn(tag.clan, tag)
+    tag.name = Theme.Text(tag, '', size or 13, C.text)
+    LayoutHelpers.AtVerticalCenterIn(tag.name, tag)
+    LayoutHelpers.SetHeight(tag, (size or 13) + 8)
+    tag.Width:Set(function() return tag.name.Right() - tag.Left() end)
+    tag.Set = function(self, player)
+        player = player or {}
+        local facts = (player.country == nil or player.clan == nil) and PlayerFacts(player.login) or {}
+        local flag = FlagPath(player.country or facts.country)
+        local clan = player.clan or facts.clan or ''
+        self.login = player.login
+        self.color = player.color or C.text
+        if flag then
+            self.flag:SetTexture(flag)
+            LayoutHelpers.SetDimensions(self.flag, 20, 14)
+        end
+        Theme.SetVisible(self.flag, flag ~= nil)
+        Theme.SetText(self.clan, clan ~= '' and ('[' .. clan .. ']') or '')
+        self.clan.Left:Set(function() return self.Left() + (flag and Scale(26) or 0) end)
+        self.name.Left:Set(function() return self.clan.Right() + (clan ~= '' and Scale(5) or 0) end)
+        Theme.SetText(self.name, player.login or '')
+        Theme.SetColor(self.name, self.color)
+    end
+    if onClick then
+        local area = Theme.HitArea(tag, function(self, event)
+            if not tag.login or tag.login == '' then
+                return false
+            end
+            if event.Type == 'MouseEnter' then
+                Theme.SetColor(tag.name, C.accent)
+            elseif event.Type == 'MouseExit' then
+                Theme.SetColor(tag.name, tag.color)
+            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+                Theme.ClickSound()
+                onClick(tag.login)
+                return true
+            end
+            return false
+        end)
+        area.Width:Set(tag.Width)
+    end
+    return tag
+end
+
 --- A dimmed cover over the whole screen that takes every click, with a bracketed panel in its middle.
 function Modal(root, width, height)
     local cover = Theme.Rect(root, 'e0020508')

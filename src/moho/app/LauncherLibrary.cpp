@@ -3,6 +3,7 @@
 // FAF's replays readied to play, and searches and downloads in FAF's replay and mod vaults on threads of their own,
 // which the pages ask after each frame (FafLibrary_Job). Nothing here runs until the launcher's Lua calls it.
 
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -18,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -225,7 +227,7 @@ namespace
   struct Job
   {
     int id = 0;
-    std::string kind; ///< "replays", "replay", "mods", "mod"
+    std::string kind; ///< "replays", "replay", "mods", "mod", "api", "thumbnail"
     std::thread thread;
     std::atomic<bool> done{false};
     std::atomic<std::uint64_t> received{0};
@@ -238,6 +240,7 @@ namespace
     VaultPage page;
     std::vector<VaultReplay> replays;
     std::vector<VaultMod> mods;
+    JsonNode answer; ///< a plain API read's answer
 
     void Fail(
       std::string why
@@ -936,6 +939,221 @@ namespace
     return 1;
   }
 
+  // ---------------------------------------------------------------------------------------------------------------
+  // Pictures from FAF's content server (map thumbnails): kept on disk beside the vault and read through the game's
+  // files. The file system indexes a folder when it mounts it, so new pictures are mounted again in one go
+  // (FafLibrary_MountThumbnails) once a page's downloads are in.
+
+  constexpr const char* kThumbnailMount = "/fafre_thumbnails";
+  constexpr std::size_t kThumbnailMaxBytes = 4 * 1024 * 1024;
+  bool gThumbnailsMounted = false;      ///< the folder is in the game's file system (main thread)
+  std::set<std::string> gThumbnailsNew; ///< files written since it was mounted (main thread)
+
+  std::filesystem::path ThumbnailFolder()
+  {
+    return VaultFolder() / "cache" / "thumbnails";
+  }
+
+  /** A picture's file name: a hash of its address, with the address's own extension (.png when it has none). */
+  std::string ThumbnailName(
+    const std::string& url
+  )
+  {
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const unsigned char c : url) {
+      hash = (hash ^ c) * 1099511628211ULL;
+    }
+    std::string extension = ".png";
+    if (const auto dot = url.find_last_of('.'); dot != std::string::npos && url.find('/', dot) == std::string::npos) {
+      const std::string own = Lower(url.substr(dot));
+      if (own == ".jpg" || own == ".jpeg" || own == ".dds") {
+        extension = own;
+      }
+    }
+    char text[24];
+    (void)std::snprintf(text, sizeof(text), "%016llx", static_cast<unsigned long long>(hash));
+    return text + extension;
+  }
+
+  /** Mounts the pictures' folder (again, when pictures came since): true when the game can read every one. */
+  bool MountThumbnails()
+  {
+    if (gThumbnailsMounted && gThumbnailsNew.empty()) {
+      return true;
+    }
+    std::error_code error;
+    std::filesystem::create_directories(ThumbnailFolder(), error);
+    if (gThumbnailsMounted) {
+      (void)moho::DISK_UnmountNow(kThumbnailMount);
+    }
+    gThumbnailsMounted = moho::DISK_MountDirectoryNow(ThumbnailFolder(), kThumbnailMount);
+    if (gThumbnailsMounted) {
+      gThumbnailsNew.clear();
+    }
+    return gThumbnailsMounted;
+  }
+
+  /**
+   * path, id = FafLibrary_Thumbnail(url): a picture from FAF's content server. path (a path of the game's files) when
+   * it can be shown now; else id, the download bringing it (FafLibrary_Job), or 0 when it is on disk and waits for
+   * FafLibrary_MountThumbnails. nil, nil for an address that isn't FAF's content server.
+   */
+  int ThumbnailBody(
+    lua_State* const L
+  )
+  {
+    const std::string url = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    if (url.empty() || !AllowedModUrl(url)) {
+      lua_pushnil(L);
+      lua_pushnil(L);
+      return 2;
+    }
+    const std::string name = ThumbnailName(url);
+    const std::filesystem::path file = ThumbnailFolder() / name;
+    std::error_code error;
+    const auto size = std::filesystem::file_size(file, error);
+    if (!error && size > 0) {
+      if (!gThumbnailsMounted && gThumbnailsNew.empty()) {
+        (void)MountThumbnails(); // the first picture this run: the folder as it is on disk
+      }
+      if (gThumbnailsMounted && !gThumbnailsNew.contains(name)) {
+        lua_pushstring(L, (std::string(kThumbnailMount) + "/" + name).c_str());
+        lua_pushnil(L);
+        return 2;
+      }
+      lua_pushnil(L);
+      lua_pushnumber(L, 0);
+      return 2;
+    }
+    lua_pushnil(L);
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("thumbnail", [url, file, name](Job& job) {
+      platform::http::Call call;
+      call.url = url;
+      call.userAgent = UserAgent();
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body, &job.received, &job.total); !sent) {
+        job.Fail("the picture didn't download: " + sent.error());
+        return;
+      }
+      if (status != 200 || body.empty() || body.size() > kThumbnailMaxBytes) {
+        job.Fail("the content server answered HTTP " + std::to_string(status));
+        return;
+      }
+      if (const auto written = WriteWhole(file, body); !written) {
+        job.Fail(written.error());
+        return;
+      }
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.path = name;
+    })));
+    return 2;
+  }
+
+  /** bool FafLibrary_MountThumbnails(): the pictures downloaded since the last call readable by the game. */
+  int MountThumbnailsBody(
+    lua_State* const L
+  )
+  {
+    lua_pushboolean(L, MountThumbnails() ? 1 : 0);
+    return 1;
+  }
+
+  /**
+   * id = FafLibrary_Api(path[, query]): GET <FAF's API><path>?<query> with the player's sign-in, the answer read as
+   * JSON; FafLibrary_Job gives it as `data` (objects as tables, arrays from 1, null as nil). query is a table of
+   * parameter -> text (filter, include, sort, page[size], ...), encoded here. Only FAF's data and the player's own
+   * record: the path starts with /data/ or is /me, and carries no query of its own.
+   */
+  int ApiBody(
+    lua_State* const L
+  )
+  {
+    const std::string path = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    if (
+      (path.rfind("/data/", 0) != 0 && path != "/me") || path.find("..") != std::string::npos ||
+      path.find_first_of(" \r\n?#%&") != std::string::npos
+    ) {
+      lua_pushnil(L);
+      lua_pushstring(L, "not a path of FAF's data");
+      return 2;
+    }
+    std::vector<std::pair<std::string, std::string>> parameters;
+    if (lua_istable(L, 2)) {
+      lua_pushnil(L);
+      while (lua_next(L, 2) != 0) {
+        if (lua_type(L, -2) == LUA_TSTRING && lua_isstring(L, -1)) {
+          parameters.emplace_back(lua_tostring(L, -2), lua_tostring(L, -1));
+        }
+        lua_pop(L, 1);
+      }
+      std::sort(parameters.begin(), parameters.end());
+    }
+    const std::string url = faf::online::ApiUrl(moho::ONLINE_ApiBase(), path, parameters);
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("api", [url](Job& job) {
+      const auto body = ApiGet(url);
+      if (!body) {
+        job.Fail(body.error());
+        return;
+      }
+      auto parsed = ParseJson(*body);
+      if (!parsed) {
+        job.Fail("FAF's API answered with something that isn't JSON");
+        return;
+      }
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.answer = std::move(*parsed);
+    })));
+    return 1;
+  }
+
+  /** A JSON value as a Lua value on the stack: objects as tables, arrays from 1, null as nil. */
+  void PushJson(
+    lua_State* const L,
+    const JsonNode& node,
+    const int depth
+  )
+  {
+    if (depth > 40) {
+      lua_pushnil(L);
+      return;
+    }
+    switch (node.kind) {
+    case JsonNode::Kind::Bool:
+      lua_pushboolean(L, node.boolean ? 1 : 0);
+      return;
+    case JsonNode::Kind::Number:
+      lua_pushnumber(L, static_cast<lua_Number>(node.number));
+      return;
+    case JsonNode::Kind::String:
+      lua_pushstring(L, node.text.c_str());
+      return;
+    case JsonNode::Kind::Array: {
+      lua_newtable(L);
+      int index = 1;
+      for (const JsonNode& item : node.items) {
+        PushJson(L, item, depth + 1);
+        lua_rawseti(L, -2, index++);
+      }
+      return;
+    }
+    case JsonNode::Kind::Object:
+      lua_newtable(L);
+      for (const auto& [key, value] : node.members) {
+        if (value.kind == JsonNode::Kind::Null) {
+          continue;
+        }
+        lua_pushstring(L, key.c_str());
+        PushJson(L, value, depth + 1);
+        lua_rawset(L, -3);
+      }
+      return;
+    default:
+      lua_pushnil(L);
+      return;
+    }
+  }
+
   /** id = FafLibrary_SearchMods{name=, author=, type=, recommended=, sort=, page=, pageSize=}. */
   int SearchModsBody(
     lua_State* const L
@@ -1079,6 +1297,11 @@ namespace
     if (job->thread.joinable()) {
       job->thread.join();
     }
+    if (job->kind == "thumbnail" && !job->failed && !job->mounted) {
+      job->mounted = true;
+      std::lock_guard<std::mutex> guard(job->lock);
+      gThumbnailsNew.insert(job->path); // readable after the next FafLibrary_MountThumbnails
+    }
     if (job->kind == "mod" && !job->failed && !job->mounted) {
       job->mounted = true;
       const std::string folder = job->message;
@@ -1098,6 +1321,10 @@ namespace
         PushReplayRows(L, job->replays);
       } else if (job->kind == "mods") {
         PushModRows(L, job->mods);
+      } else if (job->kind == "api" && !job->failed) {
+        lua_pushstring(L, "data");
+        PushJson(L, job->answer, 0);
+        lua_rawset(L, -3);
       }
     }
     std::lock_guard<std::mutex> guard(gJobsLock);
@@ -1203,6 +1430,30 @@ namespace
       nullptr,
       "<global>",
       "string FafLibrary_ModsFolder() - the vault's mods folder on disk."
+    );
+    static moho::CScrLuaBinder api(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Api",
+      &Binding<&ApiBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_Api(path, query) - reads FAF's API (/data/... or /me); FafLibrary_Job(id).data has it."
+    );
+    static moho::CScrLuaBinder thumbnail(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Thumbnail",
+      &Binding<&ThumbnailBody>,
+      nullptr,
+      "<global>",
+      "string, number FafLibrary_Thumbnail(url) - a picture of FAF's content server: its game path, or a download."
+    );
+    static moho::CScrLuaBinder mountThumbnails(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_MountThumbnails",
+      &Binding<&MountThumbnailsBody>,
+      nullptr,
+      "<global>",
+      "bool FafLibrary_MountThumbnails() - makes the pictures downloaded since the last call readable."
     );
     static moho::CScrLuaBinder job(
       moho::SCR_UserLuaInitSet(),

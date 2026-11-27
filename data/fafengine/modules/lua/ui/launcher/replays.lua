@@ -268,6 +268,12 @@ function Build(launcher, page)
         row.name.Left:Set(function() return teamArea.Left() + Scale(row.indent or 0) end)
         row.name.Right:Set(function() return teamArea.Right() - Scale(120) end)
         row.name.Top:Set(top)
+        -- A player: flag, clan and name; the name opens the player's profile.
+        row.player = Widgets.PlayerTag(teamArea, 13, function(login)
+            launcher:ShowProfile(login)
+        end)
+        row.player.Left:Set(function() return teamArea.Left() + Scale(12) end)
+        row.player.Top:Set(function() return top() - Scale(3) end)
         row.tag = Theme.Text(teamArea, '', 11, C.gold, true)
         row.tag.Left:Set(function() return teamArea.Left() + Scale(row.tagLeft or 70) end)
         row.tag.Top:Set(function() return top() + Scale(2) end)
@@ -282,16 +288,23 @@ function Build(launcher, page)
     end
     function view:ShowTeams(teams, note)
         local index = 0
-        local function Line(name, nameColor, tag, value, valueColor, change, changeColor, indent)
+        local function Line(name, nameColor, tag, value, valueColor, change, changeColor, indent, player)
             index = index + 1
             local row = TeamRow(index)
             row.indent = indent
             row.name.Left:Set(function() return teamArea.Left() + Scale(indent or 0) end)
-            Theme.SetText(row.name, name)
+            Theme.SetText(row.name, player and '' or name)
             Theme.SetColor(row.name, nameColor)
+            Theme.SetVisible(row.player, player ~= nil)
+            if player then
+                row.player:Set({ login = player.name, color = nameColor })
+            end
             Theme.SetText(row.tag, tag or '')
             local advance = name ~= '' and row.name:GetStringAdvance(name) or 0
             row.tag.Left:Set(function() return row.name.Left() + math.min(row.name.Width(), advance) + Scale(10) end)
+            if player then
+                row.tag.Left:Set(function() return row.player.Right() + Scale(10) end)
+            end
             Theme.SetText(row.value, value or '')
             Theme.SetColor(row.value, valueColor or C.gold)
             Theme.SetText(row.change, change or '')
@@ -308,7 +321,7 @@ function Build(launcher, page)
                     color = player.change >= 0 and C.good or C.bad
                 end
                 Line(player.name, C.text, (ffa and player.won) and 'WINNER' or nil,
-                    player.rated and tostring(player.rating) or nil, C.gold, change, color, 12)
+                    player.rated and tostring(player.rating) or nil, C.gold, change, color, 12, player)
             end
             if i < table.getn(teams) then
                 Line('', C.text)
@@ -322,6 +335,7 @@ function Build(launcher, page)
         end
         for i = index + 1, table.getn(self.teamRows) do
             local row = self.teamRows[i]
+            Theme.SetVisible(row.player, false)
             Theme.SetText(row.name, '')
             Theme.SetText(row.tag, '')
             Theme.SetText(row.value, '')

@@ -876,6 +876,47 @@ namespace
   /** ok = FafOnline_RetryLobby(): connects to FAF's lobby again now, when it failed. */
   void PushResult(lua_State* L, const std::expected<void, std::string>& result);
 
+  /**
+   * table|nil FafOnline_Player(login): what FAF's lobby told us about that player (its player_info, or the signed-in
+   * player's welcome): id, login, country (ISO code, lower case), clan (tag), ratings = {[type] = {mean, deviation,
+   * rating, games}}. nil for a player the lobby didn't mention.
+   */
+  int PlayerBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string login = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const LaunchPlayer* found = nullptr;
+    if (const auto it = s.players.find(login); it != s.players.end()) {
+      found = &it->second;
+    } else if (s.haveMe && s.me.login == login) {
+      found = &s.me;
+    }
+    if (found == nullptr) {
+      lua_pushnil(L);
+      return 1;
+    }
+    lua_newtable(L);
+    SetField(L, "id", found->id);
+    SetField(L, "login", found->login);
+    SetField(L, "country", Lower(found->country));
+    SetField(L, "clan", found->clan);
+    lua_pushstring(L, "ratings");
+    lua_newtable(L);
+    for (const auto& [type, rating] : found->ratings) {
+      lua_pushstring(L, type.c_str());
+      lua_newtable(L);
+      SetField(L, "mean", rating.mean);
+      SetField(L, "deviation", rating.deviation);
+      SetField(L, "rating", static_cast<double>(static_cast<long long>(rating.mean - 3.0 * rating.deviation)));
+      SetField(L, "games", static_cast<double>(rating.games));
+      lua_rawset(L, -3);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
   /** table FafOnline_Social(): friends and foes, each a table of FAF ids (text) to true. */
   int SocialBody(
     lua_State* const L
@@ -1478,6 +1519,14 @@ namespace
       nullptr,
       "<global>",
       "table FafOnline_TakeResume() - what to do after a restart on another featured mod (once), or nil."
+    );
+    static CScrLuaBinder player(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Player",
+      &Binding<&PlayerBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Player(login) - what FAF's lobby said about a player: id, country, clan, ratings; or nil."
     );
     static CScrLuaBinder social(
       moho::SCR_UserLuaInitSet(),

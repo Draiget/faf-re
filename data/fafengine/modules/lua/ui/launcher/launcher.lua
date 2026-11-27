@@ -2288,9 +2288,25 @@ function Launcher:Replays()
     end)
 end
 
---- The profiles in a menu under `anchor`: each to switch to (the one in use marked), and FAF's profile manager.
+--- A FAF player's profile over the launcher (profile.lua): ratings, rating history, maps, previous names, clan.
+function Launcher:ShowProfile(login)
+    local ok, err = pcall(function()
+        import('/fafengine/modules/lua/ui/launcher/profile.lua').Open(self, login)
+    end)
+    if not ok then
+        WARN('LAUNCHER: the profile of ' .. tostring(login) .. ' failed to open: ' .. tostring(err))
+        Message(self.root, 'Player profile', 'The profile failed to open: ' .. tostring(err))
+    end
+end
+
+--- The profiles in a menu under `anchor`: the player's own FAF profile, each game profile to switch to (the one in
+--- use marked), and FAF's profile manager.
 function Launcher:ProfileMenu(anchor)
     local items = {}
+    local status = self.lastStatus or {}
+    if status.login and status.login ~= '' then
+        table.insert(items, { 'My FAF profile', key = 'faf', color = C.accent })
+    end
     local current = CurrentProfileIndex()
     for index, profile in Profiles() do
         table.insert(items, { (index == current and 'Profile: ' or 'Switch to ') .. tostring(profile.Name), key = index,
@@ -2299,7 +2315,9 @@ function Launcher:ProfileMenu(anchor)
     table.insert(items, { 'Manage profiles...', key = 'manage', color = C.muted })
     local launcher = self
     Widgets.Dropdown(anchor, items, function(item)
-        if item.key == 'manage' then
+        if item.key == 'faf' then
+            launcher:ShowProfile(status.login)
+        elseif item.key == 'manage' then
             launcher:OpenScreen('Profiles', function(host, back)
                 import('/lua/ui/dialogs/profile.lua').CreateDialog(function()
                     ForkThread(back)
@@ -2927,6 +2945,57 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherprofiletest [login]: that player's profile (else the signed-in one's), each of its tabs.
+            local profileArg = GetCommandLineArg('/launcherprofiletest', 1)
+            local profileLogin = (profileArg and profileArg[1] and string.sub(profileArg[1], 1, 1) ~= '/' and profileArg[1]) or
+                FafOnline_Status().login
+            if GetCommandLineArg('/launcherprofiletest', 0) and profileLogin ~= '' then
+                current:ShowProfile(profileLogin)
+                local profile = import('/fafengine/modules/lua/ui/launcher/profile.lua').Current()
+                for i = 1, 15 do
+                    if profile and profile.boards then
+                        break
+                    end
+                    Wait(1)
+                end
+                for _, tab in { 'overview', 'history', 'maps', 'names', 'clan' } do
+                    if profile then
+                        profile:ShowTab(tab)
+                        for i = 1, 10 do
+                            local busy = false
+                            for _ in profile.jobs do
+                                busy = true
+                            end
+                            if not busy then
+                                break
+                            end
+                            Wait(1)
+                        end
+                        -- The chart zoomed to games 101-250 with the mouse on game 180, as a wheel and a hover do.
+                        local chart = tab == 'history' and profile.pages.history.chart
+                        if chart and table.getn(chart.points) >= 250 then
+                            chart:ShowRange(101, 250)
+                            chart:ShowOver(180)
+                            Step('profile chart: games ' .. chart.first .. '-' .. chart.last .. ', over ' ..
+                                tostring(chart.overIndex))
+                        end
+                        local errors = {}
+                        for key, why in profile.errors do
+                            table.insert(errors, key .. ': ' .. tostring(why))
+                        end
+                        Step('profile tab ' .. tab .. ': player ' .. tostring(profile.player and profile.player.id) ..
+                            ', ' .. table.getn(profile.boards or {}) .. ' leaderboards, ' ..
+                            table.getn(profile.maps or {}) .. ' maps, ' .. table.getn(profile.names or {}) ..
+                            ' names, clan ' .. tostring(profile.clan and profile.clan.tag) ..
+                            (table.getn(errors) > 0 and (', errors ' .. table.concat(errors, '; ')) or ''))
+                        Wait(2)
+                    end
+                end
+                if profile then
+                    profile:Close()
+                end
+                Step('profile closed')
+            end
             current:OpenHostDialog()
             Wait(2)
             Step(current.hostDialog and 'host dialog open' or 'host dialog did not open')
