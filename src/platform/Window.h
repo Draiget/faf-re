@@ -170,6 +170,10 @@ namespace platform::window
   // head goes (its full-screen swap chain takes the display its window is on). False with one display.
   bool GetSecondaryDisplayBounds(int* x, int* y, int* width, int* height);
 
+  // The primary display's usable size in screen pixels (without the task bar or dock): where a new window has room.
+  // False when it isn't known (the window system not started yet).
+  bool GetPrimaryUsableSize(int* width, int* height);
+
   // How much larger than 96 DPI the system draws text and controls on the display the window is
   // on (Windows' "Scale" setting: 1.5 at 150 %, a Retina display's 2.0), as SDL_GetWindowDisplayScale
   // gives it. Moving the window to a display with another scale changes it. Null: the primary

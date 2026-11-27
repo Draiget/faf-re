@@ -960,6 +960,34 @@ namespace
       IsPositiveIntegerArg((*outArgs)[0]) && IsPositiveIntegerArg((*outArgs)[1]);
   }
 
+  /**
+   * Engine addition: the size of the game's window before the player has one saved (Windows.Main.width/height).
+   * Retail opens 1024x768; the launcher's screens are laid out for 1600x900 and larger, so that is the first window
+   * when the primary display has room for it with its frame, else retail's size. A size the player saved, or one on
+   * the command line (/windowed), stays as it is.
+   */
+  void FirstWindowSize(
+    int* const width,
+    int* const height
+  )
+  {
+    constexpr int kWidth = 1600;
+    constexpr int kHeight = 900;
+    constexpr int kFrame = 80; // the window's border and title, and some room around it
+    int usableWidth = 0;
+    int usableHeight = 0;
+    if (
+      platform::window::GetPrimaryUsableSize(&usableWidth, &usableHeight) && usableWidth >= kWidth + kFrame &&
+      usableHeight >= kHeight + kFrame
+    ) {
+      *width = kWidth;
+      *height = kHeight;
+      return;
+    }
+    *width = moho::wnd_DefaultCreateWidth;
+    *height = moho::wnd_DefaultCreateHeight;
+  }
+
   [[nodiscard]] bool IsDisabledAdapterToken(
     const fa::string& value
   )
@@ -1935,13 +1963,14 @@ namespace
         primaryHead->mWindowed = false;
         const fa::string widthKey("Windows.Main.width");
         const fa::string heightKey("Windows.Main.height");
+        int firstWidth = 0;
+        int firstHeight = 0;
+        FirstWindowSize(&firstWidth, &firstHeight);
         primaryHead->mWidth = static_cast<std::uint32_t>(
-          preferences != nullptr ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
-                                 : moho::wnd_DefaultCreateWidth
+          preferences != nullptr ? preferences->GetInteger(widthKey, firstWidth) : firstWidth
         );
         primaryHead->mHeight = static_cast<std::uint32_t>(
-          preferences != nullptr ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
-                                 : moho::wnd_DefaultCreateHeight
+          preferences != nullptr ? preferences->GetInteger(heightKey, firstHeight) : firstHeight
         );
       }
     }

@@ -1259,6 +1259,21 @@ namespace platform::window
     return found;
   }
 
+  bool GetPrimaryUsableSize(
+    int* const width,
+    int* const height
+  )
+  {
+    SDL_Rect bounds{};
+    const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+    if (primary == 0 || !SDL_GetDisplayUsableBounds(primary, &bounds) || bounds.w <= 0 || bounds.h <= 0) {
+      return false;
+    }
+    *width = bounds.w;
+    *height = bounds.h;
+    return true;
+  }
+
   float DisplayScale(
     Handle const window
   )
