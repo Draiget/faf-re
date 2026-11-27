@@ -133,6 +133,158 @@ function Tabs(parent, entries, onPick)
     return tabs
 end
 
+--- A scrolling document: blocks of text, each {style, text} with style 'h1', 'h2', 'h3', 'bullet', 'text' or 'gap',
+--- wrapped to the view's width and drawn with controls only for the lines on screen. :SetBlocks(blocks) shows a
+--- document from its top; the mouse wheel scrolls it.
+local kTextStyles = {
+    h1 = { size = 20, color = C.text, bold = true, gapAfter = 6 },
+    h2 = { size = 15, color = C.accent, bold = true, gapBefore = 8, gapAfter = 2 },
+    h3 = { size = 13, color = C.text, bold = true, gapBefore = 4 },
+    text = { size = 13, color = C.muted },
+    bullet = { size = 13, color = C.muted, indent = 18 },
+    bullet2 = { size = 13, color = C.muted, indent = 36 },
+    gap = { size = 6 },
+}
+function TextView(parent)
+    local view = Group(parent, 'launcher text')
+    view.blocks = {}
+    view.lines = {}
+    view.top = 1
+    view.rows = {}
+    view.wrappedFor = -1
+    local probes = {}
+    local function Probe(style)
+        if not probes[style] then
+            local spec = kTextStyles[style]
+            local probe = Theme.Text(view, '', spec.size, spec.color, spec.bold)
+            probe.Left:Set(view.Left)
+            probe.Top:Set(view.Top)
+            Theme.SetVisible(probe, false)
+            probes[style] = probe
+        end
+        return probes[style]
+    end
+    local WrapText = import('/lua/maui/text.lua').WrapText
+    --- The blocks as lines of the view's width: {style, text, height, indent, mark}.
+    function view:Wrap()
+        local width = self.Right() - self.Left() - Scale(14)
+        self.wrappedFor = width
+        local lines = {}
+        for _, block in self.blocks do
+            local spec = kTextStyles[block.style] or kTextStyles.text
+            if spec.gapBefore then
+                table.insert(lines, { style = 'gap', text = '', height = Scale(spec.gapBefore) })
+            end
+            if block.style == 'gap' then
+                table.insert(lines, { style = 'gap', text = '', height = Scale(spec.size) })
+            else
+                local indent = Scale(spec.indent or 0)
+                local probe = Probe(block.style)
+                local wrapped = WrapText(block.text, math.max(Scale(60), width - indent), function(piece)
+                    return probe:GetStringAdvance(piece)
+                end)
+                for i, text in wrapped do
+                    table.insert(lines, { style = block.style, text = text, height = Scale(spec.size + 6), indent = indent,
+                        mark = (block.style == 'bullet' or block.style == 'bullet2') and i == 1,
+                        markAt = indent - Scale(14) })
+                end
+                if spec.gapAfter then
+                    table.insert(lines, { style = 'gap', text = '', height = Scale(spec.gapAfter) })
+                end
+            end
+        end
+        self.lines = lines
+    end
+    function view:SetBlocks(blocks)
+        self.blocks = blocks or {}
+        self.top = 1
+        self.wrappedFor = -1
+        self:Paint()
+    end
+    local function Row(index)
+        local row = view.rows[index]
+        if not row then
+            row = {}
+            for style, spec in kTextStyles do
+                if style ~= 'gap' then
+                    local text = Theme.Text(view, '', spec.size, spec.color, spec.bold)
+                    text.Left:Set(view.Left)
+                    text.Top:Set(view.Top)
+                    row[style] = text
+                end
+            end
+            row.dot = Theme.Text(view, '-', 13, C.subtle)
+            row.dot.Left:Set(view.Left)
+            row.dot.Top:Set(view.Top)
+            view.rows[index] = row
+        end
+        return row
+    end
+    function view:Paint()
+        if self.wrappedFor ~= self.Right() - self.Left() - Scale(14) then
+            self:Wrap()
+        end
+        local y = 0
+        local height = self.Bottom() - self.Top()
+        local used = 0
+        local index = self.top
+        while index <= table.getn(self.lines) do
+            local line = self.lines[index]
+            if y + line.height > height then
+                break
+            end
+            used = used + 1
+            local row = Row(used)
+            local top = y
+            for style, text in row do
+                if style ~= 'dot' then
+                    if style == line.style then
+                        Theme.SetText(text, line.text)
+                        local indent = line.indent or 0
+                        text.Left:Set(function() return view.Left() + indent end)
+                        text.Top:Set(function() return view.Top() + top end)
+                        Theme.SetVisible(text, true)
+                    else
+                        Theme.SetVisible(text, false)
+                    end
+                end
+            end
+            Theme.SetVisible(row.dot, line.mark and true or false)
+            if line.mark then
+                local markAt = line.markAt or Scale(4)
+                row.dot.Left:Set(function() return view.Left() + markAt end)
+                row.dot.Top:Set(function() return view.Top() + top end)
+            end
+            y = y + line.height
+            index = index + 1
+        end
+        for i = used + 1, table.getn(self.rows) do
+            for _, text in self.rows[i] do
+                Theme.SetVisible(text, false)
+            end
+        end
+        self.shownLines = used
+        if self.mark then
+            self.mark:Update()
+        end
+    end
+    function view:Scrolled()
+        return self.top, self.shownLines or 0, table.getn(self.lines)
+    end
+    view.mark = ScrollMark(view, view)
+    -- Groups take no events: the wheel goes to a transparent area over the text.
+    Theme.HitArea(view, function(self, event)
+        if event.Type == 'WheelRotation' then
+            local step = event.WheelRotation > 0 and -3 or 3
+            view.top = math.max(1, math.min(view.top + step, math.max(1, table.getn(view.lines) - (view.shownLines or 1) + 1)))
+            view:Paint()
+            return true
+        end
+        return false
+    end)
+    return view
+end
+
 --- A dimmed cover over the whole screen that takes every click, with a bracketed panel in its middle.
 function Modal(root, width, height)
     local cover = Theme.Rect(root, 'e0020508')

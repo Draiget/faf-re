@@ -36,8 +36,6 @@ local kRefreshSeconds = 0.5
 local current = false
 -- What a restart on another featured mod took up in this start ('host true', 'join'), for the test walk.
 resumedThisStart = false
--- On FAF's main menu opened from the launcher: its button back to the launcher.
-local fafMenuBack = false
 
 --- Whether the game opens on the launcher: on, unless the player turned it off (options key fafre_launcher = false)
 --- or the game started with /nolauncher.
@@ -1928,7 +1926,8 @@ function Launcher:Refresh()
         self.refreshFailed = true
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
     end
-    local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or nil
+    local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
+        (self.page == 'changelog' and self.changelogView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
         if not done and not self.pageFailed then
@@ -2317,41 +2316,6 @@ function Launcher:Options()
     end)
 end
 
---- FAF's own main menu, with one button on it back to the launcher.
-function Launcher:FafMenu()
-    local buildFafMenu = self.buildFafMenu
-    self:StopSounds()
-    self.root:Destroy()
-    current = false
-    local captured = false
-    local createScreenGroup = UIUtil.CreateScreenGroup
-    UIUtil.CreateScreenGroup = function(root, name)
-        local group = createScreenGroup(root, name)
-        if name == 'Main Menu ScreenGroup' and not captured then
-            captured = group
-        end
-        return group
-    end
-    local ok, err = pcall(buildFafMenu)
-    UIUtil.CreateScreenGroup = createScreenGroup
-    if not ok then
-        WARN('LAUNCHER: FAF\'s main menu failed: ' .. tostring(err))
-        return
-    end
-    if captured then
-        fafMenuBack = function()
-            fafMenuBack = false
-            captured:Destroy()
-            import('/lua/ui/menus/main.lua').CreateUI()
-        end
-        local back = Theme.Button(captured, 'Launcher', function() fafMenuBack() end, 'primary',
-            { icon = 'arrowLeft', width = 150 })
-        LayoutHelpers.AtLeftTopIn(back, captured, 20, 20)
-        back.Depth:Set(function() return captured.Depth() + 1000 end)
-    end
-    LOG('LAUNCHER: opened FAF\'s main menu')
-end
-
 function Launcher:Exit()
     if self.exitDialog then
         return
@@ -2463,7 +2427,7 @@ local function BuildRail(launcher, body)
         { 'mods', 'Mods', function() launcher:Mods() end, 'mods' },
         'Game',
         { 'settings', 'Options', function() launcher:Options() end },
-        { 'home', 'FAF main menu', function() launcher:FafMenu() end },
+        { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, 'changelog' },
         { 'logout', 'Exit', function() launcher:Exit() end },
     }
     launcher.navItems = {}
@@ -2598,6 +2562,14 @@ local function Build(launcher)
         import('/fafengine/modules/lua/ui/launcher/replays.lua').Build(launcher, replaysPage)
         Theme.SetVisible(replaysPage, false)
     end
+    -- Changelog: FAF's patch notes (changelog.lua).
+    local changelogPage = Group(content, 'launcher changelog')
+    LayoutHelpers.FillParent(changelogPage, content)
+    changelogPage.Width:Set(function() return changelogPage.Right() - changelogPage.Left() end)
+    changelogPage.Height:Set(function() return changelogPage.Bottom() - changelogPage.Top() end)
+    launcher.pages.changelog = changelogPage
+    import('/fafengine/modules/lua/ui/launcher/changelog.lua').Build(launcher, changelogPage)
+    Theme.SetVisible(changelogPage, false)
     -- Mods: installed and FAF's vault (modspage.lua), with the engine's mod library.
     if rawget(_G, 'FafLibrary_InstallMod') then
         local modsPage = Group(content, 'launcher mods')
@@ -2627,7 +2599,8 @@ local function Build(launcher)
     end
 end
 
---- Builds the launcher. `buildFafMenu` builds FAF's own main menu (the hook passes it), for its button.
+--- Builds the launcher. `buildFafMenu` builds FAF's own main menu (the hook passes it); the launcher no longer opens
+--- it, and main.lua falls back to it only when the launcher fails to load.
 function CreateUI(buildFafMenu)
     UIUtil.SetCurrentSkin('uef')
     import('/lua/ui/game/gamemain.lua').supressExitDialog = false
@@ -3029,15 +3002,17 @@ function TestWalk()
                 Widgets.OpenDropdowns())
             launcher:CloseScreen()
         end
-        Step('FAF main menu')
-        current:FafMenu()
-        Wait(5)
-        Step(fafMenuBack and 'FAF main menu open, with the button back' or 'FAF main menu has no button back')
-        if fafMenuBack then
-            fafMenuBack()
+        -- The Changelog page: FAF's patch notes, the newest first.
+        if current and current.changelogView then
+            current:ShowPage('changelog')
+            Wait(2)
+            local changelog = current.changelogView
+            Step('changelog: ' .. table.getn(changelog.items) .. ' versions, showing ' ..
+                tostring(changelog.shown and changelog.shown.key) .. ', ' .. table.getn(changelog.document.lines) ..
+                ' lines')
+            Wait(2)
+            current:ShowPage('online')
         end
-        Wait(3)
-        Step(current and 'back on the launcher from FAF\'s main menu' or 'no launcher after FAF\'s main menu')
         Wait(1)
         Step('done')
         ExitApplication()
