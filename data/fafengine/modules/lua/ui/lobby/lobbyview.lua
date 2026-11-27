@@ -17,6 +17,30 @@ local MapUtil = import('/lua/ui/maputil.lua')
 local Theme = import('/fafengine/modules/lua/ui/launcher/theme.lua')
 local Widgets = import('/fafengine/modules/lua/ui/launcher/widgets.lua')
 local C = Theme.Colors
+
+-- The player's FAF friends (FafOnline_Social), read again at most every 2 s (each slot asks on each paint).
+local socialCache = nil
+local socialAt = 0
+local function Social()
+    if not rawget(_G, 'FafOnline_Social') then
+        return { friends = {}, foes = {} }
+    end
+    if not socialCache or GetSystemTimeSeconds() - socialAt > 2 then
+        socialCache = FafOnline_Social()
+        socialAt = GetSystemTimeSeconds()
+    end
+    return socialCache
+end
+
+local function IsFriend(id)
+    return id ~= nil and Social().friends[tostring(id)] == true
+end
+
+--- Whether the menu of a player's slot can add them to the friends or remove them (a FAF id, signed in).
+local function CanFriend(api, player)
+    return player and player.Human and player.OwnerID ~= api.LocalPlayerID() and
+        rawget(_G, 'FafOnline_SetFriend') ~= nil and string.find(tostring(player.OwnerID), '^%d+$') ~= nil
+end
 local Scale = Theme.Scale
 
 local kRefreshSeconds = 0.3
@@ -306,6 +330,10 @@ local function MakeSlotRow(view, parent, slot, layout)
     local badge = Theme.Tag(row, 'Host', C.gold)
     badge.Left:Set(function() return rating.Right() + Scale(8) end)
     LayoutHelpers.AtVerticalCenterIn(badge, row)
+    -- A friend: this mark where the name starts (the name moves right by it), and the name in green.
+    local friend = Theme.Icon(row, 'userCheck', 16, C.good)
+    LayoutHelpers.AtLeftIn(friend, row, kNameLeft)
+    LayoutHelpers.AtVerticalCenterIn(friend, row)
 
     local faction = SelectBox(row, 'faction', layout, true)
     local swatch = Theme.Panel(row, C.subtle, C.lineStrong)
@@ -314,7 +342,7 @@ local function MakeSlotRow(view, parent, slot, layout)
     LayoutHelpers.AtVerticalCenterIn(swatch, row)
 
     local parts = { number = number, flag = flag, name = name, rating = rating, badge = badge, team = team,
-        faction = faction, swatch = swatch }
+        faction = faction, swatch = swatch, friend = friend }
 
     -- CPU: a bar of FAF's benchmark score (fuller is slower, full at FAF's 450) and the score after it.
     if Column(layout, 'cpu') then
@@ -483,7 +511,15 @@ function LobbyView:PaintSlot(row)
     Theme.SetVisible(p.faction, player ~= nil)
     Theme.SetVisible(p.swatch, player ~= nil)
     local keys = api.SlotMenu(slot)
-    Theme.SetVisible(p.menu, keys ~= nil and table.getn(keys) > 0)
+    Theme.SetVisible(p.menu, (keys ~= nil and table.getn(keys) > 0) or CanFriend(api, player) and true or false)
+    -- A friend's name moves right for the mark before it; any other row's name sits at its place.
+    local isFriend = human and not mine and IsFriend(player.OwnerID)
+    local shift = isFriend and 22 or 0
+    if row.nameShift ~= shift then
+        row.nameShift = shift
+        p.name.Left:Set(function() return row.Left() + Scale(kNameLeft + shift) end)
+    end
+    Theme.SetVisible(p.friend, isFriend and true or false)
 
     -- Rating, link, ping and ready count for a game with other players only.
     local rated = human and withOthers
@@ -538,7 +574,9 @@ function LobbyView:PaintSlot(row)
         if player.PlayerClan and player.PlayerClan ~= '' then
             label = '[' .. player.PlayerClan .. '] ' .. label
         end
-        Theme.SetColor(p.name, mine and C.accent or C.text)
+        -- The local player's accent, then a friend's green.
+        local friend = human and not mine and IsFriend(player.OwnerID)
+        Theme.SetColor(p.name, (mine and C.accent) or (friend and C.good) or C.text)
         Theme.SetText(p.rating, rated and tostring(math.floor(player.PL or 0)) or '')
         if not human then
             Theme.SetVisible(p.badge, true)
@@ -600,11 +638,8 @@ end
 --- The slot's menu, as FAF's name control offers it (GetSlotMenuTables), run through DoSlotBehavior.
 function LobbyView:OpenSlotMenu(slot, anchor)
     local keys, strings = self.api.SlotMenu(slot)
-    if not keys or table.getn(keys) == 0 then
-        return
-    end
     local items = {}
-    for i, key in keys do
+    for i, key in keys or {} do
         local text = Strip(strings[i])
         local color = C.text
         if key == 'remove_to_kik' then
@@ -612,8 +647,28 @@ function LobbyView:OpenSlotMenu(slot, anchor)
         end
         table.insert(items, { text, key = key, color = color })
     end
+    -- Ours after FAF's: the player into the FAF friends, or out of them.
+    local player = self.api.GameInfo().PlayerOptions[slot]
+    local friendId = CanFriend(self.api, player) and tostring(player.OwnerID) or nil
+    if friendId then
+        table.insert(items, { IsFriend(friendId) and 'Remove from friends' or 'Add to friends', key = 'fafre_friend',
+            color = C.good })
+    end
+    if table.getn(items) == 0 then
+        return
+    end
     local api = self.api
+    local view = self
     Widgets.Dropdown(anchor, items, function(item)
+        if item.key == 'fafre_friend' then
+            local ok, why = FafOnline_SetFriend(friendId, not IsFriend(friendId))
+            if not ok then
+                view:AddChat(nil, 'Friends: ' .. tostring(why))
+            end
+            socialCache = nil
+            view:Refresh()
+            return
+        end
         api.SlotAction(slot, item.key, item[1])
     end, { width = 260, maxRows = 16 })
 end

@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -273,6 +274,9 @@ namespace
     /// Every player the lobby told us about (player_info), by login: ratings, country and clan for the game list.
     std::map<std::string, LaunchPlayer> players;
     std::string notice;
+    /// The player's friends and foes by FAF id, as the lobby's `social` message lists them (and changes made since).
+    std::set<std::string> friends;
+    std::set<std::string> foes;
     /// The last hand-off of the sign-in page to the browser: "" (none yet), "opening", "opened", or why it failed. A
     /// thread of its own writes it, as the shell can take a moment.
     struct PageOpen
@@ -869,6 +873,59 @@ namespace
   }
 
   /** ok = FafOnline_RetryLobby(): connects to FAF's lobby again now, when it failed. */
+  void PushResult(lua_State* L, const std::expected<void, std::string>& result);
+
+  /** table FafOnline_Social(): friends and foes, each a table of FAF ids (text) to true. */
+  int SocialBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    lua_newtable(L);
+    for (const auto& [key, ids] : {std::pair{"friends", &s.friends}, std::pair{"foes", &s.foes}}) {
+      lua_pushstring(L, key);
+      lua_newtable(L);
+      for (const std::string& id : *ids) {
+        SetBool(L, id.c_str(), true);
+      }
+      lua_rawset(L, -3);
+    }
+    return 1;
+  }
+
+  /** ok, why = FafOnline_SetFriend(id, on): adds the player with that FAF id to the friends (on) or removes them. */
+  int SetFriendBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const bool on = lua_toboolean(L, 2) != 0;
+    if (id.empty() || id.find_first_not_of("0123456789") != std::string::npos) {
+      PushResult(L, std::unexpected(std::string("FafOnline_SetFriend needs a player's FAF id")));
+      return 2;
+    }
+    if (s.lobby.GetState() != FafLobby::State::SignedIn) {
+      PushResult(L, std::unexpected(std::string("not in FAF's lobby")));
+      return 2;
+    }
+    const auto sent = s.lobby.Send(
+      JsonObject({{"command", JsonString(on ? "social_add" : "social_remove")}, {"friend", JsonDigits(id)}})
+    );
+    if (sent) {
+      // The lobby doesn't answer with a new list; this one follows the change.
+      if (on) {
+        s.friends.insert(id);
+        s.foes.erase(id);
+      } else {
+        s.friends.erase(id);
+      }
+      LogLine(((on ? "social: added friend " : "social: removed friend ") + id).c_str());
+    }
+    PushResult(L, sent);
+    return 2;
+  }
+
   int RetryLobbyBody(
     lua_State* const L
   )
@@ -1421,6 +1478,22 @@ namespace
       "<global>",
       "table FafOnline_TakeResume() - what to do after a restart on another featured mod (once), or nil."
     );
+    static CScrLuaBinder social(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Social",
+      &Binding<&SocialBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Social() - the player's FAF friends and foes: {friends = {[id] = true}, foes = {...}}."
+    );
+    static CScrLuaBinder setFriend(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_SetFriend",
+      &Binding<&SetFriendBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_SetFriend(id, on) - adds that FAF player to the friends, or removes them."
+    );
     static CScrLuaBinder retryLobby(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_RetryLobby",
@@ -1578,6 +1651,25 @@ void moho::ONLINE_Frame()
           }
         }
       }
+    } else if (command == "social") {
+      // Sent after sign-in; a message without a list leaves that list as it was.
+      const auto read = [&](const char* const key, std::set<std::string>& into) {
+        const JsonNode* const ids = message.Get(key);
+        if (ids == nullptr || ids->kind != JsonNode::Kind::Array) {
+          return;
+        }
+        into.clear();
+        for (const JsonNode& id : ids->items) {
+          if (id.kind == JsonNode::Kind::Number || id.kind == JsonNode::Kind::String) {
+            into.insert(id.text);
+          }
+        }
+      };
+      read("friends", s.friends);
+      read("foes", s.foes);
+      LogLine(
+        ("social: " + std::to_string(s.friends.size()) + " friends, " + std::to_string(s.foes.size()) + " foes").c_str()
+      );
     } else if (command == "notice") {
       s.notice = message.String("text");
     } else if (command == "game_launch") {

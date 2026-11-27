@@ -2433,9 +2433,17 @@ end
 -- first game the online page lists as joinable and presses Join, as a player does. Once per Lua state.
 local testJoinDone = false
 local testJoinSeen = false
+local testFriendDone = false
 function TestJoin()
     if testJoinDone or not current or current.page ~= 'online' or not current.online or not current.online.grid then
         return
+    end
+    -- /launcherfriend <id>: that FAF player into the friends first (the lobby screen then marks them).
+    local friendTest = GetCommandLineArg('/launcherfriend', 1)
+    if friendTest and friendTest[1] and not testFriendDone and FafOnline_Status().lobby == 'signedin' then
+        testFriendDone = true
+        local ok, why = FafOnline_SetFriend(friendTest[1], true)
+        LOG('LAUNCHER TEST: friend ' .. friendTest[1] .. ' added: ' .. tostring(ok) .. ' ' .. tostring(why))
     end
     local view = current.online
     for _, item in view.grid.items do
