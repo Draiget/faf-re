@@ -1120,4 +1120,30 @@ namespace
     ASSERT_EQ(late.mOrders.size(), 1u);
     EXPECT_EQ(late.mOrders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
   }
+  TEST(
+    TransportPreOrdersTests,
+    GeneratedCommandIdsSurviveTheTripThroughALuaFloat
+  )
+  {
+    // UI Lua numbers are floats: GetCommandQueue hands the id to Lua and DeleteCommand reads it back.
+    // Ids that a float can't hold exactly collapse into one (0x7F000001 and 0x7F000002 both read back
+    // as 0x7F000000), and the pre-order could then never be deleted from Lua.
+    FakeUserUnitScope scopeA;
+    FakeUserUnitScope scopeB;
+    UserUnit* unitA = scopeA.GetUnit(971);
+    UserUnit* unitB = scopeB.GetUnit(972);
+    unitA->QueueTransportPreOrder(SSTICommandIssueData(EUnitCommandType::UNITCOMMAND_Move), false);
+    unitB->QueueTransportPreOrder(SSTICommandIssueData(EUnitCommandType::UNITCOMMAND_Move), false);
+
+    const std::int32_t idA = unitA->GetTransportPreOrders()[0].nextCommandId;
+    const std::int32_t idB = unitB->GetTransportPreOrders()[0].nextCommandId;
+    const auto throughLua = [](const std::int32_t id) {
+      return static_cast<std::int32_t>(static_cast<float>(id));
+    };
+    EXPECT_EQ(throughLua(idA), idA);
+    EXPECT_EQ(throughLua(idB), idB);
+    EXPECT_NE(throughLua(idA), throughLua(idB));
+    EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(throughLua(idA)));
+    EXPECT_FALSE(unitA->HasTransportPreOrders());
+  }
 } // namespace

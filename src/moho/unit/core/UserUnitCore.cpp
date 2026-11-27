@@ -18,8 +18,12 @@ namespace
   std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
   std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitStartTick; // game tick the unit began to wait
 
-  /// Pre-orders whose order carries no usable command id get one from here (bit 31 clear, never 0xFF......).
-  std::int32_t sNextPreOrderCommandId = 0x7F000001;
+  /// Pre-orders whose order carries no usable command id get one from here. UI Lua numbers are floats
+  /// (`LUA_NUMBER=float`), exact only up to 2^24, and `GetCommandQueue` / `DeleteCommand` pass ids
+  /// through them, so these ids count down from 0x00FFFFFF: exact in a float, and far above the ids
+  /// command source 0 hands out (source << 24 | counter) before a game ends.
+  constexpr std::int32_t kFirstPreOrderCommandId = 0x00FFFFFF;
+  std::int32_t sNextPreOrderCommandId = kFirstPreOrderCommandId;
 
   void AssignPreOrderCommandId(
     moho::SSTICommandIssueData& order
@@ -27,7 +31,7 @@ namespace
   {
     const auto commandId = static_cast<std::uint32_t>(order.nextCommandId);
     if (order.nextCommandId <= 0 || (commandId & 0xFF000000u) == 0xFF000000u) {
-      order.nextCommandId = sNextPreOrderCommandId++;
+      order.nextCommandId = sNextPreOrderCommandId--;
     }
   }
 
