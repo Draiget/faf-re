@@ -536,10 +536,10 @@ namespace
 
   TEST(
     TransportPreOrdersTests,
-    DefaultSwitchStateIsFalse
+    DefaultSwitchStateIsOn
   )
   {
-    EXPECT_FALSE(moho::ui_TransportPreOrders);
+    EXPECT_TRUE(moho::ui_TransportPreOrders);
   }
 
   TEST(

@@ -145,7 +145,7 @@ do
             title = "Transport Cargo Pre-orders",
             key = 'transport_preorders',
             type = 'toggle',
-            default = 0,
+            default = 1,
             tip = "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
             set = function(key, value, startup)
                 if value ~= 0 and value ~= 1 then

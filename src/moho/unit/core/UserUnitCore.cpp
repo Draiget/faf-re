@@ -8,7 +8,7 @@
 #include <vector>
 
 /// Engine addition (`ui_TransportPreOrders`): orders for units inside a transport, sent when they leave it.
-bool moho::ui_TransportPreOrders = false;
+bool moho::ui_TransportPreOrders = true;
 
 namespace
 {
