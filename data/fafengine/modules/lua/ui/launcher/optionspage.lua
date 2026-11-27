@@ -81,6 +81,7 @@ function Build(launcher, page)
             table.insert(view.sections, key)
         end
     end
+    table.insert(tabs, { 'keys', 'Key bindings' })
     table.insert(tabs, { 'profile', 'Profile' })
     view.tab = view.sections[1] or 'profile'
     view.tabs = Widgets.Tabs(page, tabs, function(key)
@@ -152,6 +153,14 @@ function Build(launcher, page)
     view.help.Left:Set(page.Left)
     view.help.Right:Set(page.Right)
     view.help.Top:Set(function() return panel.Bottom() + Scale(12) end)
+
+    -- The Key bindings tab (keyspage.lua): its own list and presets where the options' rows are.
+    local keysBuilt, keysWhy = pcall(function()
+        import('/fafengine/modules/lua/ui/launcher/keyspage.lua').Build(launcher, page, view)
+    end)
+    if not keysBuilt then
+        WARN('LAUNCHER: the key bindings tab failed to build: ' .. tostring(keysWhy))
+    end
 
     -- -------------------------------------------------------------------------------------------------------------
 
@@ -521,6 +530,18 @@ function Build(launcher, page)
         end
         self.tabs:Set(self.tab, {})
         self.search:Refresh()
+        -- Key bindings: their own view in place of the options' rows and Apply, Revert and Defaults.
+        local keys = self.tab == 'keys' and self.keysView
+        for _, control in { self.panel, self.help, self.apply, self.revert, self.defaults, self.changes } do
+            Theme.SetVisible(control, not keys)
+        end
+        if self.keysView then
+            Theme.SetVisible(self.keysView.root, keys and true or false)
+        end
+        if keys then
+            self.keysView:Refresh()
+            return
+        end
         self.entries = self:Entries()
         self.top = math.min(self.top, math.max(1, table.getn(self.entries) - self:Shown() + 1))
         self:Paint()

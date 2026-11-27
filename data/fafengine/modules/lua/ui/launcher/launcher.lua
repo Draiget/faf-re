@@ -3342,6 +3342,70 @@ function TestWalk()
             options:Refresh()
             Step('options profile tab: ' .. table.getn(options.entries) .. ' rows')
             Wait(2)
+            -- Key bindings: FAF's presets, a key pressed for an action, the player's own preset saved, used and
+            -- deleted; the profile's bindings as they were at the end.
+            local keys = options.keysView
+            if keys then
+                local KeyMapper = import('/lua/keymap/keymapper.lua')
+                local Prefs = import('/lua/user/prefs.lua')
+                local before = { name = Prefs.GetFromCurrentProfile('UserKeyMapName'),
+                    map = Prefs.GetFromCurrentProfile('UserKeyMap'), debug = Prefs.GetFromCurrentProfile('UserDebugKeyMap') }
+                options.tab = 'keys'
+                options:Refresh()
+                Wait(1)
+                local bound = 0
+                for _, row in keys.rows do
+                    if row.binding then
+                        bound = bound + 1
+                    end
+                end
+                Step('keys tab: ' .. table.getn(keys.rows) .. ' actions, ' .. bound .. ' with a key')
+                Wait(2)
+                keys:UsePreset('hotbuildKeyMap.lua', 'Hotbuild')
+                local hotbuild = 0
+                for _, row in keys.rows do
+                    if row.binding then
+                        hotbuild = hotbuild + 1
+                    end
+                end
+                Step('keys: hotbuild preset, ' .. hotbuild .. ' with a key, preset ' .. tostring(KeyMapper.GetDefaultKeyMapName()))
+                -- An action outside the orders (their Shift twins follow them), pressed as Ctrl+F9.
+                local entry = nil
+                for _, row in keys.rows do
+                    if row.category ~= 'orders' and not entry then
+                        entry = row
+                    end
+                end
+                local f9 = nil
+                for code, name in KeyMapper.GetKeyCodeLookup() do
+                    if name == 'F9' then
+                        f9 = code
+                    end
+                end
+                if entry and f9 then
+                    keys.selected = entry
+                    keys:AskKey(entry)
+                    keys.TakeKey(f9, { Ctrl = true })
+                    Step('keys: waiting for a key for ' .. entry.action)
+                    Wait(2)
+                    keys.keyDialog.Close()
+                    keys:Assign(entry, 'Ctrl-F9')
+                    Step('keys: ' .. entry.action .. ' on ' .. tostring(KeyMapper.GetCurrentKeyBinding(entry.action)))
+                    keys:SavePreset('walk test')
+                    keys:UsePreset('defaultKeyMap.lua', 'GPG default')
+                    local afterDefault = KeyMapper.GetCurrentKeyBinding(entry.action)
+                    keys:LoadPreset('walk test')
+                    Step('keys: own preset saved, GPG default gave ' .. tostring(afterDefault) .. ', the preset again gave ' ..
+                        tostring(KeyMapper.GetCurrentKeyBinding(entry.action)) .. ', base ' ..
+                        tostring(KeyMapper.GetDefaultKeyMapName()))
+                    Wait(2)
+                    keys:DeletePreset('walk test')
+                    Step('keys: own presets left: ' .. table.getsize(Prefs.GetFromCurrentProfile('fafre_key_presets') or {}))
+                end
+                Prefs.SetToCurrentProfile('UserKeyMapName', before.name)
+                Prefs.SetToCurrentProfile('UserKeyMap', before.map)
+                Prefs.SetToCurrentProfile('UserDebugKeyMap', before.debug)
+            end
             current:ShowPage('online')
         end
         -- The LAN page: listening for games. /launcherlantest host|join: one client hosts a LAN game, the other finds
