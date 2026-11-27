@@ -57,10 +57,15 @@ function Paintable(control)
     paintables[control] = true
 end
 
---- Paints every live control that hides some of its pieces again (after a Show on an ancestor).
+--- Paints every live control that hides some of its pieces again (after a Show on an ancestor). Hidden ones are
+--- skipped: a Paint shows pieces (a checkbox's mark), and a shown piece draws even under a hidden page. They paint
+--- when their page shows, which calls this again.
 function RepaintAll()
     for control in paintables do
-        pcall(control.Paint, control, false)
+        local alive, hidden = pcall(control.IsHidden, control) -- a destroyed control throws
+        if alive and not hidden then
+            pcall(control.Paint, control, false)
+        end
     end
 end
 
