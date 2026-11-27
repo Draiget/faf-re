@@ -279,6 +279,29 @@ do
     end
     --- The sim mods of the game, each a mod table (name, uid...).
     api.GameMods = function() return Mods.GetGameMods(gameInfo.GameMods) or {} end
+    --- Every mod on this computer FAF's mod manager lists (Mods.AllSelectableMods: uid -> mod_info).
+    api.AllMods = function() return Mods.AllSelectableMods() or {} end
+    --- The mods picked for this lobby, game and interface ones (Mods.GetSelectedMods: uid -> true).
+    api.SelectedMods = function() return Mods.GetSelectedMods() or {} end
+    --- Whether every player in the lobby has mod `uid` (the lists each peer sent, as FAF's mod manager checks).
+    api.EveryoneHasMod = function(uid)
+        for _, peerMods in availableMods or {} do
+            if not peerMods[uid] then
+                return false
+            end
+        end
+        return true
+    end
+    --- Whether a mod needs another that isn't installed (Mods.GetDependencies' `missing`).
+    api.ModMissingDependencies = function(uid)
+        local ok, dependencies = pcall(Mods.GetDependencies, uid)
+        return ok and dependencies and dependencies.missing and true or false
+    end
+    --- The game's and the player's interface mods as FAF's mod manager hands them over (OnModsChanged: the host's
+    --- game mods go to everyone).
+    api.SetMods = function(simMods, uiMods)
+        OnModsChanged(simMods, uiMods)
+    end
     --- The mod manager as FAF opens it: the host picks the game's mods, everyone else sees them and picks UI mods.
     api.OpenMods = function()
         if api.IsHost() then

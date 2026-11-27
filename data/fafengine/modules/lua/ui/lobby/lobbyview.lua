@@ -1262,7 +1262,7 @@ function LobbyView:Build()
     local modsCaption = Theme.Caption(mods, 'Mods', C.accent)
     LayoutHelpers.AtLeftTopIn(modsCaption, mods, 14, 12)
     self.modsButton = Theme.Button(mods, 'Manage', function()
-        api.OpenMods()
+        import('/fafengine/modules/lua/ui/lobby/lobbypages.lua').OpenMods(view)
     end, 'secondary', { icon = 'mods', height = 26, width = 110, size = 12 })
     LayoutHelpers.AtRightTopIn(self.modsButton, mods, 10, 8)
     self.restrictButton = Theme.Button(mods, 'Restrictions', function()
@@ -1318,12 +1318,12 @@ function LobbyView:Build()
     self.optionsNote.Top:Set(optionsCaption.Top)
     -- On a narrow column the count gives its place to the checkbox and the button.
     self.showOptionsNote = LayoutHelpers.InvScaleNumber(rightCol.Width()) >= 440
-    self.advanced = Theme.Button(rightCol, 'Advanced', function()
-        api.OpenAdvanced()
-    end, 'ghost', { icon = 'settings', height = 26, width = 120, size = 12 })
+    -- Every option on a page of its own (lobbypages.lua); the host changes them there, others read them.
+    self.advanced = Theme.Button(rightCol, 'All options', function()
+        import('/fafengine/modules/lua/ui/lobby/lobbypages.lua').OpenOptions(view)
+    end, 'ghost', { icon = 'settings', height = 26, width = 130, size = 12 })
     self.advanced.Right:Set(rightCol.Right)
     self.advanced.Top:Set(function() return optionsCaption.Top() - Scale(7) end)
-    Theme.SetVisible(self.advanced, hostsGame)
     -- On unless the player turned it off here (a key of its own: FAF's LobbyHideDefaultOptions is often 'false' from
     -- FAF's own lobby), and written to disk at once, so a game that doesn't end normally keeps the choice too.
     self.onlyChanged = Prefs.GetFromCurrentProfile('fafre_lobby_only_changed') ~= false
@@ -1627,8 +1627,9 @@ function LobbyView:Refresh()
         self.modsButton:SetLabel(host and 'Manage' or 'View')
         self.restrictButton:SetEnabled(host and Enabled(fafGui.gameoptionsButton) or
             (not host and Enabled(fafGui.restrictedUnitsOrPresetsBtn)))
-        Theme.SetVisible(self.advanced, host)
-        self.advanced:SetEnabled(Enabled(fafGui.gameoptionsButton))
+        -- Everyone reads every option there; only the host's page changes them.
+        Theme.SetVisible(self.advanced, true)
+        self.advanced:SetEnabled(true)
 
         local rows, changed = self:OptionRows()
         self.options:SetItems(rows)
@@ -1797,6 +1798,66 @@ function TestSteps(step)
                 ', mods ' .. table.getn(api.GameMods()))
         end,
         function()
+            -- The game options page: every option, then one picked through it (the second fog-of-war value).
+            local pages = import('/fafengine/modules/lua/ui/lobby/lobbypages.lua')
+            local page = pages.OpenOptions(view)
+            local fog = nil
+            for _, item in page.items do
+                if item.key == 'FogOfWar' then
+                    fog = item
+                end
+            end
+            step('lobby: options page ' .. table.getn(page.items) .. ' options, ' .. tostring(page.changed) .. ' changed')
+            if fog and fog.option.values[2] then
+                view.askedFog = ValueKey(fog.option.values[2])
+                api.SetOption('FogOfWar', view.askedFog)
+            end
+        end,
+        function()
+            local page = view.optionsPage
+            page:Refresh()
+            step('lobby: options page fog ' .. tostring(Info().GameOptions.FogOfWar) .. ' (asked ' ..
+                tostring(view.askedFog) .. '), changed now ' .. tostring(page.changed))
+        end,
+        function()
+            view.optionsPage:Destroy()
+            local mods = import('/fafengine/modules/lua/ui/lobby/lobbypages.lua').OpenMods(view)
+            step('lobby: mods page ' .. mods.counts.game .. ' game mods (' .. mods.counts.gameOn .. ' on), ' ..
+                mods.counts.ui .. ' interface mods (' .. mods.counts.uiOn .. ' on)')
+        end,
+        function()
+            view.modsPage.kind = 'ui'
+            view.modsPage:Refresh()
+            step('lobby: mods page interface tab ' .. table.getn(view.modsPage.items) .. ' rows')
+        end,
+        function()
+            -- A game mod turned on and applied through FAF's lobby, then off again.
+            local page = view.modsPage
+            page.kind = 'game'
+            page:Refresh()
+            local first = page.items[1]
+            view.testMod = first and first.uid
+            if first and not first.why then
+                page.chosen[first.uid] = true
+                page:Apply()
+            else
+                page:Destroy()
+            end
+        end,
+        function()
+            local names = {}
+            for _, mod in api.GameMods() do
+                table.insert(names, tostring(mod.name))
+            end
+            step('lobby: game mods after Apply: ' .. table.getn(names) .. ' (' .. table.concat(names, ', ') .. ')')
+            local page = import('/fafengine/modules/lua/ui/lobby/lobbypages.lua').OpenMods(view)
+            if view.testMod then
+                page.chosen[view.testMod] = nil
+            end
+            page:Apply()
+        end,
+        function()
+            step('lobby: game mods after turning it off: ' .. table.getn(api.GameMods()))
             view:Refresh()
             view:OpenSlotMenu(3, view.rows[3])
             step('lobby: slot 3 menu open')
