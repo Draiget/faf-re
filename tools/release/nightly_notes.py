@@ -109,6 +109,8 @@ def main():
         lines += ["", "%d more in the comparison below." % (len(commits) - len(shown))]
     lines += ["", "All changes: %s/compare/%s...%s" % (REPO, previous, tag), "",
               "## Install", "",
+              "**The easy way:** download `faf-re-setup.exe` (Windows) or `faf-re-setup-linux` (Linux, `chmod +x` it first) and run it. It checks that FAF's client and Forged Alliance are installed and that the game isn't running, downloads this release's package for your system, checks it against the SHA-256 below, installs it and adds a shortcut. `--check` only runs the checks; `--help` lists the rest. It updates an earlier install the same way, and `--uninstall` removes it.", "",
+              "By hand:", "",
               "- **x64:** extract `faf-engine-%s-x64.zip` into the folder you run the x64 engine from. `INSTALL.txt` inside lists the steps." % tag,
               "- **x86:** extract `faf-engine-%s-x86.zip` into FAF's `bin` folder." % tag,
               "- **Linux x64 (native, Vulkan; glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Mint 21, RHEL 9 and newer):** extract `faf-engine-%s-linux-x64.tar.gz` into a folder of its own and start `./faf-launch`, which finds Forged Alliance and FAF's game data. `INSTALL.txt` inside lists the steps; it plays with the rebuilt engine on Windows or Linux, not with the original exe." % tag,

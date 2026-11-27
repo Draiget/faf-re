@@ -31,7 +31,15 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 
 ## Install a release
 
-You need your own copy of Forged Alliance and an installed FAF client (it creates `C:\ProgramData\FAForever`). Releases hold only the engine: no game files, assets or maps.
+You need your own copy of Forged Alliance and an installed FAF client that has started at least one game or replay (that's when it downloads FAF's game data). Releases hold only the engine: no game files, assets or maps.
+
+**Windows:** download `faf-re-setup.exe` from the [latest release](https://github.com/Draiget/faf-re/releases/latest) and run it. It isn't code-signed, so Windows may say it "protected your PC": choose **More info**, then **Run anyway**. Its SHA-256 is in the release's `SHA256SUMS.txt`.
+**Linux x64:** download `faf-re-setup-linux`, then `chmod +x faf-re-setup-linux && ./faf-re-setup-linux`.
+
+Setup checks that FAF's client and Forged Alliance are installed, that there's room and that the game isn't running, then downloads the release's package for your system, checks it against the release's SHA-256 list, installs it and adds a shortcut. Run it again to update; `--uninstall` removes exactly what it installed, `--check` only runs the checks, and `--help` lists the rest. The setup files ship with releases after 2026.11.015; for that one, install by hand.
+
+<details>
+<summary><b>Install by hand</b></summary>
 
 1. Download `faf-engine-<version>-x64.zip` from the [latest release](https://github.com/Draiget/faf-re/releases/latest).
 2. Unzip it into `C:\ProgramData\FAForever\bin_x64` (create the folder; it sits next to FAF's `bin` folder), keeping the `fafengine` folder as it is.
@@ -43,8 +51,10 @@ You need your own copy of Forged Alliance and an installed FAF client (it create
 
 The x64 install leaves FAF's own `bin` folder alone; deleting `bin_x64` removes it. Each package carries an `INSTALL.txt` with the steps:
 
-- **x86:** unzip `faf-engine-<version>-x86.zip` into FAF's `bin` folder, next to `ForgedAlliance.exe` (keep that exe), and start `main.exe` the same way.
+- **x86:** unzip `faf-engine-<version>-x86.zip` into FAF's `bin` folder, next to `ForgedAlliance.exe` (keep that exe), and start `main.exe` the same way. Setup does this with `--x86`.
 - **Linux x64** (glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Mint 21, RHEL 9 and later): extract `faf-engine-<version>-linux-x64.tar.gz` into a folder of its own and start `./faf-launch`, which finds Forged Alliance and FAF's game data.
+
+</details>
 
 If the game crashes, it writes `faf_crash_<date>.txt` next to the exe. Please attach it, with the log from `/log`, to an [issue](https://github.com/Draiget/faf-re/issues).
 
