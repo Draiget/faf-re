@@ -12,6 +12,7 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -221,6 +222,42 @@ namespace
   }
 
   /** The service: made on the first FafOnline_* call, ended by ONLINE_Shutdown. */
+  /**
+   * The FAF init file a start without /init ran. The game then runs its default data-path script, SupComDataPath.lua;
+   * FAF's copy of it only runs init_faf.lua from its own folder, so the game is on FAF's files as with
+   * /init init_faf.lua. The script itself when it is an init file, else the first init_<name>.lua it names that sits
+   * next to it; empty when there is none (the game is not on FAF's files).
+   */
+  std::string InitFromDataPathScript()
+  {
+    const std::filesystem::path script = moho::DISK_GetDataPathScriptFile();
+    if (script.empty()) {
+      return {};
+    }
+    const std::string name = Lower(script.filename().string());
+    if (name.starts_with("init_") && name.ends_with(".lua")) {
+      return script.string();
+    }
+    std::ifstream in(script, std::ios::binary);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    text = Lower(text);
+    for (std::size_t at = text.find("init_"); at != std::string::npos; at = text.find("init_", at + 1)) {
+      std::size_t end = at + 5;
+      while (end < text.size() && (std::isalnum(static_cast<unsigned char>(text[end])) != 0 || text[end] == '_')) {
+        ++end;
+      }
+      if (end == at + 5 || text.compare(end, 4, ".lua") != 0) {
+        continue;
+      }
+      const std::filesystem::path named = script.parent_path() / text.substr(at, end + 4 - at);
+      std::error_code missing;
+      if (std::filesystem::exists(named, missing)) {
+        return named.string();
+      }
+    }
+    return {};
+  }
+
   struct Service
   {
     FafAuth auth{GameEndpoints()};
@@ -278,6 +315,13 @@ namespace
       fa::vector<fa::string> init;
       if (moho::CFG_GetArgOption("/init", 1, &init) && !init.empty()) {
         realInit = init[0].c_str();
+      } else {
+        // Started without /init (the exe run directly): the init file the default data-path script ran.
+        realInit = InitFromDataPathScript();
+        LogLine(
+          realInit.empty() ? "no /init, and the data-path script runs no FAF init file"
+                           : ("no /init; the data-path script runs " + realInit).c_str()
+        );
       }
       if (const std::string file = TestSetting("FAF_ONLINE_ACCESS_TOKEN_FILE"); !file.empty()) {
         std::ifstream in(file, std::ios::binary);
