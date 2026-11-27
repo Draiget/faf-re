@@ -194,9 +194,70 @@ namespace
     return value != nullptr ? value : "";
   }
 
+  /**
+   * One FAF server: the main one players use, or FAF's test server, with the addresses FAF's client config lists for
+   * them (content.faforever.com/dfc-config.json). Each keeps its own sign-in (token file): an account and its tokens
+   * on one are not the other's.
+   */
+  struct FafServer
+  {
+    const char* name; ///< "main" or "test", as FafOnline_SetServer takes it
+    const char* title;
+    const char* oauth;
+    const char* api;
+    const char* user;
+    const char* content;
+    const char* replay;
+    const char* tokenFile;
+  };
+
+  constexpr FafServer kServers[] = {
+    {"main",
+     "FAF",
+     "https://hydra.faforever.com",
+     "https://api.faforever.com",
+     "https://user.faforever.com",
+     "https://content.faforever.com",
+     "https://replay.faforever.com",
+     "game.token"},
+    {"test",
+     "FAF test server",
+     "https://hydra.faforever.xyz",
+     "https://api.faforever.xyz",
+     "https://user.faforever.xyz",
+     "https://content.faforever.xyz",
+     "https://replay.faforever.xyz",
+     "game-test.token"},
+  };
+
+  std::string gServerName; ///< the chosen server's name, read from server.txt on first use (main thread)
+
+  /** The server the player chose (server.txt in the data folder; the main one when there is none). */
+  const FafServer& CurrentServer()
+  {
+    if (gServerName.empty()) {
+      std::ifstream in(DataFolder() / "server.txt", std::ios::binary);
+      std::getline(in, gServerName);
+      while (!gServerName.empty() && (gServerName.back() == '\r' || gServerName.back() == ' ')) {
+        gServerName.pop_back();
+      }
+      if (gServerName.empty()) {
+        gServerName = "main";
+      }
+    }
+    for (const FafServer& server : kServers) {
+      if (gServerName == server.name) {
+        return server;
+      }
+    }
+    return kServers[0];
+  }
+
   FafEndpoints GameEndpoints()
   {
     FafEndpoints endpoints;
+    endpoints.oauthUrl = CurrentServer().oauth;
+    endpoints.apiUrl = CurrentServer().api;
     if (const std::string oauth = TestSetting("FAF_ONLINE_OAUTH"); !oauth.empty()) {
       endpoints.oauthUrl = oauth;
     }
@@ -215,6 +276,7 @@ namespace
     settings.userAgent = "faf-re-client";
     settings.version = gpg::diag::BuildVersion();
     settings.uidProgram = UidProgram();
+    settings.userServiceUrl = CurrentServer().user;
     if (const std::string service = TestSetting("FAF_ONLINE_USER_SERVICE"); !service.empty()) {
       settings.userServiceUrl = service;
     }
@@ -320,7 +382,11 @@ namespace
       lobby.SetLog(LogLine);
       std::error_code ignored;
       std::filesystem::create_directories(DataFolder(), ignored);
-      auth.SetTokenFile(DataFolder() / "game.token");
+      auth.SetTokenFile(DataFolder() / CurrentServer().tokenFile);
+      LogLine((std::string("server: ") + CurrentServer().title + ", sign-in at " + auth.Endpoints().oauthUrl +
+               ", API " + auth.Endpoints().apiUrl + ", lobby through " + GameLobbySettings().userServiceUrl +
+               ", token file " + CurrentServer().tokenFile)
+                .c_str());
       fa::vector<fa::string> init;
       if (moho::CFG_GetArgOption("/init", 1, &init) && !init.empty()) {
         realInit = init[0].c_str();
@@ -531,7 +597,9 @@ namespace
       game->FromLobby(message);
     });
 
-    s.relay = std::make_unique<ReplayRelay>();
+    ReplayRelaySettings relaySettings;
+    relaySettings.userServiceUrl = GameLobbySettings().userServiceUrl; // the chosen server's
+    s.relay = std::make_unique<ReplayRelay>(relaySettings);
     s.relay->SetLog(LogLine);
     const auto replayPort = s.relay->Listen();
     if (replayPort) {
@@ -802,6 +870,8 @@ namespace
     SetField(L, "login", s.haveMe ? s.me.login : s.auth.UserName());
     SetField(L, "lobby", LobbyStateName(s.lobby.GetState()));
     SetField(L, "lobbyMessage", s.lobby.Message());
+    SetField(L, "server", CurrentServer().name);
+    SetField(L, "serverTitle", CurrentServer().title);
     SetBool(L, "lobbyKicked", s.lobby.Kicked());
     double retryIn = 0;
     if (s.lobbyRetryAt != std::chrono::steady_clock::time_point{}) {
@@ -979,6 +1049,68 @@ namespace
     }
     lua_pushboolean(L, retry ? 1 : 0);
     return 1;
+  }
+
+  /** table FafOnline_Server(): the chosen server (name, title) and every server there is (servers = {{name, title}}).
+   */
+  int ServerBody(
+    lua_State* const L
+  )
+  {
+    lua_newtable(L);
+    SetField(L, "name", CurrentServer().name);
+    SetField(L, "title", CurrentServer().title);
+    lua_pushstring(L, "servers");
+    lua_newtable(L);
+    int index = 1;
+    for (const FafServer& server : kServers) {
+      lua_newtable(L);
+      SetField(L, "name", server.name);
+      SetField(L, "title", server.title);
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /**
+   * ok, why = FafOnline_SetServer(name): plays on that FAF server from now on (kept for the next start). The online
+   * service starts again on it: signed out of the old one's lobby, signed in with the new one's own saved sign-in
+   * when there is one. Refused while a game runs.
+   */
+  int SetServerBody(
+    lua_State* const L
+  )
+  {
+    const std::string name = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const FafServer* wanted = nullptr;
+    for (const FafServer& server : kServers) {
+      if (name == server.name) {
+        wanted = &server;
+      }
+    }
+    if (wanted == nullptr) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, "no such server");
+      return 2;
+    }
+    if (gService && gService->match != MatchState::Idle && gService->match != MatchState::Failed) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, "leave the game first");
+      return 2;
+    }
+    if (name != CurrentServer().name) {
+      std::error_code ignored;
+      std::filesystem::create_directories(DataFolder(), ignored);
+      std::ofstream(DataFolder() / "server.txt", std::ios::binary | std::ios::trunc) << name << "\n";
+      LogLine((std::string("server: ") + CurrentServer().name + " -> " + name).c_str());
+      moho::LIBRARY_Shutdown(); // its searches and downloads sign in to the old server
+      gService.reset();         // the next call makes it again, on the new server
+      gServerName = name;
+    }
+    lua_pushboolean(L, 1);
+    lua_pushnil(L);
+    return 2;
   }
 
   /** FafOnline_OpenSignInPage(): hands the sign-in page to the browser again (the engine opens it once by itself). */
@@ -1544,6 +1676,22 @@ namespace
       "<global>",
       "bool, string FafOnline_SetFriend(id, on) - adds that FAF player to the friends, or removes them."
     );
+    static CScrLuaBinder server(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Server",
+      &Binding<&ServerBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Server() - the FAF server played on (name, title) and the servers there are."
+    );
+    static CScrLuaBinder setServer(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_SetServer",
+      &Binding<&SetServerBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_SetServer(name) - plays on FAF's main or test server from now on."
+    );
     static CScrLuaBinder retryLobby(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_RetryLobby",
@@ -1864,6 +2012,16 @@ std::filesystem::path moho::ONLINE_DataFolder()
 std::string moho::ONLINE_ApiBase()
 {
   return GameEndpoints().apiUrl;
+}
+
+std::string moho::ONLINE_ContentBase()
+{
+  return CurrentServer().content;
+}
+
+std::string moho::ONLINE_ReplayBase()
+{
+  return CurrentServer().replay;
 }
 
 std::expected<std::string, std::string> moho::ONLINE_AccessToken()

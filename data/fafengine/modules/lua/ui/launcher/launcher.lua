@@ -1162,7 +1162,7 @@ local function BuildOnlinePage(launcher, page)
 
     -- Signed out or signing in: one card in the middle.
     local signIn = Theme.Panel(page, C.panel, C.line)
-    LayoutHelpers.SetDimensions(signIn, 560, 360)
+    LayoutHelpers.SetDimensions(signIn, 560, 420)
     LayoutHelpers.AtCenterIn(signIn, page, 20)
     Theme.Brackets(signIn, C.accent, true)
     view.signIn = signIn
@@ -1197,6 +1197,25 @@ local function BuildOnlinePage(launcher, page)
     end, 'primary', { width = 220, icon = 'external' })
     LayoutHelpers.AtHorizontalCenterIn(view.signButton, signIn)
     LayoutHelpers.AtBottomIn(view.signButton, signIn, 26)
+    -- Which FAF server: the main one or FAF's test server, each with a sign-in of its own (FafOnline_SetServer).
+    view.serverChoices = {}
+    if rawget(_G, 'FafOnline_Server') then
+        local servers = FafOnline_Server().servers or {}
+        local count = table.getn(servers)
+        for i, server in servers do
+            local index = i - 1
+            local name = server.name
+            local choice = Theme.Choice(signIn, name == 'main' and 'Main server' or 'Test server', 150, function()
+                launcher:SetServer(name)
+            end)
+            choice.Left:Set(function()
+                return signIn.Left() + math.floor(signIn.Width() / 2) - Scale(count * 80) + Scale(index * 160)
+            end)
+            LayoutHelpers.AtTopIn(choice, signIn, 292)
+            choice.server = name
+            table.insert(view.serverChoices, choice)
+        end
+    end
     -- Under the address: open it again, or copy it for a browser of the player's choosing.
     view.openPage = Theme.Button(signIn, 'Open the page again', function()
         FafOnline_OpenSignInPage()
@@ -1391,7 +1410,14 @@ local function RefreshOnline(launcher)
     end
     local lobbyText = ({ off = 'not connected', connecting = 'connecting', signedin = 'FAF lobby connected',
         failed = 'FAF lobby failed' })[status.lobby] or status.lobby
+    if status.server == 'test' then
+        lobbyText = string.gsub(lobbyText, 'FAF lobby', 'test server')
+    end
     Theme.SetText(view.whoNote, signedIn and lobbyText or 'Sign in to play online')
+    for _, choice in view.serverChoices or {} do
+        choice.selected = choice.server == (status.server or 'main')
+        choice:Paint(false)
+    end
     Theme.SetColor(view.whoNote, status.lobby == 'failed' and C.bad or C.muted)
 
     if not signedIn then
@@ -1513,7 +1539,8 @@ local function RefreshOnline(launcher)
             -- Signed in elsewhere (FAF's own client, another game): Try again takes the session back.
             empty = string.gsub(why, '%.$', '') .. '. Try again takes this game back online.'
         else
-            empty = 'No connection to the FAF lobby' .. (why ~= '' and (': ' .. why) or '') .. '.'
+            empty = 'No connection to the ' .. (status.server == 'test' and "FAF test server's lobby" or 'FAF lobby') ..
+                (why ~= '' and (': ' .. why) or '') .. '.'
             if (status.lobbyRetryIn or 0) > 0 then
                 empty = empty .. string.format(' Trying again in %d s.', status.lobbyRetryIn)
             end
@@ -2288,6 +2315,19 @@ function Launcher:Replays()
     end)
 end
 
+--- Plays on FAF's main or test server from now on: the online service starts again on it, signed in with that server's
+--- own saved sign-in when there is one (else the sign-in card asks). Refused while a game runs.
+function Launcher:SetServer(name)
+    local ok, why = FafOnline_SetServer(name)
+    if not ok then
+        Message(self.root, 'FAF server', 'The server stays as it is: ' .. tostring(why) .. '.')
+        return
+    end
+    LOG('LAUNCHER: playing on the FAF ' .. tostring(name) .. ' server')
+    self.profileLogin = nil
+    self:ShowPage('online')
+end
+
 --- A FAF player's profile over the launcher (profile.lua): ratings, rating history, maps, previous names, clan.
 function Launcher:ShowProfile(login)
     local ok, err = pcall(function()
@@ -2307,6 +2347,11 @@ function Launcher:ProfileMenu(anchor)
     if status.login and status.login ~= '' then
         table.insert(items, { 'My FAF profile', key = 'faf', color = C.accent })
     end
+    if rawget(_G, 'FafOnline_SetServer') then
+        local other = status.server == 'test' and 'main' or 'test'
+        table.insert(items, { other == 'test' and 'Play on the FAF test server' or 'Back to the FAF main server',
+            key = 'server:' .. other, color = C.warn })
+    end
     local current = CurrentProfileIndex()
     for index, profile in Profiles() do
         table.insert(items, { (index == current and 'Profile: ' or 'Switch to ') .. tostring(profile.Name), key = index,
@@ -2317,6 +2362,8 @@ function Launcher:ProfileMenu(anchor)
     Widgets.Dropdown(anchor, items, function(item)
         if item.key == 'faf' then
             launcher:ShowProfile(status.login)
+        elseif type(item.key) == 'string' and string.sub(item.key, 1, 7) == 'server:' then
+            launcher:SetServer(string.sub(item.key, 8))
         elseif item.key == 'manage' then
             launcher:OpenScreen('Profiles', function(host, back)
                 import('/lua/ui/dialogs/profile.lua').CreateDialog(function()
@@ -2617,6 +2664,49 @@ local function BuildStatusBar(launcher, body)
     local servers = Indicator(nil)
     local faf = Indicator(servers.dot)
     local status = {}
+    -- The FAF status picks the FAF server: a click lists the main and the test server (FafOnline_SetServer).
+    if rawget(_G, 'FafOnline_Server') then
+        faf.arrow = Theme.Icon(bar, 'chevronUp', 12, C.subtle)
+        faf.arrow.Right:Set(function() return servers.dot.Left() - Scale(18) end)
+        LayoutHelpers.AtVerticalCenterIn(faf.arrow, bar)
+        faf.text.Right:Set(function() return faf.arrow.Left() - Scale(5) end)
+        local area = Group(bar)
+        area.Left:Set(function() return faf.dot.Left() - Scale(8) end)
+        area.Right:Set(function() return faf.arrow.Right() + Scale(6) end)
+        area.Top:Set(bar.Top)
+        area.Bottom:Set(bar.Bottom)
+        Theme.SizeFromEdges(area)
+        status.serverArea = area
+        status.OpenServers = function(self)
+            local current = (launcher.lastStatus and launcher.lastStatus.server) or FafOnline_Server().name
+            local items = {}
+            for _, server in FafOnline_Server().servers or {} do
+                local chosen = server.name == current
+                table.insert(items, { (chosen and 'Playing on ' or 'Switch to ') ..
+                    (server.name == 'main' and 'FAF main server' or 'FAF test server (not for regular use)'),
+                    key = server.name, color = chosen and C.accent or C.text })
+            end
+            return Widgets.Dropdown(area, items, function(item)
+                if item.key ~= current then
+                    launcher:SetServer(item.key)
+                end
+            end, { width = 360 })
+        end
+        Theme.HitArea(area, function(control, event)
+            if event.Type == 'MouseEnter' then
+                Theme.SetColor(faf.text, C.text)
+                faf.arrow:SetIcon('chevronUp', C.accent)
+            elseif event.Type == 'MouseExit' then
+                Theme.SetColor(faf.text, C.muted)
+                faf.arrow:SetIcon('chevronUp', C.subtle)
+            elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+                Theme.ClickSound()
+                status:OpenServers()
+                return true
+            end
+            return false
+        end)
+    end
     status.Update = function(self)
         local s = Online() and launcher.lastStatus or nil
         local mod = s and s.loadedMod ~= '' and ModName(s.loadedMod) or nil
@@ -2630,7 +2720,7 @@ local function BuildStatusBar(launcher, body)
         end
         local fafState = s.signIn ~= 'signedin' and 'signed out' or (({ off = 'offline', connecting = 'connecting',
             signedin = 'connected', failed = 'failed' })[s.lobby] or s.lobby)
-        Theme.SetText(faf.text, 'FAF ' .. fafState)
+        Theme.SetText(faf.text, (s.server == 'test' and 'FAF test server ' or 'FAF ') .. fafState)
         faf.dot:SetDotColor(s.lobby == 'signedin' and C.good or (s.lobby == 'failed' and C.bad or
             (s.lobby == 'connecting' and C.warn or C.subtle)))
         local count = s.serverCount or 0
@@ -2945,6 +3035,25 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherservertest: FAF's test server, then the main one again; the service starts again on each.
+            if GetCommandLineArg('/launcherservertest', 0) then
+                current:SetServer('test')
+                Wait(4)
+                local onTest = FafOnline_Status()
+                Step('server test: on ' .. tostring(onTest.server) .. ' (' .. tostring(onTest.serverTitle) .. '), sign-in ' ..
+                    tostring(onTest.signIn))
+                if current.status and current.status.OpenServers then
+                    local menu = current.status:OpenServers()
+                    Step('server test: server menu open')
+                    Wait(2)
+                    menu.Close()
+                end
+                Wait(1)
+                current:SetServer('main')
+                Wait(4)
+                local onMain = FafOnline_Status()
+                Step('server test: back on ' .. tostring(onMain.server) .. ', sign-in ' .. tostring(onMain.signIn))
+            end
             -- /launcherprofiletest [login]: that player's profile (else the signed-in one's), each of its tabs.
             local profileArg = GetCommandLineArg('/launcherprofiletest', 1)
             local profileLogin = (profileArg and profileArg[1] and string.sub(profileArg[1], 1, 1) ~= '/' and profileArg[1]) or

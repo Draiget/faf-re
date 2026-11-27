@@ -618,7 +618,8 @@ function Dropdown(anchor, items, onPick, opts)
     local panel = Theme.Panel(catcher, 'ff0b161e', C.lineStrong)
     panel.Depth:Set(function() return catcher.Depth() + 1 end)
     LayoutHelpers.SetDimensions(panel, opts.width or math.max(120, LayoutHelpers.InvScaleNumber(anchor.Width())), shown * rowHeight + 8)
-    panel.Left:Set(anchor.Left)
+    -- Under the anchor's left edge; moved left when it would run past the screen's right (a status bar's corner).
+    panel.Left:Set(function() return math.max(frame.Left(), math.min(anchor.Left(), frame.Right() - panel.Width())) end)
     panel.Top:Set(function()
         local below = anchor.Bottom() + Scale(2)
         if below + panel.Height() > frame.Bottom() then
@@ -735,5 +736,6 @@ function Dropdown(anchor, items, onPick, opts)
         end
     end
     Paint()
+    catcher.Close = Close -- tests close it with this
     return catcher
 end

@@ -29,8 +29,12 @@ namespace moho
 
   /** Where the launcher keeps its files: %LOCALAPPDATA%, $XDG_DATA_HOME or ~/.local/share, then faf-re/online. */
   [[nodiscard]] std::filesystem::path ONLINE_DataFolder();
-  /** FAF's API (https://api.faforever.com, or a test stack's). */
+  /** FAF's API (https://api.faforever.com, the test server's, or a test stack's). */
   [[nodiscard]] std::string ONLINE_ApiBase();
+  /** The chosen FAF server's content server (mods, map pictures): https://content.faforever.com or the test one. */
+  [[nodiscard]] std::string ONLINE_ContentBase();
+  /** The chosen FAF server's replay host: https://replay.faforever.com or the test one. */
+  [[nodiscard]] std::string ONLINE_ReplayBase();
   /** The player's FAF access token, refreshed when near its end; for a worker thread. The error when not signed in. */
   [[nodiscard]] std::expected<std::string, std::string> ONLINE_AccessToken();
   /** The FAF init file the game runs on (its folder is FAF's bin folder); empty when it isn't on FAF's files. */

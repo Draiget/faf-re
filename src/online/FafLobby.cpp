@@ -27,7 +27,9 @@ namespace faf::online
       const std::string& host
     )
     {
-      return host == "faforever.com" || host.ends_with(".faforever.com");
+      // FAF's main servers and its test server: a made-up unique id goes to neither.
+      return host == "faforever.com" || host.ends_with(".faforever.com") || host == "faforever.xyz" ||
+        host.ends_with(".faforever.xyz");
     }
 
     std::optional<double> OptionalNumber(

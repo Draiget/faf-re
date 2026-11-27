@@ -65,7 +65,7 @@ namespace
   std::string ReplayBase()
   {
     const char* const test = std::getenv("FAF_ONLINE_REPLAY"); // a test hook, unset for players
-    return test != nullptr && test[0] != '\0' ? test : "https://replay.faforever.com";
+    return test != nullptr && test[0] != '\0' ? test : moho::ONLINE_ReplayBase();
   }
 
   std::string UserAgent()
@@ -731,12 +731,12 @@ namespace
     return VaultFolder() / "mods";
   }
 
-  /** Where mods may download from: FAF's content server (the FAF clients' rule), or a test stack's. */
+  /** Where mods may download from: the FAF server's content server (the FAF clients' rule), or a test stack's. */
   bool AllowedModUrl(
     const std::string& url
   )
   {
-    if (url.rfind("https://content.faforever.com/", 0) == 0) {
+    if (url.rfind(moho::ONLINE_ContentBase() + "/", 0) == 0) {
       return true;
     }
     const char* const test = std::getenv("FAF_ONLINE_CONTENT"); // a test hook, unset for players
