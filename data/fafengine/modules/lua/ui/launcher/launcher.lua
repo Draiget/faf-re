@@ -2308,7 +2308,8 @@ function TestWalk()
                 launcher:CloseScreen()
             end
             Wait(3)
-            Step(screen .. (launcher.screen and ' still open' or ' closed, back on the launcher'))
+            Step(screen .. (launcher.screen and ' still open' or ' closed, back on the launcher') .. ', open dropdowns ' ..
+                Widgets.OpenDropdowns())
             launcher:CloseScreen()
         end
         Step('FAF main menu')

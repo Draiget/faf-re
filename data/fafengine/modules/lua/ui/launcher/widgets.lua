@@ -304,6 +304,13 @@ function VirtualList(parent, columns, onPick)
 end
 
 
+local openDropdowns = 0
+
+--- How many dropdown lists are open now (the launcher's test walk checks none outlives its screen).
+function OpenDropdowns()
+    return openDropdowns
+end
+
 --- A list that opens under `anchor` and closes on a pick or a click anywhere else. items: { {text, key, color,
 --- icon (texture path), swatch (colour)}, ... }; onPick(item). opts.width (units), opts.maxRows.
 function Dropdown(anchor, items, onPick, opts)
@@ -329,8 +336,14 @@ function Dropdown(anchor, items, onPick, opts)
     end)
     local top = 1
     local rows = {}
+    local closed = false
+    openDropdowns = openDropdowns + 1
     local function Close()
-        catcher:Destroy()
+        if not closed then
+            closed = true
+            openDropdowns = openDropdowns - 1
+            catcher:Destroy()
+        end
     end
     local function Paint()
         for i, row in rows do
@@ -405,6 +418,29 @@ function Dropdown(anchor, items, onPick, opts)
             return true
         end
         return event.Type == 'WheelRotation'
+    end
+    -- The list sits on the root frame, not in its screen, so it goes with the screen by hand: it closes once the
+    -- control it opened from is destroyed or hidden (the lobby left, another page shown).
+    local isDestroyed = rawget(_G, 'IsDestroyed')
+    local function AnchorGone()
+        if isDestroyed and isDestroyed(anchor) then
+            return true
+        end
+        local control = anchor
+        while control do
+            if control:IsHidden() then
+                return true
+            end
+            control = control:GetParent()
+        end
+        return false
+    end
+    catcher:SetNeedsFrameUpdate(true)
+    catcher.OnFrame = function(self, delta)
+        if AnchorGone() then
+            LOG('LAUNCHER: a dropdown closed with its screen')
+            Close()
+        end
     end
     Paint()
     return catcher
