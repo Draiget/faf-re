@@ -1689,6 +1689,37 @@ function Create(api)
     return view
 end
 
+--- FAF's lobby lost its game (text: the host left, the connection failed, a kick): said over this screen in its
+--- own look; its button leaves the lobby with `leave` (FAF's ReturnToMenu). False when FAF's screen shows instead.
+function OnClosed(text, leave)
+    local view = current
+    if not view or not view.root or view.classic or view.root:IsHidden() then
+        return false
+    end
+    LOG('faf-re lobby: closed: ' .. tostring(text))
+    local cover = Widgets.Modal(view.root, 540, 210)
+    local panel = cover.panel
+    local head = Theme.Title(panel, 'Lobby closed', 16, C.text)
+    LayoutHelpers.AtLeftTopIn(head, panel, 26, 22)
+    local body = Theme.Paragraph(panel, 14, C.muted)
+    body.Left:Set(function() return panel.Left() + Scale(26) end)
+    body.Right:Set(function() return panel.Right() - Scale(26) end)
+    body.Top:Set(function() return panel.Top() + Scale(64) end)
+    body:SetText(text)
+    local function Leave()
+        view.closedText = nil
+        view.closedLeave = nil
+        cover:Destroy()
+        leave()
+    end
+    local back = Theme.Button(panel, 'Back to the launcher', Leave, 'primary', { width = 220, icon = 'arrowLeft' })
+    LayoutHelpers.AtRightIn(back, panel, 26)
+    LayoutHelpers.AtBottomIn(back, panel, 22)
+    view.closedText = text
+    view.closedLeave = Leave -- tests press it with this
+    return true
+end
+
 --- The launcher's screen test (launcher.lua TestWalk, in a skirmish lobby): the calls this screen's clicks make, as
 --- steps the walk runs one by one with a pause after each (Lua 5.0 can't wait inside a pcall), each followed by what
 --- FAF's lobby state says; the last leaves a slot menu open for the screenshot.

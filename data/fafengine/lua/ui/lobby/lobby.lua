@@ -165,7 +165,12 @@ end
 do
     local api = {}
     api.GameInfo = function() return gameInfo end
-    api.IsHost = function() return lobbyComm and lobbyComm:IsHost() or false end
+    -- The lobby's connection while it is alive: FAF's ConnectionFailed and Ejected destroy it (its methods go)
+    -- before they clear lobbyComm, and the screen may paint in between.
+    local function Comm()
+        return lobbyComm and lobbyComm.IsHost and lobbyComm or nil
+    end
+    api.IsHost = function() return Comm() and Comm():IsHost() or false end
     api.HostID = function() return hostID end
     api.LocalPlayerID = function() return localPlayerID end
     api.LocalSlot = function() return localPlayerID and FindSlotForID(localPlayerID) or nil end
@@ -179,7 +184,7 @@ do
 
     --- The slot's menu as FAF's name control has it (SetSlotInfo, ClearSlotInfo): nothing on your own slot.
     api.SlotMenu = function(slot)
-        local hostKey = lobbyComm:IsHost() and 'host' or 'client'
+        local hostKey = api.IsHost() and 'host' or 'client'
         local player = gameInfo.PlayerOptions[slot]
         if player then
             if player.Human and IsLocallyOwned(slot) then
@@ -199,7 +204,7 @@ do
 
     --- A new map, as the map dialog's selectBehavior does it for the host (no other option changed).
     api.SetMap = function(scenarioFile)
-        if not lobbyComm:IsHost() then
+        if not api.IsHost() then
             return
         end
         local options = {}
@@ -217,7 +222,7 @@ do
         SetGameOptions(options)
     end
     api.SetOption = function(key, value)
-        if not lobbyComm:IsHost() then
+        if not api.IsHost() then
             return
         end
         SetGameOption(key, value)
@@ -249,10 +254,10 @@ do
     api.Cpu = function(name) return name and CPU_Benchmarks[name] or nil end
     --- The ping to a peer in milliseconds (lobbyComm's peers), or nil.
     api.Ping = function(id)
-        if not lobbyComm or not id then
+        if not Comm() or not id then
             return nil
         end
-        for _, peer in lobbyComm:GetPeers() do
+        for _, peer in Comm():GetPeers() do
             if peer.id == id and peer.ping then
                 return math.floor(peer.ping)
             end
@@ -262,10 +267,10 @@ do
     --- A peer as the lobby sees it (lobbyComm:GetPeers: id, name, status 'Established' once linked, ping,
     --- establishedPeers), or nil.
     api.Peer = function(id)
-        if not lobbyComm or not id then
+        if not Comm() or not id then
             return nil
         end
-        for _, peer in lobbyComm:GetPeers() do
+        for _, peer in Comm():GetPeers() do
             if peer.id == id then
                 return peer
             end
@@ -276,7 +281,7 @@ do
     api.GameMods = function() return Mods.GetGameMods(gameInfo.GameMods) or {} end
     --- The mod manager as FAF opens it: the host picks the game's mods, everyone else sees them and picks UI mods.
     api.OpenMods = function()
-        if lobbyComm:IsHost() then
+        if api.IsHost() then
             import('/lua/ui/lobby/modsmanager.lua').CreateDialog(GUI, true, availableMods, OnModsChanged)
         elseif GUI.gameoptionsButton then
             GUI.gameoptionsButton.OnClick(GUI.gameoptionsButton)
@@ -286,7 +291,7 @@ do
     --- SetGameOptions); everyone else sees them, as FAF's client button shows them.
     api.OpenRestrictions = function()
         local unitsManager = import('/lua/ui/lobby/unitsmanager.lua')
-        if lobbyComm:IsHost() then
+        if api.IsHost() then
             unitsManager.CreateDialog(GUI, gameInfo.GameOptions.RestrictedCategories, function(restricted)
                 SetGameOptions({ RestrictedCategories = restricted })
             end, function() end, true)
@@ -296,13 +301,13 @@ do
     end
     --- FAF's presets dialog (host only).
     api.OpenPresets = function()
-        if lobbyComm:IsHost() and not singlePlayer then
+        if api.IsHost() and not singlePlayer then
             import('/lua/ui/lobby/presets.lua').CreateUI(GUI)
         end
     end
     --- FAF's own map and options dialog (the host's): every option page, presets and more.
     api.OpenAdvanced = function()
-        if lobbyComm:IsHost() and GUI.gameoptionsButton then
+        if api.IsHost() and GUI.gameoptionsButton then
             GUI.gameoptionsButton.OnClick(GUI.gameoptionsButton)
         end
     end
@@ -323,6 +328,32 @@ do
             end)
             if not ok then
                 WARN('faf-re lobby: our screen failed to build, FAF\'s shows: ' .. tostring(why))
+            end
+        end
+        -- A lost game (the host left, the connection failed, a kick) is said on our screen when it shows, instead of
+        -- FAF's dialog under it; its OK leaves the lobby as FAF's OK does.
+        local initLobbyComm = InitLobbyComm
+        if type(initLobbyComm) == 'function' then
+            InitLobbyComm = function(a, b, c, d, e)
+                initLobbyComm(a, b, c, d, e)
+                local comm = lobbyComm
+                for _, entry in { { 'ConnectionFailed', 'ConnectionFailed' }, { 'Ejected', 'Ejected' } } do
+                    local event, stringKey = entry[1], entry[2]
+                    local original = comm and comm[event]
+                    if original then
+                        comm[event] = function(self, reason)
+                            original(self, reason)
+                            pcall(function()
+                                local text = LOCF(Strings[stringKey], Strings[reason] or reason)
+                                local view = import('/fafengine/modules/lua/ui/lobby/lobbyview.lua')
+                                if view.OnClosed(text, ReturnToMenu) and GUI.connectionFailedDialog then
+                                    GUI.connectionFailedDialog:Destroy()
+                                    GUI.connectionFailedDialog = false
+                                end
+                            end)
+                        end
+                    end
+                end
             end
         end
         local addChatText = AddChatText
