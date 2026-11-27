@@ -1323,8 +1323,10 @@ namespace
   {
     const std::string path = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
     if (
-      (path.rfind("/data/", 0) != 0 && path != "/me") || path.find("..") != std::string::npos ||
-      path.find_first_of(" \r\n?#%&") != std::string::npos
+      // FAF's data, the signed-in player, and FAF's tournaments (the API's Challonge proxy, as the FAF client reads
+      // them).
+      (path.rfind("/data/", 0) != 0 && path != "/me" && path != "/challonge/v1/tournaments.json") ||
+      path.find("..") != std::string::npos || path.find_first_of(" \r\n?#%&") != std::string::npos
     ) {
       lua_pushnil(L);
       lua_pushstring(L, "not a path of FAF's data");

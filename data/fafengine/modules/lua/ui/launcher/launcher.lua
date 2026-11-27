@@ -33,6 +33,7 @@ local kStatusHeight = 28
 -- The pages under Play (the top bar's Play tab and its strip of modes).
 local kPlayPages = { online = true, matchmaking = true, coop = true, lan = true }
 local kVaultPages = { maps = true, mods = true } -- FAF's vault: Maps and Mods, a strip under the top bar like Play's
+local kRankPages = { leaderboards = true, tournaments = true } -- Leaderboards and Tournaments, under Leaderboards
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1975,7 +1976,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2493,7 +2494,7 @@ function Launcher:PlaceContent()
         return
     end
     local shown = nil
-    for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages } } do
+    for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages }, { self.rankStrip, kRankPages } } do
         local strip, pages = entry[1], entry[2]
         if strip then
             local mine = pages[self.page or ''] and true or false
@@ -2506,6 +2507,9 @@ function Launcher:PlaceContent()
     end
     if kVaultPages[self.page or ''] then
         self.lastVaultPage = self.page
+    end
+    if kRankPages[self.page or ''] then
+        self.lastRankPage = self.page
     end
     if shown then
         content.Top:Set(function() return shown.Bottom() + Scale(14) end)
@@ -2641,7 +2645,10 @@ local function BuildTopBar(launcher, body)
     local entries = {
         { 'play', 'Play', function() launcher:ShowPage('online') end, kPlayPages },
         { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
-        { 'leaderboard', 'Leaderboards', function() launcher:ShowPage('leaderboards') end, { leaderboards = true } },
+        { 'leaderboard', 'Leaderboards', function()
+            launcher:ShowPage(launcher.lastRankPage == 'tournaments' and launcher.pages.tournaments and 'tournaments' or
+                'leaderboards')
+        end, kRankPages },
         { 'replays', 'Replays', function() launcher:Replays() end, { replays = true } },
         { 'folder', 'Vault', function()
             if launcher.lastVaultPage == 'mods' or not (launcher.pages and launcher.pages.maps) then
@@ -2802,6 +2809,22 @@ local function BuildTopBar(launcher, body)
     vault.tabs.Right:Set(vault.Right)
     Theme.SetVisible(vault, false)
     launcher.vaultStrip = vault
+
+    -- Rankings: the ladders and FAF's tournaments.
+    local rank = Group(body)
+    rank.Left:Set(strip.Left)
+    rank.Right:Set(strip.Right)
+    rank.Top:Set(strip.Top)
+    LayoutHelpers.SetHeight(rank, 40)
+    rank.Width:Set(function() return rank.Right() - rank.Left() end)
+    rank.tabs = Widgets.Tabs(rank, { { 'leaderboards', 'Leaderboards' }, { 'tournaments', 'Tournaments' } }, function(key)
+        launcher:ShowPage(key)
+    end)
+    rank.tabs.Left:Set(rank.Left)
+    rank.tabs.Top:Set(rank.Top)
+    rank.tabs.Right:Set(rank.Right)
+    Theme.SetVisible(rank, false)
+    launcher.rankStrip = rank
     return bar
 end
 
@@ -3220,6 +3243,23 @@ local function Build(launcher)
             boardsPage:Destroy()
         end
     end
+    -- Tournaments: FAF's tournaments (tournamentspage.lua), beside the leaderboards.
+    if rawget(_G, 'FafLibrary_Api') then
+        local tourneyPage = Group(content, 'launcher tournaments')
+        LayoutHelpers.FillParent(tourneyPage, content)
+        tourneyPage.Width:Set(function() return tourneyPage.Right() - tourneyPage.Left() end)
+        tourneyPage.Height:Set(function() return tourneyPage.Bottom() - tourneyPage.Top() end)
+        local tourneyBuilt, tourneyWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/tournamentspage.lua').Build(launcher, tourneyPage)
+        end)
+        if tourneyBuilt then
+            launcher.pages.tournaments = tourneyPage
+            Theme.SetVisible(tourneyPage, false)
+        else
+            WARN('LAUNCHER: the tournaments page failed to build: ' .. tostring(tourneyWhy))
+            tourneyPage:Destroy()
+        end
+    end
     -- Co-op: FAF's co-op missions (coop.lua), with the engine's FAF API access.
     if rawget(_G, 'FafLibrary_Api') then
         local coopPage = Group(content, 'launcher coop')
@@ -3514,6 +3554,37 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchertourneytest: the Tournaments page: FAF's tournaments by state, one chosen.
+            if GetCommandLineArg('/launchertourneytest', 0) and current.tournamentsView then
+                local tourneys = current.tournamentsView
+                current:ShowPage('tournaments')
+                for i = 1, 20 do
+                    current:Refresh()
+                    if tourneys.tournaments or tourneys.failure then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                current:Refresh()
+                local states = {}
+                for _, item in (tourneys.tournaments or {}) do
+                    table.insert(states, item.name .. '=' .. item.state)
+                end
+                Step('tourneys: ' .. table.getn(tourneys.tournaments or {}) .. ' read: ' .. table.concat(states, ', ') ..
+                    ', chosen ' .. tostring(tourneys.chosen and tourneys.chosen.name) .. ', strip ' ..
+                    tostring(current.rankStrip and not current.rankStrip:IsHidden()) ..
+                    (tourneys.failure and (', failure ' .. tourneys.failure) or ''))
+                tourneys.tab = 'signup'
+                tourneys:Paint()
+                Wait(2)
+                Step('tourneys: sign-up open ' .. table.getn(tourneys:Shown()) .. ', chosen ' ..
+                    tostring(tourneys.chosen and tourneys.chosen.name) .. ', sign-up page ' ..
+                    tostring(tourneys.chosen and tourneys.chosen.signup))
+                tourneys.tab = 'all'
+                tourneys:Paint()
+                Wait(1)
+            end
             -- /launchernewstest: the News page: FAF's posts, a category, a post read, the next page.
             if GetCommandLineArg('/launchernewstest', 0) and current.newsView then
                 local news = current.newsView
