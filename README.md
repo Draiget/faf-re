@@ -33,7 +33,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 
 You need your own copy of Forged Alliance and an installed FAF client that has started at least one game or replay (that's when it downloads FAF's game data). Releases hold only the engine: no game files, assets or maps.
 
-**Windows:** download `faf-re-setup.exe` from the [latest release](https://github.com/Draiget/faf-re/releases/latest) and run it. It isn't code-signed, so Windows may say it "protected your PC": choose **More info**, then **Run anyway**. Its SHA-256 is in the release's `SHA256SUMS.txt`.
+**Windows:** download `faf-re-setup.exe` from the [latest release](https://github.com/Draiget/scfa-re/releases/latest) and run it. It isn't code-signed, so Windows may say it "protected your PC": choose **More info**, then **Run anyway**. Its SHA-256 is in the release's `SHA256SUMS.txt`.
 **Linux x64:** download `faf-re-setup-linux`, then `chmod +x faf-re-setup-linux && ./faf-re-setup-linux`.
 
 Setup checks that FAF's client and Forged Alliance are installed, that there's room and that the game isn't running, then downloads the release's package for your system, checks it against the release's SHA-256 list, installs it and adds a shortcut. Run it again to update; `--uninstall` removes exactly what it installed, `--check` only runs the checks, and `--help` lists the rest. The setup files ship with releases after 2026.11.015; for that one, install by hand.
@@ -41,7 +41,7 @@ Setup checks that FAF's client and Forged Alliance are installed, that there's r
 <details>
 <summary><b>Install by hand</b></summary>
 
-1. Download `faf-engine-<version>-x64.zip` from the [latest release](https://github.com/Draiget/faf-re/releases/latest).
+1. Download `faf-engine-<version>-x64.zip` from the [latest release](https://github.com/Draiget/scfa-re/releases/latest).
 2. Unzip it into `C:\ProgramData\FAForever\bin_x64` (create the folder; it sits next to FAF's `bin` folder), keeping the `fafengine` folder as it is.
 3. Start it from that folder:
 
@@ -56,7 +56,7 @@ The x64 install leaves FAF's own `bin` folder alone; deleting `bin_x64` removes 
 
 </details>
 
-If the game crashes, it writes `faf_crash_<date>.txt` next to the exe. Please attach it, with the log from `/log`, to an [issue](https://github.com/Draiget/faf-re/issues).
+If the game crashes, it writes `faf_crash_<date>.txt` next to the exe. Please attach it, with the log from `/log`, to an [issue](https://github.com/Draiget/scfa-re/issues).
 
 ## Status
 
@@ -172,8 +172,8 @@ Visual Studio 18 does not work: its static runtime imports a DLL that the `headl
 ### Building
 
 ```powershell
-git clone --recursive https://github.com/Draiget/faf-re.git
-cd faf-re
+git clone --recursive https://github.com/Draiget/scfa-re.git
+cd scfa-re
 .\build.ps1
 ```
 

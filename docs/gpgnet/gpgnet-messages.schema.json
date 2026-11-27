@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Draiget/faf-re/blob/master/docs/gpgnet/gpgnet-messages.schema.json",
+  "$id": "https://github.com/Draiget/scfa-re/blob/master/docs/gpgnet/gpgnet-messages.schema.json",
   "title": "GPGNet messages",
   "description": "Messages between Forged Alliance and the FAF client / ICE adapter / lobby server over GPGNet, in the JSON form the client exchanges with the lobby server: {\"command\": <name>, \"target\": \"game\", \"args\": [...]}. Each argument also names its GPGNet wire tag in x-gpgnet-tag (0 int32, 1 string, 2 data). Explained in docs/GPGNET_MESSAGES.md.",
   "oneOf": [

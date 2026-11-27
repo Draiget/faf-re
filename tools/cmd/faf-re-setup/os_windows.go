@@ -163,7 +163,7 @@ func afterInstall(s *system) {
 	fmt.Println("Start it with the \"Forged Alliance (faf-re)\" shortcut, or from that folder with:")
 	fmt.Printf("  %s %s\n", s.exeName, launchArgs(s))
 	fmt.Println("If the game crashes, it writes faf_crash_<date>.txt next to the exe; please attach it, with the")
-	fmt.Println("log, to an issue at https://github.com/Draiget/faf-re/issues.")
+	fmt.Println("log, to an issue at https://github.com/Draiget/scfa-re/issues.")
 }
 
 // pauseIfOwnConsole waits for Enter when setup was started by a double click, so its window doesn't

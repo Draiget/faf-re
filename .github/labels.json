@@ -1,5 +1,5 @@
 {
-  "repo": "Draiget/faf-re",
+  "repo": "Draiget/scfa-re",
   "labels": [
     { "group": "sim",    "name": "sim: none",            "color": "c2e0c6", "description": "UI, render, audio, movies, tooling, docs or build only" },
     { "group": "sim",    "name": "sim: replay/net only", "color": "bfd4f2", "description": "Replay, lobby or network; same commands on the same beats" },

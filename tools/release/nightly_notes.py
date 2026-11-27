@@ -16,7 +16,7 @@ import os
 import re
 import subprocess
 
-REPO = "https://github.com/Draiget/faf-re"
+REPO = "https://github.com/Draiget/scfa-re"
 # GitHub refuses a release body over 125,000 characters.
 MAX_CHANGES = 100_000
 # `Player-Note:` values that say the change has no note

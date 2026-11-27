@@ -237,7 +237,7 @@ func afterInstall(s *system) {
 	fmt.Printf("\nStart it from the menu (\"Forged Alliance (faf-re)\") or with:\n  %s\n",
 		strings.Join(append([]string{launch}, launchArgs(s)...), " "))
 	fmt.Println("If the game crashes, please attach its crash report and log to an issue at")
-	fmt.Println("https://github.com/Draiget/faf-re/issues.")
+	fmt.Println("https://github.com/Draiget/scfa-re/issues.")
 }
 
 func pauseIfOwnConsole() {}

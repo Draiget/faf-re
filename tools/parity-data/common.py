@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "replay-parity"))
 from replayfile import decode_fafreplay, extract_map, has_scenario, header_summary, replay_beats, replay_body_info  # noqa: E402
 
 # Cloudflare in front of FAF refuses Python's default user agent (error 1010).
-USER_AGENT = "faf-re-parity-data/1.0 (+https://github.com/Draiget/faf-re)"
+USER_AGENT = "faf-re-parity-data/1.0 (+https://github.com/Draiget/scfa-re)"
 REPLAY_URL = "https://replay.faforever.com/%d"
 MOD_URL = "https://content.faforever.com/mods/%s.zip"
 MAP_URL = "https://content.faforever.com/maps/%s.zip"

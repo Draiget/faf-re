@@ -70,7 +70,7 @@ A pull request's workflow can read master's caches too, a fork's included, which
 **Charts.** After a full run, update the run, the commit and the causes in `parity_chart.json`, then redraw the charts in `docs/images/` (the README and `docs/RETAIL_REPLAY_PARITY.md` show them). The script refuses a causes list that doesn't add up to the report's desyncs:
 
 ```
-gh run download <run id> -R Draiget/faf-re -n report -D tmp/parity-ci/run-<run id>/report
+gh run download <run id> -R Draiget/scfa-re -n report -D tmp/parity-ci/run-<run id>/report
 python tools/parity-data/chart.py --report tmp/parity-ci/run-<run id>/report/report.json
 ```
 

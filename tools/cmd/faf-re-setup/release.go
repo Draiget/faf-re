@@ -16,7 +16,7 @@ import (
 )
 
 // apiBase is GitHub's API for this repository's releases; tests point it at a local server.
-var apiBase = "https://api.github.com/repos/Draiget/faf-re"
+var apiBase = "https://api.github.com/repos/Draiget/scfa-re"
 
 const sumsName = "SHA256SUMS.txt"
 

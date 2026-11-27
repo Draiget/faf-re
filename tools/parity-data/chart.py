@@ -2,7 +2,7 @@
 
     python tools/parity-data/chart.py --report <report dir>/report.json
 
-Download the report with: gh run download <run id> -R Draiget/faf-re -n report -D <report dir>.
+Download the report with: gh run download <run id> -R Draiget/scfa-re -n report -D <report dir>.
 The report has each replay's verdict, players and length. Why a replay's checksum differs is worked out by
 hand, so the causes come from parity_chart.json; update that file with the run. Each chart is
 written twice, for GitHub's light and dark themes (a <picture> in the Markdown picks one).
