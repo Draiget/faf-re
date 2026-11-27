@@ -596,6 +596,13 @@ namespace moho
     [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
     GetAllTransportPreOrders();
     void DispatchDisembarkedPreOrders();
+    /// True when both units hold pre-orders with the same command ids in the same order; only such
+    /// units are sent their orders as one group command.
+    [[nodiscard]] static bool HaveSameTransportPreOrders(std::uint32_t lhsEntityId, std::uint32_t rhsEntityId);
+    /// True for a replicated attachment-parent id that names a parent (not 0, not the invalid sentinel).
+    [[nodiscard]] static bool IsAttachmentParentRef(std::uint32_t parentRef);
+    /// True when an entity update moves the attachment parent from a parent to none (the unit left it).
+    [[nodiscard]] static bool IsDetachTransition(std::uint32_t oldParentRef, std::uint32_t newParentRef);
 
     void SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos);
     void ClearSelectionBracketPositionOverride();

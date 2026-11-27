@@ -1,20 +1,46 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/resource/CSimResources.h"
 
+#include <algorithm>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+/// Engine addition (`ui_TransportPreOrders`): orders for units inside a transport, sent when they leave it.
 bool moho::ui_TransportPreOrders = false;
-
-#include "moho/resource/CSimResources.h"
-#include <utility>
 
 namespace
 {
-  static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
-  static std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
-  static std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
-  static std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitTicks;
+  // Client-side transport pre-order state, keyed by entity id so `sizeof(UserUnit)` stays 0x3E8.
+  std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
+  std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
+  std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
+  std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitTicks;
+
+  /// Pre-orders whose order carries no usable command id get one from here (bit 31 clear, never 0xFF......).
+  std::int32_t sNextPreOrderCommandId = 0x7F000001;
+
+  void AssignPreOrderCommandId(
+    moho::SSTICommandIssueData& order
+  )
+  {
+    const auto commandId = static_cast<std::uint32_t>(order.nextCommandId);
+    if (order.nextCommandId <= 0 || (commandId & 0xFF000000u) == 0xFF000000u) {
+      order.nextCommandId = sNextPreOrderCommandId++;
+    }
+  }
+
+  /// True when both queues hold the same command ids in the same order, i.e. the units got the same orders.
+  [[nodiscard]] bool SamePreOrderChain(
+    const std::vector<moho::SSTICommandIssueData>& lhs,
+    const std::vector<moho::SSTICommandIssueData>& rhs
+  )
+  {
+    return std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](const auto& left, const auto& right) {
+      return left.nextCommandId == right.nextCommandId;
+    });
+  }
 
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
@@ -854,45 +880,33 @@ void UserUnit::QueueTransportPreOrders(
   if (!ui_TransportPreOrders || units.empty()) {
     return;
   }
-  SSTICommandIssueData finalOrder = order;
-  if (
-    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
-  ) {
-    static std::int32_t sNextPreOrderId = 0x7F000001;
-    finalOrder.nextCommandId = sNextPreOrderId++;
-  }
+  SSTICommandIssueData groupOrder = order;
+  AssignPreOrderCommandId(groupOrder);
   for (UserUnit* const unit : units) {
     if (unit != nullptr) {
-      unit->QueueTransportPreOrder(finalOrder, clearQueue);
+      unit->QueueTransportPreOrder(groupOrder, clearQueue);
     }
   }
 }
 
 void UserUnit::QueueTransportPreOrder(
   const SSTICommandIssueData& order,
-  bool clearQueue
+  const bool clearQueue
 )
 {
   if (!ui_TransportPreOrders) {
     return;
   }
-  auto& queue = sTransportPreOrders[this->mParams.mEntityId];
+  const std::uint32_t entityId = this->mParams.mEntityId;
   if (order.mCommandType == EUnitCommandType::UNITCOMMAND_Stop) {
-    queue.clear();
-    sTransportPreOrders.erase(this->mParams.mEntityId);
+    sTransportPreOrders.erase(entityId);
     return;
   }
-  if (clearQueue) {
-    queue.clear();
-  }
   SSTICommandIssueData finalOrder = order;
-  if (
-    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
-  ) {
-    static std::int32_t sNextPreOrderId = 0x7F000001;
-    finalOrder.nextCommandId = sNextPreOrderId++;
-  }
+  AssignPreOrderCommandId(finalOrder);
 
+  // Placement is checked before the queue is touched: a rejected build keeps the queue as it was and
+  // leaves no empty entry behind (an empty entry would make `HasAnyTransportPreOrders` true).
   if (finalOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && finalOrder.mBlueprint != nullptr) {
     CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
     if (session != nullptr) {
@@ -913,6 +927,10 @@ void UserUnit::QueueTransportPreOrder(
     }
   }
 
+  auto& queue = sTransportPreOrders[entityId];
+  if (clearQueue) {
+    queue.clear();
+  }
   queue.push_back(finalOrder);
 }
 
@@ -1056,109 +1074,131 @@ const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>
   return sTransportPreOrders;
 }
 
+bool UserUnit::HaveSameTransportPreOrders(
+  const std::uint32_t lhsEntityId,
+  const std::uint32_t rhsEntityId
+)
+{
+  const auto lhs = sTransportPreOrders.find(lhsEntityId);
+  const auto rhs = sTransportPreOrders.find(rhsEntityId);
+  return lhs != sTransportPreOrders.end() && rhs != sTransportPreOrders.end() &&
+    SamePreOrderChain(lhs->second, rhs->second);
+}
+
+bool UserUnit::IsAttachmentParentRef(
+  const std::uint32_t parentRef
+)
+{
+  return parentRef != 0u && parentRef != ToRaw(EEntityIdSentinel::Invalid);
+}
+
+bool UserUnit::IsDetachTransition(
+  const std::uint32_t oldParentRef,
+  const std::uint32_t newParentRef
+)
+{
+  return IsAttachmentParentRef(oldParentRef) && !IsAttachmentParentRef(newParentRef);
+}
+
+namespace
+{
+  [[nodiscard]] bool IsAttachedToSomething(
+    const moho::UserEntity& entity
+  )
+  {
+    return entity.GetAttachmentParent() != nullptr ||
+      moho::UserUnit::IsAttachmentParentRef(entity.mVariableData.mAttachmentParentRef);
+  }
+} // namespace
+
 void UserUnit::DispatchDisembarkedPreOrders()
 {
   if (!ui_TransportPreOrders || !HasTransportPreOrders()) {
     return;
   }
-  const auto preOrders = GetTransportPreOrders();
-  if (preOrders.empty()) {
+  const std::vector<SSTICommandIssueData> preOrders = GetTransportPreOrders();
+  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
+  const auto ownEntityId = static_cast<std::uint32_t>(this->mParams.mEntityId);
+
+  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
+
+  // Orders go out from this client only for units its player controls. A unit given to another army
+  // while it was in the transport, or a focus switch to another army or to observer, drops them.
+  if (session == nullptr || this->mArmy == nullptr || this->mArmy != session->GetFocusUserArmy()) {
     ClearTransportPreOrders();
     return;
   }
 
-  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
-  const std::uint32_t myEntId = static_cast<std::uint32_t>(this->mParams.mEntityId);
-
-  auto& waitTicks = sDisembarkedWaitTicks[myEntId];
-  constexpr std::int32_t kMaxWaitTicks = 30; // 3 seconds timeout
+  auto& waitTicks = sDisembarkedWaitTicks[ownEntityId];
+  constexpr std::int32_t kMaxWaitTicks = 30; // beats: about 3 seconds
   const bool timedOut = (waitTicks >= kMaxWaitTicks);
 
-  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
-
-  // Check if any living peers sharing this group command are still attached to the transport.
-  bool hasAttachedLivingPeers = false;
-  if (session != nullptr && groupCommandId > 0 && !timedOut) {
-    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
-      if (peerEntId == myEntId || peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+  // Wait while a living unit that got exactly these orders is still in a transport, so the group gets
+  // one command, or while an entity an order targets (Guard/Assist on other cargo) is still carried.
+  bool waitForPeer = false;
+  if (groupCommandId > 0 && !timedOut) {
+    for (const auto& [peerEntityId, peerOrders] : sTransportPreOrders) {
+      if (peerEntityId == ownEntityId || !SamePreOrderChain(peerOrders, preOrders)) {
         continue;
       }
-      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
-      if (entity == nullptr || entity->mVariableData.mIsDead != 0) {
-        continue;
-      }
-      const bool isAttached = (entity->GetAttachmentParent() != nullptr) ||
-        (entity->mVariableData.mAttachmentParentRef != 0 &&
-         entity->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
-      if (isAttached) {
-        hasAttachedLivingPeers = true;
+      UserEntity* const peer = session->LookupEntityId(static_cast<EntId>(peerEntityId));
+      if (peer != nullptr && peer->mVariableData.mIsDead == 0 && IsAttachedToSomething(*peer)) {
+        waitForPeer = true;
         break;
       }
     }
   }
 
-  // Also defer if any entity target (e.g. Guard/Assist onto another cargo ghost) is still attached to a transport.
-  if (!hasAttachedLivingPeers && session != nullptr && !timedOut) {
+  bool waitForTarget = false;
+  if (!waitForPeer && !timedOut) {
     for (const SSTICommandIssueData& order : preOrders) {
-      if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
-        UserEntity* const targetEnt = session->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId));
-        if (targetEnt != nullptr && targetEnt->mVariableData.mIsDead == 0) {
-          const bool targetAttached = (targetEnt->GetAttachmentParent() != nullptr) ||
-            (targetEnt->mVariableData.mAttachmentParentRef != 0 &&
-             targetEnt->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
-          if (targetAttached) {
-            hasAttachedLivingPeers = true;
-            break;
-          }
-        }
+      if (order.mTarget.mType != EAiTargetType::AITARGET_Entity) {
+        continue;
+      }
+      UserEntity* const target = session->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId));
+      if (target != nullptr && target->mVariableData.mIsDead == 0 && IsAttachedToSomething(*target)) {
+        waitForTarget = true;
+        break;
       }
     }
   }
 
-  // Defer dispatch until remaining living units of the squad detach from the transport.
-  if (hasAttachedLivingPeers) {
+  if (waitForPeer || waitForTarget) {
     ++waitTicks;
     return;
   }
 
-  // All living peers in the group have detached (or timeout expired).
-  // Collect all detached units in this squad so they receive ONE synchronized group command!
+  // Every detached living unit with the same order chain gets the orders as one group command. Units
+  // that only share the first order (one of them got more orders later) dispatch on their own.
   gpg::fastvector<UserUnit*> groupUnits;
-  std::vector<std::uint32_t> unitsToClear;
-
-  if (session != nullptr && groupCommandId > 0) {
-    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
-      if (peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+  std::vector<std::uint32_t> dispatchedEntityIds;
+  if (groupCommandId > 0) {
+    for (const auto& [peerEntityId, peerOrders] : sTransportPreOrders) {
+      if (peerEntityId == ownEntityId || !SamePreOrderChain(peerOrders, preOrders)) {
         continue;
       }
-      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
-      UserUnit* const peerUnit =
-        (entity != nullptr) ? static_cast<UserUnit*>(entity) : (peerEntId == myEntId ? this : nullptr);
-      if (peerUnit == nullptr || peerUnit->mVariableData.mIsDead != 0) {
+      UserEntity* const peerEntity = session->LookupEntityId(static_cast<EntId>(peerEntityId));
+      UserUnit* const peer = peerEntity != nullptr ? peerEntity->IsUserUnit() : nullptr;
+      if (
+        peer == nullptr || peer->mVariableData.mIsDead != 0 || peer->mArmy != this->mArmy ||
+        IsAttachedToSomething(*peer)
+      ) {
         continue;
       }
-      const bool isAttached = (peerUnit->GetAttachmentParent() != nullptr) ||
-        (peerUnit->mVariableData.mAttachmentParentRef != 0 &&
-         peerUnit->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
-      if (!isAttached) {
-        groupUnits.push_back(peerUnit);
-        unitsToClear.push_back(peerEntId);
-      }
+      groupUnits.push_back(peer);
+      dispatchedEntityIds.push_back(peerEntityId);
     }
   }
+  groupUnits.push_back(this);
+  dispatchedEntityIds.push_back(ownEntityId);
 
-  if (groupUnits.empty()) {
-    groupUnits.push_back(this);
-    unitsToClear.push_back(myEntId);
+  for (const std::uint32_t entityId : dispatchedEntityIds) {
+    sTransportPreOrders.erase(entityId);
+    sDisembarkedWaitTicks.erase(entityId);
   }
 
-  for (const std::uint32_t id : unitsToClear) {
-    sTransportPreOrders.erase(id);
-    sDisembarkedWaitTicks.erase(id);
-  }
-
-  gpg::Warnf(
-    "TransportPreOrders: Dispatched %zu disembarked pre-orders for %zu units in group (cmdId %d)",
+  gpg::Logf(
+    "TransportPreOrders: dispatching %zu pre-orders to %zu units (cmdId %d)",
     preOrders.size(),
     groupUnits.size(),
     groupCommandId
@@ -1168,24 +1208,18 @@ void UserUnit::DispatchDisembarkedPreOrders()
     const bool isClear = (i == 0);
     SSTICommandIssueData dispatchOrder = preOrders[i];
 
-    if (
-      groupUnits.size() == 1 && dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile &&
-      dispatchOrder.nextCommandId > 0
-    ) {
-      auto it = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
-      if (it != sDispatchedPreOrderBuilders.end() && it->second != myEntId) {
+    if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+      // A unit of the squad that landed late assists the one that already started this building.
+      const auto builder = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
+      if (groupUnits.size() == 1 && builder != sDispatchedPreOrderBuilders.end() && builder->second != ownEntityId) {
         dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
         dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
-        dispatchOrder.mTarget.mEnt = it->second;
-        dispatchOrder.mTarget.mEntityId = it->second;
+        dispatchOrder.mTarget.mEnt = builder->second;
+        dispatchOrder.mTarget.mEntityId = builder->second;
         dispatchOrder.mBlueprint = nullptr;
       } else {
-        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
+        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = ownEntityId;
       }
-    } else if (
-      dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0
-    ) {
-      sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
     }
 
     moho::ISSUE_Command(groupUnits, dispatchOrder, isClear);
@@ -1647,7 +1681,9 @@ void UserUnit::Tick(
     return;
   }
 
-  if (HasTransportPreOrders() && GetAttachmentParent() == nullptr) {
+  // The detach hook in `UpdateEntityData` is skipped for updates `wld_ParallelSync` applies on workers,
+  // so the beat tick is what reliably sends the orders of a unit that has left its transport.
+  if (HasTransportPreOrders() && !IsAttachmentParentRef(mVariableData.mAttachmentParentRef)) {
     DispatchDisembarkedPreOrders();
   }
 
@@ -1730,9 +1766,7 @@ void UserUnit::UpdateEntityData(
   const std::uint32_t newParent = variableData.mAttachmentParentRef;
   UserEntity::UpdateEntityData(variableData);
 
-  const bool wasAttached = (oldParent != 0 && oldParent != ToRaw(EEntityIdSentinel::Invalid));
-  const bool nowDetached = (newParent == 0 || newParent == ToRaw(EEntityIdSentinel::Invalid));
-  if (wasAttached && nowDetached) {
+  if (IsDetachTransition(oldParent, newParent)) {
     ClearSelectionBracketPositionOverride();
     if (HasTransportPreOrders()) {
       DispatchDisembarkedPreOrders();
@@ -2625,7 +2659,11 @@ bool moho::USERUNIT_CanBeBuiltAt(
     }
   }
 
-  // Check collision with queued transport pre-orders:
+  // Engine addition: queued transport pre-order buildings block the footprint too. Only while the
+  // switch is on - with it off they are neither drawn nor sent, so they must not block placement.
+  if (!ui_TransportPreOrders) {
+    return true;
+  }
   for (const auto& [entityId, orders] : sTransportPreOrders) {
     for (const auto& order : orders) {
       if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile || order.mBlueprint == nullptr) {

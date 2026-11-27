@@ -974,10 +974,10 @@ namespace moho
       std::int32_t tick,
       float tickFraction,
       bool isGlow
-    ) const;
+    );
     void DrawPreOrderWaypointMarkers(const GeomCamera3& camera, CD3DPrimBatcher& batcher) const;
     void UpdatePreOrderBuildMeshes();
-    void DrawPreOrderSkirts(const GeomCamera3& camera, CD3DPrimBatcher& batcher) const;
+    void DrawPreOrderSkirts(const GeomCamera3& camera, CD3DPrimBatcher& batcher);
     static void ClearPreOrderGhostMeshes();
 
     /**

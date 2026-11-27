@@ -344,7 +344,7 @@ end
 function TransportHolograms:HandleWorldClick(view, event)
     if not self:IsEnabled() then return false end
     if not view or not view.Project or not event then return false end
-    if event.Type ~= 'ButtonPress' or (event.Modifiers and event.Modifiers.Right) then
+    if event.Type ~= 'ButtonPress' or not (event.Modifiers and event.Modifiers.Left) then
         return false
     end
 

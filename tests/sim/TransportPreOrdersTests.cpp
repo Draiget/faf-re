@@ -12,12 +12,15 @@ namespace
 {
   using namespace moho;
 
-  struct MockUserUnitScope
+  // `UserUnit` can't be built without a live session. The pre-order registry reads only the unit's
+  // entity id (and its army and session, which stay zero here, so a dispatch finds no session), so the
+  // tests use zeroed storage of the right size and alignment with only `mParams.mEntityId` set.
+  struct FakeUserUnitScope
   {
     alignas(UserUnit) std::byte mStorage[sizeof(UserUnit)]{};
     bool mPrevSwitchState{moho::ui_TransportPreOrders};
 
-    MockUserUnitScope()
+    FakeUserUnitScope()
     {
       moho::ui_TransportPreOrders = true;
     }
@@ -31,7 +34,7 @@ namespace
       return unit;
     }
 
-    ~MockUserUnitScope()
+    ~FakeUserUnitScope()
     {
       if (auto* unit = reinterpret_cast<UserUnit*>(mStorage)) {
         unit->ClearTransportPreOrders();
@@ -46,7 +49,7 @@ namespace
     InitialStateIsEmpty
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(101);
 
     EXPECT_FALSE(unit->HasTransportPreOrders());
@@ -58,7 +61,7 @@ namespace
     QueueSingleOrder
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(102);
 
     SSTICommandIssueData cmd(EUnitCommandType::UNITCOMMAND_Move);
@@ -75,7 +78,7 @@ namespace
     QueueWithClearQueueReplacesOrders
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(103);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -95,7 +98,7 @@ namespace
     QueueWithoutClearQueueAppendsOrders
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(104);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -116,7 +119,7 @@ namespace
     ClearPreOrdersEmptiesQueue
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(105);
 
     SSTICommandIssueData cmd(EUnitCommandType::UNITCOMMAND_Move);
@@ -133,10 +136,10 @@ namespace
     DifferentUnitsHaveIndependentQueues
   )
   {
-    MockUserUnitScope scope1;
+    FakeUserUnitScope scope1;
     UserUnit* unit1 = scope1.GetUnit(201);
 
-    MockUserUnitScope scope2;
+    FakeUserUnitScope scope2;
     UserUnit* unit2 = scope2.GetUnit(202);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -161,7 +164,7 @@ namespace
     DispatchDisembarkedPreOrdersClearsQueue
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(301);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -183,7 +186,7 @@ namespace
     DispatchDisembarkedPreOrdersNoOpWhenEmpty
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(302);
 
     EXPECT_FALSE(unit->HasTransportPreOrders());
@@ -197,7 +200,7 @@ namespace
     DetachmentTransitionPredicateTriggersDispatch
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(303);
 
     SSTICommandIssueData cmd(EUnitCommandType::UNITCOMMAND_Move);
@@ -206,10 +209,8 @@ namespace
     constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
     constexpr std::uint32_t kTransportId = 500u;
 
-    auto ShouldDispatch = [](std::uint32_t oldParent, std::uint32_t newParent) -> bool {
-      const bool wasAttached = (oldParent != 0 && oldParent != kInvalidEntityId);
-      const bool nowDetached = (newParent == 0 || newParent == kInvalidEntityId);
-      return wasAttached && nowDetached;
+    const auto ShouldDispatch = [](const std::uint32_t oldParent, const std::uint32_t newParent) {
+      return UserUnit::IsDetachTransition(oldParent, newParent);
     };
 
     // Case 1: Still attached -> Should not dispatch
@@ -240,7 +241,7 @@ namespace
     MultipleChainedOrdersSequence
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(401);
 
     SSTICommandIssueData moveCmd(EUnitCommandType::UNITCOMMAND_Move);
@@ -280,7 +281,7 @@ namespace
     ClearQueueDuringQueueing
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(402);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -306,15 +307,15 @@ namespace
   )
   {
     {
-      MockUserUnitScope scope;
+      FakeUserUnitScope scope;
       UserUnit* unit = scope.GetUnit(403);
       SSTICommandIssueData cmd(EUnitCommandType::UNITCOMMAND_Move);
       unit->QueueTransportPreOrder(cmd, false);
       EXPECT_TRUE(unit->HasTransportPreOrders());
-      // Destructor of MockUserUnitScope calls ClearTransportPreOrders()
+      // Destructor of FakeUserUnitScope calls ClearTransportPreOrders()
     }
     // Storage has destructed, verify unit 403 has no leftover records
-    MockUserUnitScope scope2;
+    FakeUserUnitScope scope2;
     UserUnit* unit2 = scope2.GetUnit(403);
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
@@ -324,7 +325,7 @@ namespace
     SelectionBracketPositionOverrideInitialState
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(501);
 
     EXPECT_FALSE(unit->HasSelectionBracketPositionOverride());
@@ -336,7 +337,7 @@ namespace
     SetAndClearSelectionBracketPositionOverride
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(502);
 
     const Wm3::Vector3f pos(100.5f, 25.0f, 200.5f);
@@ -354,7 +355,7 @@ namespace
     StopCommandClearsQueue
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(601);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -372,7 +373,7 @@ namespace
     RemoveAndDragTransportPreOrderById
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(604);
 
     SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
@@ -403,8 +404,8 @@ namespace
     SharedGroupPreOrdersCommonCommandId
   )
   {
-    MockUserUnitScope scope1;
-    MockUserUnitScope scope2;
+    FakeUserUnitScope scope1;
+    FakeUserUnitScope scope2;
     UserUnit* unit1 = scope1.GetUnit(701);
     UserUnit* unit2 = scope2.GetUnit(702);
 
@@ -446,8 +447,8 @@ namespace
     DisembarkDispatchesGroupPreOrders
   )
   {
-    MockUserUnitScope scope1;
-    MockUserUnitScope scope2;
+    FakeUserUnitScope scope1;
+    FakeUserUnitScope scope2;
     UserUnit* unit1 = scope1.GetUnit(801);
     UserUnit* unit2 = scope2.GetUnit(802);
 
@@ -477,7 +478,7 @@ namespace
     BuildMobilePreOrderQueueing
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(901);
 
     SSTICommandIssueData buildCmd(EUnitCommandType::UNITCOMMAND_BuildMobile);
@@ -504,7 +505,7 @@ namespace
     ConVarSwitchTogglesFeature
   )
   {
-    MockUserUnitScope scope;
+    FakeUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(902);
 
     // Disable feature via switch
@@ -685,9 +686,9 @@ namespace
     SharedSquadPreOrderAssignsSameCommandIdAcrossCargoUnits
   )
   {
-    MockUserUnitScope scopeA;
-    MockUserUnitScope scopeB;
-    MockUserUnitScope scopeC;
+    FakeUserUnitScope scopeA;
+    FakeUserUnitScope scopeB;
+    FakeUserUnitScope scopeC;
     UserUnit* unitA = scopeA.GetUnit(301);
     UserUnit* unitB = scopeB.GetUnit(302);
     UserUnit* unitC = scopeC.GetUnit(303);
@@ -719,8 +720,8 @@ namespace
     GuardPreOrderTargetingAnotherCargoGhost
   )
   {
-    MockUserUnitScope scopeAttacker;
-    MockUserUnitScope scopeTarget;
+    FakeUserUnitScope scopeAttacker;
+    FakeUserUnitScope scopeTarget;
     UserUnit* attacker = scopeAttacker.GetUnit(401);
     UserUnit* target = scopeTarget.GetUnit(402);
 
@@ -746,5 +747,97 @@ namespace
     EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Guard);
     EXPECT_EQ(orders[0].mTarget.mType, EAiTargetType::AITARGET_Entity);
     EXPECT_EQ(orders[0].mTarget.mEntityId, 402u);
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    GeneratedCommandIdsDoNotRepeatAcrossGroupAndSingleQueues
+  )
+  {
+    FakeUserUnitScope scopeA;
+    FakeUserUnitScope scopeB;
+    UserUnit* unitA = scopeA.GetUnit(501);
+    UserUnit* unitB = scopeB.GetUnit(502);
+
+    gpg::fastvector<UserUnit*> group;
+    group.push_back(unitA);
+    const SSTICommandIssueData groupMove(EUnitCommandType::UNITCOMMAND_Move);
+    UserUnit::QueueTransportPreOrders(group, groupMove, false);
+
+    const SSTICommandIssueData singleMove(EUnitCommandType::UNITCOMMAND_Move);
+    unitB->QueueTransportPreOrder(singleMove, false);
+
+    ASSERT_EQ(unitA->GetTransportPreOrders().size(), 1u);
+    ASSERT_EQ(unitB->GetTransportPreOrders().size(), 1u);
+    EXPECT_NE(unitA->GetTransportPreOrders()[0].nextCommandId, unitB->GetTransportPreOrders()[0].nextCommandId);
+    EXPECT_FALSE(UserUnit::HaveSameTransportPreOrders(501u, 502u));
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    SquadUnitWithAnExtraOrderIsNotGroupedWithTheOthers
+  )
+  {
+    FakeUserUnitScope scopeA;
+    FakeUserUnitScope scopeB;
+    FakeUserUnitScope scopeC;
+    UserUnit* unitA = scopeA.GetUnit(601);
+    UserUnit* unitB = scopeB.GetUnit(602);
+    UserUnit* unitC = scopeC.GetUnit(603);
+
+    gpg::fastvector<UserUnit*> squad;
+    squad.push_back(unitA);
+    squad.push_back(unitB);
+    squad.push_back(unitC);
+    SSTICommandIssueData move(EUnitCommandType::UNITCOMMAND_Move);
+    move.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    move.mTarget.mPos = Wm3::Vector3f{100.0f, 20.0f, 150.0f};
+    UserUnit::QueueTransportPreOrders(squad, move, false);
+    EXPECT_TRUE(UserUnit::HaveSameTransportPreOrders(601u, 602u));
+
+    // Only A gets a second, shift-queued order; B and C still share their one order.
+    gpg::fastvector<UserUnit*> onlyA;
+    onlyA.push_back(unitA);
+    SSTICommandIssueData attackMove(EUnitCommandType::UNITCOMMAND_AggressiveMove);
+    attackMove.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    attackMove.mTarget.mPos = Wm3::Vector3f{200.0f, 20.0f, 250.0f};
+    UserUnit::QueueTransportPreOrders(onlyA, attackMove, false);
+
+    ASSERT_EQ(unitA->GetTransportPreOrders().size(), 2u);
+    ASSERT_EQ(unitB->GetTransportPreOrders().size(), 1u);
+    EXPECT_FALSE(UserUnit::HaveSameTransportPreOrders(601u, 602u));
+    EXPECT_FALSE(UserUnit::HaveSameTransportPreOrders(601u, 603u));
+    EXPECT_TRUE(UserUnit::HaveSameTransportPreOrders(602u, 603u));
+    EXPECT_FALSE(UserUnit::HaveSameTransportPreOrders(601u, 999u));
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    DispatchWithoutAControllingPlayerDropsTheOrders
+  )
+  {
+    // The fake unit has no session and no army, as a unit seen by an observer would: its orders are
+    // dropped, never issued.
+    FakeUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(701);
+    unit->QueueTransportPreOrder(SSTICommandIssueData(EUnitCommandType::UNITCOMMAND_Move), false);
+    ASSERT_TRUE(unit->HasTransportPreOrders());
+
+    unit->DispatchDisembarkedPreOrders();
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+    EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    AttachmentParentRefTreatsZeroAndInvalidAsNoParent
+  )
+  {
+    constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
+    EXPECT_FALSE(UserUnit::IsAttachmentParentRef(0u));
+    EXPECT_FALSE(UserUnit::IsAttachmentParentRef(kInvalidEntityId));
+    EXPECT_TRUE(UserUnit::IsAttachmentParentRef(500u));
+    EXPECT_TRUE(UserUnit::IsDetachTransition(500u, 0u));
+    EXPECT_FALSE(UserUnit::IsDetachTransition(0u, kInvalidEntityId));
   }
 } // namespace

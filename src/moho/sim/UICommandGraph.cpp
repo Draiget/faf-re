@@ -3022,18 +3022,11 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
-   *
-   * What it does:
-   * Peeks at the command graph - `GetCommandGraph(false)` (0x0085AF61), so
-   * this never creates one - and draws its mesh when one is alive
-   * (0x0085AF8E), releasing the temporary afterwards (0x0085AF9B..0x0085AFCB).
-   */
-  static std::unordered_map<std::uint64_t, std::shared_ptr<MeshInstance>> sPreOrderGhostMeshes;
-
   namespace
   {
+    // Engine addition (`ui_TransportPreOrders`): ghost meshes of pre-ordered buildings, keyed by command id.
+    std::unordered_map<std::uint64_t, std::shared_ptr<MeshInstance>> sPreOrderGhostMeshes;
+
     [[nodiscard]] std::unordered_map<std::int32_t, std::uint32_t> BuildPreOrderCommandUnitCounts()
     {
       std::unordered_map<std::int32_t, std::uint32_t> counts;
@@ -3105,7 +3098,7 @@ namespace moho
     const std::int32_t tick,
     const float tickFraction,
     const bool isGlow
-  ) const
+  )
   {
     if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
       return;
@@ -3209,7 +3202,7 @@ namespace moho
             touchCount = countIt->second;
           }
         }
-        const float baseWidth = ResolvePreOrderLineBaseWidth(const_cast<UICommandGraph*>(this)->mMapD, touchCount);
+        const float baseWidth = ResolvePreOrderLineBaseWidth(mMapD, touchCount);
         const float widthFromDepth = camera.viewport.ProjectViewportWidthRow2(prevPos) * 2.0f;
         const float widthToDepth = camera.viewport.ProjectViewportWidthRow2(targetPos) * 2.0f;
         const float width = (baseWidth + std::max(widthFromDepth, widthToDepth)) * ui_WaypointLineScale;
@@ -3464,9 +3457,9 @@ namespace moho
   void UICommandGraph::DrawPreOrderSkirts(
     const GeomCamera3& camera,
     CD3DPrimBatcher& batcher
-  ) const
+  )
   {
-    const_cast<UICommandGraph*>(this)->UpdatePreOrderBuildMeshes();
+    UpdatePreOrderBuildMeshes();
 
     if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
       return;
@@ -3521,6 +3514,14 @@ namespace moho
     }
   }
 
+  /**
+   * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
+   *
+   * What it does:
+   * Peeks at the command graph - `GetCommandGraph(false)` (0x0085AF61), so
+   * this never creates one - and draws its mesh when one is alive
+   * (0x0085AF8E), releasing the temporary afterwards (0x0085AF9B..0x0085AFCB).
+   */
   void CWldSession::RenderCommandGraph(
     const GeomCamera3& camera,
     CD3DPrimBatcher* const batcher,

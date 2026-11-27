@@ -22,7 +22,8 @@ function WorldView:HandleEvent(event)
         local clickFn = rawget(holo, 'HandleWorldClick')
         local dragFn = rawget(holo, 'HandleWorldDrag')
 
-        if event.Type == 'ButtonPress' and not (event.Modifiers and event.Modifiers.Right) then
+        -- Left button only: a middle-button press near a hologram must still reach the camera.
+        if event.Type == 'ButtonPress' and event.Modifiers and event.Modifiers.Left then
             _drag.startX = event.MouseX
             _drag.startY = event.MouseY
             _drag.isShift = (event.Modifiers and event.Modifiers.Shift == true) or false
