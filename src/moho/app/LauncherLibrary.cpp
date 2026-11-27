@@ -1368,6 +1368,188 @@ namespace
     return 2;
   }
 
+  // ---------------------------------------------------------------------------------------------------------------
+  // Uploads: a map or mod folder of the vault zipped (the folder itself as the archive's top, as FAF's client zips
+  // them) and sent to FAF's vault: a map in one multipart request (/maps/upload with its ranked flag), a mod in three
+  // (the API's signed upload address from /mods/upload/start, the archive put there, /mods/upload/complete), as the FAF
+  // client sends them.
+
+  /** The files under `folder` as zip entries named "<folder's name>/...", folders ending in "/"; or why not. */
+  std::expected<std::vector<faf::online::ZipEntry>, std::string> FolderEntries(
+    const std::filesystem::path& folder
+  )
+  {
+    constexpr std::uintmax_t kLimit = 512ull * 1024 * 1024;
+    std::vector<faf::online::ZipEntry> entries;
+    const std::string top = reinterpret_cast<const char*>(folder.filename().generic_u8string().c_str());
+    entries.push_back({top + "/", ""});
+    std::uintmax_t total = 0;
+    std::error_code error;
+    for (auto it = std::filesystem::recursive_directory_iterator(folder, error);
+         !error && it != std::filesystem::recursive_directory_iterator();
+         it.increment(error)) {
+      if (it->is_symlink(error)) {
+        continue; // nothing outside the folder goes along
+      }
+      const std::u8string relative = std::filesystem::relative(it->path(), folder, error).generic_u8string();
+      const std::string name = top + "/" + reinterpret_cast<const char*>(relative.c_str());
+      if (it->is_directory(error)) {
+        entries.push_back({name + "/", ""});
+        continue;
+      }
+      total += it->file_size(error);
+      if (total > kLimit) {
+        return std::unexpected(std::string("the folder is over 512 MB"));
+      }
+      std::ifstream in(it->path(), std::ios::binary);
+      std::string data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      if (!in && !in.eof()) {
+        return std::unexpected("can't read " + it->path().string());
+      }
+      entries.push_back({name, std::move(data)});
+    }
+    if (error) {
+      return std::unexpected("can't read " + folder.string() + ": " + error.message());
+    }
+    return entries;
+  }
+
+  /** A request to FAF's API with the player's token (`contentType` and `body` when it sends one); the answer or why
+   * not. */
+  std::expected<std::string, std::string> ApiCall(
+    const std::string& method,
+    const std::string& url,
+    const std::string& contentType,
+    const std::string& body,
+    const bool signedIn = true
+  )
+  {
+    platform::http::Call call;
+    call.method = method;
+    call.url = url;
+    call.body = body;
+    call.userAgent = UserAgent();
+    call.headers = "Accept: application/json\r\n";
+    if (signedIn) {
+      const auto token = moho::ONLINE_AccessToken();
+      if (!token) {
+        return std::unexpected("sign in to FAF first (" + token.error() + ")");
+      }
+      call.headers += "Authorization: Bearer " + *token + "\r\n";
+    }
+    if (!contentType.empty()) {
+      call.headers += "Content-Type: " + contentType + "\r\n";
+    }
+    long status = 0;
+    std::string answer;
+    if (const auto sent = platform::http::Request(call, status, answer); !sent) {
+      return std::unexpected("no answer: " + sent.error());
+    }
+    if (status >= 200 && status < 300) {
+      return answer;
+    }
+    std::string why = "HTTP " + std::to_string(status);
+    if (const auto parsed = ParseJson(answer); parsed) {
+      if (
+        const JsonNode* const errors = parsed->Get("errors");
+        errors != nullptr && errors->kind == JsonNode::Kind::Array && !errors->items.empty()
+      ) {
+        const std::string detail = errors->items[0].String("detail");
+        const std::string title = errors->items[0].String("title");
+        if (!detail.empty() || !title.empty()) {
+          why += ": " + (detail.empty() ? title : detail);
+        }
+      }
+    }
+    return std::unexpected(why);
+  }
+
+  /**
+   * id, why = FafLibrary_Upload{kind = "map" or "mod", folder = <its name in the vault's maps or mods folder>,
+   * ranked = <a map's ranked flag>}: the folder zipped and sent to FAF's vault under the signed-in player.
+   */
+  int UploadBody(
+    lua_State* const L
+  )
+  {
+    const std::string kind = lua_istable(L, 1) ? TableString(L, 1, "kind") : "";
+    const std::string folder = lua_istable(L, 1) ? TableString(L, 1, "folder") : "";
+    bool ranked = false;
+    if (lua_istable(L, 1)) {
+      lua_pushstring(L, "ranked");
+      lua_gettable(L, 1);
+      ranked = lua_toboolean(L, -1) != 0;
+      lua_pop(L, 1);
+    }
+    std::error_code error;
+    const std::filesystem::path path = (kind == "map" ? MapsFolder() : ModsFolder()) / folder;
+    if ((kind != "map" && kind != "mod") || !SafeFolderName(folder) || !std::filesystem::is_directory(path, error)) {
+      lua_pushnil(L);
+      lua_pushstring(L, ("no " + kind + " folder " + folder + " in the vault").c_str());
+      return 2;
+    }
+    const std::string api = moho::ONLINE_ApiBase();
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("api", [kind, folder, path, ranked, api](Job& job) {
+      const auto entries = FolderEntries(path);
+      if (!entries) {
+        job.Fail(entries.error());
+        return;
+      }
+      const auto zip = faf::online::WriteZip(*entries);
+      if (!zip) {
+        job.Fail(zip.error());
+        return;
+      }
+      job.total = static_cast<std::uint64_t>(zip->size());
+      if (kind == "map") {
+        const std::string boundary =
+          "fafre" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        std::string body = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + folder +
+          ".zip\"\r\nContent-Type: application/zip\r\n\r\n";
+        body += *zip;
+        body += "\r\n--" + boundary +
+          "\r\nContent-Disposition: form-data; name=\"metadata\"\r\n"
+          "Content-Type: application/json\r\n\r\n";
+        body += ranked ? "{\"isRanked\":true}" : "{\"isRanked\":false}";
+        body += "\r\n--" + boundary + "--\r\n";
+        const auto sent = ApiCall("POST", api + "/maps/upload", "multipart/form-data; boundary=" + boundary, body);
+        if (!sent) {
+          job.Fail("FAF's vault refused the map: " + sent.error());
+          return;
+        }
+      } else {
+        const auto start = ApiCall("GET", api + "/mods/upload/start", "", "");
+        const auto address =
+          start ? ParseJson(*start) : std::expected<JsonNode, std::string>(std::unexpected(start.error()));
+        const std::string url = address ? address->String("uploadUrl") : "";
+        const std::string requestId = address ? address->String("requestId") : "";
+        if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0) {
+          job.Fail(
+            "FAF's vault gave no upload address: " + (start ? std::string("its answer has none") : start.error())
+          );
+          return;
+        }
+        if (const auto put = ApiCall("PUT", url, "application/zip", *zip, false); !put) {
+          job.Fail("the mod's archive didn't upload: " + put.error());
+          return;
+        }
+        using faf::online::JsonObject;
+        using faf::online::JsonString;
+        const std::string complete = faf::online::ToJson(JsonObject({{"requestId", JsonString(requestId)}}));
+        if (const auto done = ApiCall("POST", api + "/mods/upload/complete", "application/json", complete); !done) {
+          job.Fail("FAF's vault didn't take the mod: " + done.error());
+          return;
+        }
+      }
+      job.received = job.total.load();
+      LogLine("uploaded the " + kind + " " + folder + " (" + std::to_string(zip->size()) + " bytes)");
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.message = folder;
+      job.answer = faf::online::JsonObject({});
+    })));
+    return 1;
+  }
+
   /** text FafLibrary_ModsFolder(): the vault's mods folder on disk. */
   int ModsFolderBody(
     lua_State* const L
@@ -1835,6 +2017,14 @@ namespace
       nullptr,
       "<global>",
       "number, string FafLibrary_DeleteReview{kind=, review=} - takes the player's review off FAF."
+    );
+    static moho::CScrLuaBinder upload(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Upload",
+      &Binding<&UploadBody>,
+      nullptr,
+      "<global>",
+      "number, string FafLibrary_Upload{kind=, folder=, ranked=} - uploads a vault map or mod folder to FAF."
     );
     static moho::CScrLuaBinder localReplays(
       moho::SCR_UserLuaInitSet(),

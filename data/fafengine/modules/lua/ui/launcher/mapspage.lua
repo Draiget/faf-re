@@ -233,6 +233,15 @@ function Build(launcher, page)
     end, 'ghost', { icon = 'star', width = 150, height = 30 })
     view.reviewsButton.Right:Set(view.text.Right)
     view.reviewsButton.Bottom:Set(function() return view.action.Top() - Scale(44) end)
+    -- A map of the vault's own folder up to FAF's vault (upload.lua), where Reviews is for FAF's maps.
+    view.uploadButton = Theme.Button(detail, 'Upload to FAF', function()
+        if view.chosen then
+            import('/fafengine/modules/lua/ui/launcher/upload.lua').Open(launcher, { kind = 'map',
+                folder = view.chosen.folder, name = view.chosen.name })
+        end
+    end, 'ghost', { icon = 'upload', width = 190, height = 30 })
+    view.uploadButton.Right:Set(view.text.Right)
+    view.uploadButton.Bottom:Set(view.reviewsButton.Bottom)
     view.status = Theme.Cell(detail, 12, C.muted)
     view.status.Left:Set(view.text.Left)
     view.status.Right:Set(view.text.Right)
@@ -545,6 +554,8 @@ function Build(launcher, page)
         self.action:SetEnabled(map ~= nil and (installed or map.url ~= nil) and not self.jobs.install)
         Theme.SetVisible(self.action, map ~= nil and not (map.isLocal and not self:FromVault(map)))
         Theme.SetVisible(self.reviewsButton, map ~= nil and not map.isLocal and map.id ~= nil)
+        Theme.SetVisible(self.uploadButton, map ~= nil and map.isLocal and self:FromVault(map) and
+            rawget(_G, 'FafLibrary_Upload') ~= nil)
         local status = launcher.lastStatus or {}
         self.host:SetEnabled(map ~= nil and installed and status.lobby == 'signedin')
         Theme.SetText(self.status, self.statusText or '')

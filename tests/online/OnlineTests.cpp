@@ -38,6 +38,7 @@
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
 #include "online/FafChat.h"
+#include "online/Zip.h"
 #include "online/FafLobby.h"
 #include "online/FafReplay.h"
 #include "online/FafVault.h"
@@ -2201,6 +2202,40 @@ TEST(
   );
   EXPECT_NE(server.requestHead.find("Sec-WebSocket-Protocol: binary.ircv3.net"), std::string::npos);
   chat.Disconnect();
+}
+
+TEST(
+  OnlineZip,
+  WritesWhatTheReaderReadsBack
+)
+{
+  using namespace faf::online;
+  // A map's folder as the launcher uploads it: the folder, a compressible text, a tiny file, an empty one, UTF-8.
+  std::string script;
+  for (int i = 0; i < 200; ++i) {
+    script += "-- line " + std::to_string(i) + " of a map's script\n";
+  }
+  // The UTF-8 name and text are Russian ("map", "hello").
+  const std::vector<ZipEntry> written = {
+    {"my_map/", ""},
+    {"my_map/my_map_scenario.lua", "version = 3\nScenarioInfo = {}\n"},
+    {"my_map/my_map_script.lua", script},
+    {"my_map/x", "x"},
+    {"my_map/empty.txt", ""},
+    {"my_map/\xd0\xba\xd0\xb0\xd1\x80\xd1\x82\xd0\xb0"
+     ".txt",
+     "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82"},
+  };
+  const auto zip = WriteZip(written);
+  ASSERT_TRUE(zip) << zip.error();
+  EXPECT_LT(zip->size(), script.size()); // the script compressed
+  const auto read = ReadZip(*zip);
+  ASSERT_TRUE(read) << read.error();
+  ASSERT_EQ(read->size(), written.size());
+  for (std::size_t i = 0; i < written.size(); ++i) {
+    EXPECT_EQ((*read)[i].name, written[i].name);
+    EXPECT_EQ((*read)[i].data, written[i].data);
+  }
 }
 
 #if FAFRE_PLATFORM_POSIX // our own HTTP/1.1 and WebSocket code; on Windows WinHTTP reads these

@@ -210,6 +210,20 @@ function Build(launcher, page)
     view.reviewsButton.Right:Set(textRight)
     view.reviewsButton.Width:Set(function() return view.reviewsButton.Right() - view.reviewsButton.Left() end)
     view.reviewsButton.Bottom:Set(function() return view.remove.Top() - Scale(10) end)
+    -- An installed mod of the vault's own folder up to FAF's vault (upload.lua).
+    view.uploadButton = Theme.Button(details, 'Upload to FAF', function()
+        local item = view.selected
+        local installed = item and view:Installed()[item.uid]
+        local folder = installed and FolderOf(installed)
+        if folder then
+            import('/fafengine/modules/lua/ui/launcher/upload.lua').Open(launcher, { kind = 'mod', folder = folder,
+                name = item.name })
+        end
+    end, 'ghost', { icon = 'upload', height = 30 })
+    view.uploadButton.Left:Set(textLeft)
+    view.uploadButton.Right:Set(textRight)
+    view.uploadButton.Width:Set(function() return view.uploadButton.Right() - view.uploadButton.Left() end)
+    view.uploadButton.Bottom:Set(view.reviewsButton.Bottom)
     view.detailNote = Theme.Paragraph(details, 12, C.muted)
     view.detailNote.Left:Set(textLeft)
     view.detailNote.Right:Set(textRight)
@@ -390,6 +404,7 @@ function Build(launcher, page)
             self.action:SetLabel('Install')
             Theme.SetVisible(self.remove, false)
             Theme.SetVisible(self.reviewsButton, false)
+            Theme.SetVisible(self.uploadButton, false)
             return
         end
         Theme.SetVisible(self.reviewsButton, item.id ~= nil and item.id ~= '' and self.tab == 'vault')
@@ -439,6 +454,8 @@ function Build(launcher, page)
             end
         end
         Theme.SetVisible(self.remove, installed ~= nil and FolderOf(installed) ~= nil)
+        Theme.SetVisible(self.uploadButton, self.tab == 'local' and installed ~= nil and FolderOf(installed) ~= nil and
+            rawget(_G, 'FafLibrary_Upload') ~= nil)
         self.detailNote:SetText(note, C.muted)
     end
 

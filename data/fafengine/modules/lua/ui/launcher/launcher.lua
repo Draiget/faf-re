@@ -3979,6 +3979,54 @@ function TestWalk()
                     Step('matchmaking: after Stop, state ' .. FafOnline_Queues().state)
                 end
             end
+            -- /launcheruploadtest: a map and a mod of the vault's own folders uploaded to FAF's vault (both
+            -- downloaded from the stand-in first, taken off again at the end).
+            if GetCommandLineArg('/launcheruploadtest', 0) and current.mapsView and rawget(_G, 'FafLibrary_Upload') then
+                local Upload = import('/fafengine/modules/lua/ui/launcher/upload.lua')
+                local function Job(id)
+                    for i = 1, 30 do
+                        local state = FafLibrary_Job(id)
+                        if not state or state.state ~= 'working' then
+                            return state
+                        end
+                        Wait(1)
+                    end
+                end
+                local function Up(subject)
+                    local dialog = Upload.Open(current, subject)
+                    Wait(1)
+                    dialog:Upload()
+                    for i = 1, 30 do
+                        Wait(1)
+                        if not dialog.job then
+                            break
+                        end
+                    end
+                    Step('upload: ' .. subject.kind .. ' ' .. subject.folder .. ': ' .. tostring(dialog.statusText))
+                    Wait(2)
+                    dialog:Close()
+                end
+                for i = 1, 30 do
+                    if FafOnline_Status().lobby == 'signedin' then
+                        break
+                    end
+                    Wait(1)
+                end
+                local map = Job(FafLibrary_InstallMap({ url = 'http://127.0.0.1:18460/thumbs/standin_crossing.zip' }))
+                Step('upload: map downloaded: ' .. tostring(map and map.state) .. ' ' .. tostring(map and map.message))
+                current:ShowPage('maps')
+                Up({ kind = 'map', folder = 'standin_crossing', name = 'Stand-in Crossing' })
+                local mod = Job(FafLibrary_InstallMod({ url = 'http://127.0.0.1:18460/thumbs/mods/test_economy.zip',
+                    uid = 'A1B2C3D4-0000-0000-0000-000000000001' }))
+                Step('upload: mod installed: ' .. tostring(mod and mod.state) .. ' ' .. tostring(mod and mod.message))
+                Up({ kind = 'mod', folder = mod and mod.message ~= '' and mod.message or 'test_economy', name = 'Test Economy' })
+                Up({ kind = 'map', folder = 'no_such_map', name = 'nothing' })
+                FafLibrary_RemoveMap('standin_crossing')
+                if rawget(_G, 'FafLibrary_RemoveMod') then
+                    FafLibrary_RemoveMod(mod and mod.message ~= '' and mod.message or 'test_economy')
+                end
+                Wait(1)
+            end
             -- /launcherreviewstest: a vault map's reviews: read, the player's own written, changed and taken off.
             if GetCommandLineArg('/launcherreviewstest', 0) and current.mapsView then
                 local maps = current.mapsView
