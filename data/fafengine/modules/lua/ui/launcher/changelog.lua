@@ -108,6 +108,70 @@ local function UnitsIn(text, markedId)
     return found
 end
 
+--- A unit's faction from its id's second letter (uel0101: UEF), with the colour its card's edge takes.
+local kFactions = {
+    e = { 'UEF', C.accent }, a = { 'Aeon', C.good }, r = { 'Cybran', C.bad }, s = { 'Seraphim', C.gold },
+}
+
+--- A stat a note states: "Range: 42 → 35", "TurretYawSpeed 120: → 130", "Weapon range decreased 330 → 300";
+--- {label, old, new, oldText, newText}, or nil for a line that isn't one (a sentence with an arrow in it).
+local kArrow = '\226\134\146' -- "→" in UTF-8, as FAF writes its notes
+local function StatOf(text)
+    local number = '(-?%d+%.?%d*)'
+    local _, _, label, old, new, rest = string.find(text, '^%s*(.-)%s*:%s*' .. number .. '%s*' .. kArrow .. '%s*' ..
+        number .. '%s*(.*)$')
+    if not label then
+        _, _, label, old, new, rest = string.find(text, '^%s*(.-)%s+' .. number .. '%s*:?%s*' .. kArrow .. '%s*' ..
+            number .. '%s*(.*)$')
+    end
+    if not label or label == '' or string.len(label) > 40 or string.find(label, '/') or string.len(rest or '') > 24 then
+        return nil
+    end
+    local oldValue, newValue = tonumber(old), tonumber(new)
+    if not oldValue or not newValue then
+        return nil
+    end
+    return { label = label, old = oldValue, new = newValue, oldText = old, newText = new,
+        unit = rest ~= '' and (' ' .. rest) or nil }
+end
+
+--- Unit cards: a units block standing for a line that was only the unit's name becomes the card's head (icon, name,
+--- kind, faction), and the stat lines under it (until the next unit or heading) become its stat rows.
+local function Cards(blocks)
+    local out = {}
+    local head = nil -- the card the stat lines right under it belong to
+    for _, block in blocks do
+        local stat = block.style ~= 'gap' and block.style ~= 'units' and StatOf(block.text or '')
+        if block.style == 'units' and block.head then
+            local unit = block.units[1]
+            local faction = kFactions[string.sub(unit.id, 2, 2)] or { '', C.accent }
+            local kind = LOC('<LOC ' .. unit.id .. '_desc>')
+            if kind == '' or string.find(kind, '^<LOC') then
+                kind = ''
+            end
+            head = { style = 'unitHead', id = unit.id, name = unit.name, icon = unit.icon, color = faction[2],
+                kind = faction[1] .. (kind ~= '' and ('  -  ' .. kind) or '') .. '  -  ' .. string.upper(unit.id),
+                indent = block.indent or 0, stats = {} }
+            table.insert(out, head)
+        elseif stat then
+            -- A stat line: in the card of the unit right above it, else a stat row on its own.
+            if head then
+                table.insert(head.stats, stat)
+            else
+                stat.style = 'stat'
+                stat.indent = (block.style == 'bullet2' and 40) or 22
+                table.insert(out, stat)
+            end
+        else
+            if block.style ~= 'gap' then
+                head = nil -- another subject: the card ends
+            end
+            table.insert(out, block)
+        end
+    end
+    return out
+end
+
 --- A patch's notes as TextView blocks. FAF writes them as Markdown lines; its "{% unit X %} Name {% endunit %}"
 --- marks are dropped, the name kept. Each heading, bullet or paragraph that names units is followed by their icons.
 local function Blocks(patch)
@@ -184,17 +248,18 @@ local function Blocks(patch)
                 -- A line that is only the unit's name ("- Selen", a heading "Mercy"): the icon with its name stands
                 -- in its place instead of saying the name twice.
                 local bare = string.lower(string.gsub(string.gsub(block.text or '', '[%s:]+$', ''), '^%s+', ''))
-                if table.getn(units) == 1 and bare == string.lower(units[1].name) then
+                local head = table.getn(units) == 1 and bare == string.lower(units[1].name)
+                if head then
                     table.remove(withUnits)
                 end
-                table.insert(withUnits, { style = 'units', units = units,
+                table.insert(withUnits, { style = 'units', units = units, head = head,
                     indent = (block.style == 'bullet' and 18) or (block.style == 'bullet2' and 36) or 0 })
             elseif not ok then
                 WARN('LAUNCHER: changelog: units of a note: ' .. tostring(units))
             end
         end
     end
-    return withUnits
+    return Cards(withUnits)
 end
 
 function Build(launcher, page)

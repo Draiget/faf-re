@@ -3616,6 +3616,34 @@ function TestWalk()
                 end
             end
             Wait(3)
+            -- The newest version with a unit card with two stats or more, scrolled to it.
+            for _, item in changelog.items do
+                changelog:Show(item)
+                local found, cards, stats = nil, 0, 0
+                for index, line in changelog.document.lines do
+                    if line.head then
+                        cards = cards + 1
+                        if not found and table.getn(line.head.stats or {}) >= 2 then
+                            found = index
+                        end
+                    elseif line.stat then
+                        stats = stats + 1
+                    end
+                end
+                if found then
+                    local head = changelog.document.lines[found].head
+                    local parts = {}
+                    for _, stat in head.stats do
+                        table.insert(parts, stat.label .. ' ' .. stat.old .. ' > ' .. stat.new)
+                    end
+                    changelog.document.top = math.max(1, found - 1)
+                    changelog.document:Paint()
+                    Step('changelog: version ' .. item.key .. ' has ' .. cards .. ' unit cards, ' .. stats ..
+                        ' stat rows; card ' .. head.name .. ' (' .. head.kind .. '): ' .. table.concat(parts, ', '))
+                    break
+                end
+            end
+            Wait(3)
             current:ShowPage('online')
         end
         Wait(1)

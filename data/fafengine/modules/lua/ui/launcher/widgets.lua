@@ -150,6 +150,8 @@ local kTextStyles = {
     chatEvent = { size = 12, color = C.subtle },
 }
 local kUnitIcon = 48 -- a 'units' block's icons, as large as the build bar's
+local kHeadHeight = 76 -- a unit card's head
+local kStatHeight = 28 -- a stat row, in a card or on its own
 local kUnitCell = 84 -- an icon and the room for its name under it
 function TextView(parent)
     local view = Group(parent, 'launcher text')
@@ -183,6 +185,15 @@ function TextView(parent)
             end
             if block.style == 'gap' then
                 table.insert(lines, { style = 'gap', text = '', height = Scale(spec.size) })
+            elseif block.style == 'unitHead' then
+                -- A unit's card head: its icon, name and kind, and the card's action (view.onAction).
+                local count = table.getn(block.stats or {})
+                table.insert(lines, { style = 'unitHead', text = '', head = block, indent = Scale(block.indent or 0),
+                    height = Scale(kHeadHeight + count * kStatHeight + (count > 0 and 10 or 0) + 12) })
+            elseif block.style == 'stat' then
+                -- A stat a version changed: name, before, after and by how much, in columns.
+                table.insert(lines, { style = 'stat', text = '', stat = block, indent = Scale(block.indent or 0),
+                    height = Scale(28) })
             elseif block.style == 'units' then
                 -- Units as the build bar shows them, as many to a line as fit: {id, name, icon} each.
                 local indent = Scale(block.indent or 18)
@@ -225,7 +236,7 @@ function TextView(parent)
         if not row then
             row = {}
             for style, spec in kTextStyles do
-                if style ~= 'gap' and style ~= 'units' then
+                if style ~= 'gap' and style ~= 'units' and style ~= 'unitHead' and style ~= 'stat' then
                     local text = Theme.Text(view, '', spec.size, spec.color, spec.bold)
                     text.Left:Set(view.Left)
                     text.Top:Set(view.Top)
@@ -270,6 +281,155 @@ function TextView(parent)
             end
         end
     end
+    -- Card pieces: a unit's head (icon, name, kind, action button) and a stat row (name, before, after, change).
+    view.headRows = {}
+    view.statRows = {}
+    -- A stat row's pieces under `parent`: name, before, ">", after, and the change as a tag.
+    local function StatPieces(parent)
+        local row = {}
+        row.label = Theme.Cell(parent, 13, C.muted)
+        row.old = Theme.Text(parent, '', 13, C.subtle)
+        row.arrow = Theme.Text(parent, '>', 13, C.subtle)
+        row.new = Theme.Text(parent, '', 13, C.text, true)
+        row.change = Theme.Tag(parent, '', C.accent)
+        for _, control in { row.label, row.old, row.arrow, row.new, row.change } do
+            control.Depth:Set(function() return parent.Depth() + 4 end)
+        end
+        return row
+    end
+    --- Puts a stat in its row: columns from `left()`, its line at `top()`.
+    local function PlaceStat(row, stat, left, top)
+        local y = function() return top() + Scale(5) end
+        row.label.Left:Set(left)
+        row.label.Right:Set(function() return left() + Scale(210) end)
+        row.label.Top:Set(y)
+        row.old.Right:Set(function() return left() + Scale(280) end)
+        row.old.Top:Set(y)
+        row.arrow.Left:Set(function() return left() + Scale(290) end)
+        row.arrow.Top:Set(y)
+        row.new.Left:Set(function() return left() + Scale(306) end)
+        row.new.Top:Set(y)
+        row.change.Left:Set(function() return left() + Scale(376) end)
+        row.change.Top:Set(y)
+        Theme.SetText(row.label, stat.label)
+        Theme.SetText(row.old, stat.oldText or tostring(stat.old))
+        Theme.SetText(row.new, (stat.newText or tostring(stat.new)) .. (stat.unit or ''))
+        local tag = ''
+        if stat.old ~= 0 then
+            local share = math.floor((stat.new - stat.old) * 1000 / math.abs(stat.old) + 0.5) / 10
+            tag = (share > 0 and '+' or '') .. share .. '%'
+        else
+            tag = stat.new > 0 and 'new' or ''
+        end
+        row.change:SetTag(tag, stat.new > stat.old and C.accent or C.warn)
+        for _, control in { row.label, row.old, row.arrow, row.new } do
+            Theme.SetVisible(control, true)
+        end
+        Theme.SetVisible(row.change, tag ~= '')
+    end
+    local function HideStatPieces(row)
+        for _, control in { row.label, row.old, row.arrow, row.new, row.change } do
+            Theme.SetVisible(control, false)
+        end
+    end
+    -- A unit's card: the head (icon, name, kind, the action button) and, under a line, the unit's own stat table.
+    local function Head(index, line, top)
+        local head = view.headRows[index]
+        if not head then
+            head = { stats = {} }
+            head.back = Theme.Panel(view, 'ff0d1c27', C.line)
+            head.accent = Theme.Rect(head.back, C.accent)
+            head.accent:DisableHitTest()
+            head.accent.Left:Set(head.back.Left)
+            head.accent.Top:Set(head.back.Top)
+            head.accent.Bottom:Set(head.back.Bottom)
+            head.accent.Width:Set(Scale(3))
+            head.frame = Theme.Panel(head.back, 'ff08121a', C.line)
+            LayoutHelpers.SetDimensions(head.frame, 56, 56)
+            LayoutHelpers.AtLeftTopIn(head.frame, head.back, 12, 10)
+            head.icon = Bitmap(head.frame)
+            head.icon:DisableHitTest()
+            LayoutHelpers.FillParentFixedBorder(head.icon, head.frame, 1)
+            head.icon.Depth:Set(function() return head.frame.Depth() + 2 end)
+            head.name = Theme.Text(head.back, '', 17, C.text, true)
+            head.name.Left:Set(function() return head.frame.Right() + Scale(14) end)
+            head.name.Top:Set(function() return head.back.Top() + Scale(12) end)
+            head.kind = Theme.Cell(head.back, 12, C.muted)
+            head.kind.Left:Set(head.name.Left)
+            head.kind.Top:Set(function() return head.back.Top() + Scale(38) end)
+            head.button = Theme.Button(head.back, 'Preview in game', function()
+                if head.line and view.onAction then
+                    view.onAction('preview', head.line.head)
+                end
+            end, 'secondary', { width = 180, icon = 'play', height = 32 })
+            head.button.Right:Set(function() return head.back.Right() - Scale(12) end)
+            head.button.Top:Set(function() return head.back.Top() + Scale((kHeadHeight - 32) / 2) end)
+            head.divider = Theme.Rect(head.back, C.line)
+            head.divider:DisableHitTest()
+            head.divider.Left:Set(function() return head.back.Left() + Scale(12) end)
+            head.divider.Right:Set(function() return head.back.Right() - Scale(12) end)
+            head.divider.Top:Set(function() return head.back.Top() + Scale(kHeadHeight) end)
+            head.divider.Height:Set(1)
+            head.divider.Width:Set(function() return head.divider.Right() - head.divider.Left() end)
+            view.headRows[index] = head
+        end
+        head.line = line
+        local data = line.head
+        local stats = data.stats or {}
+        local count = table.getn(stats)
+        local indent = line.indent or 0
+        head.back.Left:Set(function() return view.Left() + indent end)
+        head.back.Right:Set(function() return view.Right() - Scale(14) end)
+        head.back.Top:Set(function() return view.Top() + top + Scale(4) end)
+        head.back.Height:Set(Scale(kHeadHeight + count * kStatHeight + (count > 0 and 10 or 0)))
+        head.back.Width:Set(function() return head.back.Right() - head.back.Left() end)
+        if data.icon and head.shownIcon ~= data.icon then
+            head.shownIcon = data.icon
+            head.icon:SetTexture(data.icon)
+        end
+        Theme.SetText(head.name, data.name or '')
+        Theme.SetText(head.kind, data.kind or '')
+        head.accent:SetSolidColor(data.color or C.accent)
+        Theme.SetVisible(head.back, true)
+        local withButton = view.onAction ~= nil and data.preview ~= false
+        Theme.SetVisible(head.button, withButton)
+        head.kind.Right:Set(function() return head.back.Right() - Scale(withButton and 200 or 16) end)
+        Theme.SetVisible(head.divider, count > 0)
+        -- The unit's stats in its card, lined up under its name.
+        for i, stat in stats do
+            local row = head.stats[i]
+            if not row then
+                row = StatPieces(head.back)
+                head.stats[i] = row
+            end
+            local offset = kHeadHeight + 4 + (i - 1) * kStatHeight
+            PlaceStat(row, stat, function() return head.name.Left() end,
+                function() return head.back.Top() + Scale(offset) end)
+        end
+        for i = count + 1, table.getn(head.stats) do
+            HideStatPieces(head.stats[i])
+        end
+    end
+    local function HideHead(index)
+        if view.headRows[index] then
+            Theme.SetVisible(view.headRows[index].back, false)
+        end
+    end
+    -- A stat row of no unit's card (a stat line under a note naming several units).
+    local function Stat(index, line, top)
+        local row = view.statRows[index]
+        if not row then
+            row = StatPieces(view)
+            view.statRows[index] = row
+        end
+        local indent = line.indent or 0
+        PlaceStat(row, line.stat, function() return view.Left() + indent end, function() return view.Top() + top end)
+    end
+    local function HideStat(index)
+        if view.statRows[index] then
+            HideStatPieces(view.statRows[index])
+        end
+    end
     function view:Paint()
         if self.wrappedFor ~= self.Right() - self.Left() - Scale(14) then
             self:Wrap()
@@ -300,6 +460,16 @@ function TextView(parent)
                 end
             end
             Theme.SetVisible(row.dot, line.mark and true or false)
+            if line.style == 'unitHead' then
+                Head(used, line, top)
+            else
+                HideHead(used)
+            end
+            if line.style == 'stat' then
+                Stat(used, line, top)
+            else
+                HideStat(used)
+            end
             if line.style == 'units' then
                 local pool = Icons(used, table.getn(line.units))
                 for i, unit in line.units do
@@ -340,6 +510,8 @@ function TextView(parent)
                 Theme.SetVisible(text, false)
             end
             HideIcons(i, 1)
+            HideHead(i)
+            HideStat(i)
         end
         self.shownLines = used
         if self.mark then
@@ -528,18 +700,83 @@ function VirtualList(parent, columns, onPick)
     body.Bottom:Set(list.Bottom)
     list.body = body
 
+    -- The columns' places for a width: each its share, but never narrower than its title (the first, widest one gives
+    -- the room up); when even that doesn't fit, columns go from the right. starts[i], widths[i] in pixels (0: gone).
+    local titles = {}
+    local layoutWidth, starts, widths = -1, {}, {}
+    local function Layout(width)
+        if width == layoutWidth then
+            return
+        end
+        layoutWidth = width
+        local count = table.getn(columns)
+        local least = {}
+        for i = 1, count do
+            local advance = titles[i] and titles[i]:GetStringAdvance(string.upper(columns[i][1])) or 0
+            least[i] = advance + Scale(18)
+        end
+        local shown = count
+        local function Sum(from, to, values)
+            local total = 0
+            for i = from, to do
+                total = total + values[i]
+            end
+            return total
+        end
+        while shown > 1 and Sum(1, shown, least) > width do
+            shown = shown - 1
+        end
+        local want = {}
+        for i = 1, count do
+            want[i] = i <= shown and math.max(columns[i][2] * width, least[i]) or 0
+        end
+        -- Too wide: the room comes from the columns above their least, in proportion; too narrow (columns gone):
+        -- the first column takes the rest.
+        local over = Sum(1, shown, want) - width
+        if over > 0 then
+            local spare = 0
+            for i = 1, shown do
+                spare = spare + (want[i] - least[i])
+            end
+            for i = 1, shown do
+                if spare > 0 then
+                    want[i] = want[i] - over * (want[i] - least[i]) / spare
+                end
+            end
+        elseif over < 0 then
+            want[1] = want[1] - over
+        end
+        local at = 0
+        for i = 1, count do
+            starts[i] = math.floor(at)
+            widths[i] = math.floor(want[i])
+            at = at + want[i]
+        end
+    end
     local function Edge(index, of, last)
-        local share = 0
-        for i = 1, (last and index or index - 1) do
-            share = share + columns[i][2]
-        end
         if last then
-            return function() return of.Left() + math.floor(share * of.Width()) - Scale(6) end
+            return function()
+                Layout(of.Width())
+                if widths[index] <= 0 then
+                    return of.Left() + starts[index]
+                end
+                return of.Left() + starts[index] + widths[index] - Scale(6)
+            end
         end
-        return function() return of.Left() + math.floor(share * of.Width()) + Scale(10) end
+        return function()
+            Layout(of.Width())
+            if widths[index] <= 0 then
+                return of.Left() + starts[index]
+            end
+            return of.Left() + starts[index] + Scale(10)
+        end
     end
     for index, column in columns do
         local title = Theme.Cell(header, 10, C.subtle, true)
+        titles[index] = title
+    end
+    for index, column in columns do
+        local title = titles[index]
         title.Left:Set(Edge(index, body, false))
         title.Right:Set(Edge(index, body, true))
         LayoutHelpers.AtVerticalCenterIn(title, header)
