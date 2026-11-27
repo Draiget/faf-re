@@ -605,14 +605,20 @@ namespace moho
   )
   {
     const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
-    const bool hasPreOrders = UserUnit::HasAnyTransportPreOrders();
-    if (!mIsMiniMap && (shiftDown || hasPreOrders)) {
+    // Engine addition (`ui_TransportPreOrders`): with Shift up, a pending transport pre-order keeps
+    // the graph alive for the pre-orders alone; the rest of the graph stays Shift-only, as retail.
+    const bool preOrdersOnly = !shiftDown && UserUnit::HasAnyTransportPreOrders();
+    if (!mIsMiniMap && (shiftDown || preOrdersOnly)) {
       if (!mComGraph) {
         mComGraph = mWldSession->GetCommandGraph(/*allowCreate=*/true);
       }
 
-      mWldSession->RenderCommandGraph(mCamera->CameraGetView(), batcher, gameTick, tickFraction);
-      DrawAllUnitSkirts(batcher, mWldSession, mCamera->CameraGetView());
+      if (preOrdersOnly) {
+        mWldSession->RenderPreOrderGraph(mCamera->CameraGetView(), batcher, gameTick, tickFraction);
+      } else {
+        mWldSession->RenderCommandGraph(mCamera->CameraGetView(), batcher, gameTick, tickFraction);
+        DrawAllUnitSkirts(batcher, mWldSession, mCamera->CameraGetView());
+      }
     } else {
       // Dropping the hold is what lets the graph - and the `UnitPlace` ghost
       // mesh hanging off each of its draw nodes - be destroyed once no other

@@ -977,6 +977,8 @@ namespace moho
     );
     void DrawPreOrderWaypointMarkers(const GeomCamera3& camera, CD3DPrimBatcher& batcher) const;
     void UpdatePreOrderBuildMeshes();
+    void
+    DrawPreOrderGraphOnly(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
     void DrawPreOrderSkirts(const GeomCamera3& camera, CD3DPrimBatcher& batcher);
     static void ClearPreOrderGhostMeshes();
 

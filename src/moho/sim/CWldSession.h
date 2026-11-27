@@ -993,6 +993,10 @@ namespace moho
     void
     RenderCommandGraph(const GeomCamera3& camera, CD3DPrimBatcher* batcher, std::int32_t gameTick, float tickFraction);
 
+    /// Engine addition (`ui_TransportPreOrders`): draws only the transport pre-orders of the graph.
+    void
+    RenderPreOrderGraph(const GeomCamera3& camera, CD3DPrimBatcher* batcher, std::int32_t gameTick, float tickFraction);
+
   private:
     /**
      * Address: 0x008958B0 (FUN_008958B0, ?ApplyPendingSaveData@CWldSession@Moho@@AAEXXZ)

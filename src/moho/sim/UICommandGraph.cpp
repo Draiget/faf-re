@@ -3538,4 +3538,51 @@ namespace moho
       graph->DrawCommandGraphMesh(camera, *batcher, gameTick, tickFraction);
     }
   }
+
+  /**
+   * Engine addition (`ui_TransportPreOrders`): draws only the transport pre-orders - their order
+   * lines, waypoint markers and building skirts - with the passes and batcher states
+   * `DrawCommandGraphMesh` uses for them. The world view calls this while Shift is up and a
+   * pre-order exists, so the rest of the command graph keeps the original Shift-only behaviour.
+   */
+  void UICommandGraph::DrawPreOrderGraphOnly(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    batcher.Flush();
+    (void)batcher.Setup("TCommand");
+    batcher.SetViewProjMatrix(camera);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/false);
+    batcher.Flush();
+
+    (void)batcher.Setup("TCommandGlow");
+    batcher.SetViewProjMatrix(camera);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/true);
+    batcher.Flush();
+
+    (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
+    DrawPreOrderWaypointMarkers(camera, batcher);
+    batcher.Flush();
+
+    (void)batcher.Setup("TAlphaBlendLinearSample");
+    batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    DrawPreOrderSkirts(camera, batcher);
+    batcher.Flush();
+  }
+
+  /** Engine addition (`ui_TransportPreOrders`): `RenderCommandGraph` for the pre-orders alone. */
+  void CWldSession::RenderPreOrderGraph(
+    const GeomCamera3& camera,
+    CD3DPrimBatcher* const batcher,
+    const std::int32_t gameTick,
+    const float tickFraction
+  )
+  {
+    if (const std::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
+      graph->DrawPreOrderGraphOnly(camera, *batcher, gameTick, tickFraction);
+    }
+  }
 } // namespace moho
