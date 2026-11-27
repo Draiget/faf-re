@@ -224,6 +224,15 @@ function Build(launcher, page)
     view.host = Theme.Button(detail, 'Host a game', function() view:Host() end, 'secondary', { width = 160, icon = 'play' })
     view.host.Left:Set(view.text.Left)
     LayoutHelpers.AtBottomIn(view.host, detail, 20)
+    -- FAF's reviews of a vault map, and the player's own (reviews.lua).
+    view.reviewsButton = Theme.Button(detail, 'Reviews', function()
+        if view.chosen and view.chosen.id then
+            import('/fafengine/modules/lua/ui/launcher/reviews.lua').Open(launcher, { kind = 'map', id = view.chosen.id,
+                name = view.chosen.name })
+        end
+    end, 'ghost', { icon = 'star', width = 150, height = 30 })
+    view.reviewsButton.Right:Set(view.text.Right)
+    view.reviewsButton.Bottom:Set(function() return view.action.Top() - Scale(44) end)
     view.status = Theme.Cell(detail, 12, C.muted)
     view.status.Left:Set(view.text.Left)
     view.status.Right:Set(view.text.Right)
@@ -535,6 +544,7 @@ function Build(launcher, page)
         self.action:SetLabel(installed and 'Remove' or 'Download')
         self.action:SetEnabled(map ~= nil and (installed or map.url ~= nil) and not self.jobs.install)
         Theme.SetVisible(self.action, map ~= nil and not (map.isLocal and not self:FromVault(map)))
+        Theme.SetVisible(self.reviewsButton, map ~= nil and not map.isLocal and map.id ~= nil)
         local status = launcher.lastStatus or {}
         self.host:SetEnabled(map ~= nil and installed and status.lobby == 'signedin')
         Theme.SetText(self.status, self.statusText or '')

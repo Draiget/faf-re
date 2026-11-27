@@ -3979,6 +3979,60 @@ function TestWalk()
                     Step('matchmaking: after Stop, state ' .. FafOnline_Queues().state)
                 end
             end
+            -- /launcherreviewstest: a vault map's reviews: read, the player's own written, changed and taken off.
+            if GetCommandLineArg('/launcherreviewstest', 0) and current.mapsView then
+                local maps = current.mapsView
+                current:ShowPage('maps')
+                maps.tab = 'vault'
+                maps:Search()
+                for i = 1, 15 do
+                    current:Refresh()
+                    if not maps.jobs.search then
+                        break
+                    end
+                    Wait(1)
+                end
+                maps.chosen = maps.vault[1]
+                current:Refresh()
+                Wait(1)
+                local Reviews = import('/fafengine/modules/lua/ui/launcher/reviews.lua')
+                local reviews = Reviews.Open(current, { kind = 'map', id = maps.chosen.id, name = maps.chosen.name })
+                local function Settle()
+                    for i = 1, 15 do
+                        Wait(1)
+                        if not next(reviews.jobs) then
+                            break
+                        end
+                    end
+                    Wait(1)
+                end
+                local function Line(what)
+                    local list = {}
+                    for _, review in (reviews.reviews or {}) do
+                        table.insert(list, review.login .. ' ' .. review.score .. ' "' .. review.text .. '"')
+                    end
+                    Step('reviews: ' .. what .. ': ' .. table.getn(reviews.reviews or {}) .. ' [' .. table.concat(list, '; ') ..
+                        '], latest ' .. tostring(reviews.latest) .. ', mine ' .. tostring(reviews.mine and reviews.mine.id) ..
+                        ', status ' .. tostring(reviews.statusText) .. (reviews.failure and (', failure ' .. reviews.failure) or ''))
+                end
+                Settle()
+                Line('opened')
+                reviews.score = 4
+                reviews.text.edit:SetText('Good map for the walk')
+                reviews:Save()
+                Settle()
+                Line('after Save')
+                reviews.score = 2
+                reviews.text.edit:SetText('Changed my mind')
+                reviews:Save()
+                Settle()
+                Line('after Update')
+                reviews:Delete()
+                Settle()
+                Line('after Delete')
+                reviews:Close()
+                Wait(1)
+            end
             -- /launchernotifytest: notifications away from the chat: a line naming the player, a private message
             -- (each a toast and a notice), the bell's list, a notice's click opening its conversation.
             if GetCommandLineArg('/launchernotifytest', 0) and current.chatView and current.notify then

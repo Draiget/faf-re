@@ -826,6 +826,194 @@ namespace
     return 1;
   }
 
+  // ---------------------------------------------------------------------------------------------------------------
+  // Reviews: the player's own review of a map, mod or game written to FAF's API (JSON:API, as the FAF client writes
+  // them: POST to the version's reviews, PATCH and DELETE on the review). Only these: the requests are built here from
+  // a score and a text, never from a path or a body the Lua gives.
+
+  struct ReviewKind
+  {
+    const char* kind;    ///< what the Lua names: "map", "mod", "game"
+    const char* subject; ///< the reviewed resource: mapVersion, modVersion, game
+    const char* review;  ///< the review resource
+  };
+
+  constexpr ReviewKind kReviewKinds[] = {
+    {"map", "mapVersion", "mapVersionReview"},
+    {"mod", "modVersion", "modVersionReview"},
+    {"game", "game", "gameReview"},
+  };
+
+  const ReviewKind* FindReviewKind(
+    const std::string& kind
+  )
+  {
+    for (const ReviewKind& known : kReviewKinds) {
+      if (kind == known.kind) {
+        return &known;
+      }
+    }
+    return nullptr;
+  }
+
+  bool AllDigits(
+    const std::string& text
+  )
+  {
+    return !text.empty() && text.size() < 20 && text.find_first_not_of("0123456789") == std::string::npos;
+  }
+
+  /** An authorised write to FAF's API: the answer's body ("" for 204), or why it failed (FAF's own words when given).
+   */
+  std::expected<std::string, std::string> ApiSend(
+    const std::string& method,
+    const std::string& url,
+    const std::string& body
+  )
+  {
+    const auto token = moho::ONLINE_AccessToken();
+    if (!token) {
+      return std::unexpected("sign in to FAF first (" + token.error() + ")");
+    }
+    platform::http::Call call;
+    call.method = method;
+    call.url = url;
+    call.body = body;
+    call.userAgent = UserAgent();
+    call.headers = "Accept: application/vnd.api+json\r\nAuthorization: Bearer " + *token + "\r\n";
+    if (!body.empty()) {
+      call.headers += "Content-Type: application/vnd.api+json\r\n";
+    }
+    long status = 0;
+    std::string answer;
+    if (const auto sent = platform::http::Request(call, status, answer); !sent) {
+      return std::unexpected("FAF's API didn't answer: " + sent.error());
+    }
+    if (status >= 200 && status < 300) {
+      return answer;
+    }
+    std::string why = "FAF's API answered HTTP " + std::to_string(status);
+    if (const auto parsed = ParseJson(answer); parsed) {
+      if (
+        const JsonNode* const errors = parsed->Get("errors");
+        errors != nullptr && errors->kind == JsonNode::Kind::Array && !errors->items.empty()
+      ) {
+        const std::string detail = errors->items[0].String("detail");
+        const std::string title = errors->items[0].String("title");
+        if (!detail.empty() || !title.empty()) {
+          why += ": " + (detail.empty() ? title : detail);
+        }
+      }
+    }
+    return std::unexpected(why);
+  }
+
+  /** The job of a review write: its answer as the job's data (an empty object for 204). */
+  int ReviewJob(
+    lua_State* const L,
+    std::string method,
+    std::string url,
+    std::string body
+  )
+  {
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("api", [method, url, body](Job& job) {
+      const auto answer = ApiSend(method, url, body);
+      if (!answer) {
+        job.Fail(answer.error());
+        return;
+      }
+      auto parsed =
+        answer->empty() ? std::expected<JsonNode, std::string>(faf::online::JsonObject({})) : ParseJson(*answer);
+      if (!parsed) {
+        parsed = faf::online::JsonObject({});
+      }
+      LogLine(method + " " + url.substr(url.find("/data/")) + ": done");
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.answer = std::move(*parsed);
+    })));
+    return 1;
+  }
+
+  /**
+   * id, why = FafLibrary_SaveReview{kind=, subject=, review=, player=, score=, text=}: the player's review of a map,
+   * mod or game ("map", "mod", "game"): a new one on version or game `subject` by `player` (their FAF id), or review
+   * `review` changed. Score 1 to 5, text at most 2000 bytes.
+   */
+  int SaveReviewBody(
+    lua_State* const L
+  )
+  {
+    if (!lua_istable(L, 1)) {
+      lua_pushnil(L);
+      lua_pushstring(L, "FafLibrary_SaveReview takes a table");
+      return 2;
+    }
+    const ReviewKind* const kind = FindReviewKind(TableString(L, 1, "kind"));
+    const std::string subject = TableString(L, 1, "subject");
+    const std::string review = TableString(L, 1, "review");
+    const std::string player = TableString(L, 1, "player");
+    const std::string text = TableString(L, 1, "text");
+    lua_pushstring(L, "score");
+    lua_gettable(L, 1);
+    const int score = lua_isnumber(L, -1) ? static_cast<int>(lua_tonumber(L, -1)) : 0;
+    lua_pop(L, 1);
+    const char* why = nullptr;
+    if (kind == nullptr) {
+      why = "not a kind of review (map, mod, game)";
+    } else if (score < 1 || score > 5) {
+      why = "a review's score is 1 to 5";
+    } else if (text.size() > 2000) {
+      why = "the review's text is too long";
+    } else if (review.empty() ? (!AllDigits(subject) || !AllDigits(player)) : !AllDigits(review)) {
+      why = "the review names no version and player, or no review";
+    }
+    if (why != nullptr) {
+      lua_pushnil(L);
+      lua_pushstring(L, why);
+      return 2;
+    }
+    using faf::online::JsonDigits;
+    using faf::online::JsonNumber;
+    using faf::online::JsonObject;
+    using faf::online::JsonString;
+    const auto attributes = JsonObject({{"score", JsonNumber(score)}, {"text", JsonString(text)}});
+    if (review.empty()) {
+      const std::string body = faf::online::ToJson(JsonObject(
+        {{"data",
+          JsonObject({
+            {"type", JsonString(kind->review)},
+            {"attributes", attributes},
+            {"relationships",
+             JsonObject(
+               {{"player",
+                 JsonObject({{"data", JsonObject({{"type", JsonString("player")}, {"id", JsonString(player)}})}})}}
+             )},
+          })}}
+      ));
+      return ReviewJob(L, "POST", moho::ONLINE_ApiBase() + "/data/" + kind->subject + "/" + subject + "/reviews", body);
+    }
+    const std::string body = faf::online::ToJson(JsonObject(
+      {{"data",
+        JsonObject({{"type", JsonString(kind->review)}, {"id", JsonString(review)}, {"attributes", attributes}})}}
+    ));
+    return ReviewJob(L, "PATCH", moho::ONLINE_ApiBase() + "/data/" + kind->review + "/" + review, body);
+  }
+
+  /** id, why = FafLibrary_DeleteReview{kind=, review=}: the player's review taken off FAF. */
+  int DeleteReviewBody(
+    lua_State* const L
+  )
+  {
+    const ReviewKind* const kind = lua_istable(L, 1) ? FindReviewKind(TableString(L, 1, "kind")) : nullptr;
+    const std::string review = lua_istable(L, 1) ? TableString(L, 1, "review") : "";
+    if (kind == nullptr || !AllDigits(review)) {
+      lua_pushnil(L);
+      lua_pushstring(L, "FafLibrary_DeleteReview takes the kind and the review's id");
+      return 2;
+    }
+    return ReviewJob(L, "DELETE", moho::ONLINE_ApiBase() + "/data/" + kind->review + "/" + review, "");
+  }
+
   /** A mod_info.lua's `uid = "..."`, or empty. */
   std::string ModInfoUid(
     const std::string& text
@@ -1630,6 +1818,23 @@ namespace
       nullptr,
       "<global>",
       "number FafLibrary_News{page=} - one page of FAF's news posts; FafLibrary_Job(id).data holds them."
+    );
+    static moho::CScrLuaBinder saveReview(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_SaveReview",
+      &Binding<&SaveReviewBody>,
+      nullptr,
+      "<global>",
+      "number, string FafLibrary_SaveReview{kind=, subject=, review=, player=, score=, text=} - "
+      "writes the player's review of a map, mod or game to FAF."
+    );
+    static moho::CScrLuaBinder deleteReview(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_DeleteReview",
+      &Binding<&DeleteReviewBody>,
+      nullptr,
+      "<global>",
+      "number, string FafLibrary_DeleteReview{kind=, review=} - takes the player's review off FAF."
     );
     static moho::CScrLuaBinder localReplays(
       moho::SCR_UserLuaInitSet(),

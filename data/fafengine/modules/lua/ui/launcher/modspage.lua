@@ -198,10 +198,22 @@ function Build(launcher, page)
     view.remove.Right:Set(textRight)
     view.remove.Width:Set(function() return view.remove.Right() - view.remove.Left() end)
     view.remove.Bottom:Set(function() return view.action.Top() - Scale(10) end)
+    -- FAF's reviews of a vault mod, and the player's own (reviews.lua).
+    view.reviewsButton = Theme.Button(details, 'Reviews', function()
+        local item = view.selected
+        if item and item.id and item.id ~= '' then
+            import('/fafengine/modules/lua/ui/launcher/reviews.lua').Open(launcher, { kind = 'mod', id = item.id,
+                name = item.name })
+        end
+    end, 'ghost', { icon = 'star', height = 30 })
+    view.reviewsButton.Left:Set(textLeft)
+    view.reviewsButton.Right:Set(textRight)
+    view.reviewsButton.Width:Set(function() return view.reviewsButton.Right() - view.reviewsButton.Left() end)
+    view.reviewsButton.Bottom:Set(function() return view.remove.Top() - Scale(10) end)
     view.detailNote = Theme.Paragraph(details, 12, C.muted)
     view.detailNote.Left:Set(textLeft)
     view.detailNote.Right:Set(textRight)
-    view.detailNote.Top:Set(function() return view.remove.Top() - Scale(56) end)
+    view.detailNote.Top:Set(function() return view.reviewsButton.Top() - Scale(56) end)
 
     -- -------------------------------------------------------------------------------------------------------------
 
@@ -377,8 +389,10 @@ function Build(launcher, page)
             self.action:SetEnabled(false)
             self.action:SetLabel('Install')
             Theme.SetVisible(self.remove, false)
+            Theme.SetVisible(self.reviewsButton, false)
             return
         end
+        Theme.SetVisible(self.reviewsButton, item.id ~= nil and item.id ~= '' and self.tab == 'vault')
         local installed = self:Installed()[item.uid]
         local on = self:IsOn(item.uid)
         local lines = {}
