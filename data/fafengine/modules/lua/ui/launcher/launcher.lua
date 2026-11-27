@@ -1973,6 +1973,7 @@ function Launcher:Refresh()
         WARN('LAUNCHER: the online page failed to update: ' .. tostring(err))
     end
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
+        (self.page == 'lan' and self.lanView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2262,7 +2263,13 @@ function Launcher:Campaign()
     end)
 end
 
+--- The LAN page (lanpage.lua): games on this network, hosting, an address. FAF's own LAN screen stays for a build
+--- where the page failed to build.
 function Launcher:Lan()
+    if self.pages.lan then
+        self:ShowPage('lan')
+        return
+    end
     self:OpenScreen('Multiplayer LAN', function(host, back)
         import('/lua/ui/lobby/gameselect.lua').CreateUI(host, back)
     end)
@@ -2386,6 +2393,10 @@ function Launcher:Exit()
 end
 
 function Launcher:ShowPage(name)
+    -- The LAN page listens for games only while it shows.
+    if self.page == 'lan' and name ~= 'lan' and self.lanView then
+        self.lanView:Stop()
+    end
     self.page = name
     lastShownPage = name
     for pageName, page in self.pages do
@@ -2483,7 +2494,7 @@ local function BuildRail(launcher, body)
         'Offline',
         { 'flag', 'Skirmish', function() launcher:Skirmish() end },
         { 'book', 'Campaign', function() launcher:Campaign() end },
-        { 'users', 'LAN', function() launcher:Lan() end },
+        { 'users', 'LAN', function() launcher:Lan() end, 'lan' },
         'Library',
         { 'replays', 'Replays', function() launcher:Replays() end, 'replays' },
         { 'mods', 'Mods', function() launcher:Mods() end, 'mods' },
@@ -2683,6 +2694,23 @@ local function Build(launcher)
     launcher.pages.changelog = changelogPage
     import('/fafengine/modules/lua/ui/launcher/changelog.lua').Build(launcher, changelogPage)
     Theme.SetVisible(changelogPage, false)
+    -- LAN: games on this network, hosting one, an address (lanpage.lua).
+    local lanPage = Group(content, 'launcher lan')
+    LayoutHelpers.FillParent(lanPage, content)
+    lanPage.Width:Set(function() return lanPage.Right() - lanPage.Left() end)
+    lanPage.Height:Set(function() return lanPage.Bottom() - lanPage.Top() end)
+    local lanBuilt, lanWhy = pcall(function()
+        import('/fafengine/modules/lua/ui/launcher/lanpage.lua').Build(launcher, lanPage)
+    end)
+    if lanBuilt then
+        launcher.pages.lan = lanPage
+    else
+        WARN('LAUNCHER: the LAN page failed to build: ' .. tostring(lanWhy))
+        lanPage:Destroy()
+    end
+    if launcher.pages.lan then
+        Theme.SetVisible(lanPage, false)
+    end
     -- Mods: installed and FAF's vault (modspage.lua), with the engine's mod library.
     if rawget(_G, 'FafLibrary_InstallMod') then
         local modsPage = Group(content, 'launcher mods')
@@ -3125,7 +3153,85 @@ function TestWalk()
             Wait(2)
             current:ShowPage('online')
         end
-        for _, screen in { 'Skirmish', 'Multiplayer LAN' } do
+        -- The LAN page: listening for games. /launcherlantest host|join: one client hosts a LAN game, the other finds
+        -- it in its list and joins it.
+        if current and current.lanView then
+            current:ShowPage('lan')
+            Wait(3)
+            local lan = current.lanView
+            Step('lan page: listening ' .. tostring(lan.discovery and true or false) .. ', ' ..
+                table.getn(lan:Shown()) .. ' games')
+            local lanTest = GetCommandLineArg('/launcherlantest', 1)
+            if lanTest and lanTest[1] == 'host' then
+                lan.name.edit:SetText('lanhost')
+                local dialog = lan:OpenHost()
+                dialog.gameName.edit:SetText('LAN test game')
+                dialog.gameName:Refresh()
+                Step('lan: host dialog open')
+                Wait(2)
+                lan:Host(dialog)
+                Wait(3)
+                Step('lan: hosting, screen ' .. tostring(current.screenName))
+                for i = 1, 60 do
+                    local counted, players = pcall(import('/lua/ui/lobby/lobby.lua').GetPlayerCount)
+                    players = counted and players or 0
+                    if players >= 2 then
+                        Step('lan: host sees ' .. players .. ' players in the lobby')
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(6)
+                import('/lua/ui/lobby/lobby.lua').ReturnToMenu(false)
+                Wait(3)
+                Step('lan: host left the lobby, page ' .. tostring(current.page) .. ', screen ' ..
+                    tostring(current.screenName))
+            elseif lanTest and lanTest[1] == 'join' then
+                lan.name.edit:SetText('lanjoin')
+                local game = nil
+                for i = 1, 60 do
+                    game = lan:Shown()[1]
+                    if game then
+                        break
+                    end
+                    Wait(1)
+                end
+                Step('lan: found ' .. (game and (tostring(game.GameName) .. ' at ' .. tostring(game.Address)) or 'nothing'))
+                if game then
+                    Wait(2)
+                    lan:Join(game, false)
+                    for i = 1, 30 do
+                        local counted, players = pcall(import('/lua/ui/lobby/lobby.lua').GetPlayerCount)
+                        players = counted and players or 0
+                        if players >= 2 then
+                            Step('lan: joined, ' .. players .. ' players in the lobby')
+                            break
+                        end
+                        Wait(1)
+                    end
+                    -- The host leaves a few seconds later; our lobby says so.
+                    local lobbyView = nil
+                    for i = 1, 40 do
+                        lobbyView = import('/fafengine/modules/lua/ui/lobby/lobbyview.lua').Current()
+                        if lobbyView and lobbyView.closedText then
+                            break
+                        end
+                        Wait(1)
+                    end
+                    Step('lan: after the host left, screen ' .. tostring(current.screenName) .. ', our lobby says: ' ..
+                        tostring(lobbyView and lobbyView.closedText))
+                    Wait(2)
+                    if lobbyView and lobbyView.closedLeave then
+                        lobbyView.closedLeave()
+                    end
+                    Wait(3)
+                    Step('lan: after its button, page ' .. tostring(current.page) .. ', screen ' ..
+                        tostring(current.screenName))
+                end
+            end
+            current:ShowPage('online')
+        end
+        for _, screen in { 'Skirmish' } do
             local launcher = current
             if not launcher then
                 Step('the launcher is gone before ' .. screen)
