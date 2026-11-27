@@ -30,6 +30,8 @@ FeaturedMods = {
 
 local kRailWidth = 214
 local kStatusHeight = 28
+-- The pages under Play (the top bar's Play tab and its strip of modes).
+local kPlayPages = { online = true, lan = true }
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1105,41 +1107,16 @@ local function BuildOnlinePage(launcher, page)
     -- One list for FAF's games and our servers' games, our servers' first; the heading counts the open ones.
     view.tab = 'all'
 
-    local title = Theme.Title(page, 'Multiplayer', 24)
-    LayoutHelpers.AtLeftTopIn(title, page, 0, 6)
+    -- Under the top bar's Play strip: the list's own heading, Games with its count (no page title of its own).
     view.tabs = Tabs(page, { { 'all', 'Games' } }, function(key)
         view.grid.top = 1
         launcher:Refresh()
     end)
-    view.tabs.Left:Set(function() return title.Right() + Scale(40) end)
+    view.tabs.Left:Set(page.Left)
     LayoutHelpers.AtTopIn(view.tabs, page, 0)
-    view.tabs.Right:Set(function() return page.Right() - Scale(300) end)
+    view.tabs.Right:Set(page.Right)
 
-    -- Who is signed in, at the header's right.
-    local account = Group(page)
-    account:DisableHitTest()
-    LayoutHelpers.SetHeight(account, 40)
-    account.Right:Set(page.Right)
-    LayoutHelpers.AtTopIn(account, page, 0)
-    account.Width:Set(Scale(300))
-    view.avatar = Theme.Avatar(account, '', 28)
-    view.avatar.Right:Set(account.Right)
-    LayoutHelpers.AtVerticalCenterIn(view.avatar, account)
-    view.who = Theme.Text(account, '', 14, C.text, true)
-    view.who.Right:Set(function() return view.avatar.Left() - Scale(10) end)
-    LayoutHelpers.AtTopIn(view.who, account, 3)
-    view.whoNote = Theme.Text(account, '', 11, C.muted)
-    view.whoNote.Right:Set(view.who.Right)
-    LayoutHelpers.AtTopIn(view.whoNote, account, 22)
-    -- A click on the account: the profiles (each player's options) to switch to, and FAF's profile manager.
-    local accountClick = Theme.HitArea(account, function(self, event)
-        if event.Type == 'ButtonPress' and event.Modifiers.Left then
-            Theme.ClickSound()
-            launcher:ProfileMenu(view.avatar)
-            return true
-        end
-        return false
-    end)
+    -- The account is in the launcher's top bar.
 
     local divider = Theme.Rect(page, C.line)
     divider.Left:Set(page.Left)
@@ -1383,7 +1360,6 @@ local function RefreshOnline(launcher)
         return
     end
     if view.unavailable then
-        Theme.SetText(view.who, 'Offline')
         return
     end
     local status = FafOnline_Status()
@@ -1399,8 +1375,6 @@ local function RefreshOnline(launcher)
     else
         Theme.SetVisible(view.games, signedIn)
     end
-    view.avatar:SetLogin(signedIn and status.login or '')
-    Theme.SetText(view.who, signedIn and status.login or 'Not signed in')
     if signedIn and status.login ~= '' and launcher.profileLogin ~= status.login then
         launcher.profileLogin = status.login
         local ok, why = pcall(ProfileForLogin, status.login)
@@ -1413,12 +1387,10 @@ local function RefreshOnline(launcher)
     if status.server == 'test' then
         lobbyText = string.gsub(lobbyText, 'FAF lobby', 'test server')
     end
-    Theme.SetText(view.whoNote, signedIn and lobbyText or 'Sign in to play online')
     for _, choice in view.serverChoices or {} do
         choice.selected = choice.server == (status.server or 'main')
         choice:Paint(false)
     end
-    Theme.SetColor(view.whoNote, status.lobby == 'failed' and C.bad or C.muted)
 
     if not signedIn then
         local haveCode = waiting and status.code ~= ''
@@ -2012,8 +1984,8 @@ function Launcher:Refresh()
     if self.status then
         self.status:Update()
     end
-    if self.rail and self.rail.Paint then
-        self.rail:Paint()
+    if self.topBar then
+        self.topBar:Update(self.lastStatus)
     end
 end
 
@@ -2197,6 +2169,7 @@ function Launcher:ShowHome()
     for name, page in self.pages do
         Theme.SetVisible(page, name == self.page)
     end
+    self:PlaceContent()
     -- Show on the body showed every piece a control keeps hidden (check marks, brackets): each paints itself again.
     Theme.RepaintAll()
     for _, item in self.navItems do
@@ -2457,6 +2430,22 @@ function Launcher:Exit()
         nil, nil, true, { worldCover = true, enterButton = 1, escapeButton = 2 })
 end
 
+--- Play's strip on Play's pages (custom games, LAN), the content under it; the full height under the bar elsewhere.
+function Launcher:PlaceContent()
+    local bar, strip, content = self.topBar, self.playStrip, self.content
+    if not bar or not strip or not content then
+        return
+    end
+    local play = kPlayPages[self.page or ''] and true or false
+    Theme.SetVisible(strip, play)
+    if play then
+        strip.tabs:Set(self.page, {})
+        content.Top:Set(function() return strip.Bottom() + Scale(14) end)
+    else
+        content.Top:Set(function() return bar.Bottom() + Scale(22) end)
+    end
+end
+
 function Launcher:ShowPage(name)
     -- The LAN page listens for games only while it shows.
     if self.page == 'lan' and name ~= 'lan' and self.lanView then
@@ -2467,12 +2456,181 @@ function Launcher:ShowPage(name)
     for pageName, page in self.pages do
         Theme.SetVisible(page, pageName == name)
     end
+    self:PlaceContent()
     -- The Show showed every piece the page keeps hidden (brackets of disabled buttons, tips, the hover card).
     Theme.RepaintAll()
     for _, item in self.navItems do
         item:Paint(false)
     end
     self:Refresh()
+end
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- The bar along the top: the game's name, one tab per part of the launcher (always there, in the same places), and
+-- the player's account with Exit at its right. Play's own modes are a strip under it on Play's pages.
+
+local kBarHeight = 64
+
+local function TopTab(launcher, bar, iconName, label, action, pages)
+    local item = Group(bar)
+    LayoutHelpers.SetHeight(item, kBarHeight)
+    item.Top:Set(bar.Top)
+    local back = Theme.Fill(item, C.clear)
+    back.Depth:Set(function() return item.Depth() end)
+    local icon = Theme.Icon(item, iconName, 18, C.muted)
+    LayoutHelpers.AtLeftIn(icon, item, 16)
+    LayoutHelpers.AtVerticalCenterIn(icon, item)
+    local text = Theme.Text(item, string.upper(label), 13, C.muted, true)
+    text.Left:Set(function() return icon.Right() + Scale(10) end)
+    LayoutHelpers.AtVerticalCenterIn(text, item)
+    item.Width:Set(function() return text.Right() - item.Left() + Scale(18) end)
+    local underline = Theme.Rect(item, C.accent)
+    underline.Left:Set(function() return item.Left() + Scale(10) end)
+    underline.Right:Set(function() return item.Right() - Scale(10) end)
+    underline.Bottom:Set(item.Bottom)
+    underline.Height:Set(Scale(3))
+    underline.Width:Set(function() return underline.Right() - underline.Left() end)
+    underline:DisableHitTest()
+    item.Paint = function(self, over)
+        local chosen = pages and pages[launcher.page or ''] or false
+        back:SetSolidColor(chosen and Theme.WithAlpha(C.accent, 0.08) or (over and C.raised or C.clear))
+        Theme.SetVisible(underline, chosen)
+        local color = chosen and C.accent or (over and C.text or C.muted)
+        Theme.SetColor(text, color)
+        icon:SetIcon(iconName, color)
+    end
+    Theme.HitArea(item, function(self, event)
+        if event.Type == 'MouseEnter' then
+            Theme.HoverSound()
+            item:Paint(true)
+        elseif event.Type == 'MouseExit' then
+            item:Paint(false)
+        elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
+            Theme.ClickSound()
+            action()
+            return true
+        end
+        return false
+    end)
+    Theme.Paintable(item)
+    item:Paint(false)
+    return item
+end
+
+local function BuildTopBar(launcher, body)
+    local bar = Theme.Rect(body, C.rail)
+    bar.Left:Set(body.Left)
+    bar.Right:Set(body.Right)
+    bar.Top:Set(body.Top)
+    bar.Height:Set(Scale(kBarHeight))
+    bar.Width:Set(function() return bar.Right() - bar.Left() end)
+    bar:DisableHitTest()
+    local line = Theme.Rect(body, C.line)
+    line.Left:Set(bar.Left)
+    line.Right:Set(bar.Right)
+    line.Top:Set(bar.Bottom)
+    line.Height:Set(1)
+    line.Width:Set(function() return line.Right() - line.Left() end)
+    line:DisableHitTest()
+
+    -- The game's name: the emblem, "Forged Alliance" in the title font, what this is under it.
+    local brand = Theme.Emblem(bar, 36, C.accent)
+    LayoutHelpers.AtLeftIn(brand, bar, 24)
+    LayoutHelpers.AtVerticalCenterIn(brand, bar)
+    local name = Theme.Title(bar, 'Forged Alliance', 13, C.text)
+    name.Left:Set(function() return brand.Right() + Scale(12) end)
+    name.Top:Set(function() return bar.Top() + Scale(16) end)
+    local versionOk, version = pcall(function() return import('/lua/version.lua').GetVersion() end)
+    local subtitle = Theme.Text(bar, 'Reconstructed Engine  -  ' .. (versionOk and tostring(version) or '?'), 11, C.subtle)
+    subtitle.Left:Set(name.Left)
+    subtitle.Top:Set(function() return name.Bottom() + Scale(4) end)
+
+    local entries = {
+        { 'play', 'Play', function() launcher:ShowPage('online') end, kPlayPages },
+        { 'chat', 'Chat', function() launcher:ShowPage('chat') end, { chat = true } },
+        { 'replays', 'Replays', function() launcher:Replays() end, { replays = true } },
+        { 'mods', 'Mods', function() launcher:Mods() end, { mods = true } },
+        { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true } },
+        { 'settings', 'Settings', function() launcher:Options() end, { options = true } },
+    }
+    launcher.navItems = {}
+    local before = nil
+    for _, entry in entries do
+        if entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status') then
+            local item = TopTab(launcher, bar, entry[1], entry[2], entry[3], entry[4])
+            local after = before
+            item.Left:Set(function()
+                return after and after.Right() or math.max(subtitle.Right(), name.Right()) + Scale(36)
+            end)
+            table.insert(launcher.navItems, item)
+            before = item
+        end
+    end
+
+    -- The account at the right: avatar, name and where the FAF connection stands; a click opens the account menu.
+    local exit = Theme.Button(bar, '', function() launcher:Exit() end, 'ghost', { icon = 'logout', width = 40 })
+    exit.Right:Set(function() return bar.Right() - Scale(16) end)
+    LayoutHelpers.AtVerticalCenterIn(exit, bar)
+    local account = Group(bar)
+    LayoutHelpers.SetHeight(account, 44)
+    account.Right:Set(function() return exit.Left() - Scale(14) end)
+    LayoutHelpers.AtVerticalCenterIn(account, bar)
+    account.Width:Set(Scale(260))
+    local avatar = Theme.Avatar(account, '', 32)
+    avatar.Right:Set(account.Right)
+    LayoutHelpers.AtVerticalCenterIn(avatar, account)
+    local who = Theme.Text(account, '', 14, C.text, true)
+    who.Right:Set(function() return avatar.Left() - Scale(10) end)
+    LayoutHelpers.AtTopIn(who, account, 4)
+    local note = Theme.Text(account, '', 11, C.muted)
+    note.Right:Set(who.Right)
+    LayoutHelpers.AtTopIn(note, account, 24)
+    Theme.HitArea(account, function(self, event)
+        if event.Type == 'ButtonPress' and event.Modifiers.Left then
+            Theme.ClickSound()
+            launcher:ProfileMenu(avatar)
+            return true
+        end
+        return false
+    end)
+    bar.Update = function(self, status)
+        local signedIn = status and status.signIn == 'signedin'
+        avatar:SetLogin(signedIn and status.login or '')
+        Theme.SetText(who, signedIn and status.login or 'Not signed in')
+        local lobby = status and (({ off = 'not connected', connecting = 'connecting', signedin = 'connected',
+            failed = 'lobby failed' })[status.lobby] or status.lobby) or ''
+        local server = status and status.server == 'test' and 'FAF test server' or 'FAF'
+        Theme.SetText(note, signedIn and (server .. ' ' .. lobby) or 'Sign in on Play')
+        Theme.SetColor(note, status and status.lobby == 'failed' and C.bad or C.muted)
+    end
+    bar.Update(bar, nil)
+
+    -- Play's modes: custom games (FAF's and our servers'), skirmish, campaign, LAN.
+    local strip = Group(body)
+    strip.Left:Set(function() return body.Left() + Scale(36) end)
+    strip.Right:Set(function() return body.Right() - Scale(36) end)
+    strip.Top:Set(function() return bar.Bottom() + Scale(10) end)
+    LayoutHelpers.SetHeight(strip, 40)
+    strip.Width:Set(function() return strip.Right() - strip.Left() end)
+    strip.tabs = Widgets.Tabs(strip, {
+        { 'online', 'Custom games' }, { 'skirmish', 'Skirmish' }, { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
+    }, function(key)
+        if key == 'skirmish' then
+            launcher:Skirmish()
+        elseif key == 'campaign' then
+            launcher:Campaign()
+        elseif key == 'lan' then
+            launcher:Lan()
+        else
+            launcher:ShowPage('online')
+        end
+    end)
+    strip.tabs.Left:Set(strip.Left)
+    strip.tabs.Top:Set(strip.Top)
+    strip.tabs.Right:Set(strip.Right)
+    launcher.playStrip = strip
+    bar.strip = strip
+    return bar
 end
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -2760,14 +2918,16 @@ local function Build(launcher)
     body.Depth:Set(function() return root.Depth() + 10 end)
     launcher.body = body
 
-    local rail = BuildRail(launcher, body)
-    launcher.rail = rail
+    local bar = BuildTopBar(launcher, body)
+    launcher.topBar = bar
     launcher.status = BuildStatusBar(launcher, body)
 
+    -- The pages, the full width under the bar (under Play's strip on Play's pages: Launcher:PlaceContent).
     local content = Group(body, 'launcher content')
-    content.Left:Set(function() return rail.Right() + Scale(28) end)
-    content.Right:Set(function() return body.Right() - Scale(28) end)
-    content.Top:Set(function() return body.Top() + Scale(22) end)
+    content.Left:Set(function() return body.Left() + Scale(36) end)
+    content.Right:Set(function() return body.Right() - Scale(36) end)
+    content.Top:Set(function() return bar.Bottom() + Scale(22) end)
+    launcher.content = content
     content.Bottom:Set(function() return body.Bottom() - Scale(kStatusHeight + 18) end)
 
     local onlinePage = Group(content, 'launcher online')
