@@ -104,13 +104,10 @@ function Get-InstallText([string]$a, [hashtable]$t) {
   )
   if ($a -eq 'x64') {
     $lines += @(
-      '  1. Create C:\ProgramData\FAForever\bin_x64 (it must be next to FAF''s bin folder:',
-      '     init_faf.lua finds fa_path.lua one folder up).',
-      '  2. Copy these from C:\ProgramData\FAForever\bin into bin_x64:',
-      '     init_faf.lua, SupComDataPath.lua, SupComDataPathFAF.lua, tahoma.ttf, tahomabd.ttf',
-      '     An /init file that is not in bin_x64 is read from bin, so featured-mod init files',
-      '     (init_nomads.lua, init_coop.lua, ...) that the client writes there need no copy.',
-      '  3. Unzip this package into bin_x64, keeping the fafengine folder as is.'
+      '  1. Unzip this package into C:\ProgramData\FAForever\bin_x64 (create the folder; it must',
+      '     be next to FAF''s bin folder), keeping the fafengine folder as is. Nothing needs copying:',
+      '     an /init file that is not in bin_x64 (init_faf.lua, init_coop.lua, ...) is read from bin,',
+      '     and the fonts come from Forged Alliance''s own folder.'
     )
   }
   else {
