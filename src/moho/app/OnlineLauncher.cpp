@@ -343,6 +343,19 @@ namespace
     FafAuth auth{GameEndpoints()};
     FafLobby lobby{GameLobbySettings()};
     FafChat chat{GameChatSettings()};
+    /// FAF's matchmaker queues as `matchmaker_info` gives them (ladder1v1, tmm2v2, ...), by name.
+    struct MatchQueue
+    {
+      std::string name;
+      int teamSize = 0;
+      int players = 0;                             ///< searching in it now
+      std::chrono::steady_clock::time_point popAt; ///< when the queue next makes matches
+    };
+    std::map<std::string, MatchQueue> queues;
+    std::set<std::string> searching;  ///< the queues this player searches in (`search_info`)
+    std::string matchmaking = "idle"; ///< idle, searching, found (a match is being made), cancelled
+    std::string matchedQueue;
+    bool askedQueues = false; ///< matchmaker_info asked for on this lobby connection
     bool lobbyStarted = false;
     /// A failed lobby connection is tried again at this time (unset: no try planned).
     std::chrono::steady_clock::time_point lobbyRetryAt{};
@@ -1253,6 +1266,102 @@ namespace
     return 2;
   }
 
+  /**
+   * table FafOnline_Queues(): FAF's matchmaker: state (idle, searching, found, cancelled), matched (the queue a match
+   * was found in), queues = {{name, teamSize, players, popIn (seconds), searching}, ...}.
+   */
+  int QueuesBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    lua_newtable(L);
+    SetField(L, "state", s.matchmaking);
+    SetField(L, "matched", s.matchedQueue);
+    lua_pushstring(L, "queues");
+    lua_newtable(L);
+    int index = 1;
+    const auto now = std::chrono::steady_clock::now();
+    for (const auto& [name, queue] : s.queues) {
+      lua_newtable(L);
+      SetField(L, "name", queue.name);
+      SetField(L, "teamSize", static_cast<double>(queue.teamSize));
+      SetField(L, "players", static_cast<double>(queue.players));
+      const double popIn = queue.popAt == std::chrono::steady_clock::time_point{}
+        ? 0.0
+        : std::max(0.0, std::chrono::duration<double>(queue.popAt - now).count());
+      SetField(L, "popIn", std::floor(popIn));
+      SetBool(L, "searching", s.searching.contains(name));
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /** ok, why = FafOnline_Search(queue, on): starts or stops searching for a match in a matchmaker queue. */
+  int SearchBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string queue = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    const bool on = lua_toboolean(L, 2) != 0;
+    std::expected<void, std::string> result;
+    if (queue.empty() || !s.queues.contains(queue)) {
+      result = std::unexpected(std::string("no such queue"));
+    } else if (s.lobby.GetState() != FafLobby::State::SignedIn) {
+      result = std::unexpected(std::string("not connected to FAF's lobby"));
+    } else if (on && s.match != MatchState::Idle && s.match != MatchState::Failed) {
+      result = std::unexpected(std::string("a game is under way"));
+    } else {
+      if (on && s.matchmaking == "cancelled") {
+        s.matchmaking = "idle";
+      }
+      result = s.lobby.Send(JsonObject(
+        {{"command", JsonString("game_matchmaking")},
+         {"queue_name", JsonString(queue)},
+         {"state", JsonString(on ? "start" : "stop")}}
+      ));
+      if (result) {
+        LogLine(("matchmaker: " + std::string(on ? "searching in " : "stopped searching in ") + queue).c_str());
+      }
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  /** ok, why = FafOnline_SetFactions({'uef', 'aeon', ...}): the factions the matchmaker may give this player. */
+  int SetFactionsBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    std::vector<JsonNode> factions;
+    if (lua_istable(L, 1)) {
+      for (int i = 1;; ++i) {
+        lua_rawgeti(L, 1, i);
+        if (!lua_isstring(L, -1)) {
+          lua_pop(L, 1);
+          break;
+        }
+        factions.push_back(JsonString(Lower(lua_tostring(L, -1))));
+        lua_pop(L, 1);
+      }
+    }
+    std::expected<void, std::string> result;
+    if (factions.empty()) {
+      result = std::unexpected(std::string("pick a faction at least"));
+    } else if (s.lobby.GetState() != FafLobby::State::SignedIn) {
+      result = std::unexpected(std::string("not connected to FAF's lobby"));
+    } else {
+      result = s.lobby.Send(
+        JsonObject({{"command", JsonString("set_party_factions")}, {"factions", JsonArray(std::move(factions))}})
+      );
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
   /** table FafOnline_Server(): the chosen server (name, title) and every server there is (servers = {{name, title}}).
    */
   int ServerBody(
@@ -1934,6 +2043,30 @@ namespace
       "<global>",
       "bool, string FafChat_Leave(channel) - leaves a channel."
     );
+    static CScrLuaBinder queues(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Queues",
+      &Binding<&QueuesBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Queues() - FAF's matchmaker queues and this player's search."
+    );
+    static CScrLuaBinder search(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Search",
+      &Binding<&SearchBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_Search(queue, on) - starts or stops searching in a matchmaker queue."
+    );
+    static CScrLuaBinder setFactions(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_SetFactions",
+      &Binding<&SetFactionsBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_SetFactions(list) - the factions the matchmaker may give this player."
+    );
     static CScrLuaBinder server(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_Server",
@@ -2086,6 +2219,15 @@ void moho::ONLINE_Frame()
     }
   } else if (s.lobby.GetState() == FafLobby::State::SignedIn) {
     s.lobbyFailures = 0;
+    if (!s.askedQueues) {
+      s.askedQueues = true;
+      (void)s.lobby.Send(JsonObject({{"command", JsonString("matchmaker_info")}}));
+    }
+  }
+  if (s.lobby.GetState() != FafLobby::State::SignedIn && s.askedQueues) {
+    s.askedQueues = false;
+    s.searching.clear();
+    s.matchmaking = "idle";
   }
   for (const JsonNode& message : s.lobby.TakeMessages()) {
     const std::string command = message.String("command");
@@ -2128,9 +2270,55 @@ void moho::ONLINE_Frame()
       LogLine(
         ("social: " + std::to_string(s.friends.size()) + " friends, " + std::to_string(s.foes.size()) + " foes").c_str()
       );
+    } else if (command == "matchmaker_info") {
+      // Every queue with how many search in it and when it next makes matches (lobby_ws.rs, Java MatchmakerInfo).
+      if (const JsonNode* const list = message.Get("queues"); list != nullptr && list->kind == JsonNode::Kind::Array) {
+        const auto now = std::chrono::steady_clock::now();
+        for (const JsonNode& queue : list->items) {
+          const std::string name = queue.String("queue_name");
+          if (name.empty()) {
+            continue;
+          }
+          Service::MatchQueue& kept = s.queues[name];
+          kept.name = name;
+          if (const JsonNode* const size = queue.Get("team_size"); size != nullptr) {
+            kept.teamSize = static_cast<int>(size->number);
+          }
+          if (const JsonNode* const players = queue.Get("num_players"); players != nullptr) {
+            kept.players = static_cast<int>(players->number);
+          }
+          if (const JsonNode* const pop = queue.Get("queue_pop_time_delta"); pop != nullptr) {
+            kept.popAt = now + std::chrono::milliseconds(static_cast<long long>(pop->number * 1000.0));
+          }
+        }
+      }
+    } else if (command == "search_info") {
+      const std::string name = message.String("queue_name");
+      if (message.String("state") == "start") {
+        s.searching.insert(name);
+      } else {
+        s.searching.erase(name);
+      }
+      // A late "stop" doesn't take back a match already found (lobby_ws.rs update_search).
+      if (s.matchmaking != "found") {
+        s.matchmaking = s.searching.empty() ? "idle" : "searching";
+      }
+    } else if (command == "match_found") {
+      s.matchmaking = "found";
+      s.matchedQueue = message.String("queue_name");
+      LogLine(("matchmaker: match found in " + s.matchedQueue).c_str());
+      // Ready at once, as FAF's clients answer; the game_launch that follows starts the match.
+      (void)s.lobby.Send(JsonObject({{"command", JsonString("match_ready")}}));
+    } else if (command == "match_cancelled") {
+      LogLine("matchmaker: the match was cancelled");
+      s.matchmaking = "cancelled";
+      s.searching.clear();
     } else if (command == "notice") {
       s.notice = message.String("text");
     } else if (command == "game_launch") {
+      // A matched game starts as any other; the search is over.
+      s.matchmaking = "idle";
+      s.searching.clear();
       BeginLaunch(s, message);
     }
   }

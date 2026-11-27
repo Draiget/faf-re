@@ -31,7 +31,7 @@ FeaturedMods = {
 local kRailWidth = 214
 local kStatusHeight = 28
 -- The pages under Play (the top bar's Play tab and its strip of modes).
-local kPlayPages = { online = true, lan = true }
+local kPlayPages = { online = true, matchmaking = true, lan = true }
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -1973,6 +1973,7 @@ function Launcher:Refresh()
     end
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
+        (self.page == 'matchmaking' and self.matchView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2613,9 +2614,12 @@ local function BuildTopBar(launcher, body)
     LayoutHelpers.SetHeight(strip, 40)
     strip.Width:Set(function() return strip.Right() - strip.Left() end)
     strip.tabs = Widgets.Tabs(strip, {
-        { 'online', 'Custom games' }, { 'skirmish', 'Skirmish' }, { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
+        { 'online', 'Custom games' }, { 'matchmaking', 'Matchmaking' }, { 'skirmish', 'Skirmish' },
+        { 'campaign', 'Campaign' }, { 'lan', 'LAN' },
     }, function(key)
-        if key == 'skirmish' then
+        if key == 'matchmaking' then
+            launcher:ShowPage('matchmaking')
+        elseif key == 'skirmish' then
             launcher:Skirmish()
         elseif key == 'campaign' then
             launcher:Campaign()
@@ -2963,6 +2967,23 @@ local function Build(launcher)
     launcher.pages.changelog = changelogPage
     import('/fafengine/modules/lua/ui/launcher/changelog.lua').Build(launcher, changelogPage)
     Theme.SetVisible(changelogPage, false)
+    -- Matchmaking: FAF's matchmaker queues (matchpage.lua), with the engine's FafOnline_Queues.
+    if rawget(_G, 'FafOnline_Queues') then
+        local matchPage = Group(content, 'launcher matchmaking')
+        LayoutHelpers.FillParent(matchPage, content)
+        matchPage.Width:Set(function() return matchPage.Right() - matchPage.Left() end)
+        matchPage.Height:Set(function() return matchPage.Bottom() - matchPage.Top() end)
+        local matchBuilt, matchWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/matchpage.lua').Build(launcher, matchPage)
+        end)
+        if matchBuilt then
+            launcher.pages.matchmaking = matchPage
+            Theme.SetVisible(matchPage, false)
+        else
+            WARN('LAUNCHER: the matchmaking page failed to build: ' .. tostring(matchWhy))
+            matchPage:Destroy()
+        end
+    end
     -- Chat: FAF's chat (chatpage.lua), with the engine's chat functions.
     if rawget(_G, 'FafChat_Status') then
         local chatPage = Group(content, 'launcher chat')
@@ -3213,6 +3234,28 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launchermatchtest: the Matchmaking page: the queues FAF's lobby lists, a search started and stopped.
+            if GetCommandLineArg('/launchermatchtest', 0) and current.matchView then
+                current:ShowPage('matchmaking')
+                Wait(3)
+                local queues = FafOnline_Queues().queues or {}
+                local names = {}
+                for _, queue in queues do
+                    table.insert(names, queue.name .. ' ' .. queue.players .. '/' .. queue.popIn .. 's')
+                end
+                Step('matchmaking: ' .. table.getn(queues) .. ' queues: ' .. table.concat(names, ', '))
+                local first = current.matchView.queues and current.matchView.queues[1]
+                if first then
+                    current.matchView:Toggle(first)
+                    Wait(3)
+                    current.matchView:Refresh()
+                    Step('matchmaking: after Search, state ' .. FafOnline_Queues().state)
+                    Wait(2)
+                    current.matchView:StopAll()
+                    Wait(3)
+                    Step('matchmaking: after Stop, state ' .. FafOnline_Queues().state)
+                end
+            end
             -- /launcherchattest: the Chat page: the chat started, a line said, a second channel joined.
             if GetCommandLineArg('/launcherchattest', 0) and current.chatView then
                 current:ShowPage('chat')
