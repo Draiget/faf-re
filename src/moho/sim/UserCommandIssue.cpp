@@ -11,9 +11,6 @@
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/PlannedFactoryProxy.h"
-#include "moho/entity/EntityCategoryReflection.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/RRuleGameRules.h"
 
 #include <algorithm>
 #include <array>
@@ -757,46 +754,32 @@ namespace moho
       return;
     }
 
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      auto& mgr = moho::PlannedFactoryManager::Get();
-      const auto selectedProxies = mgr.GetSelectedProxies();
-      if (!selectedProxies.empty()) {
-        if (
-          data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile ||
-          data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildFactory
-        ) {
-          if (!mgr.IsBufferingSuppressed() && data.mBlueprint != nullptr && !data.mBlueprint->mBlueprintId.empty()) {
-            const std::string bpId = data.mBlueprint->mBlueprintId.c_str();
-            mgr.QueuePlannedFactoryOrders(bpId, 1, clearQueue);
-          }
-        } else if (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
-          gpg::fastvector<UserUnit*> proxyUnits;
-          for (UserUnit* const u : units) {
-            if (mgr.IsPlannedProxyUnit(u)) {
-              proxyUnits.push_back(u);
-            }
-          }
-          if (!proxyUnits.empty()) {
-            ISSUE_FactoryCommand(proxyUnits, data, clearQueue);
-          }
-        }
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory is a client-only unit. Its part of the
+    // order waits on it for the real factory, and the rest of the selection gets the order without it.
+    if (PlannedFactoryManager::AnyPlannedProxyUnit(units)) {
+      gpg::fastvector<UserUnit*> proxyUnits{};
+      gpg::fastvector<UserUnit*> realUnits{};
+      for (UserUnit* const unit : units) {
+        (PlannedFactoryManager::IsPlannedProxyUnit(unit) ? proxyUnits : realUnits).push_back(unit);
       }
+      (void)PlannedFactoryManager::Get().OnProxyCommand(*session, proxyUnits, data, clearQueue);
+      if (!realUnits.empty()) {
+        ISSUE_Command(realUnits, data, clearQueue);
+      } else {
+        UI_OnCommandIssued(units, data, clearQueue);
+        session->DirtyCommandGraph();
+      }
+      return;
     }
 
-    gpg::fastvector<UserUnit*> realUnits;
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      auto& mgr = moho::PlannedFactoryManager::Get();
-      for (UserUnit* const u : units) {
-        if (!mgr.IsPlannedProxyUnit(u)) {
-          realUnits.push_back(u);
-        }
-      }
-    } else {
-      realUnits = units;
-    }
-
-    if (realUnits.empty()) {
-      return; // Zero Sim Stream: Do not dispatch network commands when no real units are selected
+    // Engine addition (`ui_FactoryPreOrders`): an order aimed at a planned factory. An assist goes to an
+    // engineer that will build it, a move to its spot; anything else has nothing to aim at.
+    if (
+      data.mTarget.mType == EAiTargetType::AITARGET_Entity &&
+      IsClientOnlyUnitId(static_cast<std::uint32_t>(data.mTarget.mEnt)) &&
+      !PlannedFactoryManager::Get().RetargetFromPlannedFactory(*session, data)
+    ) {
+      return;
     }
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
@@ -818,33 +801,6 @@ namespace moho
     // concrete, valid point that violates the focus army's no-rush constraints.
     bool shouldIssue = true;
     if (data.mTarget.mType != EAiTargetType::AITARGET_None) {
-      if (moho::IsFactoryPreOrdersEnabled() && data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
-        if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(data.mTarget.mEnt))) {
-          if (const UserUnit* asUnit = targetEntity->IsUserUnit()) {
-            if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
-              if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(asUnit)) {
-                const bool isMoveCommand =
-                  (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move ||
-                   data.mCommandType == EUnitCommandType::UNITCOMMAND_AggressiveMove ||
-                   data.mCommandType == EUnitCommandType::UNITCOMMAND_FormMove ||
-                   data.mCommandType == EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
-                if (
-                  !isMoveCommand && proxy->mBuilderEntityId != 0 &&
-                  session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr
-                ) {
-                  data.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
-                } else {
-                  data.mTarget.mType = EAiTargetType::AITARGET_Ground;
-                  data.mTarget.mPos = Wm3::Vector3f(proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z);
-                }
-              } else {
-                return;
-              }
-            }
-          }
-        }
-      }
-
       const float kInvalidLane = gpg::NaN;
       Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
 
@@ -889,7 +845,7 @@ namespace moho
       (data.mCommandType != EUnitCommandType::UNITCOMMAND_DetachFromTransport);
 
     gpg::fastvector<UserUnit*> simUnits{};
-    const gpg::fastvector<UserUnit*>* commandUnits = &realUnits;
+    const gpg::fastvector<UserUnit*>* commandUnits = &units;
 
     if (routePreOrders) {
       // Engine addition: If any units are currently attached to a transport (and not PODs/Carriers),
@@ -900,7 +856,7 @@ namespace moho
       static const fa::string kCarrierCategory("CARRIER");
       static const fa::string kPodCategory("POD");
 
-      for (UserUnit* const unit : realUnits) {
+      for (UserUnit* const unit : units) {
         if (unit == nullptr) {
           continue;
         }
@@ -1008,41 +964,22 @@ namespace moho
 
       if (clearQueue) {
         ResetUserUnitManagerState(unitManager, issueBeat);
-        if (moho::IsFactoryPreOrdersEnabled()) {
-          PlannedFactoryManager::Get().RemoveByBuilder(unit->mParams.mEntityId);
-        }
       }
       // The add's last argument is `data.mIndex` (`[esp+0x148]`, i.e. data+0x08
       // once LTCG's `units, clearQueue, data` stack order is accounted for),
       // not the clear flag; -1 appends.
-      const std::uint32_t cmdIndex = static_cast<std::uint32_t>(GetUserUnitManagerQueueSize(unitManager));
       UserUnitManagerAdd(unitManager, commandHelper, issueBeat, data.mIndex);
+    }
 
-      if (moho::IsFactoryPreOrdersEnabled()) {
-        if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
-          bool isFactory = false;
-          if (data.mBlueprint != nullptr) {
-            for (const auto& cat : data.mBlueprint->mCategories) {
-              if (cat == "FACTORY") {
-                isFactory = true;
-                break;
-              }
-            }
-            if (!isFactory && session != nullptr && session->mRules != nullptr) {
-              const EntityCategorySet* const factoryCat = session->mRules->GetEntityCategory("FACTORY");
-              if (factoryCat != nullptr && EntityCategory::HasBlueprint(data.mBlueprint, factoryCat)) {
-                isFactory = true;
-              }
-            }
-          }
-          if (isFactory) {
-            const Vector3f targetPos{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z};
-            PlannedFactoryManager::Get().RegisterOrUpdatePlannedFactory(
-              unit->mParams.mEntityId, cmdIndex, data.mBlueprint, targetPos
-            );
-          }
-        }
-      }
+    // Engine addition (`ui_FactoryPreOrders`): an engineer's factory order makes a planned factory.
+    if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && IsFactoryPreOrdersEnabled()) {
+      PlannedFactoryManager::Get().OnBuildOrderIssued(
+        *session,
+        *commandUnits,
+        static_cast<std::int32_t>(commandConstantData.cmd),
+        data.mBlueprint,
+        Vector3f{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z}
+      );
     }
 
     if (notifyUi) {

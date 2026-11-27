@@ -461,6 +461,11 @@ namespace
       if (!unit->IsSelectable()) {
         continue;
       }
+      // Engine addition (`ui_FactoryPreOrders`): only a click selects a planned factory, never a category
+      // (FAF's select-all and select-idle hotkeys would otherwise take it as an idle factory).
+      if (moho::PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
+        continue;
+      }
       const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);
       if (!ownedByFocusArmy && !(moho::UI_SelectAnything && session->IsCheatsEnabled)) {
         continue;
@@ -1284,22 +1289,6 @@ namespace moho
       return 0;
     }
 
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      if (
-        commandType == EUnitCommandType::UNITCOMMAND_BuildFactory ||
-        commandType == EUnitCommandType::UNITCOMMAND_BuildMobile
-      ) {
-        if (!blueprint->mBlueprintId.empty()) {
-          PlannedFactoryManager::Get().QueuePlannedFactoryOrders(
-            blueprint->mBlueprintId.c_str(), repeatCount, clearQueue
-          );
-        }
-      }
-    }
-
-    // Suppress redundant secondary buffering in ISSUE_Command during this issue batch
-    PlannedFactoryManager::ScopedBufferingSuppression suppressBuffering;
-
     // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):
     // forward each selected entity id to the sync-driver as an "add" info-pair.
     if (
@@ -1328,6 +1317,10 @@ namespace moho
     // `mBlueprint` -- the same offset the else branch writes at 0x00841F71
     // (`lea edx,[esp+0F0h]` then `mov [esp+140h], ebx`). Both branches agree.
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      PlannedFactoryManager::Get().QueueOrdersOnSelected(
+        *session, blueprint->mBlueprintId.c_str(), repeatCount, clearQueue
+      );
+
       SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
       factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
 
@@ -1339,7 +1332,8 @@ namespace moho
           selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead() &&
           selectedEntity->IsInCategory(factoryCategory)
         ) {
-          if (moho::IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(selectedUnit)) {
+          // Engine addition (`ui_FactoryPreOrders`): a planned factory keeps the order for the factory.
+          if (PlannedFactoryManager::IsPlannedProxyUnit(selectedUnit)) {
             continue;
           }
           WeakSet<UserEntity> oneUnit;

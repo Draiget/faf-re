@@ -1,6 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
 #include "moho/sim/PlannedFactoryProxy.h"
-
 #include <ranges>
 
 /**
@@ -1375,17 +1374,6 @@ namespace moho
       const StrategicIconAux& aux
     )
     {
-      if (icon.mUnit == nullptr || icon.mUnit->mVariableData.mIsDead != 0 || icon.mUnit->mMarkedForDeletion != 0) {
-        return;
-      }
-      if (IsFactoryPreOrdersEnabled()) {
-        if (const UserUnit* const asUnit = icon.mUnit->IsUserUnit()) {
-          if (PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
-            return;
-          }
-        }
-      }
-
       CD3DPrimBatcher& primBatcher = *aux.mBatcher;
       primBatcher.SetTexture(aux.mWhiteTexture);
 
@@ -2394,13 +2382,6 @@ namespace moho
           return;
         }
 
-        // Planned factory proxies skip lifebars and strategic icons:
-        if (
-          asUnit != nullptr && IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)
-        ) {
-          return;
-        }
-
         const REntityBlueprint* const blueprint = entity->mParams.mBlueprint;
         if (blueprint == nullptr || blueprint->mStrategicIconName.empty()) {
           return;
@@ -2676,6 +2657,10 @@ namespace moho
         if (entity == nullptr) {
           return;
         }
+        // Engine addition (`ui_FactoryPreOrders`): a planned factory has no icon or bars.
+        if (PlannedFactoryManager::IsPlannedProxyUnit(entity->IsUserUnit())) {
+          return;
+        }
         using Gpu = StrategicIconSourceRecord;
         std::uint32_t flags = Gpu::kValid;
         const auto map = [&](const StrategicIconSource::Flags from, const Gpu::Flags to) {
@@ -2754,15 +2739,12 @@ namespace moho
       )
       {
         UserEntity* const entity = source.mEntity;
-        if (entity == nullptr || entity->mVariableData.mIsDead != 0 || entity->mMarkedForDeletion != 0) {
+        if (entity == nullptr) {
           return;
         }
-        if (IsFactoryPreOrdersEnabled()) {
-          if (const UserUnit* const asUnit = entity->IsUserUnit()) {
-            if (PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
-              return;
-            }
-          }
+        // Engine addition (`ui_FactoryPreOrders`): a planned factory has no icon or bars.
+        if (PlannedFactoryManager::IsPlannedProxyUnit(entity->IsUserUnit())) {
+          return;
         }
 
         // `GetInterpolatedTransform`'s position, from the endpoints the record holds.
@@ -3603,20 +3585,9 @@ namespace moho
     (void)primBatcher->Setup("TLifeBar");
 
     for (UnitIconData& lifebarIcon : aux.mLifebarIcons) {
-      if (
-        lifebarIcon.mUnit == nullptr || lifebarIcon.mUnit->mVariableData.mIsDead != 0 ||
-        lifebarIcon.mUnit->mMarkedForDeletion != 0
-      ) {
+      if (lifebarIcon.mUnit != nullptr && PlannedFactoryManager::IsPlannedProxyUnit(lifebarIcon.mUnit->IsUserUnit())) {
         continue;
       }
-      if (IsFactoryPreOrdersEnabled()) {
-        if (const UserUnit* const asUnit = lifebarIcon.mUnit->IsUserUnit()) {
-          if (PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
-            continue;
-          }
-        }
-      }
-
       // The bar pass always writes both components before returning, on every
       // path; it is the label pass that may decline.
       Wm3::Vector2f labelCursor{};

@@ -416,9 +416,9 @@ namespace moho
    */
   CWldSession::~CWldSession()
   {
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      moho::PlannedFactoryManager::Get().ClearAll();
-    }
+    // Engine addition (`ui_FactoryPreOrders`): the planned factories' units are in this session's entity
+    // map, which deletes them below.
+    moho::PlannedFactoryManager::Get().ForgetAll();
 
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
 
@@ -1553,6 +1553,8 @@ namespace moho
       mState
     );
     SetSelection(WeakSet<UserEntity>());
+    // Engine addition (`ui_FactoryPreOrders`): every entity goes below, planned factories' units with them.
+    PlannedFactoryManager::Get().ForgetAll();
     USER_GetSound()->StopAllSounds();
     USER_GetSound()->SetListenerArmy(nullptr);
     sWorldParticles.ClearRenderBuckets();
@@ -1694,6 +1696,9 @@ namespace moho
     }
 
     TickBeatUnits(beat);
+
+    // Engine addition (`ui_FactoryPreOrders`): after the units' ticks noted the new ones.
+    PlannedFactoryManager::Get().Update(*this);
 
     UpdateOrphansAndVisibility();
 #if FAF_SERVER_MODE
@@ -2276,16 +2281,6 @@ namespace moho
     // erase 0x007AF740, `_Copy` 0x00867B20), then the live count at +0x4AC.
     mSelection = selection;
     mSelectionSize = static_cast<std::uint32_t>(mSelection.Size());
-
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      auto& pfm = moho::PlannedFactoryManager::Get();
-      for (const auto& proxy : pfm.GetAllProxies()) {
-        if (proxy) {
-          const bool isSelected = proxy->mUserUnit != nullptr && mSelection.Find(proxy->mUserUnit) != mSelection.end();
-          proxy->SetSelected(isSelected);
-        }
-      }
-    }
 
     if (selectionChanged) {
       if (ISTIDriver* const activeDriver = sSimDriver.get(); activeDriver != nullptr) {

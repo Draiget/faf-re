@@ -1382,67 +1382,26 @@ namespace moho
   {
     CWldSession* const session = WLD_GetActiveSession();
 
-    if (IsFactoryPreOrdersEnabled()) {
-      auto& pfm = PlannedFactoryManager::Get();
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory keeps its rally order for the real
+    // factory; the rest of the selection gets the order without it.
+    if (session != nullptr && PlannedFactoryManager::AnyPlannedProxyUnit(units)) {
+      gpg::fastvector<UserUnit*> proxyUnits{};
+      gpg::fastvector<UserUnit*> realUnits{};
       for (UserUnit* const unit : units) {
-        if (unit != nullptr && pfm.IsPlannedProxyUnit(unit)) {
-          if (auto* proxy = pfm.FindByUserUnit(unit)) {
-            RallyPointOrder rallyOrder{};
-            rallyOrder.commandType = commandIssueData.mCommandType;
-            rallyOrder.targetType = commandIssueData.mTarget.mType;
-            rallyOrder.targetEntityId = commandIssueData.mTarget.mEnt;
-            if (commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity) {
-              if (session != nullptr) {
-                if (
-                  UserEntity* const targetEntity =
-                    session->LookupEntityId(static_cast<EntId>(commandIssueData.mTarget.mEnt))
-                ) {
-                  rallyOrder.position = Vector3f{
-                    targetEntity->mVariableData.mCurTransform.pos_.x,
-                    targetEntity->mVariableData.mCurTransform.pos_.y,
-                    targetEntity->mVariableData.mCurTransform.pos_.z
-                  };
-                }
-              }
-            } else {
-              rallyOrder.position = Vector3f{
-                commandIssueData.mTarget.mPos.x, commandIssueData.mTarget.mPos.y, commandIssueData.mTarget.mPos.z
-              };
-            }
-            proxy->AddRallyOrder(rallyOrder, clearQueue);
-            gpg::Logf(
-              "[PlannedFactory] Recorded rally point (%.1f, %.1f, %.1f) for proxy %u (clear=%d)",
-              rallyOrder.position.x,
-              rallyOrder.position.y,
-              rallyOrder.position.z,
-              proxy->mProxyId,
-              clearQueue ? 1 : 0
-            );
-          }
-        }
+        (PlannedFactoryManager::IsPlannedProxyUnit(unit) ? proxyUnits : realUnits).push_back(unit);
       }
-    }
-
-    gpg::fastvector<UserUnit*> realUnits;
-    if (IsFactoryPreOrdersEnabled()) {
-      auto& pfm = PlannedFactoryManager::Get();
-      for (UserUnit* const unit : units) {
-        if (unit != nullptr && !pfm.IsPlannedProxyUnit(unit)) {
-          realUnits.push_back(unit);
-        }
+      PlannedFactoryManager::Get().OnProxyFactoryCommand(*session, proxyUnits, commandIssueData, clearQueue);
+      if (!realUnits.empty()) {
+        ISSUE_FactoryCommand(realUnits, commandIssueData, clearQueue);
+      } else {
+        UI_OnCommandIssued(units, commandIssueData, clearQueue);
+        session->DirtyCommandGraph();
       }
-    } else {
-      realUnits = units;
-    }
-
-    if (session == nullptr || session->mCommandManager == nullptr) {
       return;
     }
 
     CommandManager* const commandManager = session->mCommandManager;
-    STIMap* const playableMap = (session->mWldMap != nullptr && session->mWldMap->mTerrainRes != nullptr)
-      ? session->mWldMap->mTerrainRes->mMap
-      : nullptr;
+    STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     std::uint32_t packedCommandId = 0u;
     commandIssueData.nextCommandId =
@@ -1490,45 +1449,23 @@ namespace moho
       }
     }
 
-    CmdId issueBeat = 0;
-    if (!realUnits.empty()) {
-      BVSet<EntId, EntIdUniverse> issuedEntitySet{};
-      func_DecodeEntIdSet(issuedEntitySet, realUnits);
-      issueBeat = sSimDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
-    } else {
-      issueBeat = static_cast<CmdId>(session->mGameTick);
-    }
+    BVSet<EntId, EntIdUniverse> issuedEntitySet{};
+    func_DecodeEntIdSet(issuedEntitySet, units);
+    // The returned execution beat expires local edits and retires the helper;
+    // the packed command id remains in the published descriptor.
+    const CmdId issueBeat = sSimDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
 
     SSTICommandConstantData commandConstantData{};
     InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &commandIssueData);
 
-    const std::uint8_t deleteWhenDue = realUnits.empty() ? 0u : 1u;
     UserCommandIssueHelper* const commandHelper =
-      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, deleteWhenDue, issueBeat);
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, issueBeat);
     commandHelper->mVariableData = SSTICommandVariableData(commandIssueData);
     commandHelper->mVariableDataDirty = 1u;
-    if (realUnits.empty()) {
-      commandHelper->mDeleteWhenDue = 0u;
-    }
 
     for (UserUnit* const unit : units) {
       UserCommandQueue* const factoryQueue = unit->GetFactoryCommandQueue();
       if (factoryQueue == nullptr) {
-        continue;
-      }
-
-      if (IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(unit)) {
-        if (clearQueue) {
-          for (const auto& link : factoryQueue->primaryLinks) {
-            if (UserCommandIssueHelper* const oldHelper = link.GetObjectPtr()) {
-              delete oldHelper;
-            }
-          }
-          factoryQueue->primaryLinks.clear();
-          factoryQueue->issueQueue.clear();
-        }
-        factoryQueue->primaryLinks.push_back(WeakPtr<UserCommandIssueHelper>(commandHelper));
-        factoryQueue->resolvedLinksDirty = 1u;
         continue;
       }
 
@@ -3245,30 +3182,14 @@ namespace moho
 
         if (!resolvedByUi) {
           mode.mMode = DefaultModeFromDrag(mouseInfo->mIsDragger);
-          if (moho::IsFactoryPreOrdersEnabled() && mode.mMode == COMMOD_Reclaim) {
-            auto& pfm = moho::PlannedFactoryManager::Get();
-            const Vector3f cursorWorldPos{
-              mouseInfo->mMouseWorldPos.x, mouseInfo->mMouseWorldPos.y, mouseInfo->mMouseWorldPos.z
-            };
-            for (const auto& proxy : pfm.GetAllProxies()) {
-              if (!proxy)
-                continue;
-              float halfX = 4.0f;
-              float halfZ = 4.0f;
-              if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
-                if (rbp->Physics.SkirtSizeX > 0.0f)
-                  halfX = rbp->Physics.SkirtSizeX * 0.5f;
-                if (rbp->Physics.SkirtSizeZ > 0.0f)
-                  halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
-              }
-              if (
-                std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
-                std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ
-              ) {
-                mode.mMode = COMMOD_Move;
-                break;
-              }
-            }
+          // Engine addition (`ui_FactoryPreOrders`): a planned factory is nothing to reclaim.
+          if (
+            mode.mMode == COMMOD_Reclaim && moho::IsFactoryPreOrdersEnabled() &&
+            moho::PlannedFactoryManager::Get().FindByFootprint(
+              Vector3f{mouseInfo->mMouseWorldPos.x, mouseInfo->mMouseWorldPos.y, mouseInfo->mMouseWorldPos.z}
+            ) != nullptr
+          ) {
+            mode.mMode = COMMOD_Move;
           }
         }
       }
@@ -3354,24 +3275,20 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   }
 
   UserEntity* hoverEntity = mouseInfo->HoveredEntity();
-  if (hoverEntity != nullptr && IsFactoryPreOrdersEnabled()) {
-    if (const UserUnit* const u = hoverEntity->IsUserUnit()) {
-      if (PlannedFactoryManager::Get().IsPlannedProxyUnit(u)) {
-        if (const auto* proxy = PlannedFactoryManager::Get().FindByUserUnit(u)) {
-          const bool canAssist = (selectionCommandCaps & RULEUCC_Repair) != 0;
-          if (
-            canAssist && proxy->mBuilderEntityId != 0 &&
-            wldSession->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr
-          ) {
-            hoverEntity = wldSession->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId));
-          } else {
-            hoverEntity = nullptr;
-          }
-        } else {
-          hoverEntity = nullptr;
+  // Engine addition (`ui_FactoryPreOrders`): hovering a planned factory, units that can assist get an
+  // engineer that will build it as their target, and the rest get the ground under it.
+  if (hoverEntity != nullptr && PlannedFactoryManager::IsPlannedProxyUnit(hoverEntity->IsUserUnit())) {
+    const PlannedUnitProxy* const proxy = PlannedFactoryManager::Get().FindByUserUnit(hoverEntity->IsUserUnit());
+    UserEntity* builder = nullptr;
+    if (proxy != nullptr && (selectionCommandCaps & RULEUCC_Repair) != 0) {
+      for (const PlannedUnitProxy::Builder& entry : proxy->mBuilders) {
+        builder = wldSession->LookupEntityId(static_cast<EntId>(entry.builderId));
+        if (builder != nullptr) {
+          break;
         }
       }
     }
+    hoverEntity = builder;
   }
 
   if (hoverEntity == nullptr) {

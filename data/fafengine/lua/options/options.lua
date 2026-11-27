@@ -192,6 +192,61 @@ do
     end
 end
 
+-- Planned factory pre-orders (ui_FactoryPreOrders): off unless the player turns it on.
+do
+    local command = 'ui_FactoryPreOrders'
+    local function Supported()
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local gameplay = options and options.gameplay
+    if Supported() and gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'factory_preorders') then
+        local entry = {
+            title = "Planned Factory Pre-orders",
+            key = 'factory_preorders',
+            type = 'toggle',
+            default = 0,
+            tip = "Select a factory an engineer is ordered to build before it is started, and give it build orders, "
+                .. "a rally point and repeat. They are sent to the factory when its construction starts.",
+            set = function(key, value, startup)
+                -- A missing or malformed preference takes the default (off).
+                if value ~= 1 then
+                    value = 0
+                end
+                ConExecute("ui_FactoryPreOrders " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = "<LOC _On>", key = 1 },
+                    { text = "<LOC _Off>", key = 0 },
+                },
+            },
+        }
+
+        local position = table.getn(gameplay.items) + 1
+        for index, item in ipairs(gameplay.items) do
+            if item.key == 'transport_preorders' or item.key == 'assist_to_upgrade' then
+                position = index + 1
+                break
+            end
+        end
+        table.insert(gameplay.items, position, entry)
+    end
+end
+
 -- Queue editing from the game view (ui_QueueReorder, ui_QueueTakeFirstKeepsRest): client-only,
 -- sent as ordinary orders. Older executables have neither command, so neither option is shown.
 do

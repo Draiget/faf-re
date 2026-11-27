@@ -3,6 +3,7 @@
 #include "moho/unit/core/UserUnit.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include <utility>
 
 #if FAFRE_PLATFORM_POSIX
@@ -2994,6 +2995,20 @@ void moho::CUIWorldView::UpdateSelection(
   // from the pieces with a real, traceable source instead: hit validity and
   // world position from the fresh raycast, and hover unit from the resolved
   // selection.
+  // Engine addition (`ui_FactoryPreOrders`): a planned factory has no mesh for the pick above. With nothing
+  // else under the cursor, the planned factory whose footprint holds the cursor's ground point is hovered,
+  // so clicks, orders and the right-click action see it the way they see a unit.
+  if (bestCandidate == nullptr && hit.mHitValid != 0 && !mIsMiniMap && IsFactoryPreOrdersEnabled()) {
+    if (
+      const PlannedUnitProxy* const planned = PlannedFactoryManager::Get().FindByFootprint(
+        Vector3f{hit.mMouseWorldPos.x, hit.mMouseWorldPos.y, hit.mMouseWorldPos.z}
+      );
+      planned != nullptr
+    ) {
+      bestCandidate = planned->mUserUnit;
+    }
+  }
+
   MouseInfo resultCursor;
   resultCursor.mHitValid = hit.mHitValid;
   resultCursor.mMouseWorldPos = hit.mMouseWorldPos;

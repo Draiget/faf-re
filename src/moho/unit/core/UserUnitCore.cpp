@@ -1,6 +1,5 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 #include "moho/command/SSTICommandIssueData.h"
-#include "moho/console/CConCommand.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/sim/PlannedFactoryProxy.h"
 
@@ -784,7 +783,7 @@ UserUnit::UserUnit(
   , mQueueEmptyCached(false)
   , mIsEngineer(false)
   , mIsFactory(false)
-  , mPreOrdersDispatched(false)
+  , mPlannedFactoryChecked(false)
 {
   mManager = new UserCommandQueue(this);
 
@@ -796,15 +795,6 @@ UserUnit::UserUnit(
     // the idle-factory registry; mobile factories are handled as engineers.
     if (IsInCategory(fa::string("STRUCTURE", 9u))) {
       mIsFactory = true;
-    }
-  }
-
-  if (
-    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
-    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
-  ) {
-    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
-      mPreOrdersDispatched = true;
     }
   }
 
@@ -877,12 +867,6 @@ UserUnit::~UserUnit()
         }
       }
     }
-  }
-
-  if (
-    moho::IsFactoryPreOrdersEnabled() && mIsEngineer && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
-  ) {
-    moho::PlannedFactoryManager::Get().RemoveByBuilder(mParams.mEntityId);
   }
 
   mSelectionSets.clear();
@@ -1456,14 +1440,6 @@ bool UserUnit::UnitDataUpdateRunsLua(
 
 void UserUnit::FinishUnitDataLinks()
 {
-  if (
-    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
-    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
-  ) {
-    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
-      mPreOrdersDispatched = true;
-    }
-  }
   const EntId replicatedCreator = mUnitVarDat.mCreator;
   if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
     // 0x008C0823: the sentinel id means "no creator"; drop whatever we held.
@@ -1744,13 +1720,11 @@ void UserUnit::Tick(
     AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
   }
 
-  if (
-    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
-    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
-  ) {
-    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
-      mPreOrdersDispatched = true;
-    }
+  // Engine addition (`ui_FactoryPreOrders`): a unit's first beat, when its blueprint and position are in,
+  // tells the planned factories it exists; one of them may be what it is.
+  if (!mPlannedFactoryChecked) {
+    mPlannedFactoryChecked = true;
+    PlannedFactoryManager::Get().NoteNewUnit(*this);
   }
 
   if (IsBeingBuilt()) {
@@ -1887,15 +1861,6 @@ void UserUnit::UpdateEntityData(
     ClearSelectionBracketPositionOverride();
     if (HasTransportPreOrders()) {
       DispatchDisembarkedPreOrders();
-    }
-  }
-
-  if (
-    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
-    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
-  ) {
-    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
-      mPreOrdersDispatched = true;
     }
   }
 }

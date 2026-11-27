@@ -541,7 +541,52 @@ namespace
   {
     return digest.vals[0] == 0 && digest.vals[1] == 0 && digest.vals[2] == 0 && digest.vals[3] == 0;
   }
+
+  /**
+   * Engine addition: client-only unit ids (`IsClientOnlyUnitId`: the planned factories of
+   * `ui_FactoryPreOrders`) never reach the command stream. Every other client plays the same stream, retail
+   * ones included, and none of them knows these units. Each function below is the last stop before the
+   * marshaller; a sim unit's id never matches, so for them nothing changes.
+   */
+  [[nodiscard]] bool IsClientOnlyTarget(
+    const moho::SSTITarget& target
+  ) noexcept
+  {
+    return target.mType == moho::EAiTargetType::AITARGET_Entity &&
+      moho::IsClientOnlyUnitId(static_cast<std::uint32_t>(target.mEnt));
+  }
 } // namespace
+
+namespace moho
+{
+  const BVSet<EntId, EntIdUniverse>& WithoutClientOnlyUnits(
+    const BVSet<EntId, EntIdUniverse>& entities,
+    BVSet<EntId, EntIdUniverse>& storage
+  )
+  {
+    const auto isClientOnly = [](const moho::EntId id) {
+      return moho::IsClientOnlyUnitId(static_cast<std::uint32_t>(id));
+    };
+    bool any = false;
+    for (const moho::EntId id : entities) {
+      if (isClientOnly(id)) {
+        any = true;
+        break;
+      }
+    }
+    if (!any) {
+      return entities;
+    }
+
+    storage = entities;
+    for (const moho::EntId id : entities) {
+      if (isClientOnly(id)) {
+        (void)storage.Bits().Remove(static_cast<unsigned int>(id));
+      }
+    }
+    return storage;
+  }
+} // namespace moho
 
 /**
  * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
@@ -2043,6 +2088,9 @@ CmdId CSimDriver::DestroyEntity(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return mNextIssueBeat;
+  }
   mMarshaller->DestroyEntity(entityId);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
@@ -2058,6 +2106,9 @@ CmdId CSimDriver::WarpEntity(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return mNextIssueBeat;
+  }
   mMarshaller->WarpEntity(entityId, transform);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
@@ -2074,6 +2125,9 @@ CmdId CSimDriver::ProcessInfoPair(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return mNextIssueBeat;
+  }
   mMarshaller->ProcessInfoPair(entityId, key, val);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
@@ -2090,7 +2144,11 @@ CmdId CSimDriver::IssueCommand(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
-  mMarshaller->IssueCommand(entities, data, clear);
+  if (IsClientOnlyTarget(data.mTarget) || IsClientOnlyTarget(data.mTarget2)) {
+    return mNextIssueBeat;
+  }
+  BVSet<EntId, EntIdUniverse> filtered{};
+  mMarshaller->IssueCommand(WithoutClientOnlyUnits(entities, filtered), data, clear);
   return mNextIssueBeat;
 }
 
@@ -2105,7 +2163,11 @@ CmdId CSimDriver::IssueFactoryCommand(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
-  mMarshaller->IssueFactoryCommand(entities, data, clear);
+  if (IsClientOnlyTarget(data.mTarget) || IsClientOnlyTarget(data.mTarget2)) {
+    return mNextIssueBeat;
+  }
+  BVSet<EntId, EntIdUniverse> filtered{};
+  mMarshaller->IssueFactoryCommand(WithoutClientOnlyUnits(entities, filtered), data, clear);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
 }
@@ -2151,6 +2213,9 @@ CmdId CSimDriver::SetCommandTarget(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
+  if (IsClientOnlyTarget(target)) {
+    return mNextIssueBeat;
+  }
   mMarshaller->SetCommandTarget(id, target);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
@@ -2197,6 +2262,9 @@ CmdId CSimDriver::RemoveCommandFromUnitQueue(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(unitId))) {
+    return mNextIssueBeat;
+  }
   mMarshaller->RemoveCommandFromUnitQueue(id, unitId);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
@@ -2228,7 +2296,8 @@ CmdId CSimDriver::LuaSimCallback(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
-  mMarshaller->LuaSimCallback(fnName, args, entities);
+  BVSet<EntId, EntIdUniverse> filtered{};
+  mMarshaller->LuaSimCallback(fnName, args, WithoutClientOnlyUnits(entities, filtered));
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
 }
@@ -2245,7 +2314,8 @@ CmdId CSimDriver::ExecuteDebugCommand(
 )
 {
   fa::mutex::scoped_lock lock(mLock);
-  mMarshaller->ExecuteDebugCommand(command, worldPos, focusArmy, entities);
+  BVSet<EntId, EntIdUniverse> filtered{};
+  mMarshaller->ExecuteDebugCommand(command, worldPos, focusArmy, WithoutClientOnlyUnits(entities, filtered));
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
 }
