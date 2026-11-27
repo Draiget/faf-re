@@ -1400,6 +1400,16 @@ namespace moho
       return;
     }
 
+    // Engine addition (`ui_FactoryPreOrders`): a factory's rally aimed at a planned factory goes to its spot
+    // (an assist goes to an engineer that builds it); anything else has nothing to aim at.
+    if (
+      session != nullptr && commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity &&
+      IsClientOnlyUnitId(static_cast<std::uint32_t>(commandIssueData.mTarget.mEnt)) &&
+      !PlannedFactoryManager::Get().RetargetFromPlannedFactory(*session, commandIssueData)
+    ) {
+      return;
+    }
+
     CommandManager* const commandManager = session->mCommandManager;
     STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
 

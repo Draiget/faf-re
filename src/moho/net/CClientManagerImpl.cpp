@@ -754,10 +754,11 @@ void CMarshaller::ExecuteLuaInSim(
 namespace
 {
   /**
-   * Engine addition (ClientOnlyIds.h): whether a sim callback's arguments name a client-only unit. FAF's UI
-   * passes a unit as the string `unit:GetEntityId()` returns (CopyOrders, DistributeOrders, the capping
-   * hotkeys take the hovered unit), so a string of digits is read as an id; nested tables are looked into a
-   * few levels deep.
+   * Engine addition (ClientOnlyIds.h): whether a sim callback's arguments name a client-only unit alive now.
+   * FAF's UI passes a unit as the string `unit:GetEntityId()` returns (CopyOrders, DistributeOrders, the
+   * capping hotkeys take the hovered unit), so a string of digits that is such a unit's id counts, as a value
+   * or as a key; nested tables are looked into a few levels deep. Only live ones match, so another number
+   * that happens to fall in the range keeps its callback.
    */
   [[nodiscard]] bool LuaArgsNameClientOnlyUnit(
     const LuaPlus::LuaObject& value,
@@ -776,11 +777,11 @@ namespace
         }
         id = (id * 10u) + static_cast<std::uint64_t>(*c - '0');
       }
-      return id <= 0xFFFFFFFFull && IsClientOnlyUnitId(static_cast<std::uint32_t>(id));
+      return id <= 0xFFFFFFFFull && IsLiveClientOnlyUnit(static_cast<std::uint32_t>(id));
     }
     if (value.IsTable() && depth < 4) {
       for (LuaPlus::LuaTableIterator it(value, 1); !it.m_isDone; it.Next()) {
-        if (LuaArgsNameClientOnlyUnit(it.m_valueObj, depth + 1)) {
+        if (LuaArgsNameClientOnlyUnit(it.m_keyObj, depth + 1) || LuaArgsNameClientOnlyUnit(it.m_valueObj, depth + 1)) {
           return true;
         }
       }

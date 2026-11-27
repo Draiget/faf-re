@@ -506,11 +506,14 @@ namespace moho
     // driver call below is dropped before the stream (ClientOnlyIds.h), the local event still moves the line.
     if (IsClientOnlyCommand(static_cast<std::int32_t>(helper->mConstantData.cmd))) {
       const Wm3::Vector3<float> position = ResolvePositionFromTarget(target);
+      const SSTITarget newTarget = ConvertUserCommandTargetToSSTITarget(target);
       PlannedFactoryManager::Get().OnRallyHelperRetargeted(
-        static_cast<std::int32_t>(helper->mConstantData.cmd),
-        ConvertUserCommandTargetToSSTITarget(target),
-        Vector3f{position.x, position.y, position.z}
+        static_cast<std::int32_t>(helper->mConstantData.cmd), newTarget, Vector3f{position.x, position.y, position.z}
       );
+      // The line is drawn from the helper's data. No sim answer comes to settle it, so it is set here, and
+      // the local event below finds it already there.
+      helper->mVariableData.mTarget1 = newTarget;
+      helper->mVariableDataDirty = 1u;
     }
 
     CmdId resultCookie = helper->mConstantData.cmd;

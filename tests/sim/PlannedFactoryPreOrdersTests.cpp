@@ -166,6 +166,25 @@ TEST(
 
 TEST(
   PlannedFactoryIds,
+  OnlyLiveClientOnlyUnitsCountInLuaArguments
+)
+{
+  // A Lua argument is a number of any meaning; only the id of a planned factory alive now drops a callback.
+  const std::uint32_t planned = moho::MakePlannedProxyUnitId(0, 4);
+  EXPECT_FALSE(moho::IsLiveClientOnlyUnit(planned)) << "in the range, but no such planned factory";
+  moho::RegisterClientOnlyUnit(planned);
+  EXPECT_TRUE(moho::IsLiveClientOnlyUnit(planned));
+  EXPECT_FALSE(moho::IsLiveClientOnlyUnit(moho::MakeEntityId(moho::EEntityIdFamily::Unit, 0, 4)));
+  moho::RegisterClientOnlyUnit(moho::MakeEntityId(moho::EEntityIdFamily::Unit, 0, 4));
+  EXPECT_FALSE(moho::IsLiveClientOnlyUnit(moho::MakeEntityId(moho::EEntityIdFamily::Unit, 0, 4)))
+    << "a sim id is never client-only, registered or not";
+  moho::ReleaseClientOnlyUnit(planned);
+  moho::ReleaseClientOnlyUnit(moho::MakeEntityId(moho::EEntityIdFamily::Unit, 0, 4));
+  EXPECT_FALSE(moho::IsLiveClientOnlyUnit(planned));
+}
+
+TEST(
+  PlannedFactoryIds,
   ClientOnlyTargets
 )
 {

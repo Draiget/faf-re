@@ -195,6 +195,7 @@ namespace moho
       unit->mSpatialDbEntry.UpdateBounds(bounds);
 
       session.AddEntity(unit);
+      RegisterClientOnlyUnit(static_cast<std::uint32_t>(createParams.mEntityId));
       return unit;
     }
 
@@ -411,6 +412,9 @@ namespace moho
   {
     for (const auto& proxy : mProxies) {
       DeleteRallyHelpers(nullptr, *proxy);
+      if (proxy->mUserUnit != nullptr) {
+        ReleaseClientOnlyUnit(static_cast<std::uint32_t>(proxy->mUserUnit->mParams.mEntityId));
+      }
     }
     mProxies.clear();
     mNewUnitIds.clear();
@@ -804,6 +808,7 @@ namespace moho
   {
     DeleteRallyHelpers(&session, *proxy);
     if (UserUnit* const unit = proxy->mUserUnit; unit != nullptr) {
+      ReleaseClientOnlyUnit(static_cast<std::uint32_t>(unit->mParams.mEntityId));
       ReplaceInSelection(session, unit, replacement);
       if (replacement != nullptr) {
         // Control groups the planned factory was put in carry over to the factory.
@@ -839,9 +844,10 @@ namespace moho
         dropped.push_back(Take(mProxies.size() - 1));
       }
     } else {
-      // 1. A plan made for another army than the focus one (the focus changed) goes.
+      // 1. A plan made for another army than the focus one (the focus changed) goes, as does one without a
+      //    unit (its army is unknown; in a game every plan has one).
       for (std::size_t index = mProxies.size(); index-- > 0;) {
-        if (mProxies[index]->mUserUnit != nullptr && mProxies[index]->mUserUnit->mArmy != focusArmy) {
+        if (mProxies[index]->mUserUnit == nullptr || mProxies[index]->mUserUnit->mArmy != focusArmy) {
           dropped.push_back(Take(index));
         }
       }
