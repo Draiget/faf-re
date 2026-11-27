@@ -292,8 +292,9 @@ function Run(preview)
         if since == 3 or since == 6 then
             MoveCamera()
         end
-        -- The commander warps in a moment after the start: taken off again.
-        if since < 15 then
+        -- The commander warps in after the start (off the camera, at its start position): taken off once its warp-in
+        -- thread is done with it, as that thread errors on a commander destroyed under it.
+        if since >= 5 and since < 15 then
             local brain = GetArmyBrain('ARMY_1')
             for _, unit in (brain and brain:GetListOfUnits(categories.COMMAND, false) or {}) do
                 local ours = false
