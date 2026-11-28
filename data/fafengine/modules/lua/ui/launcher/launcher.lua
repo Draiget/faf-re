@@ -722,6 +722,10 @@ local function DetailsPanel(parent, launcher)
             row.right = Theme.Text(row, '', 12, C.muted)
             row.right.Right:Set(row.Right)
             LayoutHelpers.AtVerticalCenterIn(row.right, row)
+            -- A player's line: the kit's player tag (flag, [clan], name) in place of the plain text.
+            row.player = Widgets.PlayerTag(row, 13, function(login) launcher:ShowProfile(login) end)
+            row.player.Left:Set(row.Left)
+            LayoutHelpers.AtVerticalCenterIn(row.player, row)
             rosterRows[i] = row
         end
         return row
@@ -819,7 +823,8 @@ local function DetailsPanel(parent, launcher)
                     average and ('avg ' .. average .. '  total ' .. math.floor(team.total + 0.5)) or '', color, true })
                 for _, player in team.players do
                     table.insert(lines, { player.login .. (player.clan and player.clan ~= '' and (' [' .. player.clan .. ']') or ''),
-                        player.rating and tostring(math.floor(player.rating + 0.5)) or '', C.text })
+                        player.rating and tostring(math.floor(player.rating + 0.5)) or '', C.text,
+                        player = { login = player.login, clan = player.clan or '', country = player.country } })
                 end
             end
             local open = math.max(0, game.maxPlayers - game.players)
@@ -837,8 +842,12 @@ local function DetailsPanel(parent, launcher)
                     if i == fit and table.getn(lines) > fit then
                         line = { '+ ' .. (table.getn(lines) - fit + 1) .. ' more', '', C.subtle }
                     end
-                    Theme.SetText(row.left, line[1])
+                    Theme.SetText(row.left, line.player and '' or line[1])
                     Theme.SetColor(row.left, line[3])
+                    if line.player then
+                        row.player:Set(line.player)
+                    end
+                    Theme.SetVisible(row.player, line.player ~= nil)
                     Theme.SetText(row.right, line[2])
                     Theme.SetColor(row.right, line[4] and line[3] or C.muted)
                 end
@@ -1621,9 +1630,9 @@ local function OpenHostDialog(launcher)
     local ApplyWhere -- below
     local canServer = rawget(_G, 'FafOnline_RequestServerGame') ~= nil and (status.serverCount or 0) > 0
     if canServer then
-        for i, entry in { { 'faf', 'On FAF' }, { 'server', 'Our server' } } do
+        for i, entry in { { 'faf', 'On FAF P2P' }, { 'server', 'Client-Server' } } do
             local value = entry[1]
-            local choice = Theme.Choice(panel, entry[2], 130, function(self)
+            local choice = Theme.Choice(panel, entry[2], 150, function(self)
                 where = value
                 for _, other in whereChoices do
                     other.selected = other.value == value
@@ -1634,7 +1643,8 @@ local function OpenHostDialog(launcher)
             choice.value = value
             choice.selected = value == where
             choice:Paint(false)
-            LayoutHelpers.AtRightTopIn(choice, panel, 26 + (2 - i) * 138, 22)
+            -- Above the description's line (it starts at 52), so a long one never runs under them.
+            LayoutHelpers.AtRightTopIn(choice, panel, 26 + (2 - i) * 158, 14)
             whereChoices[i] = choice
         end
     end
@@ -1793,7 +1803,7 @@ local function OpenHostDialog(launcher)
             choice:Paint(false)
         end
         Theme.SetText(note, onServer and
-            'On our server: it runs the game and shows each player what their army sees. FAF\'s game list doesn\'t show it.' or
+            'Client-server: our server runs the game and shows each player what their army sees. FAF\'s game list doesn\'t show it.' or
             'Hosted on FAF: players on FAF\'s own client see it and can join.')
         modNoteRefresh()
     end

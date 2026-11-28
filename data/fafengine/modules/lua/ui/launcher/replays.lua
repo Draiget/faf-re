@@ -197,12 +197,20 @@ function Build(launcher, page)
     }, Pick)
     LayoutHelpers.FillParent(view.localList, listArea)
     view.vaultList = Widgets.VirtualList(listArea, {
-        { 'Title', 0.18, function(item) return item.title end },
-        { 'Map', 0.14, function(item) return item.mapName end, C.muted },
-        { 'Teams', 0.30, function(item) return TeamsText(Teams(item.players)) end, C.muted },
-        { 'Avg', 0.09, function(item) return tostring(AverageRating(item.players) or '') end, C.gold },
-        { 'Length', 0.10, function(item) return Length(item.seconds) end, C.muted },
-        { 'Date', 0.19, function(item) return item.when end, C.subtle },
+        { 'Title', 0.17, function(item) return item.title end },
+        { 'Rating', 0.09, function(item)
+            -- FAF's verdict on the game: rated (VALID) or why not, as the kit's badge.
+            if not item.validity or item.validity == '' then
+                return nil
+            end
+            return item.validity == 'VALID' and { 'Rated', C.good } or { 'Unrated', C.bad }
+        end, kind = 'badge' },
+        { 'Map', 0.13, function(item) return item.mapName end, C.muted },
+        { 'Teams', 0.29, function(item) return TeamsText(Teams(item.players)) end, C.muted },
+        { 'Avg', 0.08, function(item) return tostring(AverageRating(item.players) or '') end, C.gold },
+        { 'Length', 0.09, function(item) return Length(item.seconds) end, C.muted },
+        -- The day only: the details show the time.
+        { 'Date', 0.15, function(item) return string.sub(item.when or '', 1, 10) end, C.subtle },
     }, Pick)
     LayoutHelpers.FillParent(view.vaultList, listArea)
     view.empty = Theme.Text(listArea, '', 14, C.subtle)

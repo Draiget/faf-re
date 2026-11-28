@@ -101,7 +101,7 @@ function Build(launcher, page)
     users.Left:Set(function() return users.Right() - users.Width() end)
     users.Height:Set(function() return users.Bottom() - users.Top() end)
     view.userList = Widgets.VirtualList(users, {
-        { 'In the channel', 1.0, function(item) return item.key end },
+        { 'In the channel', 1.0, function(item) return { login = Bare(item.key) } end, kind = 'player' },
     }, function(item, double)
         if item and launcher.ShowProfile then
             launcher:ShowProfile(Bare(item.key))

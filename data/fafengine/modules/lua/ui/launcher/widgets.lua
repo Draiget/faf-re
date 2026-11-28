@@ -584,6 +584,9 @@ function PlayerTag(parent, size, onClick)
     LayoutHelpers.AtVerticalCenterIn(tag.clan, tag)
     tag.name = Theme.Text(tag, '', size or 13, C.text)
     LayoutHelpers.AtVerticalCenterIn(tag.name, tag)
+    -- Placed from the start (no flag, no clan) so a tag a list makes before its first :Set has edges to draw with.
+    tag.clan.Left:Set(tag.Left)
+    tag.name.Left:Set(function() return tag.clan.Right() end)
     LayoutHelpers.SetHeight(tag, (size or 13) + 8)
     tag.Width:Set(function() return tag.name.Right() - tag.Left() end)
     tag.Set = function(self, player)
@@ -695,7 +698,9 @@ function ScrollMark(area, list)
 end
 
 --- A list that has controls only for the rows on screen. columns: { {title, share, text(item), color}, ... };
---- onPick(item, double).
+--- onPick(item, double). A column with kind = 'player' draws a PlayerTag (flag, [clan], name) from text(item), which
+--- then gives { login, country, clan, color } (or nil); the launcher's lists show players that way everywhere. A column
+--- with kind = 'badge' draws a Theme.Tag from text(item), which gives { text, color } (or nil for none).
 function VirtualList(parent, columns, onPick)
     local list = Group(parent, 'launcher list')
     list.items = {}
@@ -817,9 +822,19 @@ function VirtualList(parent, columns, onPick)
         row.Width:Set(function() return row.Right() - row.Left() end)
         row.cells = {}
         for c, column in columns do
-            local cell = Theme.Cell(row, 13, column[4] or C.text)
-            cell.Left:Set(Edge(c, body, false))
-            cell.Right:Set(Edge(c, body, true))
+            local cell
+            if column.kind == 'player' then
+                cell = PlayerTag(row, 13)
+                cell.Left:Set(Edge(c, body, false))
+            elseif column.kind == 'badge' then
+                cell = Theme.Tag(row, '', C.muted)
+                cell.Left:Set(Edge(c, body, false))
+                cell.roomRight = Edge(c, body, true) -- what the tag may take: its column, as a text cell's
+            else
+                cell = Theme.Cell(row, 13, column[4] or C.text)
+                cell.Left:Set(Edge(c, body, false))
+                cell.Right:Set(Edge(c, body, true))
+            end
             LayoutHelpers.AtVerticalCenterIn(cell, row)
             cell.Depth:Set(function() return row.Depth() + 1 end)
             row.cells[c] = cell
@@ -893,13 +908,34 @@ function VirtualList(parent, columns, onPick)
             if item then
                 local selected = item.key == self.selectedKey
                 for c, column in columns do
-                    Theme.SetText(row.cells[c], column[3](item) or '')
-                    Theme.SetColor(row.cells[c], selected and C.accent or (item.color or column[4] or C.text))
+                    if column.kind == 'player' then
+                        local player = column[3](item)
+                        if player then
+                            player.color = selected and C.accent or (player.color or item.color or column[4] or C.text)
+                        end
+                        row.cells[c]:Set(player)
+                        Theme.SetVisible(row.cells[c], player ~= nil)
+                    elseif column.kind == 'badge' then
+                        local badge = column[3](item)
+                        if badge then
+                            local cell = row.cells[c]
+                            cell:SetTag(badge[1] or badge.text or '', badge[2] or badge.color or C.muted,
+                                cell.roomRight() - cell.Left())
+                        end
+                        Theme.SetVisible(row.cells[c], badge ~= nil)
+                    else
+                        Theme.SetText(row.cells[c], column[3](item) or '')
+                        Theme.SetColor(row.cells[c], selected and C.accent or (item.color or column[4] or C.text))
+                    end
                 end
                 row:SetSolidColor(selected and C.selected or (self.hoverRow == row and C.raised or C.clear))
             else
-                for c = 1, table.getn(columns) do
-                    Theme.SetText(row.cells[c], '')
+                for c, column in columns do
+                    if column.kind == 'player' or column.kind == 'badge' then
+                        Theme.SetVisible(row.cells[c], false)
+                    else
+                        Theme.SetText(row.cells[c], '')
+                    end
                 end
                 row:SetSolidColor(C.clear)
             end

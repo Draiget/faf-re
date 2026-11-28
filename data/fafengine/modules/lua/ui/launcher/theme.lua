@@ -593,17 +593,34 @@ function Loader(parent, color)
     return loader
 end
 
---- A small tag: square, bordered and lettered in one colour.
-function Tag(parent, text, color)
-    local tag = Panel(parent, WithAlpha(color, 0.08), WithAlpha(color, 0.6))
+--- A small tag: square, bordered and lettered in one colour. solid: on the page's dark colour, for a tag over a
+--- picture (a map's thumbnail), where the see-through one can't be read.
+function Tag(parent, text, color, solid)
+    local function Fill(of)
+        return solid and 'f0071017' or WithAlpha(of, 0.08)
+    end
+    local tag = Panel(parent, Fill(color), WithAlpha(color, 0.6))
     local label = Text(tag, string.upper(text), 10, color, true)
     LayoutHelpers.AtCenterIn(label, tag)
     tag.Width:Set(function() return label.Width() + Scale(12) end)
     LayoutHelpers.SetHeight(tag, 18)
-    tag.SetTag = function(self, newText, newColor)
-        SetText(label, string.upper(newText))
+    -- room (optional): the width the tag may take; its text steps down from 10 to 8 points to fit, as a list's
+    -- column of tags does at 1600x900 ('SIGN-UP OPEN').
+    tag.SetTag = function(self, newText, newColor, room)
+        local shown = string.upper(newText)
+        SetText(label, shown)
         SetColor(label, newColor)
-        self:SetColors(WithAlpha(newColor, 0.08), WithAlpha(newColor, 0.6))
+        self:SetColors(Fill(newColor), WithAlpha(newColor, 0.6))
+        local fit = room and (shown .. '|' .. room) or nil
+        if fit ~= self.fitFor then
+            self.fitFor = fit
+            for _, size in { 10, 9, 8 } do
+                label:SetFont(Fonts.bold, size)
+                if not room or label:GetStringAdvance(shown) + Scale(12) <= room then
+                    break
+                end
+            end
+        end
     end
     return tag
 end

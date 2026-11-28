@@ -129,7 +129,7 @@ function Build(launcher, page)
     end
     view.localList = Widgets.VirtualList(listArea, {
         { 'Name', 0.42, function(item) return item.name end },
-        { 'Type', 0.10, function(item) return item.ui_only and 'UI' or 'Sim' end, C.muted },
+        { 'Type', 0.10, function(item) return item.ui_only and { 'UI', C.accent } or { 'Sim', C.gold } end, kind = 'badge' },
         { 'Version', 0.12, function(item) return tostring(item.version or '') end, C.muted },
         { 'Author', 0.22, function(item) return item.author or '' end, C.subtle },
         { 'On', 0.14, function(item) return view:IsOn(item.uid) and 'On' or '' end, C.good },
@@ -137,7 +137,7 @@ function Build(launcher, page)
     LayoutHelpers.FillParent(view.localList, listArea)
     view.vaultList = Widgets.VirtualList(listArea, {
         { 'Name', 0.38, function(item) return item.name end },
-        { 'Type', 0.08, function(item) return item.type == 'UI' and 'UI' or 'Sim' end, C.muted },
+        { 'Type', 0.08, function(item) return item.type == 'UI' and { 'UI', C.accent } or { 'Sim', C.gold } end, kind = 'badge' },
         { 'Author', 0.20, function(item) return item.author ~= '' and item.author or item.uploader end, C.subtle },
         { 'Reviews', 0.14, function(item)
             return item.reviews > 0 and string.format('%.1f (%d)', item.reviewScore, item.reviews) or ''

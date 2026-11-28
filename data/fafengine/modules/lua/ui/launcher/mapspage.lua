@@ -183,9 +183,9 @@ function Build(launcher, page)
     -- Details.
     view.bigFrame = Theme.Panel(detail, 'ff08121a', C.line)
     -- A square as wide as the panel, smaller when the panel is short, so the name, facts, story and buttons under it
-    -- keep their room (about 270 px at scale 1).
+    -- keep their room (about 270 px at scale 1; 1600x900 leaves the picture about 100).
     local function PictureSide()
-        return math.max(Scale(120), math.min(detail.Width() - Scale(48), detail.Height() - Scale(24) - Scale(290)))
+        return math.max(Scale(96), math.min(detail.Width() - Scale(48), detail.Height() - Scale(24) - Scale(290)))
     end
     view.bigFrame.Top:Set(function() return detail.Top() + Scale(24) end)
     view.bigFrame.Height:Set(PictureSide)
@@ -203,7 +203,7 @@ function Build(launcher, page)
     view.bigThumb:DisableHitTest()
     LayoutHelpers.FillParentFixedBorder(view.bigThumb, view.bigFrame, 1)
     view.bigThumb.Depth:Set(function() return view.bigFrame.Depth() + 3 end)
-    view.name = Theme.Text(detail, '', 18, C.text, true)
+    view.name = Theme.Cell(detail, 18, C.text, true)
     view.name.Left:Set(view.text.Left)
     view.name.Top:Set(function() return view.bigFrame.Bottom() + Scale(14) end)
     view.facts = Theme.Cell(detail, 13, C.muted)
@@ -231,8 +231,9 @@ function Build(launcher, page)
                 name = view.chosen.name })
         end
     end, 'ghost', { icon = 'star', width = 150, height = 30 })
+    -- On the name's line, so a short panel (1600x900) keeps the facts and the story clear of it.
     view.reviewsButton.Right:Set(view.text.Right)
-    view.reviewsButton.Bottom:Set(function() return view.action.Top() - Scale(44) end)
+    view.reviewsButton.Top:Set(function() return view.name.Top() - Scale(4) end)
     -- A map of the vault's own folder up to FAF's vault (upload.lua), where Reviews is for FAF's maps.
     view.uploadButton = Theme.Button(detail, 'Upload to FAF', function()
         if view.chosen then
@@ -241,7 +242,8 @@ function Build(launcher, page)
         end
     end, 'ghost', { icon = 'upload', width = 190, height = 30 })
     view.uploadButton.Right:Set(view.text.Right)
-    view.uploadButton.Bottom:Set(view.reviewsButton.Bottom)
+    view.uploadButton.Top:Set(view.reviewsButton.Top)
+    view.name.Right:Set(view.text.Right) -- Paint stops it short of whichever of the two shows
     view.status = Theme.Cell(detail, 12, C.muted)
     view.status.Left:Set(view.text.Left)
     view.status.Right:Set(view.text.Right)
@@ -273,10 +275,15 @@ function Build(launcher, page)
         card.facts.Left:Set(card.name.Left)
         card.facts.Right:Set(card.name.Right)
         card.facts.Top:Set(function() return card.name.Bottom() + Scale(4) end)
-        card.badge = Theme.Tag(card, 'Installed', C.good)
+        card.badge = Theme.Tag(card, 'Installed', C.good, true)
         card.badge.Right:Set(function() return card.frame.Right() - Scale(6) end)
         card.badge.Top:Set(function() return card.frame.Top() + Scale(6) end)
         card.badge.Depth:Set(function() return card.thumb.Depth() + 2 end)
+        -- FAF's ranked flag on the vault's maps, as the kit's badge (top left; Installed is top right).
+        card.ranked = Theme.Tag(card, 'Ranked', C.gold, true)
+        card.ranked.Left:Set(function() return card.frame.Left() + Scale(6) end)
+        card.ranked.Top:Set(function() return card.frame.Top() + Scale(6) end)
+        card.ranked.Depth:Set(function() return card.thumb.Depth() + 2 end)
         Theme.HitArea(card, function(self, event)
             if event.Type == 'ButtonPress' and event.Modifiers.Left and card.map then
                 Theme.ClickSound()
@@ -490,6 +497,7 @@ function Build(launcher, page)
                 Theme.SetText(card.name, map.name)
                 Theme.SetText(card.facts, (map.size ~= '' and (map.size .. '  -  ') or '') .. map.players .. ' players')
                 Theme.SetVisible(card.badge, (not map.isLocal) and installed)
+                Theme.SetVisible(card.ranked, (not map.isLocal) and map.ranked == true)
                 local chosen = self.chosen and self.chosen.key == map.key
                 card:SetColors(chosen and 'ff123145' or 'ff0d1c27', chosen and C.accent or C.line)
             end
@@ -553,9 +561,15 @@ function Build(launcher, page)
         self.action:SetLabel(installed and 'Remove' or 'Download')
         self.action:SetEnabled(map ~= nil and (installed or map.url ~= nil) and not self.jobs.install)
         Theme.SetVisible(self.action, map ~= nil and not (map.isLocal and not self:FromVault(map)))
-        Theme.SetVisible(self.reviewsButton, map ~= nil and not map.isLocal and map.id ~= nil)
-        Theme.SetVisible(self.uploadButton, map ~= nil and map.isLocal and self:FromVault(map) and
-            rawget(_G, 'FafLibrary_Upload') ~= nil)
+        local reviewable = map ~= nil and not map.isLocal and map.id ~= nil
+        Theme.SetVisible(self.reviewsButton, reviewable)
+        local uploadable = map ~= nil and map.isLocal and self:FromVault(map) and rawget(_G, 'FafLibrary_Upload') ~= nil
+        Theme.SetVisible(self.uploadButton, uploadable)
+        local beside = reviewable and self.reviewsButton or (uploadable and self.uploadButton or nil)
+        if self.nameBeside ~= (beside or false) then
+            self.nameBeside = beside or false
+            self.name.Right:Set(beside and function() return beside.Left() - Scale(12) end or self.text.Right)
+        end
         local status = launcher.lastStatus or {}
         self.host:SetEnabled(map ~= nil and installed and status.lobby == 'signedin')
         Theme.SetText(self.status, self.statusText or '')

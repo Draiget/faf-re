@@ -94,7 +94,8 @@ function Build(launcher, page)
     detail.Right:Set(page.Right)
     detail.Top:Set(function() return divider.Bottom() + Scale(18) end)
     detail.Bottom:Set(page.Bottom)
-    LayoutHelpers.SetWidth(detail, 520)
+    -- 520 wide, but at most 40 % of the page, so the list keeps its columns at 1600x900.
+    detail.Width:Set(function() return math.min(Scale(520), math.floor((page.Right() - page.Left()) * 0.4)) end)
     detail.Left:Set(function() return detail.Right() - detail.Width() end)
     detail.Height:Set(function() return detail.Bottom() - detail.Top() end)
     local area = Group(page)
@@ -104,10 +105,11 @@ function Build(launcher, page)
     area.Bottom:Set(page.Bottom)
     Theme.SizeFromEdges(area)
     view.list = Widgets.VirtualList(area, {
-        { 'Tournament', 0.42, function(item) return item.name end },
-        { 'State', 0.16, function(item) return item.stateName end, C.accent },
+        { 'Tournament', 0.36, function(item) return item.name end },
+        { 'State', 0.16, function(item) return { item.stateName or '?', kStateColors[item.state] or C.accent } end,
+            kind = 'badge' },
         { 'Starts', 0.16, function(item) return Day(item.start) end, C.muted },
-        { 'Type', 0.16, function(item) return item.kind end, C.muted },
+        { 'Type', 0.22, function(item) return item.kind end, C.muted },
         { 'Players', 0.1, function(item) return tostring(item.players) end, C.muted },
     }, function(item, double)
         view.chosen = item

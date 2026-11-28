@@ -8,6 +8,7 @@ local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
 local Group = import('/lua/maui/group.lua').Group
 local Theme = import('/fafengine/modules/lua/ui/launcher/theme.lua')
 local Widgets = import('/fafengine/modules/lua/ui/launcher/widgets.lua')
+local Kit = import('/fafengine/modules/lua/ui/launcher/kit.lua')
 local C = Theme.Colors
 local Scale = Theme.Scale
 
@@ -142,7 +143,8 @@ function Build(launcher, page)
     Theme.SizeFromEdges(area)
     view.list = Widgets.VirtualList(area, {
         { 'Rank', 0.1, function(item) return item.rank and ('#' .. item.rank) or '' end, C.subtle },
-        { 'Player', 0.4, function(item) return item.login end },
+        { 'Player', 0.4, function(item) return { login = item.login, country = item.country, clan = item.clan } end,
+            kind = 'player' },
         { 'Rating', 0.16, function(item) return tostring(item.rating) end, C.gold },
         { 'Games', 0.16, function(item) return tostring(item.games) end, C.muted },
         { 'Win rate', 0.18, function(item) return item.winRate end, C.muted },
@@ -200,30 +202,49 @@ function Build(launcher, page)
     view.lastGame = Theme.Text(detail, '', 12, C.subtle)
     view.lastGame.Left:Set(youCaption.Left)
     view.lastGame.Top:Set(function() return view.who.Bottom() + Scale(6) end)
+    -- The numbers as the kit's stat boxes, three to a row; then the rating's history as a sparkline.
     view.stats = {}
-    local labels = { 'Rank', 'Rating', 'Win rate', 'Games', 'Won', 'Mean +/- deviation' }
-    for i, label in labels do
-        local column = math.mod(i - 1, 3)
-        local line = math.floor((i - 1) / 3)
-        local key = Theme.Text(detail, string.upper(label), 10, C.subtle, true)
-        key.Left:Set(function()
-            return detail.Left() + Scale(x) + math.floor((detail.Width() - Scale(2 * x)) * column / 3)
-        end)
-        key.Top:Set(function() return view.lastGame.Bottom() + Scale(16 + line * 46) end)
-        local value = Theme.Text(detail, '', 16, i == 2 and C.gold or C.text, true)
-        value.Left:Set(key.Left)
-        value.Top:Set(function() return key.Bottom() + Scale(4) end)
-        view.stats[i] = value
+    local labels = { 'Rank', 'Rating', 'Win rate', 'Games', 'Won', 'Mean +/- dev.' }
+    local statArea = Group(detail)
+    statArea:DisableHitTest()
+    statArea.Left:Set(function() return detail.Left() + Scale(x) end)
+    statArea.Right:Set(function() return detail.Right() - Scale(x) end)
+    statArea.Top:Set(function() return view.lastGame.Bottom() + Scale(14) end)
+    statArea.Width:Set(function() return statArea.Right() - statArea.Left() end)
+    -- Two rows of boxes when the panel has the room for them and the history (1600x900 has room for one).
+    local function Short()
+        return detail.Bottom() - view.lastGame.Bottom() < Scale(14 + 128 + 14 + 18 + 10 + 44 + 10)
     end
+    statArea.Height:Set(function() return Scale(Short() and 60 or 128) end)
+    view.short = Short
+    local firstRow, secondRow = {}, {}
+    for i, label in labels do
+        local box = Kit.StatBox(detail, label, true)
+        view.stats[i] = box
+        table.insert(i <= 3 and firstRow or secondRow, box)
+    end
+    Kit.Row(statArea, firstRow, 0, 8)
+    Kit.Row(statArea, secondRow, 68, 8)
+    local historyCaption = Kit.Heading(detail, 'Rating history')
+    historyCaption.Left:Set(statArea.Left)
+    historyCaption.Top:Set(function() return statArea.Bottom() + Scale(Short() and 10 or 14) end)
+    view.historyNote = historyCaption.note
+    view.spark = Kit.Sparkline(detail)
+    view.spark.Left:Set(statArea.Left)
+    view.spark.Right:Set(function() return statArea.Right() - Scale(6) end)
+    view.spark.Top:Set(function() return historyCaption.Bottom() + Scale(Short() and 6 or 10) end)
+    view.spark.Width:Set(function() return view.spark.Right() - view.spark.Left() end)
+    view.spark.Height:Set(function() return Scale(Short() and 26 or 44) end)
+    view.history = {} -- by '<board>:<player id>': the ratings after each game, oldest first; false while asked
 
     ----------------------------------------------------------------------------------------------------------------
 
-    local function Ask(key, query, done)
+    local function Ask(key, query, done, path)
         if not rawget(_G, 'FafLibrary_Api') then
             view.failure = 'This build has no FAF API access.'
             return
         end
-        local id, why = FafLibrary_Api('/data/leaderboardRating', query)
+        local id, why = FafLibrary_Api(path or '/data/leaderboardRating', query)
         if not id then
             view.failure = tostring(why)
             return
@@ -420,7 +441,8 @@ function Build(launcher, page)
         -- The chosen player.
         local chosen = self.chosen
         self.who:Set({ login = chosen and chosen.login or '' })
-        local values = {
+        local short = self.short() -- 1600x900: one row of boxes, the history's numbers without its line
+        local statValues = {
             chosen and chosen.rank and ('#' .. chosen.rank) or '-',
             chosen and tostring(chosen.rating) or '-',
             chosen and chosen.winRate or '-',
@@ -428,9 +450,37 @@ function Build(launcher, page)
             chosen and tostring(chosen.won) or '-',
             chosen and string.format('%d +/- %d', math.floor(chosen.mean + 0.5), math.floor(chosen.deviation + 0.5)) or '-',
         }
-        for i, value in values do
-            Theme.SetText(self.stats[i], value)
+        for i, value in statValues do
+            self.stats[i]:Set(value, i == 2 and value ~= '-' and C.gold or nil)
+            Theme.SetVisible(self.stats[i], i <= 3 or not short)
         end
+        -- The chosen player's rating after each game on this ladder (the journal's mean - 3 deviations), asked once.
+        local historyKey = chosen and chosen.playerId and (self.board .. ':' .. chosen.playerId)
+        if historyKey and self.history[historyKey] == nil and not self.jobs.history then
+            self.history[historyKey] = false
+            Ask('history', {
+                filter = 'gamePlayerStats.player.id==' .. chosen.playerId .. ';leaderboard.technicalName==' .. self.board,
+                sort = 'gamePlayerStats.scoreTime', ['page[size]'] = '1000',
+            }, function(doc)
+                local values = {}
+                for _, entry in (doc.data or {}) do
+                    local attributes = entry.attributes or {}
+                    if attributes.meanAfter and attributes.deviationAfter then
+                        table.insert(values, attributes.meanAfter - 3 * attributes.deviationAfter)
+                    end
+                end
+                view.history[historyKey] = values
+            end, '/data/leaderboardRatingJournal')
+        end
+        local values = historyKey and self.history[historyKey]
+        -- Short of room (1600x900): the history's numbers only, without its line.
+        self.spark:Draw(not short and values or {}, C.gold)
+        local count = values and table.getn(values) or 0
+        local change = count >= 2 and math.floor(values[count] - values[1] + 0.5) or nil
+        Theme.SetText(self.historyNote, not chosen and '' or (values == false and 'asking FAF...') or
+            (count < 2 and 'too few games to draw') or
+            (count .. ' games, ' .. (change >= 0 and '+' or '') .. change .. ' since the first'))
+        Theme.SetColor(self.historyNote, change and (change >= 0 and C.good or C.bad) or C.subtle)
         local last = chosen and chosen.updated and rawget(_G, 'FafLibrary_LocalTime') and FafLibrary_LocalTime(chosen.updated)
         Theme.SetText(self.lastGame, last and last ~= '' and ('Last rated game ' .. last) or '')
         self.profileButton:SetEnabled(chosen ~= nil)

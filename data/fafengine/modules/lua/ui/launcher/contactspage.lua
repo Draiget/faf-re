@@ -60,11 +60,12 @@ function Build(launcher, page)
     area.Bottom:Set(page.Bottom)
     Theme.SizeFromEdges(area)
     view.list = Widgets.VirtualList(area, {
-        { 'Player', 0.46, function(item) return (item.clan and item.clan ~= '' and ('[' .. item.clan .. '] ') or '') ..
-            (item.login or view.names[item.id] or ('player ' .. tostring(item.id))) end },
-        { 'Status', 0.18, function(item) return item.online and 'Online' or 'Offline' end, C.muted },
-        { 'Rating', 0.16, function(item) return item.rating and tostring(item.rating) or '' end, C.gold },
-        { 'Country', 0.2, function(item) return item.country and string.upper(item.country) or '' end, C.subtle },
+        { 'Player', 0.56, function(item)
+            return { login = item.login or view.names[item.id] or ('player ' .. tostring(item.id)),
+                country = item.country or '', clan = item.clan or '' }
+        end, kind = 'player' },
+        { 'Status', 0.24, function(item) return item.online and 'Online' or 'Offline' end, C.muted },
+        { 'Rating', 0.2, function(item) return item.rating and tostring(item.rating) or '' end, C.gold },
     }, function(item, double)
         view.chosen = item
         if double then
