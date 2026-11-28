@@ -125,11 +125,44 @@ function Tabs(parent, entries, onPick)
         end)
         tabs.items[i] = tab
     end
+    -- One underline for the strip, sliding from the tab left to the tab chosen (anim.lua); each tab's own stays hidden.
+    local slider = Theme.Rect(tabs, C.accent)
+    slider.Bottom:Set(tabs.Bottom)
+    slider.Height:Set(Scale(2))
+    slider.Left:Set(tabs.Left)
+    slider.Right:Set(tabs.Left)
+    slider.Width:Set(function() return slider.Right() - slider.Left() end)
+    slider:DisableHitTest()
+    tabs.slider = slider
     tabs.Paint = function(self)
+        local chosenTab = nil
         for _, tab in self.items do
             local chosen = tab.key == self.chosen
             Theme.SetColor(tab.label, chosen and C.accent or (tab.over and C.text or C.muted))
-            Theme.SetVisible(tab.underline, chosen)
+            Theme.SetVisible(tab.underline, false)
+            if chosen then
+                chosenTab = tab
+            end
+        end
+        Theme.SetVisible(slider, chosenTab ~= nil and not self:IsHidden())
+        if chosenTab and chosenTab ~= self.sliderOn then
+            local from, to = self.sliderOn, chosenTab
+            self.sliderOn = to
+            local function Rest()
+                slider.Left:Set(to.Left)
+                slider.Right:Set(to.Right)
+            end
+            if from then
+                local fromLeft, fromRight = from.Left(), from.Right()
+                import('/fafengine/modules/lua/ui/launcher/anim.lua').Run(slider, 0.22, function(t)
+                    local left = math.floor(fromLeft + (to.Left() - fromLeft) * t)
+                    local right = math.floor(fromRight + (to.Right() - fromRight) * t)
+                    slider.Left:Set(left)
+                    slider.Right:Set(right)
+                end, Rest)
+            else
+                Rest()
+            end
         end
     end
     tabs.Set = function(self, chosen, counts)

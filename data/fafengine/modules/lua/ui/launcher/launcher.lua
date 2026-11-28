@@ -4567,7 +4567,18 @@ function TestWalk()
                 local page = current.pages.links
                 WaitSeconds(0.06)
                 local midAlpha, midOffset, running = page:GetAlpha(), page.Left() - current.content.Left(), Anim.Running()
+                local strip = current.newsStrip and current.newsStrip.tabs
+                local midSlider = strip and strip.slider.Left()
                 WaitSeconds(0.6)
+                local linksTab = nil
+                for _, tab in (strip and strip.items or {}) do
+                    if tab.key == 'links' then
+                        linksTab = tab
+                    end
+                end
+                Step('anim: tab underline mid-way at ' .. tostring(midSlider) .. ', at rest ' ..
+                    tostring(strip and strip.slider.Left()) .. ' under the Links tab at ' ..
+                    tostring(linksTab and linksTab.Left()))
                 Step('anim: page mid-way alpha ' .. string.format('%.2f', midAlpha) .. ' offset ' .. midOffset ..
                     ' tweens ' .. running .. '; at rest alpha ' .. string.format('%.2f', page:GetAlpha()) ..
                     ' offset ' .. (page.Left() - current.content.Left()) .. ' tweens ' .. Anim.Running())

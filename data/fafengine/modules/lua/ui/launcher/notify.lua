@@ -79,6 +79,7 @@ function Notifier:Toast(notice)
     end)
     toast.ends = GetSystemTimeSeconds() + kToastSeconds
     table.insert(self.toasts, 1, toast)
+    import('/fafengine/modules/lua/ui/launcher/anim.lua').FadeIn(toast, 0.2)
     while table.getn(self.toasts) > kMaxToasts do
         table.remove(self.toasts):Destroy()
     end
@@ -98,7 +99,13 @@ function Notifier:ExpireToasts()
     local kept = {}
     for _, toast in self.toasts do
         if toast.ends <= now then
-            toast:Destroy()
+            -- Fades out, then goes (anim.lua; at once with Reduce motion).
+            local gone = toast
+            import('/fafengine/modules/lua/ui/launcher/anim.lua').Run(gone, 0.25, function(t)
+                gone:SetAlpha(1 - t, true)
+            end, function()
+                gone:Destroy()
+            end)
         else
             table.insert(kept, toast)
         end
