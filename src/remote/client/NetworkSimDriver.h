@@ -21,6 +21,7 @@
 #include "remote/client/BeatSynthesis.h"
 #include "remote/client/InterpBuffer.h"
 #include "remote/client/RemoteClientManager.h"
+#include "remote/client/ServerLaneMeter.h"
 #include "remote/client/ServerViewClient.h"
 
 // Engine addition, server mode (plan WP2.8, WP11; research/WP11-network-client-map.md "Session start and the sim
@@ -183,7 +184,7 @@ namespace faf::remote::client
     std::uint64_t mCamerasSent = 0;
     std::mutex mCameraLock;                    // plan WP9.3: `SetGeomCams` and the view's effects may differ in thread
     fa::vector<moho::GeomCamera3> mCameras;    // the session's cameras, as `SetGeomCams` last gave them
-    std::array<std::uint64_t, 6> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
+    std::array<std::uint64_t, kServerLaneCount> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::uint64_t mEffectLanesLogged = 0;      // plan WP9.3: beats whose effects counts went to the log
     std::uint64_t mEffectSkipsLogged = 0;
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
