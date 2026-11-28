@@ -1,6 +1,8 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/sim/UserLuaPrivate.h"
+#include "moho/sim/PlannedFactoryProxy.h"
+#include "moho/ui/UiRuntimeTypes.h"
 #include <utility>
 
 using EntId = std::int32_t;
@@ -2240,6 +2242,14 @@ int moho::cfunc_DecreaseBuildCountInQueueL(
   }
   std::int32_t remaining = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
 
+  // Engine addition (`ui_FactoryPreOrders`): the queue on show is a planned factory's kept orders.
+  if (auto* const proxy = PlannedFactoryManager::Get().FindByUserUnit(sCurrentBuildFactory.GetObjectPtr())) {
+    if (oneBasedQueueIndex >= 1) {
+      (void)proxy->RemovePreOrderByIndex(static_cast<std::size_t>(oneBasedQueueIndex - 1), remaining);
+    }
+    return 0;
+  }
+
   const CmdId* commandBegin = nullptr;
   const CmdId* commandEnd = nullptr;
   CurrentBuildQueueItemCommands(oneBasedQueueIndex, &commandBegin, &commandEnd);
@@ -2323,6 +2333,16 @@ int moho::cfunc_IncreaseBuildCountInQueueL(
     LuaPlus::LuaStackObject::TypeError(&countArg, "integer");
   }
   const int count = static_cast<int>(lua_tonumber(state->m_state, 2));
+
+  // Engine addition (`ui_FactoryPreOrders`): the queue on show is a planned factory's kept orders.
+  if (auto* const proxy = PlannedFactoryManager::Get().FindByUserUnit(sCurrentBuildFactory.GetObjectPtr())) {
+    if (
+      oneBasedQueueIndex >= 1 && static_cast<std::size_t>(oneBasedQueueIndex) <= proxy->mPreOrders.size() && count > 0
+    ) {
+      proxy->mPreOrders[static_cast<std::size_t>(oneBasedQueueIndex - 1)].count += count;
+    }
+    return 0;
+  }
 
   const CmdId* commandBegin = nullptr;
   const CmdId* commandEnd = nullptr;

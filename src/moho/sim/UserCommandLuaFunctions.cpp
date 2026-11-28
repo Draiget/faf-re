@@ -36,6 +36,7 @@
 #include "moho/app/AllowedUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/sim/SOCellPos.h"
@@ -458,6 +459,11 @@ namespace
 
       // Selectable AND (owned by focus army OR cheat-select).
       if (!unit->IsSelectable()) {
+        continue;
+      }
+      // Engine addition (`ui_FactoryPreOrders`): only a click selects a planned factory, never a category
+      // (FAF's select-all and select-idle hotkeys would otherwise take it as an idle factory).
+      if (moho::PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
         continue;
       }
       const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);
@@ -1311,6 +1317,10 @@ namespace moho
     // `mBlueprint` -- the same offset the else branch writes at 0x00841F71
     // (`lea edx,[esp+0F0h]` then `mov [esp+140h], ebx`). Both branches agree.
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      PlannedFactoryManager::Get().QueueOrdersOnSelected(
+        *session, blueprint->mBlueprintId.c_str(), repeatCount, clearQueue
+      );
+
       SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
       factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
 
@@ -1322,6 +1332,10 @@ namespace moho
           selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead() &&
           selectedEntity->IsInCategory(factoryCategory)
         ) {
+          // Engine addition (`ui_FactoryPreOrders`): a planned factory keeps the order for the factory.
+          if (PlannedFactoryManager::IsPlannedProxyUnit(selectedUnit)) {
+            continue;
+          }
           WeakSet<UserEntity> oneUnit;
           (void)oneUnit.Add(selectedEntity);
           for (int remaining = repeatCount; remaining > 0; --remaining) {

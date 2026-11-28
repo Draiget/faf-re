@@ -1,4 +1,6 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/sim/PlannedFactoryProxy.h"
+
 #include <utility>
 
 namespace moho
@@ -1379,6 +1381,35 @@ namespace moho
   )
   {
     CWldSession* const session = WLD_GetActiveSession();
+
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory keeps its rally order for the real
+    // factory; the rest of the selection gets the order without it.
+    if (session != nullptr && PlannedFactoryManager::AnyPlannedProxyUnit(units)) {
+      gpg::fastvector<UserUnit*> proxyUnits{};
+      gpg::fastvector<UserUnit*> realUnits{};
+      for (UserUnit* const unit : units) {
+        (PlannedFactoryManager::IsPlannedProxyUnit(unit) ? proxyUnits : realUnits).push_back(unit);
+      }
+      PlannedFactoryManager::Get().OnProxyFactoryCommand(*session, proxyUnits, commandIssueData, clearQueue);
+      if (!realUnits.empty()) {
+        ISSUE_FactoryCommand(realUnits, commandIssueData, clearQueue);
+      } else {
+        UI_OnCommandIssued(units, commandIssueData, clearQueue);
+        session->DirtyCommandGraph();
+      }
+      return;
+    }
+
+    // Engine addition (`ui_FactoryPreOrders`): a factory's rally aimed at a planned factory goes to its spot
+    // (an assist goes to an engineer that builds it); anything else has nothing to aim at.
+    if (
+      session != nullptr && commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity &&
+      IsClientOnlyUnitId(static_cast<std::uint32_t>(commandIssueData.mTarget.mEnt)) &&
+      !PlannedFactoryManager::Get().RetargetFromPlannedFactory(*session, commandIssueData)
+    ) {
+      return;
+    }
+
     CommandManager* const commandManager = session->mCommandManager;
     STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
@@ -1622,6 +1653,16 @@ namespace moho
   )
   {
     if (command == nullptr || unit == nullptr) {
+      return;
+    }
+
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory's rally line is its own; nothing is sent.
+    if (PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
+      if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+        PlannedFactoryManager::Get().OnRallyHelperRemoved(
+          *session, static_cast<std::int32_t>(command->mConstantData.cmd)
+        );
+      }
       return;
     }
 
@@ -3009,6 +3050,12 @@ namespace moho
       return;
     }
 
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory is selected by its own click only; a double
+    // click on it leaves that selection, and a double click on a factory skips the planned ones (below).
+    if (PlannedFactoryManager::IsPlannedProxyUnit(hoveredUnit)) {
+      return;
+    }
+
     // FAF hot-patch (FA-Binary-Patches WallSelection): the stock early return for a WALL unit
     // (`jne 0x00866002` after IsInCategory("WALL")) is NOPed at 0x00865EC2, so double-clicking
     // a wall selects all walls of that type on screen. The category test itself has no effect.
@@ -3035,7 +3082,7 @@ namespace moho
         }
 
         UserUnit* const unit = entity->IsUserUnit();
-        if (unit == nullptr || unit == hoveredUnit) {
+        if (unit == nullptr || unit == hoveredUnit || PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
           continue;
         }
 
@@ -3161,6 +3208,15 @@ namespace moho
 
         if (!resolvedByUi) {
           mode.mMode = DefaultModeFromDrag(mouseInfo->mIsDragger);
+          // Engine addition (`ui_FactoryPreOrders`): a planned factory is nothing to reclaim.
+          if (
+            mode.mMode == COMMOD_Reclaim && moho::IsFactoryPreOrdersEnabled() &&
+            moho::PlannedFactoryManager::Get().FindByFootprint(
+              Vector3f{mouseInfo->mMouseWorldPos.x, mouseInfo->mMouseWorldPos.y, mouseInfo->mMouseWorldPos.z}
+            ) != nullptr
+          ) {
+            mode.mMode = COMMOD_Move;
+          }
         }
       }
     }
@@ -3244,7 +3300,22 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     }
   }
 
-  UserEntity* const hoverEntity = mouseInfo->HoveredEntity();
+  UserEntity* hoverEntity = mouseInfo->HoveredEntity();
+  // Engine addition (`ui_FactoryPreOrders`): hovering a planned factory, units that can assist get an
+  // engineer that will build it as their target, and the rest get the ground under it.
+  if (hoverEntity != nullptr && PlannedFactoryManager::IsPlannedProxyUnit(hoverEntity->IsUserUnit())) {
+    const PlannedUnitProxy* const proxy = PlannedFactoryManager::Get().FindByUserUnit(hoverEntity->IsUserUnit());
+    UserEntity* builder = nullptr;
+    if (proxy != nullptr && (selectionCommandCaps & RULEUCC_Repair) != 0) {
+      for (const PlannedUnitProxy::Builder& entry : proxy->mBuilders) {
+        builder = wldSession->LookupEntityId(static_cast<EntId>(entry.builderId));
+        if (builder != nullptr) {
+          break;
+        }
+      }
+    }
+    hoverEntity = builder;
+  }
 
   if (hoverEntity == nullptr) {
     // No hover: consult the command the cursor is dragging. An attack/form-

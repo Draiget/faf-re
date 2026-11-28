@@ -1,6 +1,7 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/resource/CSimResources.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -782,6 +783,7 @@ UserUnit::UserUnit(
   , mQueueEmptyCached(false)
   , mIsEngineer(false)
   , mIsFactory(false)
+  , mPlannedFactoryChecked(false)
 {
   mManager = new UserCommandQueue(this);
 
@@ -800,7 +802,10 @@ UserUnit::UserUnit(
   // the army's avatar run; everything else is a candidate for the idle
   // engineer registry instead. The two are exclusive in the binary.
   const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(mParams.mBlueprint);
-  if (mArmy != nullptr && unitBlueprint != nullptr && unitBlueprint->General.QuickSelectPriority > 0) {
+  if (
+    mArmy != nullptr && unitBlueprint != nullptr && unitBlueprint->General.QuickSelectPriority > 0 &&
+    !PlannedFactoryManager::IsPlannedProxyUnit(this) // engine addition (`ui_FactoryPreOrders`)
+  ) {
     AddArmyAvatar(mArmy, this);
     return;
   }
@@ -1716,6 +1721,18 @@ void UserUnit::Tick(
   AdvanceUserCommandManagerBySeq(mManager, seqNo);
   if (mFactoryManager != nullptr) {
     AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
+  }
+
+  // Engine addition (`ui_FactoryPreOrders`): a unit's first beat, when its blueprint and position are in,
+  // tells the planned factories it exists; one of them may be what it is.
+  if (!mPlannedFactoryChecked) {
+    mPlannedFactoryChecked = true;
+    PlannedFactoryManager::Get().NoteNewUnit(*this);
+  }
+  // A planned factory's own unit stops here: the rest is for units the sim has, the idle-factory registry
+  // and a vision handle among them.
+  if (PlannedFactoryManager::IsPlannedProxyUnit(this)) {
+    return;
   }
 
   if (IsBeingBuilt()) {

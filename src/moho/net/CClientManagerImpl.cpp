@@ -10,6 +10,8 @@
 #include "CReplayClient.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
+#include "moho/command/ClientOnlyIds.h"
+#include "lua/LuaTableIterator.h"
 
 #include <utility>
 #include <algorithm>
@@ -478,6 +480,9 @@ void CMarshaller::DestroyEntity(
   const EntId entityId
 )
 {
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_DestroyEntity};
   CMessageStream stream{message};
   stream.Write(entityId);
@@ -493,6 +498,9 @@ void CMarshaller::WarpEntity(
   const VTransform& transform
 )
 {
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_WarpEntity};
   CMessageStream stream{message};
   stream.Write(entityId);
@@ -510,6 +518,9 @@ void CMarshaller::ProcessInfoPair(
   const gpg::StrArg value
 )
 {
+  if (IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_ProcessInfoPair};
   CMessageStream stream{message};
   stream.Write(entityId);
@@ -528,9 +539,19 @@ void CMarshaller::IssueCommand(
   const bool clear
 )
 {
+  // Engine addition (ClientOnlyIds.h): no client-only unit or target reaches the stream, and an order
+  // that had only client-only units is not sent at all.
+  if (IsClientOnlyTarget(commandData.mTarget) || IsClientOnlyTarget(commandData.mTarget2)) {
+    return;
+  }
+  BVSet<EntId, EntIdUniverse> filteredStorage{};
+  const BVSet<EntId, EntIdUniverse>& sent = WithoutClientOnlyUnits(entities, filteredStorage);
+  if (&sent != &entities && sent.begin() == sent.end()) {
+    return;
+  }
   CMessage message{ECmdStreamOp::CMDST_IssueCommand};
   CMessageStream stream{message};
-  WriteEntIdSet(stream, entities);
+  WriteEntIdSet(stream, sent);
   WriteCommandData(stream, commandData);
   const auto clearByte = static_cast<std::uint8_t>(clear);
   stream.Write(clearByte);
@@ -547,9 +568,19 @@ void CMarshaller::IssueFactoryCommand(
   const bool clear
 )
 {
+  // Engine addition (ClientOnlyIds.h): no client-only unit or target reaches the stream, and an order
+  // that had only client-only units is not sent at all.
+  if (IsClientOnlyTarget(commandData.mTarget) || IsClientOnlyTarget(commandData.mTarget2)) {
+    return;
+  }
+  BVSet<EntId, EntIdUniverse> filteredStorage{};
+  const BVSet<EntId, EntIdUniverse>& sent = WithoutClientOnlyUnits(entities, filteredStorage);
+  if (&sent != &entities && sent.begin() == sent.end()) {
+    return;
+  }
   CMessage message{ECmdStreamOp::CMDST_IssueFactoryCommand};
   CMessageStream stream{message};
-  WriteEntIdSet(stream, entities);
+  WriteEntIdSet(stream, sent);
   WriteCommandData(stream, commandData);
   const auto clearByte = static_cast<std::uint8_t>(clear);
   stream.Write(clearByte);
@@ -565,6 +596,9 @@ void CMarshaller::IncreaseCommandCount(
   const int count
 )
 {
+  if (IsClientOnlyCommand(static_cast<std::int32_t>(cmdId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_IncreaseCommandCount};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -581,6 +615,9 @@ void CMarshaller::DecreaseCommandCount(
   const int count
 )
 {
+  if (IsClientOnlyCommand(static_cast<std::int32_t>(cmdId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_DecreaseCommandCount};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -597,6 +634,9 @@ void CMarshaller::SetCommandTarget(
   const SSTITarget& target
 )
 {
+  if (IsClientOnlyCommand(static_cast<std::int32_t>(cmdId)) || IsClientOnlyTarget(target)) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_SetCommandTarget};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -613,6 +653,9 @@ void CMarshaller::SetCommandType(
   const EUnitCommandType type
 )
 {
+  if (IsClientOnlyCommand(static_cast<std::int32_t>(cmdId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_SetCommandType};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -631,6 +674,9 @@ void CMarshaller::SetCommandCells(
   const Wm3::Vector3<float>& pos
 )
 {
+  if (IsClientOnlyCommand(static_cast<std::int32_t>(cmdId))) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_SetCommandCells};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -648,6 +694,11 @@ void CMarshaller::RemoveCommandFromUnitQueue(
   const EntId entityId
 )
 {
+  if (
+    IsClientOnlyCommand(static_cast<std::int32_t>(cmdId)) || IsClientOnlyUnitId(static_cast<std::uint32_t>(entityId))
+  ) {
+    return; // engine addition: see ClientOnlyIds.h
+  }
   CMessage message{ECmdStreamOp::CMDST_RemoveCommandFromQueue};
   CMessageStream stream{message};
   stream.Write(cmdId);
@@ -666,13 +717,15 @@ void CMarshaller::ExecuteDebugCommand(
   const BVSet<EntId, EntIdUniverse>& entities
 )
 {
+  BVSet<EntId, EntIdUniverse> filteredStorage{}; // engine addition: see ClientOnlyIds.h
+  const BVSet<EntId, EntIdUniverse>& sent = WithoutClientOnlyUnits(entities, filteredStorage);
   CMessage message{ECmdStreamOp::CMDST_DebugCommand};
   CMessageStream stream{message};
   stream.Write(commandText);
   stream.Write(&worldPos, sizeof(worldPos));
   const auto armyByte = static_cast<std::uint8_t>(armyIndex);
   stream.Write(armyByte);
-  WriteEntIdSet(stream, entities);
+  WriteEntIdSet(stream, sent);
   mClientManager->ProcessClients(message);
 }
 
@@ -698,19 +751,64 @@ void CMarshaller::ExecuteLuaInSim(
  * Address: 0x006E7300 (FUN_006E7300)
  * Address: 0x102C2620
  */
+namespace
+{
+  /**
+   * Engine addition (ClientOnlyIds.h): whether a sim callback's arguments name a client-only unit alive now.
+   * FAF's UI passes a unit as the string `unit:GetEntityId()` returns (CopyOrders, DistributeOrders, the
+   * capping hotkeys take the hovered unit), so a string of digits that is such a unit's id counts, as a value
+   * or as a key; nested tables are looked into a few levels deep. Only live ones match, so another number
+   * that happens to fall in the range keeps its callback.
+   */
+  [[nodiscard]] bool LuaArgsNameClientOnlyUnit(
+    const LuaPlus::LuaObject& value,
+    const int depth
+  )
+  {
+    if (value.IsString()) {
+      const char* const text = value.GetString();
+      if (text == nullptr || *text == '\0') {
+        return false;
+      }
+      std::uint64_t id = 0;
+      for (const char* c = text; *c != '\0'; ++c) {
+        if (*c < '0' || *c > '9' || id > 0xFFFFFFFFull) {
+          return false;
+        }
+        id = (id * 10u) + static_cast<std::uint64_t>(*c - '0');
+      }
+      return id <= 0xFFFFFFFFull && IsLiveClientOnlyUnit(static_cast<std::uint32_t>(id));
+    }
+    if (value.IsTable() && depth < 4) {
+      for (LuaPlus::LuaTableIterator it(value, 1); !it.m_isDone; it.Next()) {
+        if (LuaArgsNameClientOnlyUnit(it.m_keyObj, depth + 1) || LuaArgsNameClientOnlyUnit(it.m_valueObj, depth + 1)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+} // namespace
+
 void CMarshaller::LuaSimCallback(
   const char* callbackName,
   const LuaPlus::LuaObject& args,
   const BVSet<EntId, EntIdUniverse>& entities
 )
 {
+  // Engine addition (ClientOnlyIds.h): a callback about a client-only unit has nothing to act on in any sim.
+  if (LuaArgsNameClientOnlyUnit(args, 0)) {
+    return;
+  }
+  BVSet<EntId, EntIdUniverse> filteredStorage{}; // engine addition: see ClientOnlyIds.h
+  const BVSet<EntId, EntIdUniverse>& sent = WithoutClientOnlyUnits(entities, filteredStorage);
   CMessage message{ECmdStreamOp::CMDST_LuaSimCallback};
   CMessageStream stream{message};
   stream.Write(callbackName);
   if (!const_cast<LuaPlus::LuaObject&>(args).ToByteStream(stream)) {
     gpg::Die("Unable to marshal lua function %s", callbackName);
   }
-  WriteEntIdSet(stream, entities);
+  WriteEntIdSet(stream, sent);
   mClientManager->ProcessClients(message);
 }
 

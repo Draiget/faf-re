@@ -10,6 +10,8 @@
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/command/ClientOnlyIds.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 #include <algorithm>
 #include <array>
@@ -500,6 +502,20 @@ namespace moho
     // which is the same shape `ISSUE_DecreaseCommandCount` already uses for
     // its own `resultCookie`. Passing the command id instead put a command id
     // where the drain expects a beat.
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory's rally line keeps its order here; the
+    // driver call below is dropped before the stream (ClientOnlyIds.h), the local event still moves the line.
+    if (IsClientOnlyCommand(static_cast<std::int32_t>(helper->mConstantData.cmd))) {
+      const Wm3::Vector3<float> position = ResolvePositionFromTarget(target);
+      const SSTITarget newTarget = ConvertUserCommandTargetToSSTITarget(target);
+      PlannedFactoryManager::Get().OnRallyHelperRetargeted(
+        static_cast<std::int32_t>(helper->mConstantData.cmd), newTarget, Vector3f{position.x, position.y, position.z}
+      );
+      // The line is drawn from the helper's data. No sim answer comes to settle it, so it is set here, and
+      // the local event below finds it already there.
+      helper->mVariableData.mTarget1 = newTarget;
+      helper->mVariableDataDirty = 1u;
+    }
+
     CmdId resultCookie = helper->mConstantData.cmd;
     if (ISTIDriver* const simDriver = WLD_GetDriver()) {
       resultCookie =
@@ -753,6 +769,34 @@ namespace moho
       return;
     }
 
+    // Engine addition (`ui_FactoryPreOrders`): a planned factory is a client-only unit. Its part of the
+    // order waits on it for the real factory, and the rest of the selection gets the order without it.
+    if (PlannedFactoryManager::AnyPlannedProxyUnit(units)) {
+      gpg::fastvector<UserUnit*> proxyUnits{};
+      gpg::fastvector<UserUnit*> realUnits{};
+      for (UserUnit* const unit : units) {
+        (PlannedFactoryManager::IsPlannedProxyUnit(unit) ? proxyUnits : realUnits).push_back(unit);
+      }
+      (void)PlannedFactoryManager::Get().OnProxyCommand(*session, proxyUnits, data, clearQueue);
+      if (!realUnits.empty()) {
+        ISSUE_Command(realUnits, data, clearQueue);
+      } else {
+        UI_OnCommandIssued(units, data, clearQueue);
+        session->DirtyCommandGraph();
+      }
+      return;
+    }
+
+    // Engine addition (`ui_FactoryPreOrders`): an order aimed at a planned factory. An assist goes to an
+    // engineer that will build it, a move to its spot; anything else has nothing to aim at.
+    if (
+      data.mTarget.mType == EAiTargetType::AITARGET_Entity &&
+      IsClientOnlyUnitId(static_cast<std::uint32_t>(data.mTarget.mEnt)) &&
+      !PlannedFactoryManager::Get().RetargetFromPlannedFactory(*session, data)
+    ) {
+      return;
+    }
+
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
     CommandManager* const commandManager = session->mCommandManager;
 
@@ -940,6 +984,17 @@ namespace moho
       // once LTCG's `units, clearQueue, data` stack order is accounted for),
       // not the clear flag; -1 appends.
       UserUnitManagerAdd(unitManager, commandHelper, issueBeat, data.mIndex);
+    }
+
+    // Engine addition (`ui_FactoryPreOrders`): an engineer's factory order makes a planned factory.
+    if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && IsFactoryPreOrdersEnabled()) {
+      PlannedFactoryManager::Get().OnBuildOrderIssued(
+        *session,
+        *commandUnits,
+        static_cast<std::int32_t>(commandConstantData.cmd),
+        data.mBlueprint,
+        Vector3f{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z}
+      );
     }
 
     if (notifyUi) {

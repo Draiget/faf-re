@@ -23,6 +23,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
@@ -109,7 +110,9 @@ namespace
   )
   {
     for (auto it = selection.begin(); it != selection.end();) {
-      if (session.CanSelectUnit(static_cast<moho::UserUnit*>(*it))) {
+      // Engine addition (`ui_FactoryPreOrders`): a box never takes a planned factory; a click does.
+      auto* const unit = static_cast<moho::UserUnit*>(*it);
+      if (session.CanSelectUnit(unit) && !moho::PlannedFactoryManager::IsPlannedProxyUnit(unit)) {
         ++it;
       } else {
         it = selection.Erase(it);
@@ -228,6 +231,58 @@ namespace
     decal->mOrientation.z = 0.0f;
 
     decal->Update();
+  }
+  /**
+   * Engine addition (`ui_FactoryPreOrders`): a click that is not a drag selects the planned factory under
+   * the cursor (with shift, adds or removes it). A unit under the cursor keeps the click as retail has it; a
+   * prop (a tree or rock on the planned spot, which the world view's hover prefers) does not.
+   */
+  [[nodiscard]] bool SelectPlannedFactoryUnderClick(
+    moho::CWldSession& session,
+    moho::CameraImpl* const camera,
+    const moho::SMauiEventData& eventData
+  )
+  {
+    auto& planned = moho::PlannedFactoryManager::Get();
+    if (!moho::IsFactoryPreOrdersEnabled() || planned.GetCount() == 0u) {
+      return false;
+    }
+    moho::UserEntity* const hovered = session.GetHoveredUserEntity();
+    moho::UserUnit* const hoveredUnit = hovered != nullptr ? hovered->IsUserUnit() : nullptr;
+    if (hoveredUnit != nullptr && !moho::PlannedFactoryManager::IsPlannedProxyUnit(hoveredUnit)) {
+      return false;
+    }
+
+    moho::PlannedUnitProxy* hit = planned.FindByUserUnit(hoveredUnit);
+    if (hit == nullptr && camera != nullptr) {
+      const moho::MouseInfo& cursor = session.GetCursorInfo();
+      const bool hasGround = cursor.mHitValid != 0;
+      const moho::Vector3f ground{cursor.mMouseWorldPos.x, cursor.mMouseWorldPos.y, cursor.mMouseWorldPos.z};
+      hit = planned.PickAt(
+        camera->CameraGetView(),
+        hasGround ? &ground : nullptr,
+        static_cast<float>(eventData.mMousePos.x),
+        static_cast<float>(eventData.mMousePos.y),
+        40.0f
+      );
+    }
+    if (hit == nullptr || hit->mUserUnit == nullptr) {
+      return false;
+    }
+
+    moho::WeakSet<moho::UserEntity> selection;
+    if ((eventData.mModifiers & moho::MEM_Shift) != 0u) {
+      selection = session.GetSelection();
+      if (selection.Find(hit->mUserUnit) != selection.end()) {
+        (void)selection.Remove(hit->mUserUnit);
+      } else {
+        (void)selection.Add(hit->mUserUnit);
+      }
+    } else {
+      (void)selection.Add(hit->mUserUnit);
+    }
+    session.SetSelection(selection);
+    return true;
   }
 } // namespace
 
@@ -383,6 +438,9 @@ namespace moho
     DragMove(eventData);
 
     if (!HasActiveSelectionDrag()) {
+      if (SelectPlannedFactoryUnderClick(*mSess, mCam, *eventData)) {
+        return;
+      }
       mSess->ReleaseDrag(eventData->mModifiers);
       return;
     }

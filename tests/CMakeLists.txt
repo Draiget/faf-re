@@ -661,6 +661,13 @@ set_target_properties(faf_ui_art_tests PROPERTIES FOLDER "Tests/UI")
 add_test(NAME ui_art COMMAND faf_ui_art_tests)
 set_tests_properties(ui_art PROPERTIES LABELS "UI")
 
+# Planned factory ghost selection and pre-orders switch and state tests
+add_executable(faf_planned_factory_preorders_tests EXCLUDE_FROM_ALL sim/PlannedFactoryPreOrdersTests.cpp)
+target_link_libraries(faf_planned_factory_preorders_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_planned_factory_preorders_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME planned_factory_preorders COMMAND faf_planned_factory_preorders_tests)
+set_tests_properties(planned_factory_preorders PROPERTIES LABELS "Sim")
+
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
 # reports it as Not Run.

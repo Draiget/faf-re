@@ -8,6 +8,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/render/DynamicLights.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace moho
 {
@@ -415,6 +416,11 @@ namespace moho
    */
   CWldSession::~CWldSession()
   {
+    // Engine addition (`ui_FactoryPreOrders`): the planned factories' units sit in this session's entity map
+    // like the sim's units and go with the session as they do; the manager only drops its pointers to them,
+    // which nothing may touch once the session is gone.
+    moho::PlannedFactoryManager::Get().ForgetAll();
+
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
 
     // Engine addition (`ui_TransportPreOrders`): pre-order state is keyed by entity ids, which the
@@ -1548,6 +1554,8 @@ namespace moho
       mState
     );
     SetSelection(WeakSet<UserEntity>());
+    // Engine addition (`ui_FactoryPreOrders`): every entity goes below, planned factories' units with them.
+    PlannedFactoryManager::Get().ForgetAll();
     USER_GetSound()->StopAllSounds();
     USER_GetSound()->SetListenerArmy(nullptr);
     sWorldParticles.ClearRenderBuckets();
@@ -1689,6 +1697,9 @@ namespace moho
     }
 
     TickBeatUnits(beat);
+
+    // Engine addition (`ui_FactoryPreOrders`): after the units' ticks noted the new ones.
+    PlannedFactoryManager::Get().Update(*this);
 
     UpdateOrphansAndVisibility();
 #if FAF_SERVER_MODE
