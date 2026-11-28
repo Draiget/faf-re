@@ -36,11 +36,13 @@
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
+#include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/Shadow.h"
+#include "moho/render/lights/LightField.h"
 
 namespace
 {
@@ -433,7 +435,9 @@ namespace moho
     );
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
-    BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
+    // Engine addition (water bodies): the water map, or the level map of the patched terrain effect on a map with
+    // bodies
+    water::BindTerrainWaterMap(*terrainRes, shaderVars.utilityTextureC);
 
     BindTextureShaderVar(shaderVars.lowerAlbedoTexture, strata.mLowerAlbedoTexture.mTextureSheet);
     BindTextureShaderVar(shaderVars.stratum0AlbedoTexture, strata.mStratum0AlbedoTexture.mTextureSheet);
@@ -598,8 +602,13 @@ namespace moho
 
     if (shadowContext != nullptr) {
       // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
+      // FAF: also on while the terrain takes the light field's sun shadow (ren_DynLightsTerrainSunShadow; the shadow
+      // map is then cleared to lit when it has no casters)
       const std::uint32_t shadowsEnabledBlob =
-        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->mShadowCameraValid));
+        (shadowContext->mShadowCameraValid ||
+         (lights::TerrainSunShadowActive() && shadowContext->GetShadowTexture() != nullptr))
+        ? 1U
+        : 0U;
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
 
       if (shaderVars.shadowMatrix.Exists()) {

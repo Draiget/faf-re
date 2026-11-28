@@ -1,7 +1,7 @@
 """Builds the water-levels test map (.plans/water-levels/PLAN.md): a shipped map's terrain with
 spline-shaped features carved into it, and water bodies at their own levels.
 
-    python make_map.py <base map folder> <output maps folder>
+    python make_map.py <base map folder> <output maps folder> [many | far]
 
 for example `make_map.py "<game>/maps/SCMP_012" "<game>/maps"`, which writes
 `<game>/maps/faf_re_waterlevels/` (scmap, scenario, save, script). Nothing binary is kept in the
@@ -19,6 +19,14 @@ water come from the same control points:
 
 The water only shows in the sim (and in a game) with `sim_FixWaterBodies 1` until a FAF game
 version carries the feature; the renderer does not draw the bodies yet.
+
+Two more maps for the renderer's limits (`faf_re_waterlevels_many`, `faf_re_waterlevels_far`; they keep the base
+map's own script, none of the checks above):
+
+- `many` (base SCMP_012, 256 x 256): twelve pools on a plateau at twelve different levels (22 to 33), more waters
+  in view than the six projected grids a frame draws, and no sea;
+- `far` (a 1024 x 1024 base, e.g. 20x20 White Fire): two lakes 500 units apart, more than the simulation window of
+  512 units holds around the middle of the view, at levels 36 and 30, plus a third at 28 in the far corner.
 """
 import math
 import os
@@ -226,13 +234,7 @@ def lua_points(points):
     return "{ " + ", ".join("{ %g, %g }" % p for p in points) + " }"
 
 
-def build(base_dir, out_root):
-    base = os.path.basename(os.path.normpath(base_dir))
-    scmap = ScMap(open(os.path.join(base_dir, base + ".scmap"), "rb").read())
-    terrain = Terrain(scmap)
-    bodies = []
-    specs = []
-
+def features_default(terrain, bodies, specs):
     # Sea bay in the north-west corner, away from both starts (south-west and north-east).
     terrain.dig_to(ellipse(24, 24, 44, 38, wobble=0.1), 0.0, 10.0)
 
@@ -269,35 +271,81 @@ def build(base_dir, out_root):
     bodies.append("{ Dry = true, FillTo = %g, Outline = %s }" % (SEA[0], lua_points(scaled(inside, 1.15))))
     specs.append({"dry": True, "fill": SEA[0], "outline": scaled(inside, 1.15)})
 
+
+def pool(terrain, bodies, specs, cx, cz, rx, rz, level, count=6):
+    """A pool dug 5 below its level, its water a body with a seed and an outline."""
+    shape = ellipse(cx, cz, rx, rz, count=count)
+    terrain.dig_to(shape, level - 5.0, 2.5)
+    bodies.append("{ Elevation = %g, Seed = { %g, %g }, Outline = %s }" % (level, cx, cz, lua_points(scaled(shape, 1.2))))
+    specs.append({"level": level, "fill": level, "seed": (cx, cz), "outline": scaled(shape, 1.2)})
+
+
+def features_many(terrain, bodies, specs):
+    # A plateau at 40 over most of the map, twelve pools in four columns and three rows, level 22 + 1 per pool: the
+    # cap of projected grids a frame (six) is passed in any view that holds more than six of them.
+    terrain.raise_to(ellipse(135, 125, 112, 88, count=8), 40.0, 12.0)
+    level = 22.0
+    for row in range(3):
+        for col in range(4):
+            pool(terrain, bodies, specs, 60 + 50 * col, 70 + 55 * row, 14, 14, level)
+            level += 1.0
+
+
+def features_far(terrain, bodies, specs):
+    # Lakes on plateaus far apart: the simulation window is 512 units around the point the view looks at.
+    for cx, cz, top, level in ((300, 512, 46.0, 36.0), (800, 512, 40.0, 30.0), (920, 940, 38.0, 28.0)):
+        terrain.raise_to(ellipse(cx, cz, 110, 90, count=8), top, 20.0)
+        pool(terrain, bodies, specs, cx, cz, 55, 42, level, count=8)
+
+
+FEATURES = {None: features_default, "many": features_many, "far": features_far}
+
+
+def build(base_dir, out_root, variant=None):
+    # the folder's name and the prefix of its files differ on maps with a version suffix (20x20_white_fire_8v8.v0001)
+    folder = os.path.basename(os.path.normpath(base_dir))
+    base = next(f[: -len(".scmap")] for f in sorted(os.listdir(base_dir)) if f.endswith(".scmap"))
+    name = NAME if variant is None else NAME + "_" + variant
+    scmap = ScMap(open(os.path.join(base_dir, base + ".scmap"), "rb").read())
+    terrain = Terrain(scmap)
+    bodies = []
+    specs = []
+
+    FEATURES[variant](terrain, bodies, specs)
+
     scmap.set_heights(terrain.words())
     scmap.set_water(True, *SEA)
 
-    out_dir = os.path.join(out_root, NAME)
+    out_dir = os.path.join(out_root, name)
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, NAME + ".scmap"), "wb") as f:
+    with open(os.path.join(out_dir, name + ".scmap"), "wb") as f:
         f.write(scmap.data)
 
     scenario = open(os.path.join(base_dir, base + "_scenario.lua"), encoding="latin-1").read()
-    scenario = scenario.replace("/maps/%s/%s" % (base, base), "/maps/%s/%s" % (NAME, NAME))
-    scenario = scenario.replace("/maps/%s/%s" % (base.lower(), base.lower()), "/maps/%s/%s" % (NAME, NAME))
-    scenario = re.sub(r"name\s*=\s*'[^']*'", "name = 'FAF RE water levels'", scenario, count=1)
-    scenario = re.sub(r"name\s*=\s*\"[^\"]*\"", "name = \"FAF RE water levels\"", scenario, count=1)
+    for source in ((folder, base), (folder.lower(), base.lower())):
+        scenario = scenario.replace("/maps/%s/%s" % source, "/maps/%s/%s" % (name, name))
+    title = "FAF RE water levels" + ("" if variant is None else " " + variant)
+    # the map's own name, the first `name =` of the file (the base map may quote it either way; a team's name comes later)
+    scenario = re.sub(r"name\s*=\s*(['\"])[^'\"]*\1", lambda m: "name = %s%s%s" % (m.group(1), title, m.group(1)), scenario, count=1)
     table = "    WaterBodies = {\n" + "".join("        %s,\n" % b for b in bodies) + "    },\n"
     scenario = re.sub(r"(ScenarioInfo\s*=\s*\{\n)", lambda m: m.group(1) + table, scenario, count=1)
     if "WaterBodies" not in scenario:
         raise SystemExit("could not place WaterBodies in the scenario")
-    if "/maps/%s/" % NAME not in scenario:
+    if "/maps/%s/" % name not in scenario:
         raise SystemExit("could not point the scenario at the new map files")
-    with open(os.path.join(out_dir, NAME + "_scenario.lua"), "w", encoding="latin-1", newline="\n") as f:
+    with open(os.path.join(out_dir, name + "_scenario.lua"), "w", encoding="latin-1", newline="\n") as f:
         f.write("-- Generated by faf-re tools/scenarios/water-levels/make_map.py from %s.\n" % base)
         f.write(scenario)
-    shutil.copyfile(os.path.join(base_dir, base + "_save.lua"), os.path.join(out_dir, NAME + "_save.lua"))
-    # The test's own script: checks the water and logs WATERTEST lines.
-    here = os.path.dirname(os.path.abspath(__file__))
-    shutil.copyfile(os.path.join(here, "map", NAME + "_script.lua"), os.path.join(out_dir, NAME + "_script.lua"))
+    shutil.copyfile(os.path.join(base_dir, base + "_save.lua"), os.path.join(out_dir, name + "_save.lua"))
+    if variant is None:
+        # The test's own script: checks the water and logs WATERTEST lines.
+        here = os.path.dirname(os.path.abspath(__file__))
+        shutil.copyfile(os.path.join(here, "map", NAME + "_script.lua"), os.path.join(out_dir, name + "_script.lua"))
+    else:
+        shutil.copyfile(os.path.join(base_dir, base + "_script.lua"), os.path.join(out_dir, name + "_script.lua"))
 
     owner = fill_bodies(terrain, specs)
-    write_preview(os.path.join(out_dir, NAME + "_water_preview.png"), terrain, owner)
+    write_preview(os.path.join(out_dir, name + "_water_preview.png"), terrain, owner, 3 if terrain.w < 600 else 1)
     for k, spec in enumerate(specs):
         cells = sum(1 for o in owner if o is not None and o is not None and o[1] == (None if spec.get("dry") else spec["level"]))
         print("body %d: %s, %d vertices" % (k + 1, "dry" if spec.get("dry") else "level %g" % spec["level"], cells))
@@ -308,6 +356,6 @@ def build(base_dir, out_root):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] not in ("many", "far")):
         raise SystemExit(__doc__)
-    build(sys.argv[1], sys.argv[2])
+    build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None)

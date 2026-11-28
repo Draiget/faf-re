@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: see EffectRuntime.h.
 
 #include "EffectRuntime.h"
+#include "gpg/gal/DynLightPass.h"
 
 #include <Windows.h>
 #include <ShlObj.h>
@@ -725,7 +726,19 @@ namespace gpg::gal
     if (skipped != nullptr && std::strstr(skipped, (";" + std::string(mName.c_str()) + ";").c_str()) != nullptr) {
       return 0;
     }
-    return static_cast<int>(mProgram->Description().techniques[mTechnique].passes.size());
+    int passes = static_cast<int>(mProgram->Description().techniques[mTechnique].passes.size());
+    // Dynamic lights: the light pass(es) at the end are not drawn while no light is active.
+    if (mDynLightPasses < 0) {
+      int marked = 0;
+      if (!GetAnnotationInt(&marked, fa::string("dynLightPasses"))) {
+        marked = 0;
+      }
+      mDynLightPasses = marked < 0 ? 0 : (marked >= passes ? passes - 1 : marked);
+    }
+    if (mDynLightPasses > 0 && !gDynLightPassActive.load(std::memory_order_relaxed)) {
+      passes -= mDynLightPasses;
+    }
+    return passes;
   }
 
   void ProgramEffectTechnique::EndTechnique()

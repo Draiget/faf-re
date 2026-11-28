@@ -11,9 +11,11 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/WaterBodies.h"
+#include "moho/terrain/water/WaterLevelTexel.h"
 
 namespace moho
 {
@@ -47,6 +49,12 @@ namespace moho
       const STIMap* map{nullptr};
       std::uint32_t generation{0};
       std::vector<WaterBodySurfaces::Level> levels;
+      std::shared_ptr<CD3DDynamicTextureSheet> owner;
+      std::uint32_t ownerGeneration{0};
+      const STIMap* ownerMap{nullptr};
+      std::shared_ptr<CD3DDynamicTextureSheet> levelMap;
+      std::uint32_t levelGeneration{0};
+      const STIMap* levelMapOf{nullptr};
 
       bool mirrored{false};
       float mirroredLevel{0.0f};
@@ -166,6 +174,17 @@ namespace moho
         WaterBodySurfaces::Level level;
         level.elevation = levelOf[body];
         level.sea = body == 0u;
+        level.body = body;
+        level.x0 = 1.0e30f;
+        level.z0 = 1.0e30f;
+        level.x1 = -1.0e30f;
+        level.z1 = -1.0e30f;
+        for (const SRun& run : runs) {
+          level.x0 = std::min(level.x0, static_cast<float>(run.hx0 * 2));
+          level.x1 = std::max(level.x1, static_cast<float>(run.hx1 * 2));
+          level.z0 = std::min(level.z0, static_cast<float>(run.hz * 2));
+          level.z1 = std::max(level.z1, static_cast<float>(run.hz * 2 + 2));
+        }
         for (std::size_t first = 0; first < runs.size(); first += kQuadsPerChunk) {
           WaterBodySurfaces::Chunk chunk;
           const std::size_t count = std::min(kQuadsPerChunk, runs.size() - first);
@@ -243,9 +262,102 @@ namespace moho
     return &state.levels;
   }
 
+  std::shared_ptr<CD3DDynamicTextureSheet> WaterBodySurfaces::OwnerTexture(
+    IWldTerrainRes* const terrainRes
+  )
+  {
+    SState& state = State();
+    const STIMap* const map = terrainRes != nullptr ? terrainRes->mMap : nullptr;
+    const std::uint32_t generation = map != nullptr ? WaterBodiesGeneration(*map) : 0u;
+    if (generation == 0u) {
+      state.owner.reset();
+      state.ownerGeneration = 0u;
+      state.ownerMap = nullptr;
+      return {};
+    }
+    if (state.owner != nullptr && state.ownerMap == map && state.ownerGeneration == generation) {
+      return state.owner;
+    }
+    state.owner.reset();
+    const CHeightField* const field = map->mHeightField.get();
+    const std::int32_t texelsX = (field->width - 1) >> 1;
+    const std::int32_t texelsZ = (field->height - 1) >> 1;
+    ID3DDeviceResources::DynamicTextureSheetHandle sheet{};
+    // gal format 6: one 8-bit channel (L8 / R8_UNORM)
+    (void)D3D_GetDevice()->GetResources()->CreateDynamicTextureSheet2(sheet, texelsX, texelsZ, 6);
+    std::uint32_t pitch = 0U;
+    void* bits = nullptr;
+    if (!sheet || !sheet->Lock(&pitch, &bits) || bits == nullptr) {
+      gpg::Warnf("Water bodies: the owner texture could not be made; the projected grid draws no lakes");
+      return {};
+    }
+    auto* const row0 = static_cast<std::uint8_t*>(bits);
+    for (std::int32_t hz = 0; hz < texelsZ; ++hz) {
+      std::uint8_t* const row = row0 + static_cast<std::size_t>(hz) * pitch;
+      for (std::int32_t hx = 0; hx < texelsX; ++hx) {
+        row[hx] = WaterOfBlock(*map, hx * 2, hz * 2).body;
+      }
+    }
+    sheet->Unlock();
+    state.owner = sheet;
+    state.ownerGeneration = generation;
+    state.ownerMap = map;
+    return state.owner;
+  }
+
+  std::shared_ptr<CD3DDynamicTextureSheet> WaterBodySurfaces::LevelTexture(
+    IWldTerrainRes* const terrainRes
+  )
+  {
+    SState& state = State();
+    const STIMap* const map = terrainRes != nullptr ? terrainRes->mMap : nullptr;
+    const std::uint32_t generation = map != nullptr ? WaterBodiesGeneration(*map) : 0u;
+    if (generation == 0u) {
+      state.levelMap.reset();
+      state.levelGeneration = 0u;
+      state.levelMapOf = nullptr;
+      return {};
+    }
+    if (state.levelMap != nullptr && state.levelMapOf == map && state.levelGeneration == generation) {
+      return state.levelMap;
+    }
+    state.levelMap.reset();
+    const CHeightField* const field = map->mHeightField.get();
+    const std::int32_t texelsX = (field->width - 1) >> 1;
+    const std::int32_t texelsZ = (field->height - 1) >> 1;
+    ID3DDeviceResources::DynamicTextureSheetHandle sheet{};
+    // gal format 2: B8G8R8A8, the byte order of the water map (a texel is the word of WaterLevelTexel.h)
+    (void)D3D_GetDevice()->GetResources()->CreateDynamicTextureSheet2(sheet, texelsX, texelsZ, 2);
+    std::uint32_t pitch = 0U;
+    void* bits = nullptr;
+    if (!sheet || !sheet->Lock(&pitch, &bits) || bits == nullptr) {
+      gpg::Warnf("Water bodies: the level map of the terrain could not be made; the terrain keeps the baked depth");
+      return {};
+    }
+    auto* const row0 = static_cast<std::uint8_t*>(bits);
+    for (std::int32_t hz = 0; hz < texelsZ; ++hz) {
+      auto* const row = reinterpret_cast<std::uint32_t*>(row0 + static_cast<std::size_t>(hz) * pitch);
+      for (std::int32_t hx = 0; hx < texelsX; ++hx) {
+        const SWaterOfBlock water = WaterOfBlock(*map, hx * 2, hz * 2);
+        row[hx] = water::PackLevelTexel(water.level, water.abyss);
+      }
+    }
+    sheet->Unlock();
+    state.levelMap = sheet;
+    state.levelGeneration = generation;
+    state.levelMapOf = map;
+    return state.levelMap;
+  }
+
   void WaterBodySurfaces::Release()
   {
     SState& state = State();
+    state.levelMap.reset();
+    state.levelGeneration = 0u;
+    state.levelMapOf = nullptr;
+    state.owner.reset();
+    state.ownerGeneration = 0u;
+    state.ownerMap = nullptr;
     ReleaseLevels(state.levels);
     state.map = nullptr;
     state.generation = 0u;

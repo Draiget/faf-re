@@ -37,6 +37,9 @@ namespace moho
   [[nodiscard]] ShaderVar& GetWater2SunColorShaderVar();
   [[nodiscard]] ShaderVar& GetWater2SunGlowShaderVar();
   [[nodiscard]] ShaderVar& GetWater2TerrainScaleShaderVar();
+  /// FAF addition: `water2/faf_WaterFilter` (float3: reflection taps, refraction taps, shoreline blend), declared by
+  /// WaterEffectPatch; absent from the shipped effect.
+  [[nodiscard]] ShaderVar& GetWater2WaterFilterShaderVar();
 
   /**
    * Shader var `water2/ViewportScaleOffset` (0x010C0FA8).

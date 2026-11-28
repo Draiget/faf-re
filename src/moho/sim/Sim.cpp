@@ -1,6 +1,7 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
 #include "moho/sim/SimConVarAccess.h"
+#include "moho/render/lights/SimLights.h"
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/sim/SimBlockLane.h"
 

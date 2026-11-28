@@ -49,6 +49,7 @@
 #include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/SimBlockLane.h"
 #include "moho/sim/SimKeyframe.h"
+#include "moho/sim/SimWaterEvents.h"
 
 namespace moho
 {
@@ -1052,6 +1053,40 @@ namespace moho
    */
   void Projectile::Impact()
   {
+    // The sea feels a shell, a bomb or a torpedo landing on or under the water (render only: the water simulation reads
+    // it, nothing feeds back).
+    // (Only where a renderer takes the events: headless and the server read nothing here, not even the damage.)
+    if (
+      SimWaterEventsEnabled() &&
+      (mImpactType == IMPACT_Water || mImpactType == IMPACT_Underwater || mImpactType == IMPACT_ProjectileUnderwater ||
+       mImpactType == IMPACT_UnitUnderwater)
+    ) {
+      float damage = mDamage;
+      if (!(damage >= 1.0f)) {
+        // (a type error outside a pcall if the projectile's object is not a table: asked only of a table)
+        const LuaPlus::LuaObject damageData =
+          mLuaObj.IsTable() ? mLuaObj.GetByName("DamageData") : LuaPlus::LuaObject();
+        if (damageData.IsTable()) {
+          const LuaPlus::LuaObject amount = damageData.GetByName("DamageAmount");
+          if (amount.IsNumber()) {
+            damage = static_cast<float>(amount.GetNumber());
+          }
+        }
+      }
+      const bool below = mImpactType != IMPACT_Water;
+      // debris and sparks (a dying ship throws dozens, none with damage) are not shells
+      if (damage >= 12.0f) {
+        // a shell of the player's own side or an ally's is shown where it lands; an enemy's only where the player sees
+        const Entity* const waterLauncher = mLauncherWeak.GetObjectPtr();
+        SimWaterImpact(
+          mImpactPosition.x,
+          mImpactPosition.z,
+          damage,
+          below ? 0.5f : 1.0f,
+          waterLauncher != nullptr ? waterLauncher->GetArmyIndex() : -1
+        );
+      }
+    }
 
     // Resolve the launcher entity (asm 0x0069DEE0-0069DEF8).
     Entity* const launcherEntity = mLauncherWeak.GetObjectPtr();

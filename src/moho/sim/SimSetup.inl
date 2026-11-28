@@ -259,6 +259,8 @@ Sim::~Sim()
   // Engine addition (issue #216): a dump still owed is taken while the state it describes exists.
   CDesyncRecorder::Detach(*this);
 
+  lights::SimLightsOnSimDestroyed(this); // Lua dynamic lights (visual only, docs/DYNAMIC_LIGHTS.md)
+
   // Stop the three task stages (disk-watcher + two sim task stages).
   mDiskWatcherTaskStage.Teardown();
   mTaskStageA.Teardown();

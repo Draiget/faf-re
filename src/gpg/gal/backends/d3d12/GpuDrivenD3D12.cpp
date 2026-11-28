@@ -695,9 +695,13 @@ namespace gpg::gal
             Transition(buffer.resource, kTextureRead);
           }
         }
-      } else if (bindings.readBoundDepth && outputContext_.depthStencil != nullptr) {
+      } else if (
+        bindings.depthTarget != nullptr || (bindings.readBoundDepth && outputContext_.depthStencil != nullptr)
+      ) {
         // The next target bind moves it back to DEPTH_WRITE (BindTargets).
-        auto* const depth = static_cast<DepthStencilTargetD3D12*>(outputContext_.depthStencil.get());
+        auto* const depth = static_cast<DepthStencilTargetD3D12*>(
+          bindings.depthTarget != nullptr ? bindings.depthTarget : outputContext_.depthStencil.get()
+        );
         if (depth->ShaderView().ptr != 0U) {
           view = depth->ShaderView();
           Transition(depth->Resource(), kTextureRead);

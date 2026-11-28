@@ -13,6 +13,11 @@
 // shader's time) and fades out over its source's life. A half-resolution compute pass sums them per pixel from the
 // depth of terrain and opaque meshes, and a composite multiplies (1 + light) into the colour, so lit ground keeps
 // its own hue. Direct3D 12 and Vulkan only (it reads the bound depth target, as ren_Ao does).
+//
+// This is the simple tier of the engine's two effect-light systems. The other one, the Dynamic Lights option
+// (moho/render/lights, docs/DYNAMIC_LIGHTS.md), lights the world from an irradiance field with shadows, in the shaders
+// of the materials, on every render API. The two never run together: while that one is on (lights::Enabled) this one
+// collects and draws nothing.
 
 #include <cstdint>
 #include <map>

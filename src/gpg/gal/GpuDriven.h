@@ -31,6 +31,7 @@
 
 namespace gpg::gal
 {
+  class DepthStencilTarget;
   class IndexBuffer;
   class RenderTarget;
   class Texture;
@@ -233,6 +234,10 @@ namespace gpg::gal
     /// Direct3D 12 and Vulkan create their head depth targets readable; anywhere else t6 reads 0.
     /// For dispatches: a draw would read the target it also writes.
     bool readBoundDepth = false;
+    /// t6 (Vulkan binding 10) read from this depth target, created sampled (`DepthStencilTargetContext::field0x10_`),
+    /// instead of the bound one; wins over `readBoundDepth`. The call must not bind it for drawing: a pass that reads a
+    /// depth target it draws apart from (ambient occlusion into targets of its own) binds none.
+    DepthStencilTarget* depthTarget = nullptr;
   };
 
   /**

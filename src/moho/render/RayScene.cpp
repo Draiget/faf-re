@@ -29,7 +29,7 @@ namespace moho
   int ren_RayShadowTerrainStep = 0;
   int ren_RayShadowFailTest = 0;
   // Engine addition (ren_RaySunAngle): soft shadows from a sun that is a disc, not a point.
-  float ren_RaySunAngle = 3.0f;
+  float ren_RaySunAngle = 0.0f;
   int ren_RayWaterReflections = 0;
   float ren_RayWaterReach = 400.0f;
   int ren_RaySoftRays = 4;
