@@ -565,6 +565,32 @@ namespace gpg
       return Legacy().insert(typename legacy_type::value_type(cell, fresh)).first->second;
     }
 
+    /**
+     * The lookup `FindOrCreate` performs, with the table kind decided by the
+     * caller instead of by a per-call branch on the process-wide mode.
+     * Engine addition: the search picks the table once per call, so the
+     * candidate loop does not ask again for every neighbour.
+     */
+    template <bool kUseFlat>
+    [[nodiscard]] TNode& FindOrCreateSelected(
+      const TCell& cell
+    )
+    {
+      if constexpr (kAllowFlat && kUseFlat) {
+        flat_type* const flat = Flat();
+        TNode* const found = flat->Find(cell);
+        return (found != nullptr) ? *found : flat->Insert(cell);
+      } else {
+        const typename legacy_type::iterator found = Legacy().find(cell);
+        if (found != Legacy().end()) {
+          return found->second;
+        }
+        TNode fresh;
+        fresh.mCell = cell;
+        return Legacy().insert(typename legacy_type::value_type(cell, fresh)).first->second;
+      }
+    }
+
     void clear()
     {
       if constexpr (kAllowFlat) {
@@ -780,8 +806,12 @@ namespace gpg
      * opens with its heuristic, an open one re-parents when this route is
      * cheaper. Returns the default step only once the open set is empty,
      * i.e. nothing further is reachable.
+     *
+     * The node table's kind is decided here, once per call, and the
+     * selected lookup is used for every candidate the loop offers.
      */
-    auto WorkOnce(
+    template <bool kUseFlat>
+    auto WorkOnceSelected(
       TTraits& traits
     )
     {
@@ -802,7 +832,7 @@ namespace gpg
         (void)mOpen.Pop();
 
         for (const neighbour_type& neighbour : neighbours) {
-          node_type& node = FindOrCreateNode(neighbour.mCell);
+          node_type& node = mNodes.template FindOrCreateSelected<kUseFlat>(neighbour.mCell);
           const float reachedCost = current->mCost + neighbour.mCost;
 
           switch (node.mState) {
@@ -842,6 +872,18 @@ namespace gpg
       }
 
       return step_type{};
+    }
+
+    auto WorkOnce(
+      TTraits& traits
+    )
+    {
+      if constexpr (kAllowFlatTable) {
+        if (AStarFlatNodeTableEnabled()) {
+          return WorkOnceSelected<true>(traits);
+        }
+      }
+      return WorkOnceSelected<false>(traits);
     }
   };
 } // namespace gpg
