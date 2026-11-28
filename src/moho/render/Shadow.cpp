@@ -19,6 +19,7 @@
 #include "moho/render/d3d/CD3DDepthStencil.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/render/shadow/ShadowFilter.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/CWldMap.h"
@@ -184,6 +185,16 @@ namespace moho
     constexpr int kCascadeGutter = 4;
     /** Texels inside a tile's edge a lookup keeps clear of: the blur's reach and the filter's footprint. */
     constexpr float kCascadeMargin = 5.0f;
+
+    /**
+     * The same, with the shadow filter's kernel (shadowfilter::FootprintTexels, up to 10 texels) in place of the blur's
+     * reach when it is the larger: a tap that left the tile would read the gutter, which holds nothing, and light the
+     * shadow along the tile's edge.
+     */
+    [[nodiscard]] float CascadeMarginTexels()
+    {
+      return std::max(kCascadeMargin, shadowfilter::FootprintTexels() + 1.0f);
+    }
     /** A finer tile covering more than this share of the whole-view map on both axes isn't worth drawing. */
     constexpr float kCascadeWorthIt = 0.75f;
 
@@ -199,6 +210,13 @@ namespace moho
     [[nodiscard]] bool CascadeAtlasWanted()
     {
       return ren_ShadowCascades > 0 && RenderingOnModern() && !gpg::gal::effects::gShadowCascadesBlocked.load();
+    }
+
+    /** The shadow map edge (the tile edge of the atlas) wanted now: ren_ShadowSize, or more while the shadow filter's
+     * level asks for it. */
+    [[nodiscard]] int WantedShadowSize()
+    {
+      return shadowfilter::WantedMapSize(ren_ShadowSize, CascadeAtlasWanted());
     }
 
     // The shadow renderers whose targets are the atlas. Shadow's layout is the binary's.
@@ -506,8 +524,11 @@ namespace moho
   {
     // Both tuning values are sampled before the reset below, which zeroes the
     // cached copies.
-    const int shadowSize = RenderingOnD3D9() ? std::min(ren_ShadowSize, kShadowSizeLimitD3D9) : ren_ShadowSize;
-    const bool shadowBlur = ren_ShadowBlur;
+    // Engine addition (shadow filtering): with the filter on (shadowfilter::Active) its level sets the map size (the
+    // tile size of the atlas) and the variance blur is not used (the patched lookups compare depth in the raw map), so
+    // its two targets are not allocated.
+    const int shadowSize = RenderingOnD3D9() ? std::min(ren_ShadowSize, kShadowSizeLimitD3D9) : WantedShadowSize();
+    const bool shadowBlur = ren_ShadowBlur && !shadowfilter::Active();
 
     (void)ReleaseRenderResources();
 
@@ -779,6 +800,8 @@ namespace moho
     const float farMagnitude = std::fabs(lightSpaceVolume.Min.Z());
     const float nearDepth = std::min(nearMagnitude, farMagnitude) - 25.0f;
     const float farDepth = std::max(nearMagnitude, farMagnitude);
+    // Engine addition (shadow filtering): the world size of the light volume, for the penumbra estimate of the filter.
+    shadowfilter::SetLightVolume(lightSpaceVolume.Max.X() - lightSpaceVolume.Min.X(), farDepth - nearDepth);
 
     ShadowStableBox box{
       lightSpaceVolume.Min.X(),
@@ -822,7 +845,7 @@ namespace moho
         sCasterRegion.light[2] = lightDirection.Z() / lightLength;
         sCasterRegion.floorY = volume.Min.Y();
         const float texel = std::max(box.maxX - box.minX, box.maxY - box.minY) / static_cast<float>(content);
-        sCasterRegion.margin = kCasterMarginTexels * texel;
+        sCasterRegion.margin = std::max(kCasterMarginTexels, shadowfilter::FootprintTexels() + 1.0f) * texel;
         sCasterRegion.active = true;
       }
     }
@@ -971,7 +994,7 @@ namespace moho
           static_cast<float>(originY + kCascadeGutter),
           static_cast<float>(content),
           atlasSize,
-          kCascadeMargin
+          CascadeMarginTexels()
         );
         std::memcpy(vectors[1 + 2 * entry], lookup.box, sizeof(lookup.box));
         std::memcpy(vectors[2 + 2 * entry], lookup.map, sizeof(lookup.map));
@@ -1278,16 +1301,20 @@ namespace moho
     // Engine addition (ren_ShadowCascades): turning the atlas on or off rebuilds the targets too.
     const bool atlasChanged =
       mShadowFidelity != 0 && (CascadeAtlasWanted() && CascadeContent(mShadowSize) > 64) != IsCascadeAtlas(*this);
+    const bool filtered = shadowfilter::Active();
     if (
-      fidelity != mShadowFidelity || ren_ShadowSize != mShadowSize || ren_ShadowBlur != mShadowBlurEnabled ||
-      atlasChanged
+      fidelity != mShadowFidelity || WantedShadowSize() != mShadowSize ||
+      (ren_ShadowBlur && !filtered) != mShadowBlurEnabled || atlasChanged
     ) {
       (void)Init(fidelity);
 
-      // Init settles what could actually be allocated; publish that back.
+      // Init settles what could actually be allocated; publish that back. (Not while the shadow filter overrides the
+      // size and the blur: the user's ren_ShadowSize / ren_ShadowBlur come back when it is switched off.)
       shadow_Fidelity = mShadowFidelity;
-      ren_ShadowSize = mShadowSize;
-      ren_ShadowBlur = mShadowBlurEnabled;
+      if (!filtered) {
+        ren_ShadowSize = mShadowSize;
+        ren_ShadowBlur = mShadowBlurEnabled;
+      }
     }
 
     IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
@@ -1296,10 +1323,12 @@ namespace moho
     }
 
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
-    if (!PrepareLightCamera(viewCamera, sunDirection, zoom)) {
+    const bool cameraValid = PrepareLightCamera(viewCamera, sunDirection, zoom);
+    if (!cameraValid) {
       // Engine addition (ren_ShadowCascades): no tiles this frame, so no lookup follows last frame's.
       PublishNoCascades();
     }
+    shadowfilter::UpdateShaderVars(ShadowTextureSize(*this), cameraValid);
     RenderShadowMap(terrain, viewCamera);
   }
 

@@ -17,6 +17,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Matrix.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -60,15 +61,103 @@ namespace gpg::gal
   } // namespace
 
   // ---------------------------------------------------------------------------
+  // Anisotropic filtering of tiled textures (effects/TextureFiltering.h)
+
+  void EffectSamplersD3D11::Collect(
+    ID3DX11Effect* const effect,
+    const std::vector<std::pair<std::string, std::string>>& samplerTextures
+  )
+  {
+    D3DX11_EFFECT_DESC effectDesc{};
+    if (effect == nullptr || FAILED(effect->GetDesc(&effectDesc))) {
+      return;
+    }
+    effect->GetDevice(&device);
+    for (UINT index = 0U; index < effectDesc.GlobalVariables; ++index) {
+      ID3DX11EffectVariable* const variable = effect->GetVariableByIndex(index);
+      if (variable == nullptr || !variable->IsValid()) {
+        continue;
+      }
+      D3DX11_EFFECT_VARIABLE_DESC variableDesc{};
+      D3DX11_EFFECT_TYPE_DESC typeDesc{};
+      ID3DX11EffectType* const type = variable->GetType();
+      if (
+        type == nullptr || FAILED(variable->GetDesc(&variableDesc)) || FAILED(type->GetDesc(&typeDesc)) ||
+        typeDesc.Type != D3D_SVT_SAMPLER
+      ) {
+        continue;
+      }
+      ID3DX11EffectSamplerVariable* const sampler = variable->AsSampler();
+      if (sampler == nullptr || !sampler->IsValid()) {
+        continue;
+      }
+      Entry entry;
+      entry.name = (variableDesc.Name != nullptr) ? variableDesc.Name : "";
+      std::string texture;
+      for (const auto& link : samplerTextures) {
+        if (link.first == entry.name) {
+          texture = link.second;
+          break;
+        }
+      }
+      const UINT elements = std::max(typeDesc.Elements, 1U);
+      bool takes = true;
+      for (UINT element = 0U; element < elements && takes; ++element) {
+        D3D11_SAMPLER_DESC authored{};
+        takes = SUCCEEDED(sampler->GetBackingStore(element, &authored)) &&
+          effects::TakesTextureAnisotropy(
+                  static_cast<std::uint32_t>(authored.Filter),
+                  static_cast<std::uint32_t>(authored.AddressU),
+                  static_cast<std::uint32_t>(authored.AddressV),
+                  texture
+          );
+        entry.authored.push_back(authored);
+      }
+      if (takes && !entry.authored.empty()) {
+        entry.variable = sampler;
+        samplers.push_back(std::move(entry));
+      }
+    }
+  }
+
+  void EffectSamplersD3D11::Sync()
+  {
+    const int wanted = effects::gTextureAnisotropy > 1 ? std::min(effects::gTextureAnisotropy, 16) : 1;
+    if (wanted == applied) {
+      return;
+    }
+    applied = wanted;
+    for (Entry& entry : samplers) {
+      for (UINT element = 0U; element < entry.authored.size(); ++element) {
+        // Back to the effect's own state first, then the anisotropic copy.
+        static_cast<void>(entry.variable->UndoSetSampler(element));
+        if (wanted <= 1 || device == nullptr) {
+          continue;
+        }
+        D3D11_SAMPLER_DESC desc = entry.authored[element];
+        desc.Filter = D3D11_FILTER_ANISOTROPIC;
+        desc.MaxAnisotropy = static_cast<UINT>(wanted);
+        Microsoft::WRL::ComPtr<ID3D11SamplerState> state;
+        if (SUCCEEDED(device->CreateSamplerState(&desc, &state))) {
+          static_cast<void>(entry.variable->SetSampler(element, state.Get()));
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // EffectD3D11
 
   EffectD3D11::EffectD3D11(
     const EffectContext& context,
-    ID3DX11Effect* const effect
+    ID3DX11Effect* const effect,
+    const std::vector<std::pair<std::string, std::string>>& samplerTextures
   )
     : mContext(context)
     , mEffect(effect)
+    , mSamplers(std::make_shared<EffectSamplersD3D11>())
   {
+    mSamplers->Collect(effect, samplerTextures);
     // The wrapper keeps no source once the effect exists (D3D10 empties the
     // copied buffer in `SetEffect`, 0x0094BFE0).
     mContext.mSourceBuffer.Reset();
@@ -99,7 +188,9 @@ namespace gpg::gal
       D3DX11_TECHNIQUE_DESC techniqueDesc{};
       CheckHresult("EffectD3D11.cpp", __LINE__, technique->GetDesc(&techniqueDesc));
       outTechniques.push_back(
-        std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(techniqueDesc.Name, mEffect.Get(), technique))
+        std::shared_ptr<EffectTechnique>(
+          new EffectTechniqueD3D11(techniqueDesc.Name, mEffect.Get(), technique, mSamplers)
+        )
       );
     }
   }
@@ -129,7 +220,7 @@ namespace gpg::gal
     if (technique == nullptr || !technique->IsValid()) {
       ThrowMissing("EffectD3D11.cpp", __LINE__, "technique", name);
     }
-    return std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(name, mEffect.Get(), technique));
+    return std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(name, mEffect.Get(), technique, mSamplers));
   }
 
   void EffectD3D11::OnReset() {}
@@ -142,11 +233,13 @@ namespace gpg::gal
   EffectTechniqueD3D11::EffectTechniqueD3D11(
     const char* const name,
     ID3DX11Effect* const effect,
-    ID3DX11EffectTechnique* const technique
+    ID3DX11EffectTechnique* const technique,
+    std::shared_ptr<EffectSamplersD3D11> samplers
   )
     : mName((name != nullptr) ? name : "")
     , mEffect(effect)
     , mTechnique(technique)
+    , mSamplers(std::move(samplers))
   {
     if (mEffect == nullptr) {
       ThrowError("EffectTechniqueD3D11.cpp", __LINE__, "invalid effect specified");
@@ -175,6 +268,9 @@ namespace gpg::gal
     Device::GetInstance()->BeginTechnique();
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("BeginTechnique %s", mName.c_str());
+    }
+    if (mSamplers != nullptr) {
+      mSamplers->Sync(); // ren_TextureAnisotropy
     }
 
     D3DX11_TECHNIQUE_DESC desc{};

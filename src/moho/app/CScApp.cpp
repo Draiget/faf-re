@@ -58,6 +58,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/render/RenderFeatures.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiWorldShapes.h"
@@ -2123,12 +2124,21 @@ bool CScApp::CreateDevice()
   }
 
   (void)gpg::gal::Device::GetInstance();
+  // The startup option groups below import the options module, whose Video tab is built from the render features of the
+  // running API.
+  if (const gpg::gal::DeviceContext* const earlyContext = gpg::gal::Device::GetInstance()->GetDeviceContext()) {
+    moho::render::SetActiveApi(earlyContext->mDeviceType);
+  }
   ConfigureStartupGraphicsOptionGroups(secondarySetupMode);
   moho::SetupBasicMovieManager();
 
   gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
   if (const gpg::gal::DeviceContext* const createdContext = device->GetDeviceContext()) {
     ApplyWindowTitleDetails(title, *createdContext);
+    // The renderer features (docs/RENDERER_BACKENDS.md, "Render features"): the registry learns which API runs and
+    // hands every supported feature the level the player chose.
+    moho::render::SetActiveApi(createdContext->mDeviceType);
+    moho::render::ApplyStartupSettings();
   }
   return true;
 }
