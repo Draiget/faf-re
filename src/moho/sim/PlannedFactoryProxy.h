@@ -74,7 +74,8 @@ namespace moho
     bool mRepeatBuild{false};
     std::vector<Builder> mBuilders{};
 
-    /// The client-only unit. The session's entity map owns it; the proxy only points at it.
+    /// The client-only unit. It sits in the session's entity map like the sim's units; the proxy only points
+    /// at it, and removes it itself when the plan goes during a game (`Destroy`).
     UserUnit* mUserUnit{nullptr};
 
     void AddPreOrder(const std::string& bpId, std::int32_t count = 1);
@@ -182,7 +183,8 @@ namespace moho
     /// Once per beat, after the units' ticks. See the class comment.
     void Update(CWldSession& session);
 
-    /// Session end: the session's entity map owns the client-only units and deletes them itself.
+    /// Session end: drops every proxy and its pointer without touching its unit, which stays with the ending
+    /// session's entities like the sim's units do.
     void ForgetAll() noexcept;
 
     /// The planned factory under a screen point, by its footprint at the cursor's ground point, then by

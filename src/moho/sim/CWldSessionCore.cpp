@@ -416,8 +416,9 @@ namespace moho
    */
   CWldSession::~CWldSession()
   {
-    // Engine addition (`ui_FactoryPreOrders`): the planned factories' units are in this session's entity
-    // map, which deletes them below.
+    // Engine addition (`ui_FactoryPreOrders`): the planned factories' units sit in this session's entity map
+    // like the sim's units and go with the session as they do; the manager only drops its pointers to them,
+    // which nothing may touch once the session is gone.
     moho::PlannedFactoryManager::Get().ForgetAll();
 
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
