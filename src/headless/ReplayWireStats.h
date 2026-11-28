@@ -57,7 +57,6 @@ namespace faf::headless
     void AccountFieldBits(const faf::remote::wire::SFrameDelta& delta);
 
     std::FILE* mFile = nullptr;
-    const faf::remote::wire::SContentTables& mTables;
     faf::remote::wire::SFrameCodec mCodec;
     faf::remote::CViewFrameBuilder mBuilder;
     faf::remote::wire::SViewFrame mPrevious;

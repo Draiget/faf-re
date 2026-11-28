@@ -60,7 +60,7 @@ namespace faf::remote::client
     static_assert(sizeof(out.origin) == sizeof(float) * 4u, "the origin is four floats");
     out.cmd = static_cast<std::int32_t>(descriptor.id);
     out.mFormationScriptIndex = descriptor.formation;
-    std::memcpy(&out.origin, descriptor.origin.data(), sizeof(out.origin));
+    std::memcpy(static_cast<void*>(&out.origin), descriptor.origin.data(), sizeof(out.origin)); // four floats as sent
     out.unk1 = descriptor.scale;
     out.blueprint = descriptor.blueprint != 0u && descriptor.blueprint - 1u < blueprints.size()
       ? const_cast<moho::REntityBlueprint*>(blueprints[descriptor.blueprint - 1u])

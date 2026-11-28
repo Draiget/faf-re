@@ -18,7 +18,12 @@ namespace faf::online
     lobby.kind = node.String("kind");
     lobby.origin = node.String("origin");
     lobby.tournament = node.String("tournament");
-    lobby.map = node.String("map");
+    // The service sends the map as {id, name, km, players}; a plain name is taken too.
+    if (const JsonNode* const map = node.Get("map"); map != nullptr && map->kind == JsonNode::Kind::Object) {
+      lobby.map = map->String("id");
+    } else {
+      lobby.map = node.String("map");
+    }
     lobby.stale = node.Bool("stale");
     if (const JsonNode* const seats = node.Get("seats"); seats != nullptr && seats->kind == JsonNode::Kind::Array) {
       for (const JsonNode& item : seats->items) {
@@ -229,10 +234,6 @@ namespace faf::online
     const ServerGameRequest& request
   )
   {
-    const auto token = mTokens ? mTokens() : std::expected<std::string, std::string>(std::unexpected("no tokens set"));
-    if (!token) {
-      return std::unexpected("no FAF sign-in: " + token.error());
-    }
     std::vector<JsonNode> seats{JsonObject({{"kind", JsonString("human")}})};
     for (const std::string& other : request.otherSeats) {
       seats.push_back(
@@ -252,12 +253,74 @@ namespace faf::online
       {"region", JsonString(request.region)},
       {"placement", JsonString(request.byPing ? "ping" : "load")},
     });
+    return Call("POST", "/api/v1/requests", ToJson(body));
+  }
+
+  namespace
+  {
+    /** A request's <host>/<id> as the service makes them: letters, digits, '-', '_' and '.' around one '/'. */
+    [[nodiscard]] bool IsRequestRef(
+      const std::string& ref
+    )
+    {
+      // No "." or ".." part: a client that tidies paths would send the token somewhere else in the service.
+      if (ref.starts_with(".") || ref.contains("/.")) {
+        return false;
+      }
+      int slashes = 0;
+      for (const char c : ref) {
+        if (c == '/') {
+          ++slashes;
+        } else if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' ||
+                     c == '_' || c == '.')) {
+          return false;
+        }
+      }
+      return slashes == 1 && ref.front() != '/' && ref.back() != '/';
+    }
+  } // namespace
+
+  std::expected<JsonNode, std::string> ControlServiceClient::FollowRequest(
+    const std::string& ref
+  )
+  {
+    if (!IsRequestRef(ref)) {
+      return std::unexpected(std::string("not a request: ") + ref);
+    }
+    return Call("GET", "/api/v1/requests/" + ref, {});
+  }
+
+  std::expected<JsonNode, std::string> ControlServiceClient::PlayerRequests()
+  {
+    return Call("GET", "/api/v1/requests", {});
+  }
+
+  std::expected<JsonNode, std::string> ControlServiceClient::CancelRequest(
+    const std::string& ref
+  )
+  {
+    if (!IsRequestRef(ref)) {
+      return std::unexpected(std::string("not a request: ") + ref);
+    }
+    return Call("DELETE", "/api/v1/requests/" + ref, {});
+  }
+
+  std::expected<JsonNode, std::string> ControlServiceClient::Call(
+    const char* const method,
+    const std::string& path,
+    const std::string& body
+  )
+  {
+    const auto token = mTokens ? mTokens() : std::expected<std::string, std::string>(std::unexpected("no tokens set"));
+    if (!token) {
+      return std::unexpected("no FAF sign-in: " + token.error());
+    }
     platform::http::Call call;
-    call.method = "POST";
-    call.url = mBaseUrl + "/api/v1/requests";
-    call.headers =
-      "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer " + *token + "\r\n";
-    call.body = ToJson(body);
+    call.method = method;
+    call.url = mBaseUrl + path;
+    call.headers = std::string(body.empty() ? "" : "Content-Type: application/json\r\n") +
+      "Accept: application/json\r\nAuthorization: Bearer " + *token + "\r\n";
+    call.body = body;
     call.userAgent = mUserAgent;
     long status = 0;
     std::string text;

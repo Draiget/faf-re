@@ -2,6 +2,7 @@
 
 #include "online/FafVault.h"
 
+#include <charconv>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -186,16 +187,30 @@ namespace faf::online
     const std::string& text
   )
   {
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    int hour = 0;
-    int minute = 0;
-    int second = 0;
-    if (
-      std::sscanf(text.c_str(), "%d-%d-%dT%d:%d:%d", &year, &month, &day, &hour, &minute, &second) < 6 || month < 1 ||
-      month > 12 || day < 1 || day > 31
-    ) {
+    // "YYYY-MM-DDTHH:MM:SS", each number read in turn after its separator; anything shorter is no time.
+    int parts[6] = {};
+    const char* at = text.data();
+    const char* const end = text.data() + text.size();
+    for (int i = 0; i < 6; ++i) {
+      if (i > 0) {
+        if (at == end || *at != "--T::"[i - 1]) {
+          return 0;
+        }
+        ++at;
+      }
+      const auto read = std::from_chars(at, end, parts[i]);
+      if (read.ec != std::errc{}) {
+        return 0;
+      }
+      at = read.ptr;
+    }
+    const int year = parts[0];
+    const int month = parts[1];
+    const int day = parts[2];
+    const int hour = parts[3];
+    const int minute = parts[4];
+    const int second = parts[5];
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
       return 0;
     }
     const std::chrono::sys_days date = std::chrono::year(year) / std::chrono::month(static_cast<unsigned>(month)) /

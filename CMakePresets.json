@@ -59,6 +59,12 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
     },
     {
+      "name": "clang-x64-release-noserver",
+      "displayName": "clang-cl x64 Release without server mode (main_x64.exe)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_SERVER_MODE": "OFF" }
+    },
+    {
       "name": "clang-x64-release-server",
       "displayName": "clang-cl x64 Release with server mode (main_x64.exe)",
       "inherits": "clang-x64-release",

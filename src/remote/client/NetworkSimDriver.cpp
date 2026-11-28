@@ -1346,6 +1346,12 @@ namespace faf::remote::client
     return sHaveLaunch;
   }
 
+  void ClearServerLaunch() noexcept
+  {
+    sLaunch = SServerLaunch{};
+    sHaveLaunch = false;
+  }
+
   moho::ISTIDriver* CreateServerSessionDriver(
     moho::RRuleGameRules& rules,
     const moho::LaunchInfoBase& launch,

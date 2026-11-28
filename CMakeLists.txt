@@ -118,9 +118,10 @@ include(FafPgoWindows)
 include(FafCoverage)
 include(FafCodegen)
 
-# Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's
-# `/connectserver` path. Off, the build contains none of it.
-option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (/connectserver)" OFF)
+# Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's side of games
+# on our servers (the launcher's, `/connectserver`). On by default: it runs only in such a game,
+# and every other game is the same lockstep game. Off, the build contains none of it.
+option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (games on our servers)" ON)
 
 # --- Dependencies (built here, /MT, read-only sources) ----------------------------------
 add_subdirectory(cmake/deps/wildmagic)

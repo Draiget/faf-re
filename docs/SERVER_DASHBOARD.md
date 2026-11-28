@@ -18,7 +18,7 @@ cd tools && go build -o ../build/server-host ./cmd/server-host
 - `server-host` starts a `server` per lobby. It needs Go (the version in `tools/go.mod`).
 - The game data is a folder laid out as `--data` describes in [SWITCHES.md](SWITCHES.md): `fa/`, `faf/` (with `faf/bin/init_replay.lua`) and `vault/`.
 
-Players need a game built with server mode (`cmake --preset clang-x64-release-server`, then `build.ps1`'s usual steps or `cmake --build --preset clang-x64-release-server`): only that build has the join switches (`/connectserver`). The FAF client's normal `main_x64.exe` doesn't.
+Players need a game built with server mode, which every build has unless it was turned off (`FAF_SERVER_MODE=OFF`, preset `clang-x64-release-noserver`): only such a build has the join switches (`/connectserver`) and joins from the in-game launcher. A retail or FAF `ForgedAlliance.exe` doesn't.
 
 ## 2. Make an admin token
 

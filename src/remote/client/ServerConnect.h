@@ -96,8 +96,25 @@ namespace faf::remote
   [[nodiscard]] EServerSessionStart
   StartServerSession(const SServerConnectRequest& request, bool (*startLobbyUi)(), std::string& error);
 
+  /**
+   * Engine addition (in-game launcher): the same start in steps, so the game's frames go on while the server answers.
+   * `BeginServerSession` opens the channel (false and `error` when it can't); `PollServerSession`, called each frame,
+   * moves it: `NotRequested` while it waits for the server's answer (up to 15 s), then `Started` (the lobby UI is up)
+   * or `Failed` with `error`. No message box: the caller shows why.
+   */
+  [[nodiscard]] bool BeginServerSession(const SServerConnectRequest& request, std::string& error);
+  [[nodiscard]] EServerSessionStart PollServerSession(bool (*startLobbyUi)(), std::string& error);
+
   /** A server session was started in this process (from the command line or a launcher's `JoinServer`). */
   [[nodiscard]] bool ServerSessionStarted();
+
+  /**
+   * Engine addition (in-game launcher): the session ends without the process: what the game still has for the server
+   * (the driver's `Leaving`) goes out for up to `flushMs`, the channel closes, and the next session is a lockstep one
+   * again (`client::ClearServerLaunch`). Call it once no world session runs and the lobby task is gone. Does nothing
+   * outside a server session.
+   */
+  void EndServerSession(int flushMs = 300);
 
   /**
    * Plan WP2.12: the server's next lobby signal (remote/net/LobbySignals.h), if it is next in line: the lobby's own

@@ -23,6 +23,7 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "remote/ContentCheck.h"
+#include "remote/client/NetworkSimDriver.h"
 #include "remote/client/ServerRelayConnector.h"
 #include "remote/net/GameLinks.h"
 #include "remote/net/Datagram.h"
@@ -394,6 +395,68 @@ namespace faf::remote
 
     // How long startup waits for the server's answer before telling the player.
     constexpr double kConnectSeconds = 15.0;
+
+    // Engine addition (in-game launcher): the stepped start's server and when its channel opened.
+    std::string sConnectEndpoint;
+    std::chrono::steady_clock::time_point sConnectStart;
+    bool sConnecting = false;
+
+    /** Opens the channel to `request`'s server; why not, or empty. */
+    std::string OpenSession(
+      const SServerConnectRequest& request
+    )
+    {
+      net::SEndpoint server;
+      if (!net::ParseEndpoint(request.endpoint, server)) {
+        return "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in "
+               "brackets and port ([address]:port): \"" +
+          request.endpoint + "\".";
+      }
+      sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
+      // FAF_SERVER_LOCAL_ADDRESS (a test hook, unset for players): the client's socket on that one address (IPv4, or
+      // IPv6 in brackets) instead of every address, for a test machine that drops what any-address sockets send.
+      net::SEndpoint local;
+      if (const char* const address = std::getenv("FAF_SERVER_LOCAL_ADDRESS"); address != nullptr && *address != 0) {
+        if (!net::ParseEndpoint(std::string(address) + ":1", local)) { // the parser wants a port; the system picks one
+          return std::string("FAF_SERVER_LOCAL_ADDRESS isn't an address: ") + address;
+        }
+        local.port = 0;
+      }
+      if (auto opened = sSession->link.Open(local); !opened) {
+        return "Can't reach the game server: " + opened.error();
+      }
+      return {};
+    }
+
+    /** With the server's answer in: why it refused, or empty and the session's lobby UI started. */
+    std::string FinishSessionStart(
+      const std::string& endpoint,
+      bool (*const startLobbyUi)()
+    )
+    {
+      if (sSession->link.State() != net::CClientLink::EState::Connected) {
+        const auto refusal = sSession->link.Refusal();
+        if (refusal == net::EHandshakeRefusal::Version) {
+          return "The game server runs another version of the game's network protocol: this game can't play there.";
+        }
+        if (refusal == net::EHandshakeRefusal::NotAdmitted) {
+          return "The game server doesn't admit this player: no seat in its match, or the time to join is over.";
+        }
+        return "The game server refused this player" +
+          (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + ".";
+      }
+      gpg::Logf("Server session: connected to %s", endpoint.c_str());
+      sSession->channel.KeepAlive(); // the stall cover counts from the game thread's last pump
+      sSession->StartStallCover();
+
+      // The front end waits for the server's lobby signals (plan WP2.12): a task the UI side runs takes them and makes
+      // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes
+      // `TakeServerLobbyConnector`.
+      if (startLobbyUi == nullptr || !startLobbyUi()) {
+        return "Unable to start the lobby.";
+      }
+      return {};
+    }
   } // namespace
 
   moho::INetConnector* TakeServerLobbyConnector()
@@ -555,6 +618,25 @@ namespace faf::remote
     return sSession != nullptr;
   }
 
+  void EndServerSession(
+    const int flushMs
+  )
+  {
+    if (sSession == nullptr) {
+      client::ClearServerLaunch();
+      return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    while (sSession->channel.Up() &&
+           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() < flushMs) {
+      sSession->channel.KeepAlive(); // pumps the link: the reliable messages left go out
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    sSession.reset(); // the stall cover stops with it
+    client::ClearServerLaunch();
+    gpg::Logf("Server session: ended; the next session is a lockstep one.");
+  }
+
   EServerSessionStart StartServerSession(
     const SServerConnectRequest& request,
     bool (*const startLobbyUi)(),
@@ -574,17 +656,8 @@ namespace faf::remote
     };
 
     // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
-    net::SEndpoint server;
-    if (!net::ParseEndpoint(request.endpoint, server)) {
-      return fail(
-        "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in brackets and "
-        "port ([address]:port): \"" +
-        request.endpoint + "\"."
-      );
-    }
-    sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
-    if (auto opened = sSession->link.Open(); !opened) {
-      return fail("Can't reach the game server: " + opened.error());
+    if (std::string why = OpenSession(request); !why.empty()) {
+      return fail(std::move(why));
     }
     const auto start = std::chrono::steady_clock::now();
     while (sSession->link.State() == net::CClientLink::EState::Connecting) {
@@ -594,22 +667,63 @@ namespace faf::remote
       sSession->link.Pump(NowUs());
       sSession->link.Wait(20);
     }
-    if (sSession->link.State() != net::CClientLink::EState::Connected) {
-      const auto refusal = sSession->link.Refusal();
-      return fail(
-        "The game server refused this player" +
-        (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + "."
-      );
+    if (std::string why = FinishSessionStart(request.endpoint, startLobbyUi); !why.empty()) {
+      return fail(std::move(why));
     }
-    gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
-    sSession->channel.KeepAlive(); // the stall cover counts from the game thread's last pump
-    sSession->StartStallCover();
+    return EServerSessionStart::Started;
+  }
 
-    // The front end waits for the server's lobby signals (plan WP2.12): a task the UI side runs takes them and makes
-    // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes
-    // `TakeServerLobbyConnector`.
-    if (startLobbyUi == nullptr || !startLobbyUi()) {
-      return fail("Unable to start the lobby.");
+  bool BeginServerSession(
+    const SServerConnectRequest& request,
+    std::string& error
+  )
+  {
+    if (sSession != nullptr) {
+      error = "a server session is already running";
+      return false;
+    }
+    gpg::Logf("Server session requested: %s as player %d", request.endpoint.c_str(), request.uid);
+    if (std::string why = OpenSession(request); !why.empty()) {
+      gpg::Logf("Server session: %s", why.c_str());
+      error = std::move(why);
+      sSession.reset();
+      return false;
+    }
+    sConnectEndpoint = request.endpoint;
+    sConnectStart = std::chrono::steady_clock::now();
+    sConnecting = true;
+    return true;
+  }
+
+  EServerSessionStart PollServerSession(
+    bool (*const startLobbyUi)(),
+    std::string& error
+  )
+  {
+    if (!sConnecting || sSession == nullptr) {
+      sConnecting = false;
+      error = "no server session is starting";
+      return EServerSessionStart::Failed;
+    }
+    const auto fail = [&](std::string text) {
+      gpg::Logf("Server session: %s", text.c_str());
+      error = std::move(text);
+      sSession.reset();
+      sConnecting = false;
+      return EServerSessionStart::Failed;
+    };
+    if (sSession->link.State() == net::CClientLink::EState::Connecting) {
+      if (std::chrono::duration<double>(std::chrono::steady_clock::now() - sConnectStart).count() > kConnectSeconds) {
+        return fail("The game server at " + sConnectEndpoint + " doesn't answer.");
+      }
+      sSession->link.Pump(NowUs());
+      if (sSession->link.State() == net::CClientLink::EState::Connecting) {
+        return EServerSessionStart::NotRequested; // still waiting
+      }
+    }
+    sConnecting = false;
+    if (std::string why = FinishSessionStart(sConnectEndpoint, startLobbyUi); !why.empty()) {
+      return fail(std::move(why));
     }
     return EServerSessionStart::Started;
   }

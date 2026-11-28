@@ -1351,7 +1351,13 @@ local function BuildOnlinePage(launcher, page)
     view.footer.Right:Set(function() return listArea.Right() - Scale(150) end)
     view.footer.Bottom:Set(function() return games.Bottom() - Scale(6) end)
     view.footerJoin = Theme.Button(games, 'Join', function()
-        launcher:JoinSelected()
+        if view.footerAction == 'cancel' then
+            launcher:CancelServerRequest()
+        elseif view.footerAction == 'rejoin' then
+            launcher:Join({ source = 'server', uid = view.footerRejoin })
+        else
+            launcher:JoinSelected()
+        end
     end, 'primary', { width = 120, height = 26 })
     view.footerJoin.Right:Set(listArea.Right)
     view.footerJoin.Bottom:Set(games.Bottom)
@@ -1460,6 +1466,7 @@ local function RefreshOnline(launcher)
                     source = 'server', uid = lobby.key, title = lobby.name ~= '' and lobby.name or lobby.key,
                     map = lobby.map, players = lobby.humans, maxPlayers = lobby.humanSeats, featuredMod = '',
                     host = lobby.host, state = state, password = false, joinable = lobby.joinable, why = lobby.why,
+                    seated = lobby.seated,
                 })
             end
         end
@@ -1472,7 +1479,7 @@ local function RefreshOnline(launcher)
             counts.all = counts.all + 1
         end
         do
-            local visible = (showStarted or game.state == 'open') and Matches(game, filter) and
+            local visible = (showStarted or game.state == 'open' or game.seated) and Matches(game, filter) and
                 not (hidePrivate and (game.password or game.visibility == 'friends')) and
                 not (hideModded and game.simMods and game.simMods > 0)
             if game.state == 'open' or showStarted then
@@ -1538,7 +1545,13 @@ local function RefreshOnline(launcher)
 
     local footer
     local footerColor = C.subtle
-    if status.match == 'preparing' or status.match == 'running' then
+    local request = launcher:FollowServerRequest(status)
+    view.footerAction = request and request.action or nil
+    view.footerRejoin = request and request.lobbyKey or nil
+    if request then
+        footer = request.text
+        footerColor = request.color
+    elseif status.match == 'preparing' or status.match == 'running' then
         footer = status.matchMessage ~= '' and status.matchMessage or 'Starting the game'
         footerColor = C.accent
     elseif status.match == 'failed' and status.matchMessage ~= '' then
@@ -1568,9 +1581,15 @@ local function RefreshOnline(launcher)
     end
     Theme.SetText(view.footer, footer)
     Theme.SetColor(view.footer, footerColor)
-    Theme.SetVisible(view.footerJoin, not wide)
-    view.footerJoin:SetEnabled(selected ~= nil and WhyNotJoinable(selected, status) == nil and
-        status.match ~= 'preparing' and status.match ~= 'running')
+    Theme.SetVisible(view.footerJoin, view.footerAction ~= nil or not wide)
+    view.footerJoin:SetLabel((view.footerAction == 'cancel' and 'Cancel') or (view.footerAction == 'rejoin' and 'Rejoin') or
+        'Join')
+    if view.footerAction then
+        view.footerJoin:SetEnabled(not request.cancelling and status.match ~= 'preparing' and status.match ~= 'running')
+    else
+        view.footerJoin:SetEnabled(selected ~= nil and WhyNotJoinable(selected, status) == nil and
+            status.match ~= 'preparing' and status.match ~= 'running')
+    end
     view.listButton.icon:SetIcon('list', view.grid.mode == 'list' and C.accent or C.muted)
     view.gridButton.icon:SetIcon('grid', view.grid.mode == 'grid' and C.accent or C.muted)
 end
@@ -1595,6 +1614,31 @@ local function OpenHostDialog(launcher)
     LayoutHelpers.AtLeftTopIn(head, panel, 26, 22)
     local note = Theme.Text(panel, 'Hosted on FAF: players on FAF\'s own client see it and can join.', 12, C.muted)
     LayoutHelpers.AtLeftTopIn(note, panel, 26, 52)
+    -- Where it runs: on FAF (the players' games link to each other), or on one of our servers, which runs the game and
+    -- sends each player what their army sees. Our servers only when a control service of ours is set up.
+    local where = 'faf'
+    local whereChoices = {}
+    local ApplyWhere -- below
+    local canServer = rawget(_G, 'FafOnline_RequestServerGame') ~= nil and (status.serverCount or 0) > 0
+    if canServer then
+        for i, entry in { { 'faf', 'On FAF' }, { 'server', 'Our server' } } do
+            local value = entry[1]
+            local choice = Theme.Choice(panel, entry[2], 130, function(self)
+                where = value
+                for _, other in whereChoices do
+                    other.selected = other.value == value
+                    other:Paint(false)
+                end
+                ApplyWhere()
+            end)
+            choice.value = value
+            choice.selected = value == where
+            choice:Paint(false)
+            LayoutHelpers.AtRightTopIn(choice, panel, 26 + (2 - i) * 138, 22)
+            whereChoices[i] = choice
+        end
+    end
+    cover.whereChoices = whereChoices -- for the test walk
 
     local function Label(text, top)
         local caption = Theme.Caption(panel, text)
@@ -1609,7 +1653,7 @@ local function OpenHostDialog(launcher)
     titleField:Refresh()
     LayoutHelpers.AtLeftTopIn(titleField, panel, 26, 100)
 
-    Label('Password', 144)
+    local passwordLabel = Label('Password', 144)
     local passwordField = Theme.TextField(panel, 340, 'None: anyone can join', 'lock', 40)
     LayoutHelpers.AtLeftTopIn(passwordField, panel, 26, 160)
 
@@ -1667,7 +1711,7 @@ local function OpenHostDialog(launcher)
     ModNote()
     cover.modChoices = modChoices -- for the test walk
 
-    Label('Who sees it', 322)
+    local visLabel = Label('Who sees it', 322)
     local visibility = 'public'
     local visChoices = {}
     for i, entry in { { 'public', 'Everyone' }, { 'friends', 'Friends only' } } do
@@ -1686,7 +1730,28 @@ local function OpenHostDialog(launcher)
         visChoices[i] = choice
     end
 
-    Label('Rating range', 382)
+    -- On our server: who takes the other seats (open ones for players to join, or the AI).
+    local seatsLabel = Label('Other seats', 144)
+    local otherSeats = 'human'
+    local seatChoices = {}
+    for i, entry in { { 'human', 'Open for players' }, { 'rush', 'AI (Rush)' } } do
+        local value = entry[1]
+        local choice = Theme.Choice(panel, entry[2], 166, function(self)
+            otherSeats = value
+            for _, other in seatChoices do
+                other.selected = other.value == value
+                other:Paint(false)
+            end
+        end)
+        choice.value = value
+        choice.selected = value == otherSeats
+        choice:Paint(false)
+        LayoutHelpers.AtLeftTopIn(choice, panel, 26 + (i - 1) * 174, 160)
+        seatChoices[i] = choice
+    end
+    cover.seatChoices = seatChoices -- for the test walk
+
+    local ratingLabel = Label('Rating range', 382)
     local minField = Theme.TextField(panel, 100, 'Any', nil, 5)
     LayoutHelpers.AtLeftTopIn(minField, panel, 26, 398)
     local dash = Theme.Text(panel, '-', 14, C.subtle)
@@ -1695,6 +1760,44 @@ local function OpenHostDialog(launcher)
     LayoutHelpers.AtLeftTopIn(maxField, panel, 148, 398)
     local enforce = Theme.Checkbox(panel, 'Enforce', function() end)
     LayoutHelpers.AtLeftTopIn(enforce, panel, 262, 398)
+
+    -- What each place takes: FAF's own settings, or the seats on our server (its game runs FAF's files, open to all).
+    local fafOnly = { passwordLabel, passwordField, minField, dash, maxField, enforce, visLabel, ratingLabel }
+    for _, choice in visChoices do
+        table.insert(fafOnly, choice)
+    end
+    local serverOnly = { seatsLabel }
+    for _, choice in seatChoices do
+        table.insert(serverOnly, choice)
+    end
+    ApplyWhere = function()
+        local onServer = where == 'server'
+        for _, control in fafOnly do
+            Theme.SetVisible(control, not onServer)
+        end
+        for _, control in serverOnly do
+            Theme.SetVisible(control, onServer)
+        end
+        for _, choice in modChoices do
+            if onServer then
+                choice.enabledBefore = choice.enabledBefore == nil and choice.enabled or choice.enabledBefore
+                choice.enabled = choice.id == 'faf'
+                choice.why = choice.id == 'faf' and choice.why or 'Our servers run FAF\'s own game files'
+                choice.selected = choice.id == 'faf'
+            else
+                if choice.enabledBefore ~= nil then
+                    choice.enabled = choice.enabledBefore
+                end
+                choice.selected = choice.id == chosenMod
+            end
+            choice:Paint(false)
+        end
+        Theme.SetText(note, onServer and
+            'On our server: it runs the game and shows each player what their army sees. FAF\'s game list doesn\'t show it.' or
+            'Hosted on FAF: players on FAF\'s own client see it and can join.')
+        modNoteRefresh()
+    end
+    ApplyWhere()
 
     -- The map: its picture, a search and the maps on this computer, by name.
     local right = function() return panel.Right() - Scale(26) end
@@ -1907,6 +2010,21 @@ local function OpenHostDialog(launcher)
         end
         Prefs.SetToCurrentProfile('fafre_host_title', request.title)
         Prefs.SetToCurrentProfile('fafre_host_map', map.path)
+        if where == 'server' then
+            local seats = {}
+            for i = 2, math.max(2, Facts(map.path).players) do
+                table.insert(seats, otherSeats)
+            end
+            local ok, why = launcher:RequestServerGame({ map = map.folder, seats = seats })
+            if not ok then
+                errorText:SetText(tostring(why))
+                return
+            end
+            LOG('LAUNCHER: asked our server for ' .. map.folder .. ' with ' .. table.getn(seats) .. ' other seats')
+            Close()
+            launcher:Refresh()
+            return
+        end
         local ok, why = launcher:HostRequest(request)
         if not ok then
             errorText:SetText(tostring(why))
@@ -1918,6 +2036,18 @@ local function OpenHostDialog(launcher)
     end, 'primary', { width = 170 })
     host.Right:Set(function() return cancel.Left() - Scale(12) end)
     LayoutHelpers.AtBottomIn(host, panel, 22)
+    cover.createButton = host -- for the test walk
+    cover.PickMap = function(folder) -- for the test walk
+        for index, item in mapList.items do
+            if item.folder == folder then
+                mapList.selectedKey = item.key
+                mapList:ScrollSetTop(nil, index - 3)
+                ShowMap(item)
+                return true
+            end
+        end
+        return false
+    end
 
     import('/lua/ui/uimain.lua').SetEscapeHandler(Close)
     return cover
@@ -2037,6 +2167,92 @@ function Launcher:HostRequest(request)
         return false, 'FAF refused: ' .. tostring(why)
     end
     return true
+end
+
+--- Asks our control service for a game the player hosts (FafOnline_RequestServerGame); the online page's footer
+--- follows it, and once its lobby has the player's seat the launcher joins it.
+function Launcher:RequestServerGame(request)
+    local ok, why = FafOnline_RequestServerGame(request)
+    if not ok then
+        return false, 'Our server refused: ' .. tostring(why)
+    end
+    self.requestJoined = false
+    self.requestEndShown = false
+    return true
+end
+
+function Launcher:CancelServerRequest()
+    local ok, why = FafOnline_CancelServerRequest()
+    if not ok then
+        self.lastError = 'Could not cancel: ' .. tostring(why)
+    end
+    self:Refresh()
+end
+
+local kRequestStates = {
+    sending = 'Asking our server for the game',
+    queued = 'Waiting for a free game server',
+    starting = 'Our server is starting the game',
+    lobby = 'The game is ready on our server',
+    game = 'Your game on our server is running',
+}
+
+--- The player's request for a game on our servers, for the footer: { text, color, active, cancelling }, or nil. Joins
+--- its lobby once it has the player's seat (once per request); a finished one is shown for 8 s, then forgotten.
+function Launcher:FollowServerRequest(status)
+    if not rawget(_G, 'FafOnline_ServerRequest') then
+        return nil
+    end
+    local request = FafOnline_ServerRequest()
+    if not request then
+        return nil
+    end
+    local over = request.state == 'ended' or request.state == 'refused' or request.state == 'cancelled' or
+        request.state == 'failed'
+    if over then
+        self.requestEndShown = self.requestEndShown or GetSystemTimeSeconds()
+        if GetSystemTimeSeconds() - self.requestEndShown > 8 then
+            FafOnline_ForgetServerRequest()
+            return nil
+        end
+        local text = ({ ended = 'Your game on our server has ended.', cancelled = 'Request cancelled.',
+            refused = 'Our server refused the game', failed = 'The request failed' })[request.state]
+        if request.message ~= '' and request.state ~= 'ended' and request.state ~= 'cancelled' then
+            text = text .. ': ' .. request.message
+        end
+        return { text = text, color = (request.state == 'refused' or request.state == 'failed') and C.bad or C.muted }
+    end
+    if request.ready and not self.requestJoined and status.match ~= 'preparing' and status.match ~= 'running' then
+        self.requestJoined = request.ref
+        LOG('LAUNCHER: our server\'s game ' .. request.lobbyKey .. ' is ready; joining')
+        self:Join({ source = 'server', uid = request.lobbyKey })
+    end
+    if status.serverGame and (status.match == 'preparing' or status.match == 'running') then
+        return nil -- the match's own line says how it goes
+    end
+    local text = kRequestStates[request.state] or ('Our server: ' .. tostring(request.state))
+    local action = 'cancel'
+    if request.left and (request.state == 'lobby' or request.state == 'game') then
+        -- The server took the player out of it when they left; it goes on (the AI plays on) until it ends.
+        text = request.state == 'lobby' and 'You left the lobby of your game on our server' or
+            'You left your game on our server; it goes on without you'
+        action = nil
+    elseif request.joined and (request.state == 'lobby' or request.state == 'game') and request.lobbyKey ~= '' then
+        -- Joined once (or found open from before): the player may go back in.
+        text = request.state == 'lobby' and 'Your game on our server waits in its lobby' or
+            'Your game on our server is running'
+        action = 'rejoin'
+    elseif request.state == 'game' then
+        action = nil -- a started game can't be cancelled; it ends in the game
+    end
+    if request.state == 'queued' and request.position > 0 then
+        text = text .. ' (' .. request.position .. (request.position == 1 and ', next)' or ' in line)')
+    end
+    if request.cancelling then
+        text = 'Cancelling the request'
+    end
+    return { text = text .. '.', color = C.accent, action = action, cancelling = request.cancelling,
+        lobbyKey = request.lobbyKey }
 end
 
 --- A FAF tutorial (trainingpage.lua): its scenario `technicalName` started offline on FAF's tutorials featured mod, as
@@ -3483,6 +3699,63 @@ end
 local testJoinDone = false
 local testJoinSeen = false
 local testFriendDone = false
+-- FAF_ONLINE_AUTOTEST=server:<map>:<seconds>[:game] (a test hook; OnlineLauncher.cpp calls this every 2 s until a
+-- match starts): Create game, Our server, AI seats, <map>, Create, as a player does. The launcher joins the lobby itself.
+local testServerAsked = false
+local testServerRejoined = false
+function TestServerHost(map)
+    if not current or current.page ~= 'online' then
+        return
+    end
+    if testServerAsked then
+        -- An open game of the player's own from before: the footer offers Rejoin; pressed as a player would.
+        local view = current.online
+        if not testServerRejoined and view and view.footerAction == 'rejoin' and view.footerJoin then
+            testServerRejoined = true
+            LOG('LAUNCHER TEST: pressing Rejoin for ' .. tostring(view.footerRejoin))
+            view.footerJoin.onClick(view.footerJoin)
+        end
+        return
+    end
+    if not current.hostDialog then
+        current:OpenHostDialog()
+        LOG('LAUNCHER TEST: host dialog ' .. (current.hostDialog and 'open' or 'did not open'))
+        return -- the next call picks, so the dialog can be seen first
+    end
+    local cover = current.hostDialog
+    if table.getn(cover.whereChoices or {}) < 2 then
+        LOG('LAUNCHER TEST: no Our server choice (no control service live?)')
+        return
+    end
+    if not cover.testFilled then
+        cover.whereChoices[2].onPick(cover.whereChoices[2])
+        cover.seatChoices[2].onPick(cover.seatChoices[2])
+        if not cover.PickMap(map) then
+            LOG('LAUNCHER TEST: no map ' .. tostring(map) .. ' in the dialog')
+            testServerAsked = true
+            return
+        end
+        cover.testFilled = true
+        LOG('LAUNCHER TEST: server dialog filled') -- the next call presses Create, so the dialog can be seen filled
+        return
+    end
+    testServerAsked = true
+    LOG('LAUNCHER TEST: Create game on our server, ' .. map .. ', AI seats')
+    cover.createButton.onClick(cover.createButton)
+end
+
+-- FAF_ONLINE_AUTOTEST=...:then-preview (a test hook): the changelog's unit preview, a single-player session, as
+-- /launcherpreviewtest starts it; its overlay walks on by itself and comes back to the launcher.
+function TestPreviewNow()
+    if not current then
+        return
+    end
+    Prefs.SetToCurrentProfile('fafre_preview_test', true)
+    current:PreviewUnit({ id = 'uel0303', name = 'Titan', stats = {
+        { label = 'Range', old = 30, new = 24, oldText = '30', newText = '24' },
+    } }, 'test')
+end
+
 function TestJoin()
     if testJoinDone or not current or current.page ~= 'online' or not current.online or not current.online.grid then
         return

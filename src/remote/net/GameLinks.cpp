@@ -491,9 +491,11 @@ namespace faf::remote::net
     , mHandshake(std::make_unique<CClientHandshake>(uid, token))
   {}
 
-  std::expected<void, std::string> CClientLink::Open()
+  std::expected<void, std::string> CClientLink::Open(
+    const SEndpoint& local
+  )
   {
-    return mSocket.Open(SEndpoint{});
+    return mSocket.Open(local);
   }
 
   void CClientLink::Reconnect()

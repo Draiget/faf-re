@@ -40,8 +40,7 @@ namespace faf::headless
     const float mapSizeX,
     const float mapSizeZ
   )
-    : mTables(tables)
-    , mCodec(MakeCodec(mapSizeX, mapSizeZ))
+    : mCodec(MakeCodec(mapSizeX, mapSizeZ))
     , mBuilder(tables, mCodec)
   {
     const auto variant = [&](

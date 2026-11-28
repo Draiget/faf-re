@@ -1588,6 +1588,57 @@ TEST(
   EXPECT_TRUE(server.RequestHead().contains("Content-Type: application/json"));
 }
 
+TEST(
+  OnlineControlService,
+  ReadsTheMapAsTheServiceSendsIt
+)
+{
+  // The service sends a lobby's map as an object; its id is what the launcher shows and matches.
+  const auto parsed = faf::online::ParseJson(
+    R"({"key":"eu-1/l4","state":"game","map":{"id":"scmp_009","name":"Seton's Clutch","km":20,"players":8}})"
+  );
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(faf::online::ReadServerLobby(*parsed).map, "scmp_009");
+  const auto plain = faf::online::ParseJson(R"({"key":"eu-1/l5","map":"scmp_007"})");
+  ASSERT_TRUE(plain);
+  EXPECT_EQ(faf::online::ReadServerLobby(*plain).map, "scmp_007");
+}
+
+TEST(
+  OnlineControlService,
+  FollowsAndCancelsTheRequestByItsReference
+)
+{
+  const std::string answer = "{\"ok\":true,\"request\":{\"id\":\"r1\",\"state\":\"lobby\",\"ref\":\"eu-1/r1\"}}";
+  const std::string reply =
+    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + std::to_string(answer.size()) +
+    "\r\nConnection: close\r\n\r\n" + answer;
+  for (const bool cancel : {false, true}) {
+    PlainHttpServer server(reply, {}, std::chrono::milliseconds(0), std::chrono::milliseconds(0));
+    const std::string base = server.Url().substr(0, server.Url().find("/api/"));
+    faf::online::ControlServiceClient client(base, "faf-re-client/test");
+    client.SetTokens([] {
+      return std::expected<std::string, std::string>("ACCESS");
+    });
+    const auto result = cancel ? client.CancelRequest("eu-1/r1") : client.FollowRequest("eu-1/r1");
+    ASSERT_TRUE(result) << result.error();
+    EXPECT_EQ(result->Get("request")->String("state"), "lobby");
+    const std::string expected = cancel ? "DELETE /api/v1/requests/eu-1/r1 " : "GET /api/v1/requests/eu-1/r1 ";
+    EXPECT_TRUE(server.RequestHead().starts_with(expected)) << server.RequestHead();
+    EXPECT_TRUE(server.RequestHead().contains("Authorization: Bearer ACCESS"));
+  }
+  // A reference that isn't one never leaves the client: no path of the service's but the request's own.
+  faf::online::ControlServiceClient client("http://127.0.0.1:9", "faf-re-client/test");
+  client.SetTokens([] {
+    return std::expected<std::string, std::string>("ACCESS");
+  });
+  for (const char* const bad :
+       {"eu-1/../../admin", "../r1", "eu-1/..", "./r1", "eu-1", "/r1", "eu-1/r1?x=1", "eu 1/r1"}) {
+    EXPECT_FALSE(client.FollowRequest(bad)) << bad;
+    EXPECT_FALSE(client.CancelRequest(bad)) << bad;
+  }
+}
+
 // --- WP4: the launcher's GPGNet side of a match ----------------------------------------------------------------------
 
 namespace

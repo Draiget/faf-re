@@ -267,6 +267,8 @@ namespace faf::remote::client
   void SetServerLaunch(const SServerLaunch& launch);
   /** A server session's launch was set: `WLD_DoLoading` makes the network driver, not a sim. */
   [[nodiscard]] bool HasServerLaunch() noexcept;
+  /** Engine addition (in-game launcher): the server session ended; the next session is a lockstep one. */
+  void ClearServerLaunch() noexcept;
   /** `WLD_DoLoading`, in a server session: the driver, over the session's rules and its map's heights (may be null). */
   [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(
     moho::RRuleGameRules& rules,

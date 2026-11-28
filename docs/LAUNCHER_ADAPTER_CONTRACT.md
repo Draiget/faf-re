@@ -208,7 +208,7 @@ Two traps when testing with a relay:
 
 ## 10. Games on a game server
 
-Not part of FAF's contract yet: how a game the FAF client launches the usual way (`/gpgnet 127.0.0.1:<port>`) learns that it plays on a dedicated game server instead of hosting or joining peers. Only a build with server mode (preset `clang-x64-release-server`) can; its engine side is `src/moho/app/ServerLobbyUi.cpp` and `src/remote/client/ServerConnect.h`. On a game server there is no peer lobby and there are no peer links: the server tells each game who hosts the lobby and who is in it, relays the lobby's messages, launches the match and runs its only sim.
+Not part of FAF's contract yet: how a game the FAF client launches the usual way (`/gpgnet 127.0.0.1:<port>`) learns that it plays on a dedicated game server instead of hosting or joining peers. Only a build with server mode (the default; not preset `clang-x64-release-noserver`) can; its engine side is `src/moho/app/ServerLobbyUi.cpp` and `src/remote/client/ServerConnect.h`. On a game server there is no peer lobby and there are no peer links: the server tells each game who hosts the lobby and who is in it, relays the lobby's messages, launches the match and runs its only sim.
 
 A game needs one connection string: the server's address and port (`a.b.c.d:port`, or `[ipv6]:port`), this player's token (1 to 1024 printable characters, no spaces) and this player's id. The token admits that one player and keys the handshake; it never goes on the wire. A launcher gives each player its own string and never another player's, nor an observer's (observers watch with `/replay gpgnet://<server>:<port>/<their own token>`). There are two ways to give it:
 

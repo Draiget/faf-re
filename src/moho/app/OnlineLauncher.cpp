@@ -35,6 +35,10 @@
 #include "moho/net/Common.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/ui/IUIManager.h"
+#if FAF_SERVER_MODE
+#include "moho/app/ServerLobbyUi.h"
+#include "remote/client/ServerConnect.h"
+#endif
 #include "online/ControlService.h"
 #include "online/FafAuth.h"
 #include "online/FafChat.h"
@@ -341,6 +345,33 @@ namespace
     return {};
   }
 
+  /**
+   * Engine addition: the game the player asked one of our control services to make (FafOnline_RequestServerGame), as
+   * a thread of its own follows it: sent, then its host's state every 2 s until its lobby has the player's join line
+   * (which stays here) or it is over.
+   */
+  struct ServerRequestJob
+  {
+    std::mutex lock;
+    std::string state = "sending"; ///< sending, queued, starting, lobby, game, ended, refused, cancelled, failed
+    std::string message;           ///< the service's or host's reason, or why the job failed
+    int position = 0;              ///< in the host's queue, 1 is next
+    std::string ref;               ///< <host>/<id>
+    std::string lobbyKey;          ///< <host>/<lobby id> once it has one
+    std::string join;              ///< the player's join line
+    std::string service;
+    std::atomic<bool> stop{false};
+    std::atomic<bool> cancel{false};
+    std::atomic<bool> done{false};
+    /// The launcher joined its lobby once: it isn't joined by itself again (a player who left stays out), only from
+    /// the games list.
+    std::atomic<bool> joined{false};
+    /// The player left its game (the launcher's way out): the server takes them out of that match for good.
+    std::atomic<bool> left{false};
+    std::thread worker;
+  };
+  std::shared_ptr<ServerRequestJob> gServerRequest;
+
   struct Service
   {
     FafAuth auth{GameEndpoints()};
@@ -394,6 +425,9 @@ namespace
     std::unique_ptr<ReplayRelay> finishingRelay; ///< the last match's, sending its last bytes
     std::chrono::steady_clock::time_point finishingSince;
     bool endedFromLobby = false;
+    /// The match is a game on one of our servers (FafOnline_JoinServer), not a FAF one: no GPGNet, nothing to FAF.
+    bool serverGame = false;
+    std::string serverGameKey; ///< its lobby, <host>/<id>
     std::string fixedToken; ///< FAF_ONLINE_ACCESS_TOKEN_FILE's, a test hook
     /// Our control services (ControlServiceAddresses), followed while the player is signed in to FAF.
     std::vector<std::unique_ptr<ControlServiceClient>> controls;
@@ -402,6 +436,8 @@ namespace
     // launcher lists through its Join (join:<seconds>); leave after <seconds> in the lobby or the game, quit after.
     std::string autotestMap; ///< the map to host; "join" for the join test
     bool autotestJoin = false;
+    bool autotestServer = false;      ///< server:<map>:<seconds>[:game]: Create game on our server, through the dialog
+    bool autotestThenPreview = false; ///< ...:then-preview: a single-player session (the unit preview) after it
     int autotestSeconds = 0;
     bool autotestGame = false; ///< launch the game from FAF's lobby, leave that
     /// 0: host once in the lobby; 1: wait for the match; 2: in FAF's lobby; 5: launched, waiting for the session;
@@ -440,11 +476,17 @@ namespace
         }
         LogLine(fixedToken.empty() ? "test: FAF_ONLINE_ACCESS_TOKEN_FILE is empty" : "test: a fixed access token");
       }
-      if (const std::string test = TestSetting("FAF_ONLINE_AUTOTEST"); test.starts_with("host:")) {
-        const std::size_t colon = test.find(':', 5);
-        autotestMap = test.substr(5, colon == std::string::npos ? std::string::npos : colon - 5);
+      if (
+        const std::string test = TestSetting("FAF_ONLINE_AUTOTEST");
+        test.starts_with("host:") || test.starts_with("server:")
+      ) {
+        autotestServer = test.starts_with("server:");
+        const std::size_t from = autotestServer ? 7 : 5;
+        const std::size_t colon = test.find(':', from);
+        autotestMap = test.substr(from, colon == std::string::npos ? std::string::npos : colon - from);
         autotestSeconds = colon == std::string::npos ? 30 : std::atoi(test.c_str() + colon + 1);
-        autotestGame = test.ends_with(":game");
+        autotestThenPreview = test.ends_with(":then-preview");
+        autotestGame = test.ends_with(":game") || test.contains(":game:");
         LogLine(("autotest: host on " + autotestMap + ", leave the " + (autotestGame ? "game" : "lobby") + " after " +
                  std::to_string(autotestSeconds) + " s")
                   .c_str());
@@ -472,6 +514,13 @@ namespace
 
     ~Service()
     {
+      if (gServerRequest) {
+        gServerRequest->stop = true;
+        if (gServerRequest->worker.joinable()) {
+          gServerRequest->worker.join();
+        }
+        gServerRequest.reset();
+      }
       for (const auto& control : controls) {
         control->Stop();
       }
@@ -688,6 +737,29 @@ namespace
     Service& s
   )
   {
+    if (s.serverGame) {
+      // A game on our server: its lobby task and channel go; FAF never heard of it.
+#if FAF_SERVER_MODE
+      moho::SERVERLOBBY_End();
+#endif
+      s.serverGame = false;
+      s.match = MatchState::Idle;
+      s.matchMessage.clear();
+      if (gServerRequest) {
+        const std::lock_guard<std::mutex> lock(gServerRequest->lock);
+        if (gServerRequest->lobbyKey == s.serverGameKey) {
+          gServerRequest->left = true;
+        }
+      }
+      LogLine(("server game " + s.serverGameKey + " ended; back to the launcher").c_str());
+      if (s.endedFromLobby) {
+        (void)moho::UI_StartFrontEnd();
+      } else {
+        moho::CON_Execute("ren_Oblivion false");
+        moho::CON_Execute("ren_Ui true");
+      }
+      return;
+    }
     s.lobby.SetGameHandler({});
     SendGameEnded(s);
     moho::GPGNET_Shutdown();
@@ -918,6 +990,7 @@ namespace
     // The FAF game the match is (its uid in FafOnline_Games), for the lobby screen's title and rules.
     SetField(L, "matchGame", s.match == MatchState::Idle ? std::string() : s.launch.uid);
     SetField(L, "matchMessage", s.matchMessage);
+    SetBool(L, "serverGame", s.serverGame && s.match != MatchState::Idle);
     SetField(L, "loadedMod", LoadedFeaturedMod(s));
     // Our control services: how many, and the worst state among them (off, connecting, failed, live).
     std::string servers = s.controls.empty() ? "none" : "live";
@@ -1862,15 +1935,222 @@ namespace
     return "off";
   }
 
-  /** Why this build can't join a game on our servers from the launcher yet. */
-  const char* ServerJoinUnavailable()
+  /** Why this build can't join a game on our servers from the launcher, or empty when it can. */
+  std::string ServerJoinUnavailable()
   {
 #if FAF_SERVER_MODE
-    // A server session lives until the process ends (remote/client/ServerConnect.cpp): it has no end that returns
-    // to the launcher yet.
-    return "Joining a server game from the launcher comes later: a server game can't hand back to the launcher yet.";
+    if (!moho::SERVERLOBBY_GamesOn()) {
+      return "Games on our servers are turned off (net_ServerGames 0).";
+    }
+    return {};
 #else
     return "This build of the game can't play on our servers (it was built without server mode).";
+#endif
+  }
+
+  /** Why the player can't join `lobby` now, or empty. */
+  std::string WhyNotJoinable(
+    const ServerLobby& lobby
+  )
+  {
+    if (std::string why = ServerJoinUnavailable(); !why.empty()) {
+      return why;
+    }
+    if (lobby.join.empty()) {
+      return lobby.watch.empty() ? "You have no seat in this game." : "You may only watch this game.";
+    }
+    if (lobby.state != "starting" && lobby.state != "lobby" && lobby.state != "game") {
+      return "This game is over.";
+    }
+    if (gServerRequest && gServerRequest->left.load()) {
+      const std::lock_guard<std::mutex> lock(gServerRequest->lock);
+      if (gServerRequest->lobbyKey == lobby.key) {
+        return "You left this game: the server took you out of it.";
+      }
+    }
+    return {};
+  }
+
+#if FAF_SERVER_MODE
+  /**
+   * A join line as our servers hand it out: `/connectserver <address> /servertoken <token> /serveruid <uid>`; the
+   * address, token and uid in `out`, false when one is missing.
+   */
+  bool ReadJoinLine(
+    const std::string& line,
+    std::string& address,
+    std::string& token,
+    long long& uid
+  )
+  {
+    std::vector<std::string> words;
+    std::string word;
+    for (const char c : line) {
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+        if (!word.empty()) {
+          words.push_back(std::move(word));
+          word.clear();
+        }
+      } else {
+        word += c;
+      }
+    }
+    if (!word.empty()) {
+      words.push_back(std::move(word));
+    }
+    bool haveUid = false;
+    for (std::size_t i = 0; i + 1 < words.size(); ++i) {
+      if (words[i] == "/connectserver") {
+        address = words[i + 1];
+      } else if (words[i] == "/servertoken") {
+        token = words[i + 1];
+      } else if (words[i] == "/serveruid") {
+        char* end = nullptr;
+        uid = std::strtoll(words[i + 1].c_str(), &end, 10);
+        haveUid = end != nullptr && *end == 0 && uid > 0;
+      }
+    }
+    return !address.empty() && !token.empty() && haveUid;
+  }
+#endif
+
+  /**
+   * Starts the game on our server whose lobby is `key`, with the player's own join line from its control service:
+   * the channel opens here, the server's answer comes in ONLINE_Frame (PollServerGame). The join line (the player's
+   * credential) never reaches Lua.
+   */
+  std::expected<void, std::string> JoinServerGame(
+    Service& s,
+    const std::string& key
+  )
+  {
+    if (std::string why = ServerJoinUnavailable(); !why.empty()) {
+      return std::unexpected(why);
+    }
+#if FAF_SERVER_MODE
+    if (s.match == MatchState::Preparing || s.match == MatchState::Running || s.match == MatchState::Ending) {
+      return std::unexpected(std::string("a game is already running"));
+    }
+    if (moho::WLD_GetActiveSession() != nullptr) {
+      return std::unexpected(std::string("a game is already running"));
+    }
+    const ServerLobby* found = nullptr;
+    std::vector<ServerLobby> lobbies;
+    for (const auto& control : s.controls) {
+      for (ServerLobby& lobby : control->Lobbies()) {
+        lobbies.push_back(std::move(lobby));
+      }
+    }
+    for (const ServerLobby& lobby : lobbies) {
+      if (lobby.key == key) {
+        found = &lobby;
+      }
+    }
+    ServerLobby fromRequest;
+    if (found == nullptr && gServerRequest) {
+      // The player's own request: its lobby may be here before the service's event stream lists it.
+      const std::lock_guard<std::mutex> lock(gServerRequest->lock);
+      if (gServerRequest->lobbyKey == key && !gServerRequest->join.empty()) {
+        fromRequest.key = key;
+        fromRequest.state = gServerRequest->state;
+        fromRequest.join = gServerRequest->join;
+        found = &fromRequest;
+      }
+    }
+    if (found == nullptr) {
+      return std::unexpected(std::string("no such game on our servers"));
+    }
+    if (std::string why = WhyNotJoinable(*found); !why.empty()) {
+      return std::unexpected(why);
+    }
+    std::string address;
+    std::string token;
+    long long uid = 0;
+    if (!ReadJoinLine(found->join, address, token, uid) || uid > 0x7FFFFFFFll) {
+      return std::unexpected(std::string("the server's join line for this seat doesn't read"));
+    }
+    faf::remote::SServerConnectRequest request;
+    if (
+      auto made = faf::remote::MakeServerConnectRequest(address, token, static_cast<std::int32_t>(uid), request); !made
+    ) {
+      return std::unexpected(made.error());
+    }
+    std::string error;
+    if (!faf::remote::BeginServerSession(request, error)) {
+      return std::unexpected(error);
+    }
+    if (gServerRequest) {
+      const std::lock_guard<std::mutex> lock(gServerRequest->lock);
+      if (gServerRequest->lobbyKey == key) {
+        gServerRequest->joined = true;
+      }
+    }
+    s.serverGame = true;
+    s.serverGameKey = key;
+    s.endedFromLobby = false;
+    s.match = MatchState::Preparing;
+    s.matchMessage = "Connecting to the game server";
+    LogLine(("server game " + key + ": connecting to " + address).c_str());
+    return {};
+#else
+    (void)s;
+    (void)key;
+    return std::unexpected(std::string("no server mode"));
+#endif
+  }
+
+#if FAF_SERVER_MODE
+  /** The lobby UI of a launcher's server game: FAF's lobby modules load again (their switches), then the task. */
+  bool StartLauncherServerLobby()
+  {
+    if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
+      (void)moho::SCR_LuaDoString(
+        "if __modules then __modules['/lua/ui/lobby/lobby.lua'] = nil __modules['/lua/ui/lobby/autolobby.lua'] = nil "
+        "__modules['/lua/multiplayer/gpgnet.lua'] = nil end",
+        state
+      );
+    }
+    return moho::SERVERLOBBY_StartForLauncher();
+  }
+#endif
+
+  /** Each frame while a server game starts or runs: the server's answer, and a channel lost outside the game. */
+  void PollServerGame(
+    Service& s
+  )
+  {
+#if FAF_SERVER_MODE
+    if (!s.serverGame) {
+      return;
+    }
+    if (s.match == MatchState::Preparing) {
+      std::string error;
+      switch (faf::remote::PollServerSession(&StartLauncherServerLobby, error)) {
+      case faf::remote::EServerSessionStart::NotRequested:
+        return;
+      case faf::remote::EServerSessionStart::Started:
+        s.match = MatchState::Running;
+        s.matchMessage = "On the game server: waiting for its lobby";
+        LogLine(("server game " + s.serverGameKey + ": connected").c_str());
+        return;
+      case faf::remote::EServerSessionStart::Failed:
+        moho::SERVERLOBBY_End();
+        s.serverGame = false;
+        Fail(s, error);
+        LogLine(("server game " + s.serverGameKey + ": " + error).c_str());
+        return;
+      }
+    }
+    if (s.match == MatchState::Running && moho::WLD_GetActiveSession() == nullptr && !faf::remote::ServerSessionUp()) {
+      // The channel is gone before a game began (in the lobby or while it waited): back to the launcher, saying so. A
+      // game's own end goes through the session's (ONLINE_ReturnToLauncherInsteadOfQuitting).
+      LogLine(("server game " + s.serverGameKey + ": the connection to the game server was lost").c_str());
+      s.endedFromLobby = true;
+      FinishMatch(s);
+      Fail(s, "The connection to the game server was lost.");
+    }
+#else
+    (void)s;
 #endif
   }
 
@@ -1919,20 +2199,297 @@ namespace
         SetField(L, "openSeats", static_cast<double>(openSeats));
         SetBool(L, "seated", !lobby.join.empty());
         SetBool(L, "stale", lobby.stale);
-        SetBool(L, "joinable", false);
-        SetField(L, "why", ServerJoinUnavailable());
+        const std::string why = WhyNotJoinable(lobby);
+        SetBool(L, "joinable", why.empty());
+        SetField(L, "why", why);
         lua_rawseti(L, -2, index++);
       }
     }
     return 1;
   }
 
-  /** ok, why = FafOnline_JoinServer(key): refused until a server game can hand back to the launcher. */
+  /** One host request record (`request` in the service's answers) into `job`, under its lock. */
+  void ReadRequestRecord(
+    ServerRequestJob& job,
+    const JsonNode& record,
+    const std::string& myUid
+  )
+  {
+    const std::lock_guard<std::mutex> lock(job.lock);
+    if (const std::string ref = record.String("ref"); !ref.empty()) {
+      job.ref = ref;
+    }
+    if (const std::string state = record.String("state"); !state.empty()) {
+      job.state = state;
+    }
+    const JsonNode* const position = record.Get("position");
+    job.position =
+      position != nullptr && position->kind == JsonNode::Kind::Number ? static_cast<int>(position->number) : 0;
+    job.message = record.String("reason");
+    const JsonNode* const lobby = record.Get("lobby");
+    if (lobby == nullptr || lobby->kind != JsonNode::Kind::Object) {
+      return;
+    }
+    const std::string host = record.String("host");
+    if (const std::string id = lobby->String("id"); !id.empty() && !host.empty()) {
+      job.lobbyKey = host + "/" + id;
+    }
+    // The player's seat: their FAF id, else seat 1 (the service makes the requesting player seat 1).
+    if (const JsonNode* const seats = lobby->Get("seats"); seats != nullptr && seats->kind == JsonNode::Kind::Array) {
+      std::string first;
+      for (const JsonNode& seat : seats->items) {
+        const JsonNode* const uid = seat.Get("uid");
+        const std::string join = seat.String("join");
+        if (!myUid.empty() && uid != nullptr && uid->text == myUid && !join.empty()) {
+          job.join = join;
+          return;
+        }
+        if (seat.Number("seat") == 1 && !join.empty()) {
+          first = join;
+        }
+      }
+      if (!first.empty()) {
+        job.join = first;
+      }
+    }
+  }
+
+  [[nodiscard]] bool RequestOver(
+    const std::string& state
+  )
+  {
+    return state == "ended" || state == "refused" || state == "cancelled" || state == "failed";
+  }
+
+  /**
+   * ok, why = FafOnline_RequestServerGame{map, seats = {"human" | an AI's name ...} (after the player's own),
+   * options = {key = value}, host, region, byPing}: asks the first of our control services for a game the player
+   * hosts, followed by FafOnline_ServerRequest. One at a time.
+   */
+  int RequestServerGameBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const auto fail = [L](std::string why) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, why.c_str());
+      return 2;
+    };
+    if (std::string why = ServerJoinUnavailable(); !why.empty()) {
+      return fail(why);
+    }
+    if (s.controls.empty()) {
+      return fail("no control service of ours is set up (control-services.txt)");
+    }
+    if (gServerRequest && !gServerRequest->done.load()) {
+      return fail("a request of yours is still on its way: cancel it first");
+    }
+    if (!lua_istable(L, 1)) {
+      return fail("FafOnline_RequestServerGame takes a table");
+    }
+    ServerGameRequest request;
+    request.map = TableString(L, 1, "map");
+    if (request.map.empty()) {
+      return fail("the request needs a map");
+    }
+    lua_pushstring(L, "seats");
+    lua_gettable(L, 1);
+    if (lua_istable(L, -1)) {
+      const int seats = lua_gettop(L);
+      for (int i = 1; i <= 16; ++i) {
+        lua_rawgeti(L, seats, i);
+        const bool more = lua_isstring(L, -1) != 0;
+        if (more) {
+          request.otherSeats.emplace_back(lua_tostring(L, -1));
+        }
+        lua_pop(L, 1);
+        if (!more) {
+          break;
+        }
+      }
+    }
+    lua_pop(L, 1);
+    lua_pushstring(L, "options");
+    lua_gettable(L, 1);
+    if (lua_istable(L, -1)) {
+      const int options = lua_gettop(L);
+      lua_pushnil(L);
+      while (lua_next(L, options) != 0) {
+        // A number key would be turned into a string in place and break lua_next: strings only.
+        if (lua_type(L, -2) == LUA_TSTRING && lua_isstring(L, -1)) {
+          request.options[lua_tostring(L, -2)] = lua_tostring(L, -1);
+        }
+        lua_pop(L, 1);
+      }
+    }
+    lua_pop(L, 1);
+    request.host = TableString(L, 1, "host");
+    request.region = TableString(L, 1, "region");
+    request.byPing = TableBool(L, 1, "byPing");
+
+    if (gServerRequest && gServerRequest->worker.joinable()) {
+      gServerRequest->worker.join(); // done: it has returned
+    }
+    auto job = std::make_shared<ServerRequestJob>();
+    job->service = s.controls.front()->Address();
+    const std::string myUid = s.haveMe ? s.me.id : std::string();
+    auto client =
+      std::make_shared<ControlServiceClient>(job->service, std::string("faf-re-client/") + gpg::diag::BuildVersion());
+    client->SetTokens(s.Tokens());
+    job->worker = std::thread([job, client, request, myUid] {
+      const auto finish = [&job](const char* state, std::string why) {
+        {
+          const std::lock_guard<std::mutex> lock(job->lock);
+          job->state = state;
+          job->message = std::move(why);
+        }
+        job->done = true;
+      };
+      auto answer = client->RequestGame(request);
+      if (!answer) {
+        // A host takes one request per player: one still open (the game left without its end, a restart) is the
+        // player's to rejoin or cancel, so it is followed instead.
+        bool adopted = false;
+        if (auto mine = client->PlayerRequests(); mine) {
+          if (
+            const JsonNode* const list = mine->Get("requests"); list != nullptr && list->kind == JsonNode::Kind::Array
+          ) {
+            for (const JsonNode& record : list->items) {
+              const std::string state = record.String("state");
+              if (!state.empty() && state != "unknown" && !RequestOver(state)) {
+                ReadRequestRecord(*job, record, myUid);
+                // Not joined by itself: the player asked for a new game; this one is theirs to join from the list or
+                // cancel.
+                job->joined = true;
+                adopted = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!adopted) {
+          LogLine(("server request for " + request.map + " failed: " + answer.error()).c_str());
+          finish("failed", answer.error());
+          return;
+        }
+        LogLine(
+          ("server request: following the player's open request " + job->ref + " (" + answer.error() + ")").c_str()
+        );
+      } else {
+        if (const JsonNode* const record = answer->Get("request")) {
+          ReadRequestRecord(*job, *record, myUid);
+        }
+        LogLine(("server request " + job->ref + " sent: " + request.map).c_str());
+      }
+      auto next = std::chrono::steady_clock::now();
+      while (!job->stop.load()) {
+        if (job->cancel.load()) {
+          std::string ref;
+          {
+            const std::lock_guard<std::mutex> lock(job->lock);
+            ref = job->ref;
+          }
+          auto cancelled = client->CancelRequest(ref);
+          finish(cancelled ? "cancelled" : "failed", cancelled ? std::string() : cancelled.error());
+          LogLine(
+            ("server request " + ref + (cancelled ? " cancelled" : " not cancelled: " + cancelled.error())).c_str()
+          );
+          return;
+        }
+        {
+          const std::lock_guard<std::mutex> lock(job->lock);
+          if (RequestOver(job->state)) {
+            break;
+          }
+        }
+        if (std::chrono::steady_clock::now() >= next) {
+          next = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+          std::string ref;
+          {
+            const std::lock_guard<std::mutex> lock(job->lock);
+            ref = job->ref;
+          }
+          if (auto followed = client->FollowRequest(ref); followed) {
+            if (const JsonNode* const record = followed->Get("request")) {
+              ReadRequestRecord(*job, *record, myUid);
+            }
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+      job->done = true;
+    });
+    gServerRequest = job;
+    lua_pushboolean(L, 1);
+    lua_pushnil(L);
+    return 2;
+  }
+
+  /**
+   * table FafOnline_ServerRequest(): the player's request (state, message, position, ref, lobbyKey, ready: its lobby
+   * has the player's seat to join, service), or nil without one.
+   */
+  int ServerRequestBody(
+    lua_State* const L
+  )
+  {
+    if (!gServerRequest) {
+      lua_pushnil(L);
+      return 1;
+    }
+    ServerRequestJob& job = *gServerRequest;
+    const std::lock_guard<std::mutex> lock(job.lock);
+    lua_newtable(L);
+    SetField(L, "state", job.state);
+    SetField(L, "message", job.message);
+    SetField(L, "position", static_cast<double>(job.position));
+    SetField(L, "ref", job.ref);
+    SetField(L, "lobbyKey", job.lobbyKey);
+    SetField(L, "service", job.service);
+    SetBool(L, "ready", !job.join.empty() && !job.lobbyKey.empty() && !RequestOver(job.state) && !job.joined.load());
+    SetBool(L, "joined", job.joined.load());
+    SetBool(L, "left", job.left.load());
+    SetBool(L, "cancelling", job.cancel.load() && !job.done.load());
+    return 1;
+  }
+
+  /** ok, why = FafOnline_CancelServerRequest(): cancels the player's request; FafOnline_ServerRequest says when. */
+  int CancelServerRequestBody(
+    lua_State* const L
+  )
+  {
+    if (!gServerRequest || gServerRequest->done.load()) {
+      PushResult(L, std::unexpected(std::string("no request of yours is on its way")));
+      return 2;
+    }
+    gServerRequest->cancel = true;
+    PushResult(L, {});
+    return 2;
+  }
+
+  /** FafOnline_ForgetServerRequest(): the launcher has shown a finished request's end; it goes. */
+  int ForgetServerRequestBody(
+    lua_State* const L
+  )
+  {
+    (void)L;
+    if (gServerRequest && gServerRequest->done.load()) {
+      if (gServerRequest->worker.joinable()) {
+        gServerRequest->worker.join();
+      }
+      gServerRequest.reset();
+    }
+    return 0;
+  }
+
+  /** ok, why = FafOnline_JoinServer(key): joins the game on our server whose lobby is `key` (<host>/<id>). */
   int JoinServerBody(
     lua_State* const L
   )
   {
-    PushResult(L, std::unexpected(std::string(ServerJoinUnavailable())));
+    const char* const key = lua_tostring(L, 1);
+    PushResult(L, JoinServerGame(TheService(), key != nullptr ? key : ""));
     return 2;
   }
 
@@ -2284,7 +2841,39 @@ namespace
       &Binding<&JoinServerBody>,
       nullptr,
       "<global>",
-      "bool, string FafOnline_JoinServer(key) - joins a game on our servers (not yet: says why)."
+      "bool, string FafOnline_JoinServer(key) - joins a game on our servers, or says why not."
+    );
+    static CScrLuaBinder requestServerGame(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_RequestServerGame",
+      &Binding<&RequestServerGameBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_RequestServerGame(table) - asks our control service for a game the player hosts."
+    );
+    static CScrLuaBinder serverRequest(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_ServerRequest",
+      &Binding<&ServerRequestBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_ServerRequest() - the player's request for a game on our servers, or nil."
+    );
+    static CScrLuaBinder cancelServerRequest(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_CancelServerRequest",
+      &Binding<&CancelServerRequestBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_CancelServerRequest() - cancels the player's request for a game on our servers."
+    );
+    static CScrLuaBinder forgetServerRequest(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_ForgetServerRequest",
+      &Binding<&ForgetServerRequestBody>,
+      nullptr,
+      "<global>",
+      "FafOnline_ForgetServerRequest() - drops a finished request once shown."
     );
     static CScrLuaBinder host(
       moho::SCR_UserLuaInitSet(),
@@ -2329,7 +2918,8 @@ void moho::ONLINE_Frame()
   if (!gService) {
     // An autotest (a test hook) starts the service on its own, as the launcher's screen would.
     static const bool autotest = TestSetting("FAF_ONLINE_AUTOTEST").starts_with("host:") ||
-      TestSetting("FAF_ONLINE_AUTOTEST").starts_with("join:");
+      TestSetting("FAF_ONLINE_AUTOTEST").starts_with("join:") ||
+      TestSetting("FAF_ONLINE_AUTOTEST").starts_with("server:");
     if (!autotest || moho::USER_GetLuaState() == nullptr) {
       return;
     }
@@ -2490,7 +3080,8 @@ void moho::ONLINE_Frame()
       BeginLaunch(s, message);
     }
   }
-  if (s.match == MatchState::Preparing && s.iceReady.load()) {
+  PollServerGame(s);
+  if (s.match == MatchState::Preparing && !s.serverGame && s.iceReady.load()) {
     if (s.iceThread.joinable()) {
       s.iceThread.join();
     }
@@ -2511,6 +3102,24 @@ void moho::ONLINE_Frame()
           (void)moho::SCR_LuaDoString(
             "local launcher = __modules and __modules['/fafengine/modules/lua/ui/launcher/launcher.lua'] "
             "if launcher and launcher.TestJoin then launcher.TestJoin() end",
+            state
+          );
+        }
+      }
+    } else if (s.autotestStep == 0 && s.autotestServer) {
+      // Our server: the launcher's Create game dialog, Our server, AI seats, the map, Create (launcher.lua
+      // TestServerHost), tried every 2 s until the control service's lobbies are live; the launcher joins by itself.
+      if (s.match != MatchState::Idle) {
+        s.autotestStep = 1;
+      } else if (now - s.autotestSince > std::chrono::seconds(2)) {
+        s.autotestSince = now;
+        const bool live = !s.controls.empty() && s.controls.front()->GetState() == ControlServiceClient::State::Live;
+        if (LuaPlus::LuaState* const state = moho::USER_GetLuaState(); state != nullptr && live) {
+          (void)moho::SCR_LuaDoString(
+            ("local launcher = __modules and __modules['/fafengine/modules/lua/ui/launcher/launcher.lua'] "
+             "if launcher and launcher.TestServerHost then launcher.TestServerHost('" +
+             s.autotestMap + "') end")
+              .c_str(),
             state
           );
         }
@@ -2565,6 +3174,34 @@ void moho::ONLINE_Frame()
       if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
         (void)moho::SCR_LuaDoString("ExitApplication()", state);
       }
+      s.autotestStep = 3;
+      s.autotestSince = now;
+    } else if (
+      s.autotestStep == 3 && s.autotestThenPreview && s.match == MatchState::Idle &&
+      now - s.autotestSince > std::chrono::seconds(8)
+    ) {
+      // The next game in this process is a lockstep one: the changelog's unit preview, a single-player session.
+      LogLine("autotest: back in the launcher; starting a single-player session (the unit preview)");
+      if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
+        (void)moho::SCR_LuaDoString(
+          "local launcher = __modules and __modules['/fafengine/modules/lua/ui/launcher/launcher.lua'] "
+          "if launcher and launcher.TestPreviewNow then launcher.TestPreviewNow() end",
+          state
+        );
+      }
+      s.autotestThenPreview = false;
+      s.autotestStep = 7;
+      s.autotestSince = now;
+    } else if (s.autotestStep == 7 && moho::WLD_GetActiveSession() != nullptr) {
+      LogLine("autotest: the single-player session runs");
+      s.autotestStep = 8;
+      s.autotestSince = now;
+    } else if (s.autotestStep == 8 && moho::WLD_GetActiveSession() == nullptr) {
+      LogLine("autotest: the single-player session ended");
+      s.autotestStep = 3;
+      s.autotestSince = now;
+    } else if (s.autotestStep == 7 && now - s.autotestSince > std::chrono::seconds(60)) {
+      LogLine("autotest: no single-player session 60 s after the preview");
       s.autotestStep = 3;
       s.autotestSince = now;
     } else if (s.autotestStep == 3 && s.match == MatchState::Idle && now - s.autotestSince > std::chrono::seconds(8)) {

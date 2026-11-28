@@ -557,7 +557,7 @@ int HEADLESS_Main(
   ) {
     std::println(
       "[{}] --wire-stats, --loopback, --command-check, --seats, --oracle-check, --changeset-check, --view-packets, "
-      "--view-frames and --view-bench need a server-mode build (FAF_SERVER_MODE, the *-server presets)",
+      "--view-frames and --view-bench need a server-mode build (FAF_SERVER_MODE, on unless built without it)",
       gLabel
     );
     return kExitBadInput;

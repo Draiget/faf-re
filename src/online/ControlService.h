@@ -96,8 +96,20 @@ namespace faf::online
     [[nodiscard]] std::vector<ServerLobby> Lobbies() const;
     /** Asks for a game the player hosts; the service's answer (`request`, `ref`, `placement`) or why not. */
     [[nodiscard]] std::expected<JsonNode, std::string> RequestGame(const ServerGameRequest& request);
+    /**
+     * Engine addition: one of the player's requests as its host has it now (GET /api/v1/requests/<ref>, `ref` being
+     * <host>/<id>): the service's answer (`request` with `state`, `position`, `reason`, `lobby`) or why not.
+     */
+    [[nodiscard]] std::expected<JsonNode, std::string> FollowRequest(const std::string& ref);
+    /** Engine addition: the player's requests (GET /api/v1/requests): the service's answer (`requests`) or why not. */
+    [[nodiscard]] std::expected<JsonNode, std::string> PlayerRequests();
+    /** Engine addition: cancels one (DELETE /api/v1/requests/<ref>): out of the queue, or its lobby stopped. */
+    [[nodiscard]] std::expected<JsonNode, std::string> CancelRequest(const std::string& ref);
 
   private:
+    /** One call of the API with the player's token: the answer when it says `ok`, else why not. */
+    [[nodiscard]] std::expected<JsonNode, std::string>
+    Call(const char* method, const std::string& path, const std::string& body);
     void Run();
     void Event(const std::string& name, const std::string& data);
     void Log(const std::string& line) const;

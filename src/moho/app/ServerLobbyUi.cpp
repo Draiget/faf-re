@@ -15,6 +15,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WinApp.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/Common.h"
@@ -67,6 +68,15 @@ namespace
   // came first and the launcher never heard `Launching`).
   std::vector<SLauncherMessage> sForLauncher;
   constexpr std::size_t kMaxForLauncher = 64;
+  bool sInGameLauncherOwns = false; // engine addition: SERVERLOBBY_StartForLauncher
+
+  bool net_ServerGames = true;
+  moho::TConVar<bool> gTConVar_net_ServerGames(
+    "net_ServerGames",
+    "Join games on our servers when a launcher asks (1, the default: the in-game launcher's and GPGNet's JoinServer) "
+    "or only list them (0). Games on FAF, replays and single-player games are the same either way.",
+    &net_ServerGames
+  );
 
   /** Sends what waits, in order, while the launcher's link takes it. */
   void FlushLauncher()
@@ -118,9 +128,25 @@ namespace
     FlushLauncher();
   }
 
+  class CServerLobbyTask;
+  // Engine addition (in-game launcher): the session's lobby task, deleted when the session ends (SERVERLOBBY_End).
+  CServerLobbyTask* sLobbyTask = nullptr;
+
   class CServerLobbyTask final : public moho::CPullTask<CServerLobbyTask>
   {
   public:
+    CServerLobbyTask()
+    {
+      sLobbyTask = this;
+    }
+    ~CServerLobbyTask() override
+    {
+      if (sLobbyTask == this) {
+        sLobbyTask = nullptr;
+      }
+      delete mLobby; // the Lua state is up: the session ends before the process does
+    }
+
     void PullTask();
 
   private:
@@ -170,7 +196,9 @@ namespace
     if (mLobby == nullptr && !mLostSaid && !mLaunched && !faf::remote::ServerSessionUp()) {
       mLostSaid = true;
       gpg::Logf("SERVER LOBBY: the channel to the server is gone before the lobby started.");
-      moho::WIN_OkBox("Ack!", "The connection to the game server was lost.");
+      if (!sInGameLauncherOwns) {
+        moho::WIN_OkBox("Ack!", "The connection to the game server was lost.");
+      }
     }
   }
 
@@ -402,9 +430,36 @@ bool moho::SERVERLOBBY_Start()
   } catch (const std::exception& error) {
     gpg::Warnf("SERVER LOBBY: no waiting screen: %s", error.what());
   }
-  (void)new CServerLobbyTask(); // runs every frame for the rest of the session, as CGpgNetInterface's task
+  (void)new CServerLobbyTask(); // runs every frame until the session ends (SERVERLOBBY_End), as CGpgNetInterface's
   gpg::Logf("SERVER LOBBY: waiting for the server's lobby signals.");
   return true;
+}
+
+bool moho::SERVERLOBBY_GamesOn()
+{
+  return net_ServerGames;
+}
+
+bool moho::SERVERLOBBY_StartForLauncher()
+{
+  sInGameLauncherOwns = true;
+  return SERVERLOBBY_Start();
+}
+
+void moho::SERVERLOBBY_End()
+{
+  sInGameLauncherOwns = false;
+  if (!faf::remote::ServerSessionStarted() && sLobbyTask == nullptr) {
+    return;
+  }
+  delete sLobbyTask; // unlinks itself from its task thread (CTask::~CTask)
+  sForLauncher.clear();
+  if (LuaPlus::LuaState* const state = USER_GetLuaState()) {
+    state->GetGlobals().SetNil("ServerLobbySession");
+    state->GetGlobals().SetNil("ServerLobbyControl");
+  }
+  faf::remote::EndServerSession();
+  gpg::Logf("SERVER LOBBY: the server session is over.");
 }
 
 namespace
@@ -429,6 +484,11 @@ namespace
     ) {
       TellLauncher(faf::remote::kServerSessionCommand, {"refused", "JoinServer takes address, token and uid"});
       throw std::runtime_error("Wrong arguments to JoinServer, expected address (string), token (string), uid (int)");
+    }
+    if (!net_ServerGames) {
+      gpg::Logf("GPGNET: JoinServer refused: games on our servers are turned off (net_ServerGames 0).");
+      TellLauncher(faf::remote::kServerSessionCommand, {"refused", "games on game servers are turned off"});
+      return;
     }
     if (faf::remote::ServerSessionStarted()) {
       gpg::Logf("GPGNET: JoinServer ignored: this game is on a game server already.");

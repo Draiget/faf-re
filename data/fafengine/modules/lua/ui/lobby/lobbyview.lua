@@ -1456,6 +1456,14 @@ function LobbyView:RefreshNetwork(info)
         end
     end
     local text
+    if rawget(_G, 'ServerLobbySession') then
+        -- A game on our server: every link goes through it (the engine's channel), none between the players.
+        text = 'Our server  -  ' .. (direct + relayed + linked + linking + failed == 0 and 'waiting for players' or
+            (direct + relayed + linked) .. ' of ' .. (direct + relayed + linked + linking + failed) .. ' connected')
+        Theme.SetText(self.networkNote, text)
+        Theme.SetColor(self.networkNote, C.muted)
+        return
+    end
     if direct + relayed + linked + linking + failed == 0 then
         text = 'P2P  -  waiting for players'
     else
@@ -1499,8 +1507,11 @@ function LobbyView:Refresh()
         end
         local match = self.match
         local gameName = api.GameName()
-        if gameName == 'GPGNetGame' then
-            gameName = ''
+        if gameName == 'GPGNetGame' or gameName == 'ServerGame' then
+            gameName = '' -- the engine's names for a FAF-hosted game and a game on our server
+        end
+        if gameName == '' and rawget(_G, 'ServerLobbySession') then
+            gameName = 'Game on our server'
         end
         Theme.SetText(self.title, info.GameOptions.Title or (match and match.title) or
             (gameName ~= '' and gameName) or 'Game lobby')

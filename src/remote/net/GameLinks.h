@@ -389,7 +389,9 @@ namespace faf::remote::net
 
     CClientLink(std::int32_t uid, const Token& token, const SEndpoint& server, const ChannelConfig& channel = {});
 
-    [[nodiscard]] std::expected<void, std::string> Open();
+    /** The client's socket, on every address (the default) or on `local`'s address, its port the system's. */
+
+    [[nodiscard]] std::expected<void, std::string> Open(const SEndpoint& local = {});
     /** Starts a new session with new keys, as after a lost link or a restart. */
     void Reconnect();
 

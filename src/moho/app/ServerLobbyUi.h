@@ -27,6 +27,25 @@ namespace moho
   bool SERVERLOBBY_Start();
 
   /**
+   * Engine addition (in-game launcher): the server session is over (no world session runs): the lobby task and its
+   * lobby go, and the channel closes (`faf::remote::EndServerSession`), so the next game may be any. Called on the
+   * main thread outside the task's run. Does nothing without a server session.
+   */
+  void SERVERLOBBY_End();
+
+  /**
+   * Engine addition (in-game launcher): `SERVERLOBBY_Start` for a game the launcher started: a channel lost before the
+   * lobby is the launcher's to tell (no message box).
+   */
+  bool SERVERLOBBY_StartForLauncher();
+
+  /**
+   * Engine addition: `net_ServerGames` (1 by default). 0: a launcher's games on our servers are refused (the in-game
+   * launcher's and GPGNet's `JoinServer`); `/connectserver` on the command line still joins, as the player asked.
+   */
+  [[nodiscard]] bool SERVERLOBBY_GamesOn();
+
+  /**
    * Plan WP12.2: one launcher command, before `CGpgNetInterface` handles it. Takes `JoinServer` (starts the server
    * session and answers `ServerSession`), and in a server session every peer lobby or link command, which it ignores.
    * False for the rest, which go on as before.
