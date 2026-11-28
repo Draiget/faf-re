@@ -143,3 +143,50 @@ function CreateUI(isReplay)
         end
     end
 end
+
+-- ============================================================================
+-- The launcher's background battle (game option FafreMenuBattle): no HUD, the launcher over the world
+-- (/fafengine/modules/lua/ui/launcher/battle.lua).
+-- ============================================================================
+local function MenuBattle()
+    local options = SessionGetScenarioInfo().Options or {}
+    return options.FafreMenuBattle == true or options.FafreMenuBattle == 'true'
+end
+--- The battle's HUD hidden (HideGameUI toggles: only while it shows). FAF builds and expands the HUD as the game
+--- starts running, and its opening animations show parts again after that, so the battle asks for a few seconds.
+function FafreBattleHideHud()
+    if not gameUIHidden then
+        HideGameUI('on')
+        return true
+    end
+    -- Hidden by the flag, yet an opening animation may have shown a cluster again.
+    local shown = false
+    for _, group in { controlClusterGroup, statusClusterGroup } do
+        if group and not group:IsHidden() then
+            group:Hide()
+            shown = true
+        end
+    end
+    return shown
+end
+local battleOnFirstUpdate = OnFirstUpdate
+function OnFirstUpdate()
+    battleOnFirstUpdate()
+    if not SessionIsReplay() and MenuBattle() then
+        FafreBattleHideHud()
+        LOG('MENU BATTLE: the HUD is hidden')
+    end
+end
+local battleCreateUI = CreateUI
+function CreateUI(isReplay)
+    battleCreateUI(isReplay)
+    local options = SessionGetScenarioInfo().Options or {}
+    if not isReplay and (options.FafreMenuBattle == true or options.FafreMenuBattle == 'true') then
+        local ok, why = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/battle.lua').OnGameUI()
+        end)
+        if not ok then
+            WARN('MENU BATTLE: ' .. tostring(why))
+        end
+    end
+end

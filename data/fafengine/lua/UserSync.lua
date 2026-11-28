@@ -17,3 +17,19 @@ do
         end
     end
 end
+
+-- The launcher's background battle: where the fight is (Sync.FafreBattleFocus) for the launcher's camera.
+do
+    local battleOnSync = OnSync
+    function OnSync()
+        battleOnSync()
+        if Sync.FafreBattleFocus then
+            local ok, why = pcall(function()
+                import('/fafengine/modules/lua/ui/launcher/battle.lua').OnFocus(Sync.FafreBattleFocus)
+            end)
+            if not ok then
+                WARN('MENU BATTLE: ' .. tostring(why))
+            end
+        end
+    end
+end

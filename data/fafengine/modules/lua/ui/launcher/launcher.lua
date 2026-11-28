@@ -41,6 +41,8 @@ local kNewsPages = { news = true, events = true, links = true } -- News, Events 
 local kPageOrder = { 'online', 'matchmaking', 'lan', 'training', 'coop', 'chat', 'contacts', 'leaderboards', 'tournaments',
     'replays', 'maps', 'mods', 'units', 'news', 'events', 'links', 'changelog', 'options' }
 local Anim = import('/fafengine/modules/lua/ui/launcher/anim.lua')
+-- The battle behind the launcher (battle.lua): what starts a game or a full screen ends it first.
+local Battle = import('/fafengine/modules/lua/ui/launcher/battle.lua')
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -2173,6 +2175,9 @@ end
 --- Hosts `request` on FAF. On another featured mod than the loaded one, the game starts again on its files and the
 --- new start hosts it (RestartOn keeps the request for it).
 function Launcher:HostRequest(request)
+    if Battle.Leave('HostRequest', { request }) then
+        return true
+    end
     local status = FafOnline_Status()
     if request.mod and request.mod ~= '' and request.mod ~= status.loadedMod then
         local action = { kind = 'host' }
@@ -2357,6 +2362,9 @@ function Launcher:Resume(status)
 end
 
 function Launcher:Join(game, password)
+    if Battle.Leave('Join', { game, password }) then
+        return true
+    end
     local ok, why
     local status = FafOnline_Status()
     if game.source ~= 'server' and game.featuredMod and game.featuredMod ~= '' and
@@ -2402,6 +2410,10 @@ end
 
 --- Hides the launcher while one of FAF's screens is open over it; `back` shows it again.
 function Launcher:OpenScreen(name, open, stopMusic)
+    -- A screen's builder doesn't outlive the battle: the front end's launcher opens on this page, one click from it.
+    if Battle.Leave('ShowPage', { self.page }) then
+        return
+    end
     local launcher = self
     if stopMusic then
         self:StopSounds()
@@ -2514,6 +2526,9 @@ local kPreviewMap = '/maps/SCMP_013/SCMP_013_scenario.lua' -- Winter Duel: 5 km,
 local kFactionOfLetter = { e = 1, a = 2, r = 3, s = 4 }
 
 function Launcher:PreviewUnit(head, version)
+    if Battle.Leave('PreviewUnit', { head, version }) then
+        return
+    end
     local ok, why = pcall(function()
         local id = string.lower(head.id or '')
         local scenario = import('/lua/ui/maputil.lua').LoadScenario(kPreviewMap)
@@ -2558,6 +2573,9 @@ function Launcher:PreviewUnit(head, version)
 end
 
 function Launcher:Skirmish()
+    if Battle.Leave('Skirmish', {}) then
+        return
+    end
     local launcher = self
     self:TutorialPrompt(function()
         launcher:OpenScreen('Skirmish', function(host, back)
@@ -2571,6 +2589,9 @@ function Launcher:Skirmish()
 end
 
 function Launcher:Campaign()
+    if Battle.Leave('Campaign', {}) then
+        return
+    end
     local launcher = self
     self:TutorialPrompt(function()
         launcher:StopSounds()
@@ -2677,6 +2698,9 @@ end
 --- Watches a replay file (a FAF replay is decoded first), as FAF's replay screen launches one. False and why when the
 --- game can't start it.
 function Launcher:WatchReplay(path)
+    if Battle.Leave('WatchReplay', { path }) then
+        return true
+    end
     -- Replays of any FAF game version play, with the engine patches of the nearest version this engine models
     -- (rep_PlayAnyVersion, as /noversioncheck); their own game files at runtime come later.
     ConExecute('rep_PlayAnyVersion true')
@@ -2737,6 +2761,57 @@ function Launcher:Options()
             back()
         end)
     end)
+end
+
+--- Over the battle: the launcher fades to almost nothing so the battle shows; a click anywhere or Esc brings it back.
+function Launcher:WatchBattle(on)
+    if on == nil then
+        on = not self.watching
+    end
+    if (self.watching and true or false) == on or not self.body then
+        return
+    end
+    self.watching = on
+    local body, root = self.body, self.root
+    -- Faded, not hidden: a Show would show the pieces each page keeps hidden; the layer below takes the clicks.
+    Anim.Run(body, 0.3, function(t)
+        body:SetAlpha(on and (1 - t) or t, true)
+    end, function()
+        body:SetAlpha(on and 0 or 1, true)
+    end)
+    if on then
+        -- A layer that takes the click that brings the launcher back (the world under it takes none).
+        local back = Theme.Rect(root, '00000000')
+        LayoutHelpers.FillParent(back, root)
+        Theme.SizeFromEdges(back)
+        back.Depth:Set(function() return root.Depth() + 400 end)
+        back.HandleEvent = function(control, event)
+            if event.Type == 'ButtonPress' or event.Type == 'KeyDown' then
+                self:WatchBattle(false)
+                return true
+            end
+            return false
+        end
+        local hint = Theme.Text(back, 'Watching the battle  -  click or press Esc to come back', 13, C.muted)
+        LayoutHelpers.AtHorizontalCenterIn(hint, back)
+        LayoutHelpers.AtBottomIn(hint, back, 28)
+        self.watchLayer = back
+        if self.dim then
+            self.dim:SetSolidColor('00000000')
+        end
+        import('/lua/ui/uimain.lua').SetEscapeHandler(function() self:WatchBattle(false) end)
+    else
+        if self.watchLayer then
+            self.watchLayer:Destroy()
+            self.watchLayer = nil
+        end
+        if self.dim then
+            self.dim:SetSolidColor('80040a10')
+        end
+        local launcher = self
+        import('/lua/ui/uimain.lua').SetEscapeHandler(function() launcher:Exit() end)
+    end
+    LOG('LAUNCHER: watching the battle ' .. tostring(on))
 end
 
 function Launcher:Exit()
@@ -2949,6 +3024,8 @@ local function BuildTopBar(launcher, body)
         end, kVaultPages },
         { 'units', 'Units', function() launcher:ShowPage('units') end, { units = true } },
         -- Utilities: icons by the account, their names in a tip.
+        -- Over the battle: the launcher fades out to watch it, and comes back on a click or Esc.
+        launcher.battle and { 'eye', 'Watch the battle', function() launcher:WatchBattle() end, {}, true } or false,
         { 'bell', 'Notifications', function() launcher.notify:OpenList() end, {}, true },
         { 'news', 'News', function()
             local last = launcher.lastNewsPage
@@ -2961,7 +3038,7 @@ local function BuildTopBar(launcher, body)
     launcher.utilityItems = {}
     local before = nil
     for _, entry in entries do
-        if (entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status')) and
+        if entry and (entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status')) and
             (entry[1] ~= 'leaderboard' or rawget(_G, 'FafLibrary_Api')) and
             true then
             local item = TopTab(launcher, bar, entry[1], entry[2], entry[3], entry[4])
@@ -3437,8 +3514,20 @@ local function Build(launcher)
         launcher:StopSounds()
     end
 
-    Theme.Fill(root, C.page)
-    if Prefs.GetOption('mainmenu_bgmovie') then
+    launcher.battle = Battle.InBattle()
+    Theme.SetGlass(launcher.battle)
+    if launcher.battle then
+        -- The battle shows through, darkened enough for the panels to read.
+        launcher.dim = Theme.Fill(root, '80040a10')
+        -- The world under it takes no mouse: no hover marks, no selection boxes behind the pages.
+        launcher.dim:EnableHitTest()
+        launcher.dim.HandleEvent = function(self, event)
+            return true
+        end
+    else
+        Theme.Fill(root, C.page)
+    end
+    if not launcher.battle and Prefs.GetOption('mainmenu_bgmovie') then
         local movie = Movie(root)
         movie:Set('/movies/main_menu.sfd')
         LayoutHelpers.AtCenterIn(movie, root)
@@ -3786,7 +3875,59 @@ function CreateUI(buildFafMenu)
         end)
     end
     launcher:ShowHome()
-    LOG('LAUNCHER: shown')
+    LOG('LAUNCHER: shown' .. (launcher.battle and ' over the battle' or ''))
+    if launcher.battle then
+        -- Esc over the battle: the launcher's Exit, not the game's menu.
+        import('/lua/ui/uimain.lua').SetEscapeHandler(function() launcher:Exit() end)
+        -- /menubattletest: the battle runs a while under the launcher, then Skirmish ends it and opens the lobby.
+        if GetCommandLineArg('/menubattletest', 0) then
+            ForkThread(function()
+                WaitSeconds(25)
+                LOG('BATTLE TEST: over the battle, page ' .. tostring(launcher.page) .. ', in battle ' ..
+                    tostring(Battle.InBattle()) .. ', camera cuts ' .. Battle.Cuts())
+                WaitSeconds(tonumber((GetCommandLineArg('/menubattletest', 1) or {})[1]) or 15)
+                LOG('BATTLE TEST: later, camera cuts ' .. Battle.Cuts())
+                launcher:WatchBattle(true)
+                WaitSeconds(2)
+                LOG('BATTLE TEST: watching, launcher alpha ' .. string.format('%.2f', launcher.body:GetAlpha()))
+                WaitSeconds(2)
+                launcher:WatchBattle(false)
+                WaitSeconds(1)
+                WaitSeconds(3)
+                Prefs.SetToCurrentProfile('MenuTutorialPrompt', true) -- FAF's first-time question stays away
+                launcher:Skirmish()
+            end)
+        end
+        return
+    end
+    local kept = Battle.TakePending()
+    if kept then
+        ForkThread(function()
+            WaitSeconds(0.2)
+            local method = current == launcher and Launcher[kept.method]
+            if method then
+                LOG('LAUNCHER: after the battle: ' .. kept.method)
+                method(launcher, unpack(kept.args or {}))
+            end
+            if GetCommandLineArg('/menubattletest', 0) then
+                WaitSeconds(6)
+                LOG('BATTLE TEST: back in the front end, in battle ' .. tostring(Battle.InBattle()) .. ', screen ' ..
+                    tostring(launcher.screenName))
+                WaitSeconds(3)
+                ExitApplication()
+            end
+        end)
+    elseif Battle.Wanted() then
+        local status = rawget(_G, 'FafOnline_Status') and FafOnline_Status() or {}
+        if (status.match or 'idle') == 'idle' and not launcher.resume then
+            ForkThread(function()
+                WaitSeconds(0.5)
+                if current == launcher and not launcher.screen and Battle.Wanted() then
+                    Battle.Start()
+                end
+            end)
+        end
+    end
 end
 
 --- The launcher on screen now, or false.

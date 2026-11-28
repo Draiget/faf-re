@@ -13,3 +13,16 @@ do
         end
     end
 end
+
+-- The launcher's background battle (game option FafreMenuBattle): AI armies fight behind the launcher; the player
+-- watches (/fafengine/modules/lua/sim/menubattle.lua).
+do
+    local battleBeginSession = BeginSession
+    function BeginSession()
+        battleBeginSession()
+        local options = ScenarioInfo.Options or {}
+        if options.FafreMenuBattle == true or options.FafreMenuBattle == 'true' then
+            ForkThread(import('/fafengine/modules/lua/sim/menubattle.lua').Run, options)
+        end
+    end
+end

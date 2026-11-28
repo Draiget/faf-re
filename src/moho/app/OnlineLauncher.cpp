@@ -402,6 +402,7 @@ namespace
     /// Invitations to other players' parties: the inviter's FAF id and when it came (the lobby keeps one for a day).
     std::map<std::string, std::chrono::steady_clock::time_point> partyInvites;
     std::string partyNote; ///< the last thing that happened to the party, for the player ("You were removed ...")
+    bool battleEnding = false; ///< a match waits for the launcher's background battle to end (asked once)
     bool lobbyStarted = false;
     /// A failed lobby connection is tried again at this time (unset: no try planned).
     std::chrono::steady_clock::time_point lobbyRetryAt{};
@@ -3378,10 +3379,27 @@ void moho::ONLINE_Frame()
   }
   PollServerGame(s);
   if (s.match == MatchState::Preparing && !s.serverGame && s.iceReady.load()) {
-    if (s.iceThread.joinable()) {
-      s.iceThread.join();
+    if (moho::WLD_GetActiveSession() != nullptr) {
+      // The launcher's background battle (a sandbox game behind it, battle.lua) ends first; FAF's lobby takes the UI
+      // once no game runs. Asked once; the next polls wait for the session to go.
+      if (!s.battleEnding) {
+        s.battleEnding = true;
+        LogLine("a match is ready while the launcher's battle runs; ending the battle first");
+        if (LuaPlus::LuaState* const state = moho::USER_GetLuaState()) {
+          (void)moho::SCR_LuaDoString(
+            "local ok, battle = pcall(import, '/fafengine/modules/lua/ui/launcher/battle.lua') "
+            "if ok and battle.EndForMatch then battle.EndForMatch() end",
+            state
+          );
+        }
+      }
+    } else {
+      s.battleEnding = false;
+      if (s.iceThread.joinable()) {
+        s.iceThread.join();
+      }
+      StartMatch(s);
     }
-    StartMatch(s);
   }
   if (s.match == MatchState::Ending && moho::WLD_GetActiveSession() == nullptr) {
     FinishMatch(s);

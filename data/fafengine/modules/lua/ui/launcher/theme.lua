@@ -290,6 +290,18 @@ function Brackets(control, color, all, size)
     return made
 end
 
+-- Glass: over the battle behind the launcher, a panel's solid fill lets a little of it through (alpha e6 of ff).
+local glass = false
+function SetGlass(on)
+    glass = on and true or false
+end
+local function Glassy(color)
+    if glass and type(color) == 'string' and string.len(color) == 8 and string.sub(color, 1, 2) == 'ff' then
+        return 'e6' .. string.sub(color, 3)
+    end
+    return color
+end
+
 --- A square panel: a fill and a one-pixel line around it. :SetColors(fill, line) recolours it; its pieces lie
 --- under its children.
 function Panel(parent, fill, line)
@@ -319,7 +331,7 @@ function Panel(parent, fill, line)
     panel.SetColors = function(self, newFill, newLine)
         if self.fill ~= newFill then
             self.fill = newFill
-            back:SetSolidColor(newFill)
+            back:SetSolidColor(Glassy(newFill))
         end
         newLine = newLine or newFill
         if self.line ~= newLine then

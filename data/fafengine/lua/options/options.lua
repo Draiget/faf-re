@@ -1150,3 +1150,34 @@ do
         end
     end
 end
+
+-- Battle behind the launcher (/fafengine/modules/lua/ui/launcher/battle.lua): AI armies fight on a small map behind
+-- the launcher's pages. Off gives the menu movie back. After Reduce motion.
+do
+    for _, tab in options do
+        local items = type(tab) == 'table' and tab.items
+        if items and not HasOptionKey(items, 'fafre_menu_battle') then
+            local at = nil
+            for index, item in items do
+                if item.key == 'fafre_reduce_motion' then
+                    at = index
+                end
+            end
+            if at then
+                table.insert(items, at + 1, {
+                    title = "Battle behind the launcher",
+                    key = 'fafre_menu_battle',
+                    type = 'toggle',
+                    default = true,
+                    custom = {
+                        states = {
+                            { text = "<LOC _On>", key = true },
+                            { text = "<LOC _Off>", key = false },
+                        },
+                    },
+                })
+                break
+            end
+        end
+    end
+end
