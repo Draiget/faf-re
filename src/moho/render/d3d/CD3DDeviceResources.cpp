@@ -777,6 +777,20 @@ namespace moho
     mEffects.push_back(replacementEffect);
   }
 
+  bool CD3DDeviceResources::ReloadEffectNamed(
+    const char* const effectName
+  )
+  {
+    const CD3DEffect* const before = FindEffect(effectName);
+    if (before == nullptr) {
+      return false;
+    }
+    const fa::string path = before->mFile; // the effect is deleted by the reload: keep its path
+    ReloadEffectFile(path);
+    // the reload puts the new effect last (it is allocated while the old one lives, so never at its address)
+    return !mEffects.empty() && mEffects.back() != before && FindEffect(effectName) == mEffects.back();
+  }
+
   /**
    * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
    *

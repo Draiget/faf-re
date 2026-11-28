@@ -190,3 +190,24 @@ Reports of crashes on vsync changes and presents on NVIDIA and Intel led to a re
 | `FAF_EFFECT_DUMP_DIR` | Writes each effect's original source, translated source and generated HLSL (local files only); on Direct3D 11 `<effect>.d3d11.fx`, the text handed to D3DCompile |
 | `FAF_SHADER_PRECOMPILE=1` | Compiles every entry point when an effect loads |
 | `FAF_DRAW_STATS_LOG=N` | Logs the average frame time over N frames |
+
+## Render features (settings per graphics API)
+
+Rule: a visual feature the engine adds on top of the shipped renderer works on every render API according to what that API can do, and its setting in Options, Video exists only where the running API supports it. Such a feature is registered once in `src/moho/render/RenderFeatures.{h,cpp}` (`render::RegisterFeature`) with its title, tip, console variable, levels (states), default, whether it needs a restart, and for each API (D3D9, D3D10, D3D11, D3D12, Vulkan) whether it is supported, why not, the highest level and the default on that API:
+
+- `data/fafengine/lua/options/optionslogic.lua` (a hook appended to the game's `/lua/options/optionslogic.lua`) builds one Video entry per supported feature when the options data is asked for after the device exists (the options module can load earlier, while the Graphics API option is read, so the entries are synced once per API), after the Graphics API entry. The entry's setter runs the feature's console variable with the level; the profile stores the key of the chosen state.
+- The Lua global `GetRenderFeatures()` returns `{ api, features = { { key, title, tip, console, default, restart, states } }, unsupported = { { key, title, reason } } }` for the running API (`api == ''` before the device exists).
+- The engine asks `render::FeatureLevel(key, api)` for the level the player chose (the profile option, else the API's default) and calls `render::ApplyStartupSettings()` once after the device is created: a feature's `apply` callback receives the level.
+- Changing the Graphics API takes a restart; the list is built for the new API after it.
+
+The registry lives next to the Lua blocks of `data/fafengine/lua/options/options.lua` (shadow cascades, ray-traced shadows, ambient occlusion, Water Quality, ...), which show their entry whenever their console command exists. The two do not clash: a feature whose key is already an option of the tab is left out by `optionslogic.lua`, so each option shows once and a profile that stores the key keeps working. A new engine feature that is hardware dependent goes through the registry; the existing Lua blocks stay as they are.
+
+Registered features:
+
+| Feature (option key) | D3D10 | D3D11 | D3D12 | Vulkan |
+|---|---|---|---|---|
+| Dynamic Lights (`dynlights_quality`, Off / Low / Medium / High / Ultra; off to on rebuilds the mesh, terrain and water effects once in the running game and makes the terrain renderers again, no restart: about 0.2 s on Direct3D 12 and Vulkan; Direct3D 11 compiles the three lit effects on worker threads while the game goes on and the swap takes under 0.1 s; [DYNAMIC_LIGHTS.md](DYNAMIC_LIGHTS.md)) | no: does not start | yes | yes | yes |
+
+Dynamic Lights and the Lua block "Explosion and weapon lights" (`dynamic_lights_optin`, upstream's screen-space effect lights) never run together: while Dynamic Lights is on and its effects are patched, the other one collects and draws nothing.
+
+|---|---|---|---|

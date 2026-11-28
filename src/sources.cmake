@@ -281,6 +281,20 @@ set(FAF_ENGINE_SOURCES
   moho/misc/CombinedMilitaryExtractor.cpp
   moho/misc/CountermeasureExtractor.cpp
   moho/particles/CWorldParticles.cpp
+  moho/render/lights/LightCollector.cpp
+  moho/render/lights/LightField.cpp
+  moho/render/lights/LightGrid.cpp
+  moho/render/lights/LightEffectPatch.cpp
+  moho/render/lights/LightBinding.cpp
+  moho/render/lights/LightDebugView.cpp
+  moho/render/lights/LightTexture.cpp
+  moho/render/lights/LightTextureCache.cpp
+  moho/render/lights/LightMeshEmission.cpp
+  moho/render/lights/SimLights.cpp
+  moho/render/lights/LightFeeds.cpp
+  moho/render/lights/LightFeedSources.cpp
+  moho/render/lights/LightCensus.cpp
+  moho/render/lights/LightMeshFeed.cpp
   moho/app/WinApp.cpp
   moho/misc/WinPlatform.cpp
   gpg/core/diagnostics/CrashHooks.cpp
@@ -340,9 +354,15 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/LowFidelityWater.cpp
   moho/terrain/water/WaterFactory.cpp
   moho/terrain/water/WaterShaderVars.cpp
+  moho/terrain/water/WaterQuality.cpp
+  moho/terrain/water/WaterEffectPatch.cpp
+  moho/terrain/water/WaterSimulation.cpp
+  moho/terrain/water/WaterMeshFeed.cpp
   moho/terrain/water/WaveSystem.cpp
   moho/terrain/water/Shoreline.cpp
   moho/terrain/water/WaterBodySurfaces.cpp
+  moho/terrain/water/TerrainWaterLevelPatch.cpp
+  moho/terrain/water/TerrainWaterLevels.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
   moho/ui/UiDisplayScale.cpp
@@ -419,6 +439,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserStartupRegistrations.cpp
   moho/sim/Sim.cpp
   moho/sim/SimTick.cpp
+  moho/sim/SimWaterEvents.cpp
   moho/sim/SimLuaGetters.cpp
   moho/sim/SimLuaFunctions.cpp
   moho/sim/SimLuaSetters.cpp
@@ -937,6 +958,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/BounceLight.cpp
   moho/render/DynamicLights.cpp
   moho/render/TemporalAA.cpp
+  moho/render/RenderFeatures.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp

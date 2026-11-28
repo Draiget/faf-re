@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <limits>
 
+#include "moho/console/CConCommand.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
@@ -15,6 +16,35 @@ namespace moho
   extern int ren_ClipDecalLevel;
   extern float ren_ShoreErrorCoeff;
   extern float ren_maxViewError;
+
+  // FAF: how much of the view error a terrain node near the water level may keep, as a factor (the shipped game only
+  // refines nodes that cross the water level, by ren_ShoreErrorCoeff = 0.4). Zoomed out, a coarse node of a canyon or
+  // of a shallow, broken shore can bridge over the water (or sink under it) by the error the view allows (about a unit
+  // at 1000 units), and the water mask then cuts a square, straight-edged hole in the sea.
+  float ren_ShoreTessCoeff = 0.1f;
+  // The vertex shader of the terrain flattens every submerged vertex to the water level, so a coarse triangle with one
+  // dry and two submerged vertices is a ramp that stays above the water over its whole width: the water mask then cuts
+  // a band as wide as the node out of the sea. The error test cannot see it (it measures the real height error, not the
+  // flattened one), so a node that crosses the water level is refined until it is only this share of its view depth
+  // wide (0.002: two or three pixels).
+  float ren_ShoreTessCell = 0.002f;
+  static TConVar<float> gTConVar_ren_ShoreTessCell(
+    "ren_ShoreTessCell",
+    "Terrain tessellation at the shore: a node that crosses the water level is split until its width is at most this "
+    "share of its view depth (default 0.002, "
+    "two or three pixels; 0 turns it off). Larger shows bands of water cut away by the coarse terrain when zoomed out; "
+    "smaller costs triangles along shores.",
+    &ren_ShoreTessCell
+  );
+  static TConVar<float> gTConVar_ren_ShoreTessCoeff(
+    "ren_ShoreTessCoeff",
+    "Terrain tessellation near the water: the share of the screen error that a terrain node whose height range lies "
+    "within its own error of the water "
+    "level may keep (default 0.1; 0.4 is the shipped value for nodes that cross the water, 1 turns the extra detail "
+    "off). Smaller shows fewer square holes "
+    "in the water when zoomed out and costs triangles along broken shores.",
+    &ren_ShoreTessCoeff
+  );
 } // namespace moho
 namespace moho
 {
@@ -39,6 +69,8 @@ namespace moho
      * Engine addition (water bodies): whether a water body's surface crosses the tile
      * `[x0, x1) x [z0, z1)` with terrain in `[minY, maxY]`, and the highest such level in
      * `*highest`. The binary tests the sea only; this adds every lake whose cells overlap the tile.
+     * `*nearWater` is set when a body's level lies within `margin` of that range (FAF: its shore is near
+     * enough for the tile's error to move it, see `ren_ShoreTessCoeff`), crossing or not.
      */
     [[nodiscard]] bool WaterBodyCrossesTile(
       const std::int32_t x0,
@@ -47,7 +79,9 @@ namespace moho
       const std::int32_t z1,
       const float minY,
       const float maxY,
-      float* const highest
+      const float margin,
+      float* const highest,
+      bool* const nearWater
     ) noexcept
     {
       if (sTesselatorMap == nullptr || !sTesselatorMap->HasWaterBodies()) {
@@ -62,6 +96,9 @@ namespace moho
         }
         if (body.elevation >= minY && maxY >= body.elevation) {
           crosses = true;
+        }
+        if (body.elevation >= minY - margin && maxY + margin >= body.elevation) {
+          *nearWater = true;
         }
         *highest = std::max(*highest, body.elevation);
       }
@@ -959,13 +996,27 @@ namespace moho
     bounds.Max.y = tierBounds.y;
     bounds.Max.z = static_cast<float>(cellZ + (1 << tier));
 
+    const float tierMaxError = mField->GetTierMaxError(tier, x, z);
     float waterElevation = mWaterElevation;
     bool crossesWaterSurface = (waterElevation >= tierBounds.x) && (tierBounds.y >= waterElevation);
+    // FAF: the shore of a node is near when a water level is within its error of its height range (the sea's or a
+    // body's, in the same test)
+    bool nearWaterSurface =
+      (waterElevation >= tierBounds.x - tierMaxError) && (tierBounds.y + tierMaxError >= waterElevation);
     // Engine addition (water bodies): a lake's shore is refined as the sea's, and a tile under a
-    // lake is kept by the frustum test up to the lake's surface.
+    // lake is kept by the frustum test up to the lake's surface. (`waterElevation` is the highest
+    // level of the tile's bodies after this call: it is for the frustum test below, not for the shore tests.)
     if (
       WaterBodyCrossesTile(
-        cellX, cellZ, cellX + (1 << tier), cellZ + (1 << tier), tierBounds.x, tierBounds.y, &waterElevation
+        cellX,
+        cellZ,
+        cellX + (1 << tier),
+        cellZ + (1 << tier),
+        tierBounds.x,
+        tierBounds.y,
+        tierMaxError,
+        &waterElevation,
+        &nearWaterSurface
       )
     ) {
       crossesWaterSurface = true;
@@ -986,11 +1037,21 @@ namespace moho
     }
 
     const Wm3::Vector3f testCorner = SelectAabbCornerByMask(bounds, mCornerSelectionMask);
-    const float tierMaxError = mField->GetTierMaxError(tier, x, z);
-    const float shoreErrorCoeff = crossesWaterSurface ? ren_ShoreErrorCoeff : 1.0f;
+    float shoreErrorCoeff = crossesWaterSurface ? ren_ShoreErrorCoeff : 1.0f;
+    if (nearWaterSurface) {
+      shoreErrorCoeff = std::min(shoreErrorCoeff, ren_ShoreTessCoeff);
+    }
 
     const Vector4f& row1 = mCam->viewport.r[1];
     const float projectedDepth = (row1.z * testCorner.z) + (row1.y * testCorner.y) + (row1.x * testCorner.x) + row1.w;
+
+    // FAF: see ren_ShoreTessCell
+    if (
+      crossesWaterSurface && ren_ShoreTessCell > 0.0f &&
+      static_cast<float>(1 << tier) > std::max(1.0f, projectedDepth * ren_ShoreTessCell)
+    ) {
+      return kSplit;
+    }
 
     const float maxAllowedError = shoreErrorCoeff * projectedDepth * ren_maxViewError;
     return (tierMaxError < maxAllowedError) ? kAccept : kSplit;
