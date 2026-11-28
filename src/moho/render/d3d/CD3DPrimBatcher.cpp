@@ -1,6 +1,7 @@
 #include "CD3DPrimBatcher.h"
 
 #include "moho/render/font/MsdfTextGpuRenderer.h"
+#include "gpg/gal/RenderProfiler.h"
 
 #include <algorithm>
 #include <array>
@@ -32,6 +33,37 @@
 
 namespace moho
 {
+  namespace
+  {
+    // FAF_GPU_PROFILE: why a prim batcher flush was requested (the rest are explicit Flush() calls).
+    enum class FlushReason : std::uint8_t
+    {
+      Texture,
+      QueueFull,
+      Mode,
+      AtlasFull,
+    };
+
+    void ProfileFlushReason(
+      const FlushReason reason
+    ) noexcept
+    {
+      switch (reason) {
+      case FlushReason::Texture:
+        FAF_PROFILE_COUNT("ui.prim.flush.texture", 1);
+        break;
+      case FlushReason::QueueFull:
+        FAF_PROFILE_COUNT("ui.prim.flush.queuefull", 1);
+        break;
+      case FlushReason::Mode:
+        FAF_PROFILE_COUNT("ui.prim.flush.mode", 1);
+        break;
+      case FlushReason::AtlasFull:
+        FAF_PROFILE_COUNT("ui.prim.flush.atlasfull", 1);
+        break;
+      }
+    }
+  } // namespace
   // Declared in moho/math/QuaternionMath.h; that header is not included here
   // because its header-scope yaw constants would add dynamic initializers to
   // this translation unit.
@@ -354,6 +386,7 @@ namespace moho
 
     if (useDirectTexture) {
       if (!runtime->mVertices.empty() && runtime->mTexture.get() != texture.get()) {
+        ProfileFlushReason(FlushReason::Texture);
         Flush();
       }
 
@@ -373,6 +406,7 @@ namespace moho
     }
 
     if (!runtime->mVertices.empty() && runtime->mDynamicTexSheet) {
+      ProfileFlushReason(FlushReason::Texture);
       Flush();
     }
 
@@ -381,6 +415,7 @@ namespace moho
       // Engine addition: pending instanced quads use this atlas too, and it's about to start over.
       MSDF_FlushPendingText();
       if (!runtime->mVertices.empty()) {
+        ProfileFlushReason(FlushReason::AtlasFull);
         Flush();
       }
       runtime->mTextureBatcher->Reset();
@@ -426,6 +461,7 @@ namespace moho
       std::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
 
     if (!runtime->mVertices.empty() && runtime->mDynamicTexSheet.get() != derivedSheet.get()) {
+      ProfileFlushReason(FlushReason::Texture);
       Flush();
     }
 
@@ -490,6 +526,10 @@ namespace moho
         runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType) ||
         (vertexCount + 4u) > kPrimQueueCapacity || (primitiveCount + 6u) > kPrimQueueCapacity
       ) {
+        ProfileFlushReason(
+          (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) ? FlushReason::Mode
+                                                                                     : FlushReason::QueueFull
+        );
         Flush();
       }
     }
@@ -550,6 +590,10 @@ namespace moho
           runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType) ||
           (vertexCount + 4u) > kPrimQueueCapacity || (primitiveCount + 6u) > kPrimQueueCapacity
         ) {
+          ProfileFlushReason(
+            (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) ? FlushReason::Mode
+                                                                                       : FlushReason::QueueFull
+          );
           Flush();
         }
       }
@@ -615,6 +659,7 @@ namespace moho
 
     auto* const runtime = this;
     if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+      ProfileFlushReason(FlushReason::Mode);
       Flush();
     }
 
@@ -640,6 +685,7 @@ namespace moho
 
     auto* const runtime = this;
     if (!runtime->mVertices.empty() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
+      ProfileFlushReason(FlushReason::Mode);
       Flush();
     }
 
@@ -668,6 +714,10 @@ namespace moho
         runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType) ||
         (vertexCount + 2u) > kPrimQueueCapacity || (primitiveCount + 2u) > kPrimQueueCapacity
       ) {
+        ProfileFlushReason(
+          (runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) ? FlushReason::Mode
+                                                                                 : FlushReason::QueueFull
+        );
         Flush();
       }
     }
@@ -710,6 +760,7 @@ namespace moho
       const std::uint32_t maxByVertices = (kPrimQueueCapacity - usedVertices) / verticesPerPrimitive;
       const std::uint32_t batchPrimitiveCount = std::min(primitiveCount, std::min(maxByIndices, maxByVertices));
       if (batchPrimitiveCount == 0u) {
+        ProfileFlushReason(FlushReason::QueueFull);
         Flush();
         continue;
       }
@@ -759,6 +810,14 @@ namespace moho
     if (runtime->mVertices.empty()) {
       return;
     }
+
+    // FAF_GPU_PROFILE: this flush's time and what it uploads; flushes by reason are counted where they are requested.
+    gpg::gal::CpuProfileScope profileFlush("UiPrimFlush");
+    FAF_PROFILE_COUNT("ui.prim.quads", runtime->mPrimitives.size() / 6u);
+    FAF_PROFILE_COUNT(
+      "ui.prim.uploadbytes",
+      runtime->mVertices.size() * sizeof(Vertex) + runtime->mPrimitives.size() * sizeof(std::int16_t)
+    );
 
     if (runtime->mResetComposite != 0u) {
       runtime->mComposite = VMatrix4::Multiply(runtime->mViewMatrix, runtime->mProjectionMatrix);
