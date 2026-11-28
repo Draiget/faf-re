@@ -48,6 +48,7 @@
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
+#include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -453,7 +454,9 @@ namespace moho
     BindTextureShaderVar(shaderVars.skirtTexture, std::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture));
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
-    BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
+    // Engine addition (water bodies): the water map, or the level map of the patched terrain effect on a map with
+    // bodies
+    water::BindTerrainWaterMap(*terrainRes, shaderVars.utilityTextureC);
 
     BindTextureShaderVar(shaderVars.lowerAlbedoTexture, strata.mLowerAlbedoTexture.mTextureSheet);
     BindTextureShaderVar(shaderVars.stratum0AlbedoTexture, strata.mStratum0AlbedoTexture.mTextureSheet);

@@ -37,6 +37,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimStartupRegistrations.h"
+#include "moho/sim/SimWaterEvents.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
@@ -2190,6 +2191,15 @@ namespace moho
       } else {
         const char* impactSurface = (unit->mVarDat.mLayerMask == LAYER_Land) ? "Terrain" : "Water";
         unit->CallbackStr("OnImpact", &impactSurface);
+        // A wreck that falls into the sea (an aircraft shot down) splashes where it lands, by what it cost (render
+        // only: nothing feeds back).
+        if (unit->mVarDat.mLayerMask != LAYER_Land) {
+          if (const RUnitBlueprint* const impactBlueprint = unit->GetBlueprint(); impactBlueprint != nullptr) {
+            SimWaterUnitDeath(
+              newPos.x, newPos.y, newPos.z, impactBlueprint->Economy.BuildCostMass, unit->GetArmyIndex()
+            );
+          }
+        }
 
         const EUnitMotionState currentState = mMotionState;
         if (currentState != kUnitMotionStateCrashed) {

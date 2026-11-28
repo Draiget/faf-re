@@ -280,6 +280,14 @@ namespace moho
      */
     void ClearCachedVertexFormats();
 
+    /**
+     * FAF addition (not in the binary): rebuilds the effect of this name ("mesh", "terrain", "water2") from its source
+     * with the patches that are wanted now. Used when a render feature whose shader patch is applied as the effect
+     * loads is switched on in a running game (Dynamic Lights: Off -> a level). Returns false when there is no such
+     * effect or the new one does not build (the old one stays).
+     */
+    bool ReloadEffectNamed(const char* effectName);
+
   private:
     /**
      * Address: 0x00440D00 (FUN_00440D00)
