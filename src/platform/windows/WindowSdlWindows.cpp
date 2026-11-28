@@ -153,8 +153,12 @@ namespace platform::window::sdl
 {
   void OnInit()
   {
-    // The window library's full-screen frame stayed up when another program took the keyboard.
-    (void)SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
+    // The window library's full-screen frame stayed up when another program took the keyboard, and so does the
+    // borderless frame: SDL minimises only a window in a display mode of its own (full screen below the display's
+    // resolution, platform::window::SetFullscreenMode), which gives the desktop its mode back on Alt+Tab and takes
+    // the game's again on restore, as the binary's Direct3D 9 exclusive full screen did (issue #505). "0" kept such
+    // a window up with the display still in the game's mode, the desktop's windows partly off screen.
+    (void)SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "auto");
     // A borderless window is a plain popup (WS_POPUP), as the window library made the full-screen
     // frame (style 0x200800), not SDL's popup with caption bits that it hides itself (#418).
     (void)SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "0");
