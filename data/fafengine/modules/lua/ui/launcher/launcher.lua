@@ -4869,11 +4869,17 @@ function TestWalk()
             Step('lan page: listening ' .. tostring(lan.discovery and true or false) .. ', ' ..
                 table.getn(lan:Shown()) .. ' games')
             local lanTest = GetCommandLineArg('/launcherlantest', 1)
-            if lanTest and lanTest[1] == 'host' then
+            -- hostport: on the fixed port 16010, for joinaddr, which types the address into Connect by address.
+            if lanTest and (lanTest[1] == 'host' or lanTest[1] == 'hostport') then
                 lan.name.edit:SetText('lanhost')
                 local dialog = lan:OpenHost()
                 dialog.gameName.edit:SetText('LAN test game')
                 dialog.gameName:Refresh()
+                if lanTest[1] == 'hostport' and dialog.anyPort then
+                    dialog.anyPort:SetOn(false)
+                    dialog.port.edit:SetText('16010')
+                    dialog.port:Refresh()
+                end
                 Step('lan: host dialog open')
                 Wait(2)
                 lan:Host(dialog)
@@ -4893,7 +4899,7 @@ function TestWalk()
                 Wait(3)
                 Step('lan: host left the lobby, page ' .. tostring(current.page) .. ', screen ' ..
                     tostring(current.screenName))
-            elseif lanTest and lanTest[1] == 'join' then
+            elseif lanTest and (lanTest[1] == 'join' or lanTest[1] == 'joinaddr') then
                 lan.name.edit:SetText('lanjoin')
                 local game = nil
                 for i = 1, 60 do
@@ -4904,9 +4910,22 @@ function TestWalk()
                     Wait(1)
                 end
                 Step('lan: found ' .. (game and (tostring(game.GameName) .. ' at ' .. tostring(game.Address)) or 'nothing'))
-                if game then
+                if game and lanTest[1] == 'joinaddr' then
+                    -- Connect by address, typed as a player does: the host's address and its port.
+                    local address = lanTest[2] or string.gsub(tostring(game.Address), ':%d+$', '') -- the host's
+                    local dialog = lan:OpenConnect()
+                    dialog.address.edit:SetText(address)
+                    dialog.address:Refresh()
+                    dialog.port.edit:SetText('16010')
+                    dialog.port:Refresh()
+                    Step('lan: connect by address ' .. address .. ' port 16010')
+                    Wait(3)
+                    lan:Connect(dialog)
+                elseif game then
                     Wait(2)
                     lan:Join(game, false)
+                end
+                if game then
                     for i = 1, 30 do
                         local counted, players = pcall(import('/lua/ui/lobby/lobby.lua').GetPlayerCount)
                         players = counted and players or 0

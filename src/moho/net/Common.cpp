@@ -2,6 +2,7 @@
 
 #include <utility>
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
@@ -796,7 +797,7 @@ INetConnector* moho::NET_MakeUDPConnector(
   sockaddr_in name;
   name.sin_family = AF_INET;
   name.sin_port = htons(port);
-  name.sin_addr.s_addr = htonl(0);
+  name.sin_addr.s_addr = NET_TestLocalAddress(); // 0: every address, as the binary binds
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
@@ -849,7 +850,7 @@ INetConnector* moho::NET_MakeTCPConnector(
   sockaddr_in name{};
   name.sin_family = AF_INET;
   name.sin_port = htons(port);
-  name.sin_addr.s_addr = htonl(0);
+  name.sin_addr.s_addr = NET_TestLocalAddress(); // 0: every address, as the binary binds
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
@@ -1117,4 +1118,41 @@ ENetProtocolType moho::NET_ProtocolFromString(
 
   const fa::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
   throw std::domain_error(msg.c_str());
+}
+
+std::uint32_t moho::NET_TestLocalAddress()
+{
+  static const std::uint32_t address = [] {
+    const char* const text = std::getenv("FAF_NET_LOCAL_ADDRESS");
+    if (text == nullptr || *text == 0) {
+      return std::uint32_t{0};
+    }
+    std::uint32_t value = 0;
+    const char* at = text;
+    const char* const end = text + std::strlen(text);
+    for (int part = 0; part < 4; ++part) {
+      if (part > 0) {
+        if (at == end || *at != '.') {
+          gpg::Warnf("FAF_NET_LOCAL_ADDRESS isn't an IPv4 address: %s", text);
+          return std::uint32_t{0};
+        }
+        ++at;
+      }
+      unsigned octet = 0;
+      const auto read = std::from_chars(at, end, octet);
+      if (read.ec != std::errc{} || octet > 255u) {
+        gpg::Warnf("FAF_NET_LOCAL_ADDRESS isn't an IPv4 address: %s", text);
+        return std::uint32_t{0};
+      }
+      value = (value << 8u) | octet;
+      at = read.ptr;
+    }
+    if (at != end) {
+      gpg::Warnf("FAF_NET_LOCAL_ADDRESS isn't an IPv4 address: %s", text);
+      return std::uint32_t{0};
+    }
+    gpg::Logf("NET: lobby and discovery sockets on %s (FAF_NET_LOCAL_ADDRESS, a test hook)", text);
+    return static_cast<std::uint32_t>(htonl(value));
+  }();
+  return address;
 }

@@ -364,6 +364,13 @@ namespace moho
   bool NET_GetAddrInfo(const char* str, u_short defaultPort, bool isTcp, u_long& address, u_short& port);
 
   /**
+   * Engine addition (a test hook, unset for players): FAF_NET_LOCAL_ADDRESS=a.b.c.d puts the lobby's UDP connector and
+   * the LAN discovery sockets on that one address instead of every address, for a test machine that drops UDP to and
+   * from sockets bound to every address. In network byte order; 0 (every address) when unset or not an address.
+   */
+  [[nodiscard]] std::uint32_t NET_TestLocalAddress();
+
+  /**
    * Address: 0x0047ED50 (FUN_0047ED50, NET_ProtocolFromString)
    *
    * What it does:

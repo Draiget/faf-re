@@ -81,7 +81,7 @@ INetDatagramSocket* moho::NET_OpenDatagramSocket(
   sockaddr_in name{};
   name.sin_family = AF_INET;
   name.sin_port = htons(port);
-  name.sin_addr.s_addr = htonl(INADDR_ANY);
+  name.sin_addr.s_addr = NET_TestLocalAddress(); // 0: INADDR_ANY, as the binary binds
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_OpenDatagramSocket: bind() failed: %s", NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
