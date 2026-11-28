@@ -1839,6 +1839,7 @@ namespace
         std::size_t lastIn = 0;
         std::uint64_t toServer = 0;
         bool hostLeftSaid = false;
+        bool everyoneLeftLobby = false; // every player who joined left before the game: no game
         bool launched = false;
         std::int32_t lastHost = signaller.Host();
         const int forceStartsBefore = gForceStartRequests;
@@ -1988,6 +1989,11 @@ namespace
           }
           if (signaller.HostLeft() && !std::exchange(hostLeftSaid, true)) {
             Say("Lobby: the host left and nobody is left to take over; the lobby can't go on");
+          }
+          if (net->EveryoneGone()) {
+            // Nobody is left to play: the lobby ends here, with no game of the AI alone after it.
+            everyoneLeftLobby = true;
+            break;
           }
           for (const std::string& line : net->TakeNews()) {
             Say("%s", line.c_str());
@@ -2235,6 +2241,13 @@ namespace
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
         net->CloseLobby();
+        if (everyoneLeftLobby) {
+          end.stoppedBy = "every player left";
+          Say("Lobby: every player left before the game; no game");
+          controlEvent("ended", "\"reason\":\"every player left\"");
+          WriteResult(resultPath, end);
+          return kExitEnded;
+        }
         Say(
           "Lobby closed: %d of %d participants in, %llu messages to the server",
           static_cast<int>(lastIn),
@@ -2994,6 +3007,11 @@ namespace
       if (net && net->NobodyCame()) {
         end.stoppedBy = "nobody connected";
         Say("Nobody connected in time");
+        break;
+      }
+      if (net && net->EveryoneGone()) {
+        end.stoppedBy = "every player left";
+        Say("Every player left: the game ends");
         break;
       }
       if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {

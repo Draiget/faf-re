@@ -778,6 +778,17 @@ namespace faf::server
         mNobodyCame.store(true, std::memory_order_relaxed);
       }
     }
+    if (!mSeats.empty() && !mEveryoneGone.load(std::memory_order_relaxed)) {
+      bool anyoneJoined = false;
+      bool allGone = true;
+      for (const auto& [uid, seat] : mSeats) {
+        anyoneJoined = anyoneJoined || seat.joinedEver;
+        allGone = allGone && seat.gone;
+      }
+      if (anyoneJoined && allGone) {
+        mEveryoneGone.store(true, std::memory_order_relaxed);
+      }
+    }
   }
 
   remote::wire::SRoster CServerNet::BuildRoster(

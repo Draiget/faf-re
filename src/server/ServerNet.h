@@ -295,6 +295,14 @@ namespace faf::server
     {
       return mNobodyCame.load(std::memory_order_relaxed);
     }
+    /**
+     * Every player who joined is gone for good (left, or didn't come back in time) and nobody else holds a seat: the
+     * match has nobody to play it, so the lobby or game ends rather than running on with the AI alone.
+     */
+    [[nodiscard]] bool EveryoneGone() const noexcept
+    {
+      return mEveryoneGone.load(std::memory_order_relaxed);
+    }
 
     [[nodiscard]] remote::net::SEndpoint Local() const noexcept
     {
@@ -382,6 +390,7 @@ namespace faf::server
     std::thread mThread;
     std::atomic<bool> mStop{false};
     std::atomic<bool> mNobodyCame{false};
+    std::atomic<bool> mEveryoneGone{false};
     std::atomic<std::int32_t> mBeat{-1};
     std::int32_t mBeatSent = -1;
     std::uint64_t mStartUs = 0;
