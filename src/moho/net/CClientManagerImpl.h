@@ -13,6 +13,9 @@
 #include "moho/net/CommandStreamCheck.h"
 #include "moho/net/PeerFeatures.h"
 #include "moho/net/CRejoinFeed.h"
+#include "moho/net/NetworkWaitTracker.h"
+
+#include <vector>
 
 namespace moho
 {
@@ -502,6 +505,12 @@ namespace moho
      * Demangled: Moho::CClientManagerImpl::Func4
      */
     virtual SClientBottleneckInfo GetBottleneckInfo();
+
+    // Engine addition: wait timing for the Connectivity screen. Not virtual and not
+    // members, so the vtable and the object layout stay the binary's.
+    void RecordNetworkWaitDemand(bool demanded, bool waiting, int targetBeat);
+    void RefreshNetworkWaitDiagnostics();
+    std::vector<NetworkWaitMetrics> GetNetworkWaitMetrics();
 
     /**
      * Address: 0x0053F920

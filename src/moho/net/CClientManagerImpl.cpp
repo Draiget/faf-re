@@ -20,6 +20,8 @@
 #include <cstring>
 #include <mutex>
 #include <random>
+#include <unordered_map>
+#include <vector>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"
@@ -856,8 +858,43 @@ void CMarshaller::WriteCells(
  * Destroys owned clients, tears down connector ownership, and leaves
  * remaining member/base teardown to C++ destruction order.
  */
+namespace
+{
+  // Engine addition (not in the binary): wait timing per client manager. Kept outside
+  // the class so the manager keeps the binary's layout.
+  struct NetworkWaitState
+  {
+    NetworkWaitTracker tracker;
+    bool demanded = false;
+    bool waiting = false;
+    int targetBeat = 0;
+  };
+
+  struct NetworkWaitStore
+  {
+    std::mutex mutex;
+    std::unordered_map<const CClientManagerImpl*, NetworkWaitState> sessions;
+  };
+
+  NetworkWaitStore& NetworkWaits()
+  {
+    static auto* const store = new NetworkWaitStore;
+    return *store;
+  }
+
+  double NetworkWaitClockSeconds()
+  {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  }
+} // namespace
+
 CClientManagerImpl::~CClientManagerImpl()
 {
+  {
+    NetworkWaitStore& store = NetworkWaits();
+    std::scoped_lock guard(store.mutex);
+    store.sessions.erase(this);
+  }
   // It holds client pointers, and deleting a client can still route a message.
   mRejoinFeed.reset();
   // Engine addition (issue #275): rejoin candidates hold this manager, its seats and links of its connector.
@@ -1381,6 +1418,8 @@ void CClientManagerImpl::DoBeat()
   // Engine additions (issue #236), off by default.
   NoteAvailableBeat(availableBefore, mAvailableBeat);
   MaybeSendTestBurst(mClients, mAvailableBeat);
+  // Engine addition: a delivered beat ends a wait without waiting for the next UI frame.
+  RefreshNetworkWaitDiagnostics();
 
   const SClientBottleneckInfo bottleneckInfo = GetBottleneckInfo();
   const float currentUiBottleneckTimeMs = GetBottleneckUiTimestampMs(*this);
@@ -1654,4 +1693,124 @@ void CClientManagerImpl::Disconnect()
 
   CMessage message{ECmdStreamOp::CMDST_EndGame};
   ProcessClients(message);
+}
+
+/**
+ * Engine addition (not in the binary): the session loop says each frame whether it is
+ * running normally (`demanded`: not paused, not fast-forwarding or catching up) and
+ * whether it is stalled on `targetBeat` with nothing left to simulate (`waiting`).
+ * Records the state and which peers that beat is still missing. Reads only; nothing
+ * is sent and nothing reaches the sim.
+ */
+void CClientManagerImpl::RecordNetworkWaitDemand(
+  const bool demanded,
+  const bool waiting,
+  const int targetBeat
+)
+{
+  std::scoped_lock lock(mLock);
+  {
+    NetworkWaitStore& store = NetworkWaits();
+    std::scoped_lock guard(store.mutex);
+    NetworkWaitState& state = store.sessions[this];
+    state.demanded = demanded;
+    state.waiting = waiting;
+    state.targetBeat = targetBeat;
+  }
+  RefreshNetworkWaitDiagnostics();
+}
+
+/**
+ * Engine addition (not in the binary): samples the wait state now, from every
+ * `DoBeat` and every session frame. Under `mLock` it reads each client's confirmations
+ * for the stalled beat (clients x clients comparisons, 256 at 16 players), takes the
+ * store's mutex for one map lookup and appends to the tracker's 30 s history when the
+ * state changed. No I/O.
+ */
+void CClientManagerImpl::RefreshNetworkWaitDiagnostics()
+{
+  std::scoped_lock lock(mLock);
+  NetworkWaitStore& store = NetworkWaits();
+  std::scoped_lock guard(store.mutex);
+  const auto found = store.sessions.find(this);
+  if (found == store.sessions.end()) {
+    return;
+  }
+  NetworkWaitState& state = found->second;
+  const std::size_t count = mClients.size();
+  // The first 100 beats (10 s at speed +0) are the load-in, when every client is
+  // still catching up; nobody is blamed for them. A stream the command check stopped
+  // is not waiting on anyone's connection.
+  constexpr int kStartupBeats = 100;
+  const bool active = state.demanded && mWeAreReady && mEveryoneIsReady && mDispatchedBeat > kStartupBeats &&
+    count <= NetworkWaitTracker::kMaxPeers && mLocalClient != nullptr &&
+    (mStreamCheck == nullptr || !mStreamCheck->StopsGame());
+
+  std::uint64_t waitedOn = 0;
+  const int beat = state.targetBeat;
+  // Only the beat the session is stalled on, never beats queued ahead of time, and only
+  // once this client has issued it: before that the wait is our own pacing.
+  if (
+    active && state.waiting && beat > mAvailableBeat && beat > mDispatchedBeat &&
+    mLocalClient->mQueuedBeat >= static_cast<uint32_t>(beat)
+  ) {
+    // The test `IsReadyForBeat` makes, kept per pair: lacks[r] bit s = client r has not
+    // confirmed client s's beat. Ejected clients confirm nothing and block nothing; a
+    // client being ejected blocks only the beats before its eject (as `IsReadyForBeat`).
+    std::uint64_t blocking = 0;
+    for (std::size_t s = 0; s < count; ++s) {
+      CClientBase* const sender = mClients[s];
+      if (sender == nullptr || sender->mEjected) {
+        continue;
+      }
+      bool blocks = !sender->mEjectPending;
+      if (sender->mEjectPending) {
+        int mostExpiredBeat = beat;
+        sender->GetMostExpiredEjectRequest(mostExpiredBeat);
+        blocks = beat < mostExpiredBeat;
+      }
+      if (blocks) {
+        blocking |= std::uint64_t{1} << s;
+      }
+    }
+    std::uint64_t lacks[NetworkWaitTracker::kMaxPeers]{};
+    unsigned local = 0;
+    for (std::size_t r = 0; r < count; ++r) {
+      const CClientBase* const receiver = mClients[r];
+      if (receiver == mLocalClient) {
+        local = static_cast<unsigned>(r);
+      }
+      if (receiver == nullptr || receiver->mEjected || receiver->mEjectPending) {
+        continue;
+      }
+      const fa::vector<int32_t>& acks = receiver->mLatestAckReceived;
+      for (std::size_t s = 0; s < count && s < acks.size(); ++s) {
+        if ((blocking & (std::uint64_t{1} << s)) != 0 && acks[s] < beat) {
+          lacks[r] |= std::uint64_t{1} << s;
+        }
+      }
+    }
+    waitedOn = NetworkWaitBlame(lacks, static_cast<unsigned>(count), local, blocking);
+  }
+  state.tracker.Observe(NetworkWaitClockSeconds(), active, waitedOn);
+}
+
+/**
+ * Engine addition (not in the binary): wait timing for every client index, for
+ * `GetSessionClients`. All zero before the session loop first reports.
+ */
+std::vector<NetworkWaitMetrics> CClientManagerImpl::GetNetworkWaitMetrics()
+{
+  std::scoped_lock lock(mLock);
+  NetworkWaitStore& store = NetworkWaits();
+  std::scoped_lock guard(store.mutex);
+  std::vector<NetworkWaitMetrics> result(mClients.size());
+  const auto found = store.sessions.find(this);
+  if (found != store.sessions.end()) {
+    const double now = NetworkWaitClockSeconds();
+    for (unsigned i = 0; i < result.size(); ++i) {
+      result[i] = found->second.tracker.Read(now, i);
+    }
+  }
+  return result;
 }

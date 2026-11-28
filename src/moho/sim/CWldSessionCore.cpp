@@ -2120,6 +2120,16 @@ namespace moho
         DoBeat(fa::auto_ptr<SSyncData>(packet));
       }
 
+    // Engine addition: tell the Connectivity screen's wait timing whether this frame ran
+    // normally (no pause, fast-forward or rejoin catch-up) and stalled for the next beat.
+    // It only records; what the session does next is unchanged.
+    if (auto* const localSimDriver = dynamic_cast<CSimDriver*>(simDriver)) {
+      const bool demanded = mGameTick > 0 && !mReplayIsPaused && fastForwardTarget < 0 && !rejoinCatchingUp;
+      localSimDriver->RecordNetworkWaitDemand(
+        demanded, demanded && mGameTick < targetTick && !simDriver->HasSyncData()
+      );
+    }
+
     if (sEngineStat_Sync_Count == nullptr) {
       sEngineStat_Sync_Count = GetEngineStats()->GetItem("Sync_Count", true);
       (void)sEngineStat_Sync_Count->Release(0);
