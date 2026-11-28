@@ -130,6 +130,46 @@ function Open(preview)
                 table.insert(lines, item.label .. ' ' .. (item.shown and 'shown' or ('not shown: ' .. tostring(item.why))))
             end
             LOG('UNIT PREVIEW TEST: ' .. table.concat(lines, '; '))
+            -- /launchergamemenutest: the game's menu (Esc's tab) in the launcher's look, its Options as the
+            -- launcher's options page, the Key bindings tab, closed again.
+            if GetCommandLineArg('/launchergamemenutest', 0) then
+                local GameMenu = import('/fafengine/modules/lua/ui/game/gamemenu.lua')
+                import('/lua/ui/game/tabs.lua').ToggleTab('main')
+                WaitSeconds(1.5)
+                local menu = GameMenu.Current()
+                local labels = {}
+                for _, button in (menu and menu.buttons or {}) do
+                    table.insert(labels, button.action)
+                end
+                LOG('GAME MENU TEST: menu ' .. (menu and 'open' or 'not open') .. ': ' .. table.concat(labels, ', '))
+                WaitSeconds(2)
+                for _, button in (menu and menu.buttons or {}) do
+                    if button.action == 'Options' then
+                        button.onClick(button)
+                    end
+                end
+                WaitSeconds(2)
+                local dialog = GameMenu.CurrentOptions()
+                local view = dialog and dialog.view
+                LOG('GAME MENU TEST: options ' .. (dialog and 'open' or 'not open') .. ', menu closed ' ..
+                    tostring(GameMenu.Current() == false) .. ', tab ' .. tostring(view and view.tab) .. ', rows ' ..
+                    tostring(view and view.Shown and view:Shown()))
+                WaitSeconds(2)
+                if view then
+                    view.tab = 'keys'
+                    view.top = 1
+                    view:Refresh()
+                end
+                WaitSeconds(2)
+                LOG('GAME MENU TEST: keys tab ' .. tostring(view and view.tab) .. ', keys view ' ..
+                    tostring(view and view.keysView ~= nil))
+                WaitSeconds(2)
+                if dialog then
+                    dialog:Close()
+                end
+                WaitSeconds(1)
+                LOG('GAME MENU TEST: closed, options ' .. tostring(GameMenu.CurrentOptions() == false))
+            end
             SimCallback({ Func = 'FafrePreviewRestart', Args = {} })
             WaitSeconds(4)
             LOG('UNIT PREVIEW TEST: restarted')
