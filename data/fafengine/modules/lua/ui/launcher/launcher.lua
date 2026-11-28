@@ -3541,6 +3541,27 @@ function TestWalk()
             WaitSeconds(seconds)
         end
         Prefs.SetToCurrentProfile('MenuTutorialPrompt', true)
+        -- /launcherfonttest: string widths (advances) of the launcher's fonts, regular against bold, for the squeezed
+        -- bold capitals.
+        if GetCommandLineArg('/launcherfonttest', 0) then
+          for _, mode in { 1, 0 } do
+            ConExecute('ren_MsdfAdvances ' .. mode)
+            Step('font: ren_MsdfAdvances ' .. mode)
+            for _, size in { 10, 13, 15 } do
+                for _, face in { 'Arial', 'Arial Bold', 'Arial Black' } do
+                    local probe = UIUtil.CreateText(current.root, 'RANK', size, face)
+                    local widths = {}
+                    for _, text in { 'RANK', 'REVIEWS', 'IIII', 'WWWW' } do
+                        table.insert(widths, text .. '=' .. tostring(probe:GetStringAdvance(text)))
+                    end
+                    Step('font: ' .. face .. ' ' .. size .. ': ' .. table.concat(widths, ' ') .. ' height ' ..
+                        tostring(probe.Height()))
+                    probe:Destroy()
+                end
+            end
+          end
+          ConExecute('ren_MsdfAdvances 1')
+        end
         -- /launcherpreviewtest: the changelog's game preview of a made-up Titan card (four values the preview puts
         -- back, a cost, one changed again since). The game's overlay walks on by itself and comes back here.
         if GetCommandLineArg('/launcherpreviewtest', 0) then

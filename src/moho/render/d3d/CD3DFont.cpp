@@ -413,6 +413,24 @@ namespace moho
     );
 
     /**
+     * Engine addition: `ren_MsdfAdvances`. Text MSDF draws is spaced by its outline's own advances (GDI's measured at
+     * kPreciseAdvanceScale times the size, so the hinting's rounding to whole pixels is gone), as the atlas draws the
+     * unhinted outline: GDI's rounded advances are up to a pixel narrower per character at small sizes, which
+     * squeezed small bold capitals together. Layout (string widths) takes the same advances, so it matches the
+     * drawing; text GDI draws (ren_MsdfText 0, sizes under ren_MsdfTextMinSize) keeps GDI's.
+     */
+    bool ren_MsdfAdvances = true;
+    constexpr int kPreciseAdvanceScale = 8;
+    constexpr std::uint64_t kPreciseAdvanceKeySalt = 0x5EC15EADu; // the glyph cache keeps the two kinds apart
+
+    TConVar<bool> gTConVar_ren_MsdfAdvances(
+      "ren_MsdfAdvances",
+      "Space the text MSDF draws by its outline's own advances, unrounded (1, the default), or by GDI's advances "
+      "rounded to whole pixels at its size (0). Text GDI draws keeps GDI's.",
+      &ren_MsdfAdvances
+    );
+
+    /**
      * Engine change: `ren_MsdfGlyphReuse`. MSDF text looked each character's glyph up twice, a binary search
      * in the check that every character has one and again while drawing; the drawing loop now takes the
      * glyphs the check found, in the same order.
@@ -457,6 +475,10 @@ namespace moho
       // The atlas page had no room for this mod font's atlas: it draws in the default font, with that font's
       // advances too, rather than GDI's glyphs at the mod font's spacing. Its bitmaps of small sizes still apply.
       bool mNoPage = false;
+      // Engine addition (ren_MsdfAdvances): the face at kPreciseAdvanceScale times the size, made on first use, and
+      // whether the advances measured so far are its (1) or GDI's at the size (0); -1 before the first.
+      HFONT mPreciseFont = nullptr;
+      int mAdvanceMode = -1;
     };
 
     /**
@@ -1488,6 +1510,61 @@ namespace moho
       return !ren_MsdfText || binding.mPointSize < ren_MsdfTextMinSize;
     }
 
+    /**
+     * Engine addition (ren_MsdfAdvances): whether `font`'s advances are its outline's own: a game font MSDF draws,
+     * with the switch on. A mod's font has its atlas's advances already.
+     */
+    [[nodiscard]] bool TakesPreciseAdvances(
+      const CD3DFont& font
+    )
+    {
+      if (!ren_MsdfAdvances) {
+        return false;
+      }
+      const auto bound = sMsdfBindings.find(&font);
+      return bound != sMsdfBindings.end() && !bound->second.mIsMod && !DrawsThroughGdiGlyphs(font);
+    }
+
+    /** Engine addition (ren_MsdfAdvances): which advances a game font of `pointSize` takes now (1 its outline's). */
+    [[nodiscard]] int AdvanceModeFor(
+      const std::int32_t pointSize
+    )
+    {
+      return ren_MsdfAdvances && ren_MsdfText && pointSize >= ren_MsdfTextMinSize ? 1 : 0;
+    }
+
+    /**
+     * Engine addition (ren_MsdfAdvances): when the switches change which advances fonts take, the characters'
+     * entries of each font whose advances change (their advances, and the glyphs built at them) are dropped, to be
+     * measured again. One comparison per call while the switches stay as they are: this runs for every character.
+     */
+    void SyncAdvanceMode(
+      CD3DFont& /*font*/
+    )
+    {
+      static int sAppliedSwitches = -1;
+      const int switches =
+        (ren_MsdfAdvances ? 1 : 0) | (ren_MsdfText ? 2 : 0) | (std::max(0, ren_MsdfTextMinSize) << 2);
+      if (switches == sAppliedSwitches) {
+        return;
+      }
+      sAppliedSwitches = switches;
+      for (auto& [font, binding] : sMsdfBindings) {
+        if (binding.mIsMod) {
+          continue;
+        }
+        const int mode = AdvanceModeFor(binding.mPointSize);
+        if (binding.mAdvanceMode != mode) {
+          if (binding.mAdvanceMode != -1) {
+            CD3DFont& changed = const_cast<CD3DFont&>(*font);
+            DestroyGlyphPageCache(changed.mCharInfo);
+            InitializeGlyphPageCache(changed.mCharInfo);
+          }
+          binding.mAdvanceMode = mode;
+        }
+      }
+    }
+
     /// Engine addition (ren_GlyphCache): the glyph cache's key for one of the font's characters, 0 when the font has
     /// no identity.
     [[nodiscard]] std::uint64_t CachedGlyphKey(
@@ -1503,7 +1580,11 @@ namespace moho
           fontIdentity = found->second;
         }
       }
-      return fontIdentity != 0 ? GlyphKey(fontIdentity, chText) : 0;
+      if (fontIdentity == 0) {
+        return 0;
+      }
+      // Engine addition (ren_MsdfAdvances): an outline's own advance under a key of its own.
+      return GlyphKey(TakesPreciseAdvances(font) ? (fontIdentity ^ kPreciseAdvanceKeySalt) : fontIdentity, chText);
     }
 
     /**
@@ -1526,8 +1607,28 @@ namespace moho
       float advance = knownAdvance;
       if (knownAdvance == 0.0f) {
         RECT textRect{};
-        (void)DrawTextW(font.mDeviceContext, &chText, 1, &textRect, 0xC20u);
-        advance = static_cast<float>(textRect.right - textRect.left);
+        // Engine addition (ren_MsdfAdvances): the outline's own advance, measured at kPreciseAdvanceScale times the
+        // size, where the hinting's rounding is under a pixel's eighth.
+        const auto bound = TakesPreciseAdvances(font) ? sMsdfBindings.find(&font) : sMsdfBindings.end();
+        if (bound != sMsdfBindings.end()) {
+          MsdfBinding& binding = bound->second;
+          if (binding.mPreciseFont == nullptr) {
+            binding.mPreciseFont = CreateFontA(
+              -binding.mPointSize * kPreciseAdvanceScale, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, binding.mFace.c_str()
+            );
+          }
+          if (binding.mPreciseFont != nullptr) {
+            const HGDIOBJ previous = SelectObject(font.mDeviceContext, binding.mPreciseFont);
+            (void)DrawTextW(font.mDeviceContext, &chText, 1, &textRect, 0xC20u);
+            (void)SelectObject(font.mDeviceContext, previous);
+            advance = static_cast<float>(textRect.right - textRect.left) / static_cast<float>(kPreciseAdvanceScale);
+          }
+        }
+        if (advance == 0.0f) {
+          textRect = RECT{};
+          (void)DrawTextW(font.mDeviceContext, &chText, 1, &textRect, 0xC20u);
+          advance = static_cast<float>(textRect.right - textRect.left);
+        }
       }
 
       outStrike = nullptr;
@@ -1615,6 +1716,7 @@ namespace moho
     binding.mFace = lookup.mFace;
     binding.mPointSize = pointSize;
     binding.mIsMod = isModFace;
+    binding.mAdvanceMode = isModFace ? -1 : AdvanceModeFor(pointSize); // engine addition (ren_MsdfAdvances)
     sHasModFonts = sHasModFonts || isModFace;
     sMsdfBindings[createdFont] = std::move(binding);
 
@@ -1741,7 +1843,12 @@ namespace moho
       const std::lock_guard<std::mutex> lock(gFontIdentityLock);
       FontIdentities().erase(this);
     }
-    sMsdfBindings.erase(this);
+    if (const auto bound = sMsdfBindings.find(this); bound != sMsdfBindings.end()) {
+      if (bound->second.mPreciseFont != nullptr) {
+        DeleteObject(bound->second.mPreciseFont); // engine addition (ren_MsdfAdvances)
+      }
+      sMsdfBindings.erase(bound);
+    }
 
     // FUN_004272F0: the member-empty `operator=` release of the kerning vector.
     mKerningPairs = CD3DFont::KerningPairVector{};
@@ -1778,6 +1885,7 @@ namespace moho
     constexpr int kGlyphScratchHeight = 128;
     constexpr std::uint32_t kDxtOpaqueColorBlock = 0x000000000000FFFFull;
 
+    SyncAdvanceMode(*this); // engine addition (ren_MsdfAdvances)
     const std::uint8_t pageIndex = static_cast<std::uint8_t>((static_cast<std::uint16_t>(chText) >> 8u) & 0xFFu);
     SCharInfoPage& page = mCharInfo[pageIndex];
     if (page.size() != 256u) {
@@ -2091,6 +2199,7 @@ namespace moho
     if (!ren_GlyphAdvanceOnly) {
       return GetCharInfo(chText).mAdvance;
     }
+    SyncAdvanceMode(*this); // engine addition (ren_MsdfAdvances)
     const std::uint8_t pageIndex = static_cast<std::uint8_t>((static_cast<std::uint16_t>(chText) >> 8u) & 0xFFu);
     SCharInfoPage& page = mCharInfo[pageIndex];
     if (page.size() != 256u) {
