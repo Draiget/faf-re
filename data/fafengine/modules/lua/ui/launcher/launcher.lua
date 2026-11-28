@@ -4722,6 +4722,45 @@ function TestWalk()
                 end
             end
             Step('options without help: ' .. table.getn(missing) .. ' ' .. table.concat(missing, ' '))
+            -- The launcher's own help texts in the game's language (optionhelp.lua): which have none in it.
+            local own = import('/fafengine/modules/lua/ui/launcher/optionhelp.lua')
+            local untranslated = {}
+            for _, key in own.Keys() do
+                if own.Language() ~= 'us' and not own.Translated(key) then
+                    table.insert(untranslated, key)
+                end
+            end
+            Step('option help in ' .. own.Language() .. ': ' .. table.getn(own.Keys()) .. ' texts, ' ..
+                table.getn(untranslated) .. ' untranslated ' .. table.concat(untranslated, ' '))
+            -- Every option's help as the page shows it: still English (the same as FAF's English text) in this language?
+            if own.Language() ~= 'us' then
+                local english = {}
+                for _, key in options.sections do
+                    for _, item in options.data[key].items do
+                        if item.type ~= 'header' and not own.Translated(item.key) then
+                            local info = tooltips['options_' .. tostring(item.key)]
+                            local source = (info and info.description) or item.tip
+                            if source then
+                                local plain = string.gsub(source, '^<LOC [^>]*>', '')
+                                if LOC(source) == plain then
+                                    table.insert(english, tostring(item.key))
+                                end
+                            end
+                        end
+                    end
+                end
+                Step('options still in English in ' .. own.Language() .. ': ' .. table.getn(english) .. ' ' ..
+                    table.concat(english, ' '))
+            end
+            options.tab = 'video'
+            options:Refresh()
+            Step('options video tab shown')
+            Wait(4)
+            -- Its end, where the engine's own options are.
+            options.top = math.max(1, table.getn(options.entries) - 5)
+            options:Refresh()
+            Step('options video tab end shown')
+            Wait(4)
             options.tab = 'gameplay'
             options:Refresh()
             Wait(1)

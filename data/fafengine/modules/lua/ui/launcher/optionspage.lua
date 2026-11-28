@@ -33,6 +33,12 @@ end
 --- An option's help in the player's language: FAF's tooltip (options_<key>, translated by the game's own LOC), else
 --- its tip, else the launcher's own text for options FAF has none for (optionhelp.lua, per language).
 local function Help(item)
+    -- The launcher's own translation of the engine's options (FAF's are translated by FAF, through LOC below).
+    local helpOk, own = pcall(import, '/fafengine/modules/lua/ui/launcher/optionhelp.lua')
+    local translated = helpOk and own.Translated(item.key)
+    if translated then
+        return Text(translated) -- LOC fills in the key names ({i ...}) some of FAF's texts have
+    end
     local ok, tooltips = pcall(import, '/lua/ui/help/tooltips.lua')
     local info = ok and tooltips and tooltips.Tooltips and tooltips.Tooltips['options_' .. tostring(item.key)]
     if info and info.description and info.description ~= '' then
@@ -41,8 +47,36 @@ local function Help(item)
     if item.tip then
         return Text(item.tip)
     end
-    local helpOk, own = pcall(import, '/fafengine/modules/lua/ui/launcher/optionhelp.lua')
     return helpOk and own.Help(item.key) or ''
+end
+
+--- `text` cut to fit `control`'s width, whole characters (UTF-8) and "..." when cut: the row's one line of help; the
+--- whole text shows under the list while the mouse is on the row.
+local function FitLine(control, text)
+    local width = control.Right() - control.Left()
+    if width <= 0 or control:GetStringAdvance(text) <= width then
+        return text
+    end
+    -- The byte where each character starts (a UTF-8 continuation byte is 0x80-0xBF).
+    local starts = {}
+    for i = 1, string.len(text) do
+        local byte = string.byte(text, i)
+        if byte < 128 or byte >= 192 then
+            table.insert(starts, i)
+        end
+    end
+    local low, high = 1, table.getn(starts)
+    while low < high do
+        local middle = math.floor((low + high + 1) / 2)
+        if control:GetStringAdvance(string.sub(text, 1, starts[middle] - 1) .. '...') <= width then
+            low = middle
+        else
+            high = middle - 1
+        end
+    end
+    local cut = string.sub(text, 1, starts[low] - 1)
+    cut = string.gsub(cut, '[%s,;:]+$', '')
+    return cut .. '...'
 end
 
 --- A slider's value as text: whole numbers unless its step is a fraction.
@@ -480,7 +514,7 @@ function Build(launcher, page)
                 local changed = value ~= self.current[item.key]
                 Theme.SetText(row.title, Text(item.title))
                 local help = Help(item)
-                Theme.SetText(row.about, help ~= '' and help or 'No description yet.')
+                Theme.SetText(row.about, FitLine(row.about, help ~= '' and help or 'No description yet.'))
                 Theme.SetColor(row.title, changed and C.accent or C.text)
                 row.back:SetSolidColor(changed and Theme.WithAlpha(C.accent, 0.06) or C.clear)
                 if isToggle then
