@@ -226,7 +226,8 @@ namespace faf::editor
     std::error_code ec;
     std::filesystem::create_directories(out.parent_path(), ec);
     std::ofstream zip(out, std::ios::binary | std::ios::trunc);
-    const std::string bytes = WriteZip(entries);
+    const std::string bytes =
+      faf::editor::WriteZip(entries); // not online::WriteZip, which ZipEntry's namespace brings in
     zip.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
     if (!zip) {
       return std::unexpected("couldn't write " + out.string());

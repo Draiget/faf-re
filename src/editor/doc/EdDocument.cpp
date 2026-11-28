@@ -2493,7 +2493,8 @@ namespace faf::editor
         {plan.folder + "/" + name, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())}
       );
     }
-    const std::string zip = WriteZip(entries);
+    const std::string zip =
+      faf::editor::WriteZip(entries); // not online::WriteZip, which ZipEntry's namespace brings in
     std::error_code error;
     const std::filesystem::path packages = mVault / "packages";
     std::filesystem::create_directories(packages, error);
