@@ -102,13 +102,23 @@ function Build(launcher, page)
     view.foeButton.Left:Set(function() return view.friendButton.Right() + Scale(10) end)
     view.foeButton.Top:Set(view.friendButton.Top)
     view.messageButton = Theme.Button(detail, 'Message', function() view:Message() end, 'secondary',
-        { icon = 'chat', width = 372 })
+        { icon = 'chat', width = 181 })
     view.messageButton.Left:Set(view.who.Left)
     view.messageButton.Top:Set(function() return view.friendButton.Bottom() + Scale(10) end)
+    -- A report to FAF's moderators (report.lua).
+    view.reportButton = Theme.Button(detail, 'Report', function() view:Report() end, 'secondary',
+        { icon = 'flag', width = 181 })
+    view.reportButton.Left:Set(function() return view.messageButton.Right() + Scale(10) end)
+    view.reportButton.Top:Set(view.messageButton.Top)
+    -- Queue together: an invite into this player's matchmaker party.
+    view.partyButton = Theme.Button(detail, 'Invite to party', function() view:InviteToParty() end, 'secondary',
+        { icon = 'users', width = 372 })
+    view.partyButton.Left:Set(view.who.Left)
+    view.partyButton.Top:Set(function() return view.messageButton.Bottom() + Scale(10) end)
     view.status = Theme.Paragraph(detail, 12, C.subtle)
     view.status.Left:Set(view.who.Left)
     view.status.Right:Set(function() return detail.Right() - Scale(x) end)
-    view.status.Top:Set(function() return view.messageButton.Bottom() + Scale(16) end)
+    view.status.Top:Set(function() return view.partyButton.Bottom() + Scale(16) end)
 
     ----------------------------------------------------------------------------------------------------------------
 
@@ -120,6 +130,24 @@ function Build(launcher, page)
         local login = Login(self.chosen)
         if login then
             launcher:ShowProfile(login)
+        end
+    end
+
+    function view:InviteToParty()
+        local item = self.chosen
+        if item and item.id and rawget(_G, 'FafOnline_PartyInvite') then
+            local ok, why = FafOnline_PartyInvite(item.id)
+            self.statusText = ok and ('Invited ' .. (Login(item) or 'them') .. ' to your party; Matchmaking shows it.') or
+                ('Not invited: ' .. tostring(why))
+            self:Paint()
+        end
+    end
+
+    function view:Report()
+        local item = self.chosen
+        if item and item.id then
+            import('/fafengine/modules/lua/ui/launcher/report.lua').Open(launcher, { id = item.id,
+                login = Login(item) or ('player ' .. item.id) })
         end
     end
 
@@ -296,6 +324,10 @@ function Build(launcher, page)
         self.foeButton:SetLabel(item and item.foe and 'Remove foe' or 'Add foe')
         self.friendButton:SetEnabled(item ~= nil and signedIn)
         self.foeButton:SetEnabled(item ~= nil and signedIn)
+        local mine = import('/fafengine/modules/lua/ui/launcher/report.lua').MyId(launcher)
+        self.partyButton:SetEnabled(item ~= nil and item.id ~= nil and item.online == true and signedIn and
+            rawget(_G, 'FafOnline_PartyInvite') ~= nil and tostring(item.id) ~= tostring(mine))
+        self.reportButton:SetEnabled(item ~= nil and item.id ~= nil and signedIn and tostring(item.id) ~= tostring(mine))
         self.status:SetText(self.statusText or '', C.subtle)
     end
 

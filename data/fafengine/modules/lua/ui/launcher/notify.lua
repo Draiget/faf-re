@@ -245,8 +245,26 @@ function Notifier:PollMatch()
     self.matchState = info.state or 'idle'
 end
 
+--- A matchmaker party invite: a notice that opens Matchmaking, where it is accepted or declined.
+function Notifier:PollParty()
+    if not rawget(_G, 'FafOnline_Party') then
+        return
+    end
+    local party = FafOnline_Party() or {}
+    local now = {}
+    for _, invite in party.invites or {} do
+        now[invite.id] = true
+        if self.partyInvites and not self.partyInvites[invite.id] then
+            local who = invite.login ~= '' and invite.login or ('player ' .. invite.id)
+            self:Add('party', 'Party invite', who .. ' invites you to queue together.',
+                function() self.launcher:ShowPage('matchmaking') end)
+        end
+    end
+    self.partyInvites = now
+end
+
 function Notifier:Poll()
-    for _, source in { 'PollFriends', 'PollChat', 'PollMatch' } do
+    for _, source in { 'PollFriends', 'PollChat', 'PollMatch', 'PollParty' } do
         local ok, why = pcall(self[source], self)
         if not ok and not self.failed then
             self.failed = true

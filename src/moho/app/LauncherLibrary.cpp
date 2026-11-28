@@ -308,6 +308,15 @@ namespace
     return body;
   }
 
+  /** number FafLibrary_UtcNow(): seconds since 1970 (UTC), for calendars that count from it. */
+  int UtcNowBody(
+    lua_State* const L
+  )
+  {
+    lua_pushnumber(L, static_cast<lua_Number>(std::time(nullptr)));
+    return 1;
+  }
+
   /** text FafLibrary_UtcDate(daysAgo): the UTC date that many days back as FAF's API compares times. */
   int UtcDateBody(
     lua_State* const L
@@ -1012,6 +1021,160 @@ namespace
       return 2;
     }
     return ReviewJob(L, "DELETE", moho::ONLINE_ApiBase() + "/data/" + kind->review + "/" + review, "");
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Reports: the player's report of another player to FAF's moderators (JSON:API moderationReport, as the FAF clients
+  // write it: the reporter, the reported player, the description, and a game with the time in it when it was one).
+  // Built here from those values only.
+
+  /**
+   * id, why = FafLibrary_Report{reporter=, player=, text=, game=, time=}: a report on FAF player `player` by
+   * `reporter` (both FAF ids); text 10 to 4000 bytes; game (a replay id) optional, and then time ("12:30", the
+   * incident's time in the game) is needed.
+   */
+  int ReportBody(
+    lua_State* const L
+  )
+  {
+    if (!lua_istable(L, 1)) {
+      lua_pushnil(L);
+      lua_pushstring(L, "FafLibrary_Report takes a table");
+      return 2;
+    }
+    const std::string reporter = TableString(L, 1, "reporter");
+    const std::string player = TableString(L, 1, "player");
+    const std::string text = TableString(L, 1, "text");
+    const std::string game = TableString(L, 1, "game");
+    const std::string time = TableString(L, 1, "time");
+    const char* why = nullptr;
+    if (!AllDigits(reporter) || !AllDigits(player)) {
+      why = "the report names no reporter or player";
+    } else if (reporter == player) {
+      why = "a player can't report themselves";
+    } else if (text.size() < 10) {
+      why = "describe what happened in 10 characters at least";
+    } else if (text.size() > 4000) {
+      why = "the description is longer than 4000 characters";
+    } else if (!game.empty() && !AllDigits(game)) {
+      why = "a replay id is a whole number";
+    } else if (!game.empty() && time.empty()) {
+      why = "give the time in the game it happened at";
+    } else if (time.size() > 40) {
+      why = "the time in the game is too long";
+    }
+    if (why != nullptr) {
+      lua_pushnil(L);
+      lua_pushstring(L, why);
+      return 2;
+    }
+    using faf::online::JsonArray;
+    using faf::online::JsonNode;
+    using faf::online::JsonObject;
+    using faf::online::JsonString;
+    const auto Ref = [](const char* type, const std::string& id) {
+      return JsonObject({{"type", JsonString(type)}, {"id", JsonString(id)}});
+    };
+    std::vector<std::pair<std::string, JsonNode>> relationships = {
+      {"reporter", JsonObject({{"data", Ref("player", reporter)}})},
+      {"reportedUsers", JsonObject({{"data", JsonArray({Ref("player", player)})}})},
+    };
+    if (!game.empty()) {
+      relationships.push_back({"game", JsonObject({{"data", Ref("game", game)}})});
+    }
+    std::vector<std::pair<std::string, JsonNode>> attributes = {{"reportDescription", JsonString(text)}};
+    if (!time.empty()) {
+      // The attribute's own spelling, with a lower-case c.
+      attributes.push_back({"gameIncidentTimecode", JsonString(time)});
+    }
+    const std::string body = faf::online::ToJson(JsonObject(
+      {{"data",
+        JsonObject({
+          {"type", JsonString("moderationReport")},
+          {"attributes", JsonObject(std::move(attributes))},
+          {"relationships", JsonObject(std::move(relationships))},
+        })}}
+    ));
+    return ReviewJob(L, "POST", moho::ONLINE_ApiBase() + "/data/moderationReport", body);
+  }
+
+  /** A JSON document anyone may read (no sign-in) as a job's data: `what` names the source in a failure. */
+  int PublicJsonJob(
+    lua_State* const L,
+    std::string url,
+    std::string what
+  )
+  {
+    lua_pushnumber(L, static_cast<lua_Number>(StartJob("api", [url, what](Job& job) {
+      platform::http::Call call;
+      call.url = url;
+      call.userAgent = UserAgent();
+      call.headers = "Accept: application/json\r\n";
+      long status = 0;
+      std::string body;
+      if (const auto sent = platform::http::Request(call, status, body); !sent) {
+        job.Fail(what + " didn't answer: " + sent.error());
+        return;
+      }
+      if (status != 200) {
+        job.Fail(what + " answered HTTP " + std::to_string(status));
+        return;
+      }
+      if (body.size() > 4u * 1024u * 1024u) {
+        job.Fail(what + " sent more than 4 MB");
+        return;
+      }
+      auto parsed = ParseJson(body);
+      if (!parsed) {
+        job.Fail(what + " answered with something that isn't JSON");
+        return;
+      }
+      std::lock_guard<std::mutex> guard(job.lock);
+      job.answer = std::move(*parsed);
+    })));
+    return 1;
+  }
+
+  /** An address from the environment (tests point it at a stand-in), else the given one. */
+  std::string UrlOr(
+    const char* const variable,
+    const char* const fallback
+  )
+  {
+    const char* const value = std::getenv(variable);
+    return value != nullptr && value[0] != '\0' ? std::string(value) : std::string(fallback);
+  }
+
+  /**
+   * id = FafLibrary_Releases(): this engine's releases on GitHub, newest first (GitHub's release list: tag_name,
+   * name, body, html_url, prerelease, published_at), as the job's data. FAF_RELEASES_URL replaces the address.
+   */
+  int ReleasesBody(
+    lua_State* const L
+  )
+  {
+    return PublicJsonJob(
+      L,
+      UrlOr("FAF_RELEASES_URL", "https://api.github.com/repos/Draiget/scfa-re/releases?per_page=20"),
+      "GitHub's release list"
+    );
+  }
+
+  /**
+   * id = FafLibrary_Events(): FAF's community events catalogue (the FAF Rust client's published calendar.json:
+   * events = {{id, title, summary, category, origin, host, startsAt, endsAt, allDay, recurrence, recursUntil, links}},
+   * submitUrl), as the job's data. FAF_EVENTS_CATALOGUE_URL replaces the address, as in that client.
+   */
+  int EventsBody(
+    lua_State* const L
+  )
+  {
+    std::string url = UrlOr(
+      "FAF_EVENTS_CATALOGUE_URL", "https://raw.githubusercontent.com/FAForeverRustClient/events/main/calendar.json"
+    );
+    // The CDN keeps a copy for minutes; a changing query asks for the current one, as that client does.
+    url += (url.find('?') == std::string::npos ? "?t=" : "&t=") + std::to_string(std::time(nullptr));
+    return PublicJsonJob(L, url, "FAF's events catalogue");
   }
 
   /** A mod_info.lua's `uid = "..."`, or empty. */
@@ -1993,6 +2156,14 @@ namespace
       "<global>",
       "string FafLibrary_UtcDate(daysAgo) - the UTC date that many days back, as 2026-10-28T00:00:00Z."
     );
+    static moho::CScrLuaBinder utcNow(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_UtcNow",
+      &Binding<&UtcNowBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_UtcNow() - seconds since 1970, UTC."
+    );
     static moho::CScrLuaBinder news(
       moho::SCR_UserLuaInitSet(),
       "FafLibrary_News",
@@ -2017,6 +2188,31 @@ namespace
       nullptr,
       "<global>",
       "number, string FafLibrary_DeleteReview{kind=, review=} - takes the player's review off FAF."
+    );
+    static moho::CScrLuaBinder report(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Report",
+      &Binding<&ReportBody>,
+      nullptr,
+      "<global>",
+      "number, string FafLibrary_Report{reporter=, player=, text=, game=, time=} - "
+      "sends the player's report of another player to FAF's moderators."
+    );
+    static moho::CScrLuaBinder releases(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Releases",
+      &Binding<&ReleasesBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_Releases() - this engine's releases on GitHub, newest first, as the job's data."
+    );
+    static moho::CScrLuaBinder events(
+      moho::SCR_UserLuaInitSet(),
+      "FafLibrary_Events",
+      &Binding<&EventsBody>,
+      nullptr,
+      "<global>",
+      "number FafLibrary_Events() - FAF's community events catalogue, as the job's data."
     );
     static moho::CScrLuaBinder upload(
       moho::SCR_UserLuaInitSet(),

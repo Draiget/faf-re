@@ -368,6 +368,20 @@ local texts = {
         ko = 'UI 배율이 게임이 있는 디스플레이의 Windows 배율(설정, 디스플레이, 배율)을 따릅니다. 그곳이 150%면 여기도 150%입니다. 창을 다른 디스플레이로 옮기면 바뀝니다.',
         kk = 'Интерфейс масштабы ойын тұрған экрандағы Windows масштабына ереді (Параметрлер, Дисплей, Масштаб): онда 150 % болса, мұнда да 150 %. Терезені басқа экранға жылжытсаңыз, ол өзгереді.',
     },
+    fafre_reduce_motion = {
+        us = 'Turns off the launcher\'s motion: pages, dialogs and lists show at once instead of sliding and fading in, and buttons change colour without easing.',
+        ru = 'Отключает анимации лаунчера: страницы, окна и списки появляются сразу, без сдвига и плавного появления, а кнопки меняют цвет без перехода.',
+        de = 'Schaltet die Bewegungen des Launchers ab: Seiten, Dialoge und Listen erscheinen sofort statt einzugleiten und einzublenden, Schaltflächen wechseln die Farbe ohne Übergang.',
+        fr = "Désactive les animations du lanceur : pages, fenêtres et listes s'affichent d'un coup au lieu de glisser et d'apparaître en fondu, et les boutons changent de couleur sans transition.",
+        pl = 'Wyłącza animacje launchera: strony, okna i listy pojawiają się od razu zamiast wsuwać się i rozjaśniać, a przyciski zmieniają kolor bez przejścia.',
+        es = 'Desactiva las animaciones del lanzador: páginas, diálogos y listas aparecen de golpe en lugar de deslizarse y fundirse, y los botones cambian de color sin transición.',
+        it = 'Disattiva le animazioni del launcher: pagine, finestre ed elenchi compaiono subito invece di scorrere e sfumare, e i pulsanti cambiano colore senza transizione.',
+        cz = 'Vypne animace spouštěče: stránky, dialogy a seznamy se ukážou hned místo zasunutí a prolnutí a tlačítka mění barvu bez přechodu.',
+        cn = '关闭启动器的动画：页面、对话框和列表直接显示，不再滑入和淡入；按钮变色也不再过渡。',
+        tw = '關閉啟動器的動畫：頁面、對話框和清單直接顯示，不再滑入和淡入；按鈕變色也不再過渡。',
+        ko = '런처의 움직임을 끕니다. 페이지, 대화 상자, 목록이 미끄러지거나 서서히 나타나지 않고 바로 보이며, 버튼 색도 전환 없이 바뀝니다.',
+        kk = 'Лаунчер анимацияларын өшіреді: беттер, терезелер мен тізімдер жылжымай, біртіндеп пайда болмай бірден көрінеді, ал батырмалар түсін ауысусыз өзгертеді.',
+    },
     -- FAF's own options whose help FAF's language files don't have yet (loc/<lang>/strings_db.lua; Traditional
     -- Chinese has them). The English is FAF's tooltip, shown from there; {i ...} names a key, filled in by LOC.
     commands_ignore_mode = {

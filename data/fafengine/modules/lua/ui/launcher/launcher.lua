@@ -35,6 +35,12 @@ local kPlayPages = { online = true, matchmaking = true, coop = true, training = 
 local kVaultPages = { maps = true, mods = true } -- FAF's vault: Maps and Mods, a strip under the top bar like Play's
 local kRankPages = { leaderboards = true, tournaments = true } -- Leaderboards and Tournaments, under Leaderboards
 local kChatPages = { chat = true, contacts = true } -- Chat and Contacts, under Chat
+local kNewsPages = { news = true, events = true, links = true } -- News, Events and Links, under News
+-- The pages in the order the bar and the strips show them: a page further on slides in from the right, one before
+-- from the left (anim.lua PageIn).
+local kPageOrder = { 'online', 'matchmaking', 'lan', 'training', 'coop', 'chat', 'contacts', 'leaderboards', 'tournaments',
+    'replays', 'maps', 'mods', 'units', 'news', 'events', 'links', 'changelog', 'options' }
+local Anim = import('/fafengine/modules/lua/ui/launcher/anim.lua')
 local kRefreshSeconds = 0.5
 
 -- One launcher at a time; a new CreateUI replaces it.
@@ -2117,7 +2123,7 @@ function Launcher:Refresh()
     local pageView = (self.page == 'replays' and self.replaysView) or (self.page == 'mods' and self.modsView) or
         (self.page == 'lan' and self.lanView) or (self.page == 'chat' and self.chatView) or
         (self.page == 'matchmaking' and self.matchView) or (self.page == 'coop' and self.coopView) or
-        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'tournaments' and self.tournamentsView) or (self.page == 'training' and self.trainingView) or (self.page == 'contacts' and self.contactsView) or
+        (self.page == 'maps' and self.mapsView) or (self.page == 'leaderboards' and self.leaderboardsView) or (self.page == 'units' and self.unitsView) or (self.page == 'news' and self.newsView) or (self.page == 'links' and self.linksView) or (self.page == 'events' and self.eventsView) or (self.page == 'tournaments' and self.tournamentsView) or (self.page == 'training' and self.trainingView) or (self.page == 'contacts' and self.contactsView) or
         (self.page == 'changelog' and self.changelogView) or (self.page == 'options' and self.optionsView) or nil
     if pageView then
         local done, why = pcall(pageView.Refresh, pageView)
@@ -2134,6 +2140,9 @@ function Launcher:Refresh()
     end
     if self.notify then
         self.notify:Poll()
+    end
+    if self.updates then
+        self.updates:Poll()
     end
 end
 
@@ -2753,7 +2762,7 @@ function Launcher:PlaceContent()
     end
     local shown = nil
     for _, entry in { { self.playStrip, kPlayPages }, { self.vaultStrip, kVaultPages }, { self.rankStrip, kRankPages },
-        { self.chatStrip, kChatPages } } do
+        { self.chatStrip, kChatPages }, { self.newsStrip, kNewsPages } } do
         local strip, pages = entry[1], entry[2]
         if strip then
             local mine = pages[self.page or ''] and true or false
@@ -2773,6 +2782,9 @@ function Launcher:PlaceContent()
     if kChatPages[self.page or ''] then
         self.lastChatPage = self.page
     end
+    if kNewsPages[self.page or ''] then
+        self.lastNewsPage = self.page
+    end
     if shown then
         content.Top:Set(function() return shown.Bottom() + Scale(14) end)
     else
@@ -2785,12 +2797,25 @@ function Launcher:ShowPage(name)
     if self.page == 'lan' and name ~= 'lan' and self.lanView then
         self.lanView:Stop()
     end
+    local previous = self.page
     self.page = name
     lastShownPage = name
     for pageName, page in self.pages do
         Theme.SetVisible(page, pageName == name)
     end
     self:PlaceContent()
+    if previous and previous ~= name and self.pages[name] and self.content then
+        local from, to = 0, 0
+        for index, pageName in kPageOrder do
+            if pageName == previous then
+                from = index
+            end
+            if pageName == name then
+                to = index
+            end
+        end
+        Anim.PageIn(self.pages[name], self.content, to >= from and 28 or -28)
+    end
     -- The Show showed every piece the page keeps hidden (brackets of disabled buttons, tips, the hover card).
     Theme.RepaintAll()
     for _, list in { self.navItems or {}, self.utilityItems or {} } do
@@ -2925,7 +2950,10 @@ local function BuildTopBar(launcher, body)
         { 'units', 'Units', function() launcher:ShowPage('units') end, { units = true } },
         -- Utilities: icons by the account, their names in a tip.
         { 'bell', 'Notifications', function() launcher.notify:OpenList() end, {}, true },
-        { 'news', 'News', function() launcher:ShowPage('news') end, { news = true }, true },
+        { 'news', 'News', function()
+            local last = launcher.lastNewsPage
+            launcher:ShowPage(last and launcher.pages[last] and last or (launcher.pages.news and 'news' or 'links'))
+        end, kNewsPages, true },
         { 'changelog', 'Changelog', function() launcher:ShowPage('changelog') end, { changelog = true }, true },
         { 'settings', 'Settings', function() launcher:Options() end, { options = true }, true },
     }
@@ -2935,7 +2963,7 @@ local function BuildTopBar(launcher, body)
     for _, entry in entries do
         if (entry[1] ~= 'chat' or rawget(_G, 'FafChat_Status')) and
             (entry[1] ~= 'leaderboard' or rawget(_G, 'FafLibrary_Api')) and
-            (entry[1] ~= 'news' or rawget(_G, 'FafLibrary_News')) then
+            true then
             local item = TopTab(launcher, bar, entry[1], entry[2], entry[3], entry[4])
             if entry[5] then
                 item:SetCompact(true)
@@ -3098,6 +3126,30 @@ local function BuildTopBar(launcher, body)
     rank.tabs.Right:Set(rank.Right)
     Theme.SetVisible(rank, false)
     launcher.rankStrip = rank
+
+    -- News, FAF's events and its sites. ShowPage drops a tab whose page didn't build (RefreshNewsTabs).
+    local newsStrip = Group(body)
+    newsStrip.Left:Set(strip.Left)
+    newsStrip.Right:Set(strip.Right)
+    newsStrip.Top:Set(strip.Top)
+    LayoutHelpers.SetHeight(newsStrip, 40)
+    newsStrip.Width:Set(function() return newsStrip.Right() - newsStrip.Left() end)
+    local newsEntries = {}
+    if rawget(_G, 'FafLibrary_News') then
+        table.insert(newsEntries, { 'news', 'News' })
+    end
+    if rawget(_G, 'FafLibrary_Events') then
+        table.insert(newsEntries, { 'events', 'Events' })
+    end
+    table.insert(newsEntries, { 'links', 'Links' })
+    newsStrip.tabs = Widgets.Tabs(newsStrip, newsEntries, function(key)
+        launcher:ShowPage(key)
+    end)
+    newsStrip.tabs.Left:Set(newsStrip.Left)
+    newsStrip.tabs.Top:Set(newsStrip.Top)
+    newsStrip.tabs.Right:Set(newsStrip.Right)
+    Theme.SetVisible(newsStrip, false)
+    launcher.newsStrip = newsStrip
 
     -- Chat and contacts (friends, foes, players online).
     local chatStrip = Group(body)
@@ -3406,7 +3458,11 @@ local function Build(launcher)
     body.Depth:Set(function() return root.Depth() + 10 end)
     launcher.body = body
 
+    -- Motion (anim.lua): one frame update for every tween.
+    Anim.Attach(root)
     launcher.notify = import('/fafengine/modules/lua/ui/launcher/notify.lua').Create(launcher)
+    -- A newer release of this engine, as a notice with its notes (updates.lua).
+    launcher.updates = import('/fafengine/modules/lua/ui/launcher/updates.lua').Create(launcher)
     local bar = BuildTopBar(launcher, body)
     launcher.topBar = bar
     launcher.status = BuildStatusBar(launcher, body)
@@ -3501,6 +3557,40 @@ local function Build(launcher)
         else
             WARN('LAUNCHER: the news page failed to build: ' .. tostring(newsWhy))
             newsPage:Destroy()
+        end
+    end
+    -- Events: FAF's calendar (eventspage.lua).
+    if rawget(_G, 'FafLibrary_Events') then
+        local eventsPage = Group(content, 'launcher events')
+        LayoutHelpers.FillParent(eventsPage, content)
+        eventsPage.Width:Set(function() return eventsPage.Right() - eventsPage.Left() end)
+        eventsPage.Height:Set(function() return eventsPage.Bottom() - eventsPage.Top() end)
+        local eventsBuilt, eventsWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/eventspage.lua').Build(launcher, eventsPage)
+        end)
+        if eventsBuilt then
+            launcher.pages.events = eventsPage
+            Theme.SetVisible(eventsPage, false)
+        else
+            WARN('LAUNCHER: the events page failed to build: ' .. tostring(eventsWhy))
+            eventsPage:Destroy()
+        end
+    end
+    -- Links: the sites FAF runs (linkspage.lua).
+    do
+        local linksPage = Group(content, 'launcher links')
+        LayoutHelpers.FillParent(linksPage, content)
+        linksPage.Width:Set(function() return linksPage.Right() - linksPage.Left() end)
+        linksPage.Height:Set(function() return linksPage.Bottom() - linksPage.Top() end)
+        local linksBuilt, linksWhy = pcall(function()
+            import('/fafengine/modules/lua/ui/launcher/linkspage.lua').Build(launcher, linksPage)
+        end)
+        if linksBuilt then
+            launcher.pages.links = linksPage
+            Theme.SetVisible(linksPage, false)
+        else
+            WARN('LAUNCHER: the links page failed to build: ' .. tostring(linksWhy))
+            linksPage:Destroy()
         end
     end
     -- Units: every unit's blueprint through FAF's unit analyzer (unitspage.lua).
@@ -3960,6 +4050,76 @@ function TestWalk()
                 table.getn(FafOnline_Games()) .. ' games listed')
             Wait(8)
             Step('online list shown')
+            -- /launcherpartytest owner|member <other login>: two clients of one lobby: the owner invites the other
+            -- (by the id the lobby's player list gives), the member accepts, both see a party of two (the member's
+            -- Search off), the owner removes the member, both see it gone. /launcherpartyonly ends the walk there.
+            local partyTest = GetCommandLineArg('/launcherpartytest', 2)
+            if partyTest and current.matchView and rawget(_G, 'FafOnline_Party') then
+                current:ShowPage('matchmaking')
+                local role, other = partyTest[1], partyTest[2]
+                local function Party()
+                    current:Refresh()
+                    return FafOnline_Party()
+                end
+                local function Until(seconds, test)
+                    for i = 1, seconds do
+                        if test(Party()) then
+                            return true
+                        end
+                        Wait(1)
+                    end
+                    return false
+                end
+                if role == 'owner' then
+                    local otherPlayer = nil
+                    Until(90, function()
+                        otherPlayer = FafOnline_Player(other)
+                        return otherPlayer ~= nil and otherPlayer.id ~= nil
+                    end)
+                    local otherId = otherPlayer and otherPlayer.id or ''
+                    local ok, why = FafOnline_PartyInvite(otherId)
+                    Step('party: invited ' .. other .. ' (' .. tostring(otherId) .. '): ' .. tostring(ok) .. ' ' .. tostring(why))
+                    local formed = Until(90, function(p) return table.getn(p.members or {}) >= 2 end)
+                    local p = Party()
+                    local names = {}
+                    for _, member in p.members do
+                        table.insert(names, member.login .. '[' .. table.concat(member.factions, '') .. ']')
+                    end
+                    Step('party: formed ' .. tostring(formed) .. ', members ' .. table.concat(names, ', ') .. ', owner ' ..
+                        p.owner .. ', mine ' .. tostring(p.mine))
+                    Wait(8)
+                    ok, why = FafOnline_PartyKick(otherId)
+                    local gone = Until(30, function(q) return table.getn(q.members or {}) == 0 end)
+                    Step('party: removed ' .. other .. ': ' .. tostring(ok) .. ' ' .. tostring(why) .. ', party gone ' ..
+                        tostring(gone))
+                else
+                    local got = Until(120, function(p) return p.invites ~= nil and p.invites[1] ~= nil end)
+                    local p = Party()
+                    Wait(2)
+                    local notice = current.notify and current.notify.notices[1]
+                    Step('party: invite seen ' .. tostring(got) .. ' from ' .. tostring(p.invites[1] and p.invites[1].login) ..
+                        ', notice "' .. tostring(notice and notice.title) .. ': ' .. tostring(notice and notice.text) ..
+                        '", hint "' .. tostring(current.matchView.partyHint:GetText()) .. '"')
+                    Wait(4)
+                    current.matchView:AnswerInvite(true)
+                    local joined = Until(30, function(q) return table.getn(q.members or {}) >= 2 end)
+                    p = Party()
+                    local card = current.matchView.cards[1]
+                    Step('party: joined ' .. tostring(joined) .. ', ' .. table.getn(p.members) .. ' members, owner ' ..
+                        p.owner .. ', mine ' .. tostring(p.mine) .. ', search enabled ' ..
+                        tostring(card and card.button.enabled) .. ', banner "' ..
+                        tostring(current.matchView.bannerText:GetText()) .. '"')
+                    local removed = Until(60, function(q) return table.getn(q.members or {}) == 0 end)
+                    p = Party()
+                    Step('party: after removal ' .. tostring(removed) .. ', note "' .. tostring(p.note) .. '"')
+                end
+                Wait(3)
+                if GetCommandLineArg('/launcherpartyonly', 0) then
+                    Step('done')
+                    ExitApplication()
+                    return
+                end
+            end
             -- /launchercontactstest <id>: the Contacts page: player <id> (offline) made a friend, named through FAF's
             -- API, made a foe, then taken off again, the players online listed.
             local contactsTest = GetCommandLineArg('/launchercontactstest', 1)
@@ -4103,6 +4263,187 @@ function TestWalk()
                 Step('news: after Load more: ' .. table.getn(news.posts or {}) .. ' posts, page ' .. news.pageNumber ..
                     ', more ' .. tostring(news.more))
                 Wait(1)
+            end
+            -- /launcherlinkstest: the Links page under News: its cards, their hosts, the strip (no link is opened).
+            if GetCommandLineArg('/launcherlinkstest', 0) and current.linksView then
+                local links = current.linksView
+                current:ShowPage('links')
+                Wait(2)
+                local hosts = {}
+                for _, card in links.cards do
+                    table.insert(hosts, card.link[1] .. '=' .. import('/fafengine/modules/lua/ui/launcher/linkspage.lua').Host(card.link[5]))
+                end
+                local first = links.cards[1]
+                Step('links: ' .. table.getn(links.cards) .. ' cards (' .. table.concat(hosts, ', ') .. '), strip ' ..
+                    tostring(current.newsStrip and not current.newsStrip:IsHidden()) .. ', first at ' ..
+                    tostring(first and (first.Left() .. ',' .. first.Top() .. ' ' .. first.Width() .. 'x' .. first.Height())))
+                Wait(1)
+            end
+            -- /launcherreporttest <id>: the report dialog on that player: the checks, a report sent, the history.
+            if GetCommandLineArg('/launcherreporttest', 1) then
+                local Report = import('/fafengine/modules/lua/ui/launcher/report.lua')
+                local target = GetCommandLineArg('/launcherreporttest', 1)[1]
+                local report = Report.Open(current, { id = target, login = 'user' .. target })
+                Wait(1)
+                report.text.edit:SetText('short')
+                report:Paint()
+                local early = report.status:GetText()
+                report.text.edit:SetText('Left the game in the first minute and told the team in chat to give up.')
+                report.game.edit:SetText('11171272')
+                report:Paint()
+                local noTime = report.status:GetText()
+                report.time.edit:SetText('05:30')
+                report:Paint()
+                Step('report: checks: "' .. tostring(early) .. '" / "' .. tostring(noTime) .. '", send enabled ' ..
+                    tostring(report.send.enabled))
+                report:Send()
+                for i = 1, 20 do
+                    if not report.jobs.send then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(1)
+                Step('report: after Send: "' .. tostring(report.status:GetText()) .. '", sent ' .. tostring(report.sent))
+                report.tab = 'history'
+                report:LoadHistory()
+                report:Paint()
+                for i = 1, 20 do
+                    if not report.jobs.history then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(2)
+                local first = report.history and report.history[1]
+                Step('report: history: ' .. tostring(report.history and table.getn(report.history)) .. ' reports, ' ..
+                    'first ' .. tostring(first and (first.who .. ' ' .. first.status .. ' game ' .. tostring(first.game))) ..
+                    ', note "' .. tostring(report.historyNote:GetText()) .. '"')
+                Wait(2)
+                report:Close()
+            end
+            -- /launcherupdatetest <version>: the release list read, that version taken as the running one (a test
+            -- build has none of its own), the releases compared, "What's new" open.
+            if GetCommandLineArg('/launcherupdatetest', 1) and current.updates then
+                local updates = current.updates
+                updates.testVersion = GetCommandLineArg('/launcherupdatetest', 1)[1]
+                updates.releases = nil
+                updates:Check()
+                for i = 1, 20 do
+                    current:Refresh()
+                    if updates.releases or updates.failure then
+                        break
+                    end
+                    Wait(1)
+                end
+                local newer = {}
+                for _, release in (updates.newer or {}) do
+                    table.insert(newer, release.tag_name)
+                end
+                updates:Open()
+                Wait(2)
+                Step('update: running ' .. updates:Running() .. ', ' .. tostring(updates.releases and
+                    table.getn(updates.releases)) .. ' releases, newer: ' .. table.concat(newer, ', ') .. ', blocks ' ..
+                    tostring(updates.shownBlocks) .. (updates.failure and (', failure ' .. updates.failure) or ''))
+                Wait(2)
+                updates:Close()
+            end
+            -- /launchereventstest: the Events page: the sources read, the three views, a day, an event, a suggestion
+            -- composed (not opened).
+            if GetCommandLineArg('/launchereventstest', 0) and current.eventsView then
+                local events = current.eventsView
+                current:ShowPage('events')
+                for i = 1, 20 do
+                    current:Refresh()
+                    if not next(events.jobs) then
+                        break
+                    end
+                    Wait(1)
+                end
+                Wait(1)
+                local counts = {}
+                for key, list in events.sources do
+                    table.insert(counts, key .. ' ' .. table.getn(list))
+                end
+                table.sort(counts)
+                local first = events.shown and events.shown[1]
+                Step('events: sources ' .. table.concat(counts, ', ') .. '; coming up ' .. table.getn(events.shown or {}) ..
+                    ', first ' .. tostring(first and (first.entry.title .. ' day ' .. first.day .. ' ' ..
+                    tostring(first.clock))) .. (events.failure and (', failure ' .. events.failure) or ''))
+                if first then
+                    events.chosen = first
+                    events.day = first.day
+                    events:Paint()
+                end
+                Wait(2)
+                events.mode = 'week'
+                events:Paint()
+                Wait(1)
+                local from, to = events:Range()
+                Step('events: week ' .. from .. '-' .. to .. ', ' .. table.getn(events.shown) .. ' shown, range "' ..
+                    tostring(events.range:GetText()) .. '"')
+                Wait(2)
+                events.mode = 'month'
+                events.chosen = nil
+                events:Paint()
+                Wait(1)
+                local chips = 0
+                for _, cell in events.cells do
+                    for _, chip in cell.chips do
+                        chips = chips + ((chip.occurrence and not chip:IsHidden()) and 1 or 0)
+                    end
+                end
+                Step('events: month "' .. tostring(events.range:GetText()) .. '", ' .. table.getn(events.shown) ..
+                    ' shown, ' .. chips .. ' chips')
+                Wait(2)
+                local EventsPage = import('/fafengine/modules/lua/ui/launcher/eventspage.lua')
+                local form = EventsPage.Suggest(current, events)
+                form.dryRun = true
+                form.title.edit:SetText('Test cup')
+                form.day.edit:SetText('2026-12-12')
+                form.time.edit:SetText('25:00')
+                form:Paint()
+                local bad = form.status:GetText()
+                form.time.edit:SetText('18:30')
+                form.endTime.edit:SetText('21:00')
+                form.host.edit:SetText('Test clan')
+                form.repeats = 'weekly'
+                form:Paint()
+                Wait(1)
+                form:Send()
+                Step('events: suggestion: bad time "' .. tostring(bad) .. '", entry ' .. tostring(form.json) ..
+                    ', address ' .. tostring(form.issueUrl and string.sub(form.issueUrl, 1, 70)))
+                Wait(2)
+                form:Close()
+            end
+            -- /launcheranimtest: motion: a page switch fades and slides the new page in (mid-way alpha below 1, its
+            -- left edge off its place), and everything ends at rest (alpha 1, edge back, no tween left); a dialog the
+            -- same; with Reduce motion on, the switch lands at once.
+            if GetCommandLineArg('/launcheranimtest', 0) and current.pages.links and current.pages.news then
+                current:ShowPage('news')
+                WaitSeconds(0.6)
+                current:ShowPage('links')
+                local page = current.pages.links
+                WaitSeconds(0.06)
+                local midAlpha, midOffset, running = page:GetAlpha(), page.Left() - current.content.Left(), Anim.Running()
+                WaitSeconds(0.6)
+                Step('anim: page mid-way alpha ' .. string.format('%.2f', midAlpha) .. ' offset ' .. midOffset ..
+                    ' tweens ' .. running .. '; at rest alpha ' .. string.format('%.2f', page:GetAlpha()) ..
+                    ' offset ' .. (page.Left() - current.content.Left()) .. ' tweens ' .. Anim.Running())
+                local cover = Widgets.Modal(current.root, 500, 300)
+                WaitSeconds(0.05)
+                local dialogMid = cover:GetAlpha()
+                WaitSeconds(0.5)
+                Step('anim: dialog mid-way alpha ' .. string.format('%.2f', dialogMid) .. ', at rest ' ..
+                    string.format('%.2f', cover:GetAlpha()) .. ', tweens ' .. Anim.Running())
+                cover:Destroy()
+                local Prefs = import('/lua/user/prefs.lua')
+                Prefs.SetOption('fafre_reduce_motion', true)
+                current:ShowPage('news')
+                WaitSeconds(0.03)
+                Step('anim: reduce motion: alpha at once ' .. string.format('%.2f', current.pages.news:GetAlpha()) ..
+                    ', offset ' .. (current.pages.news.Left() - current.content.Left()) .. ', tweens ' .. Anim.Running())
+                Prefs.SetOption('fafre_reduce_motion', false)
             end
             -- /launcherunitstest: the Units page: the blueprints read, a faction's units, a filter, a unit's card.
             if GetCommandLineArg('/launcherunitstest', 0) and current.unitsView then

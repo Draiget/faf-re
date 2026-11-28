@@ -333,6 +333,23 @@ function Panel(parent, fill, line)
     return panel
 end
 
+--- The colour `t` (0..1) of the way from a to b, both 'aarrggbb'; b when either isn't one.
+function Mix(a, b, t)
+    if type(a) ~= 'string' or type(b) ~= 'string' or string.len(a) ~= 8 or string.len(b) ~= 8 then
+        return b
+    end
+    local out = ''
+    for i = 1, 7, 2 do
+        local x = tonumber(string.sub(a, i, i + 1), 16)
+        local y = tonumber(string.sub(b, i, i + 1), 16)
+        if not x or not y then
+            return b
+        end
+        out = out .. string.format('%02x', math.floor(x + (y - x) * t + 0.5))
+    end
+    return out
+end
+
 --- A transparent control over `under` that takes its clicks (panels and groups don't).
 function HitArea(under, handler)
     local area = Rect(under, Colors.clear)
@@ -404,13 +421,24 @@ function Button(parent, label, onClick, kind, opts)
     button.enabled = true
     button.text = text
     button.icon = icon
-    local function Paint(over)
+    local function Paint(over, ease)
         local textColor = style.text
         if not button.enabled then
             button:SetColors(kind == 'primary' and Colors.raised or style.fill, kind == 'primary' and Colors.line or style.line)
             textColor = Colors.subtle
         else
-            button:SetColors(over and style.hover or style.fill, over and style.hoverLine or style.line)
+            local fill, line = over and style.hover or style.fill, (over and style.hoverLine) or style.line
+            if ease and button.fill and button.line then
+                -- Hover eases in and out (anim.lua): the colours mix over a short tween.
+                local fromFill, fromLine = button.fill, button.line
+                import('/fafengine/modules/lua/ui/launcher/anim.lua').Run(button, 0.12, function(t)
+                    button:SetColors(Mix(fromFill, fill, t), Mix(fromLine, line, t))
+                end, function()
+                    button:SetColors(fill, line)
+                end)
+            else
+                button:SetColors(fill, line)
+            end
             if over and style.hoverText then
                 textColor = style.hoverText
             end
@@ -458,11 +486,19 @@ function Button(parent, label, onClick, kind, opts)
             return false
         end
         if event.Type == 'MouseEnter' then
-            Paint(true)
+            Paint(true, true)
         elseif event.Type == 'MouseExit' then
-            Paint(false)
+            Paint(false, true)
         elseif event.Type == 'ButtonPress' and event.Modifiers.Left then
             ClickSound()
+            -- A press flashes the edge and settles back (feedback before whatever the click opens).
+            local fill = button.fill
+            import('/fafengine/modules/lua/ui/launcher/anim.lua').Run(button, 0.18, function(t)
+                button:SetColors(Mix(style.line ~= Colors.clear and style.line or Colors.accent, fill, t),
+                    Mix(Colors.accent, style.hoverLine or style.line, t))
+            end, function()
+                Paint(true)
+            end)
             onClick(button)
             return true
         end

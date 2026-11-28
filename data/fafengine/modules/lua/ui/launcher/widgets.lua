@@ -643,6 +643,7 @@ function Modal(root, width, height)
     panel.Depth:Set(function() return cover.Depth() + 1 end)
     Theme.Brackets(panel, C.accent, true)
     cover.panel = panel
+    import('/fafengine/modules/lua/ui/launcher/anim.lua').DialogIn(cover, panel, root)
     return cover
 end
 
@@ -678,6 +679,10 @@ function ScrollMark(area, list)
     local thumb = Theme.Rect(area, C.accent)
     thumb.Right:Set(area.Right)
     thumb.Width:Set(Scale(3))
+    -- Edges from the start: a parent's Show shows the thumb too, before Update has placed it (a thumb with only a
+    -- height asks its top for its bottom and its bottom for its top).
+    thumb.Top:Set(track.Top)
+    thumb.Height:Set(Scale(16))
     thumb:DisableHitTest()
     thumb.Depth:Set(function() return track.Depth() + 1 end)
     local mark = {}
@@ -882,9 +887,14 @@ function VirtualList(parent, columns, onPick)
     end
 
     function list:SetItems(items)
+        -- New content fades in row by row; the same list painted again (a refresh) doesn't.
+        local fresh = items ~= self.items and table.getn(items) > 0 and table.getn(self.items or {}) == 0
         self.items = items
         self.top = math.min(self.top, math.max(1, table.getn(items) - VisibleCount() + 1))
         self:Paint()
+        if fresh then
+            import('/fafengine/modules/lua/ui/launcher/anim.lua').RowsIn(self.rows, 14)
+        end
     end
 
     function list:Selected()

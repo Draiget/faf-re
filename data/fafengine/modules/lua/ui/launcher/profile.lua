@@ -168,9 +168,13 @@ local function Build(launcher)
 
     local close = Theme.Button(head, '', function() profile:Close() end, 'secondary', { icon = 'close', width = 40 })
     LayoutHelpers.AtRightTopIn(close, head, 24, 26)
+    -- A report to FAF's moderators (report.lua), on another player's profile.
+    profile.report = Theme.Button(head, 'Report', function() profile:Report() end, 'ghost', { icon = 'flag', width = 110 })
+    LayoutHelpers.AtTopIn(profile.report, head, 26)
     profile.another = Theme.TextField(head, 280, 'View another player...', 'search', 40)
     -- TextField places itself at its parent's left: its Left is what moves it.
     profile.another.Left:Set(function() return close.Left() - Scale(12) - profile.another.Width() end)
+    profile.report.Right:Set(function() return profile.another.Left() - Scale(12) end)
     LayoutHelpers.AtTopIn(profile.another, head, 26)
     profile.another.edit.OnEnterPressed = function(self, text)
         if text and text ~= '' then
@@ -232,6 +236,14 @@ local function Build(launcher)
     end
     profile.tab = 'overview'
     return profile
+end
+
+--- A report on the player shown, to FAF's moderators (report.lua).
+function Profile:Report()
+    if self.player and self.player.id then
+        import('/fafengine/modules/lua/ui/launcher/report.lua').Open(self.launcher, { id = self.player.id,
+            login = self.player.login })
+    end
 end
 
 function Profile:Close()
@@ -980,6 +992,7 @@ function Profile:PaintHead()
     local own = status.login and self.login and string.lower(status.login) == string.lower(self.player and
         self.player.login or self.login)
     Theme.SetVisible(self.you, own and true or false)
+    Theme.SetVisible(self.report, not own and self.player ~= nil and self.player.id ~= nil and status.lobby == 'signedin')
     local online = facts.id ~= nil
     self.dot:SetDotColor(online and C.good or C.subtle)
     local parts = { online and 'Online' or 'Not in FAF\'s lobby' }

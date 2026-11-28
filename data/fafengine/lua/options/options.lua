@@ -1119,3 +1119,34 @@ do
         end
     end
 end
+
+-- Reduce motion (/fafengine/modules/lua/ui/launcher/anim.lua): the launcher's page, dialog, list and hover animations
+-- put at their end at once. After the interface scale entries, where the interface's own settings are.
+do
+    for _, tab in options do
+        local items = type(tab) == 'table' and tab.items
+        if items and not HasOptionKey(items, 'fafre_reduce_motion') then
+            local at = nil
+            for index, item in items do
+                if item.key == 'ui_scale_auto' or (item.key == 'ui_scale' and not at) then
+                    at = index
+                end
+            end
+            if at then
+                table.insert(items, at + 1, {
+                    title = "Reduce motion",
+                    key = 'fafre_reduce_motion',
+                    type = 'toggle',
+                    default = false,
+                    custom = {
+                        states = {
+                            { text = "<LOC _Off>", key = false },
+                            { text = "<LOC _On>", key = true },
+                        },
+                    },
+                })
+                break
+            end
+        end
+    end
+end

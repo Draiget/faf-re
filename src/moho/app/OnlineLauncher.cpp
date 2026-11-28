@@ -390,6 +390,18 @@ namespace
     std::string matchmaking = "idle"; ///< idle, searching, found (a match is being made), cancelled
     std::string matchedQueue;
     bool askedQueues = false; ///< matchmaker_info asked for on this lobby connection
+    /// The matchmaker party this player is in (FAF lobby server party_service.py): its owner's FAF id ("" when the
+    /// player is in none, which the lobby counts as a party of one) and its members with the factions each may get.
+    struct PartyMember
+    {
+      std::string id;
+      std::vector<std::string> factions;
+    };
+    std::string partyOwner;
+    std::vector<PartyMember> partyMembers;
+    /// Invitations to other players' parties: the inviter's FAF id and when it came (the lobby keeps one for a day).
+    std::map<std::string, std::chrono::steady_clock::time_point> partyInvites;
+    std::string partyNote; ///< the last thing that happened to the party, for the player ("You were removed ...")
     bool lobbyStarted = false;
     /// A failed lobby connection is tried again at this time (unset: no try planned).
     std::chrono::steady_clock::time_point lobbyRetryAt{};
@@ -1528,6 +1540,194 @@ namespace
       ));
       if (result) {
         LogLine(("matchmaker: " + std::string(on ? "searching in " : "stopped searching in ") + queue).c_str());
+      }
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  /** A login for a FAF id, from the lobby's player list ("" when the lobby hasn't told us about that player). */
+  std::string LoginOf(
+    const Service& s,
+    const std::string& id
+  )
+  {
+    if (s.haveMe && s.me.id == id) {
+      return s.me.login;
+    }
+    for (const auto& [login, player] : s.players) {
+      if (player.id == id) {
+        return login;
+      }
+    }
+    return {};
+  }
+
+  /**
+   * table FafOnline_Party(): the matchmaker party: owner (FAF id, "" in none), mine (this player owns it or is in
+   * none), members = {{id, login, factions = {...}}}, invites = {{id, login}} (parties this player may join), note.
+   */
+  int PartyBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    lua_newtable(L);
+    SetField(L, "owner", s.partyOwner);
+    SetBool(L, "mine", s.partyOwner.empty() || (s.haveMe && s.partyOwner == s.me.id));
+    SetField(L, "note", s.partyNote);
+    lua_pushstring(L, "members");
+    lua_newtable(L);
+    int index = 1;
+    for (const Service::PartyMember& member : s.partyMembers) {
+      lua_newtable(L);
+      SetField(L, "id", member.id);
+      SetField(L, "login", LoginOf(s, member.id));
+      lua_pushstring(L, "factions");
+      lua_newtable(L);
+      int f = 1;
+      for (const std::string& faction : member.factions) {
+        lua_pushstring(L, faction.c_str());
+        lua_rawseti(L, -2, f++);
+      }
+      lua_rawset(L, -3);
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    lua_pushstring(L, "invites");
+    lua_newtable(L);
+    index = 1;
+    for (const auto& [id, at] : s.partyInvites) {
+      lua_newtable(L);
+      SetField(L, "id", id);
+      SetField(L, "login", LoginOf(s, id));
+      lua_rawseti(L, -2, index++);
+    }
+    lua_rawset(L, -3);
+    return 1;
+  }
+
+  /** The party commands' shared checks: a FAF id (when `needsId`), the lobby signed in, no search running. */
+  std::expected<void, std::string> PartyReady(
+    const Service& s,
+    const std::string& id,
+    const bool needsId
+  )
+  {
+    if (needsId && (id.empty() || id.find_first_not_of("0123456789") != std::string::npos)) {
+      return std::unexpected(std::string("needs a player's FAF id"));
+    }
+    if (s.lobby.GetState() != FafLobby::State::SignedIn) {
+      return std::unexpected(std::string("not connected to FAF's lobby"));
+    }
+    if (!s.searching.empty()) {
+      return std::unexpected(std::string("stop searching first: a party changes only out of the queue"));
+    }
+    return {};
+  }
+
+  /**
+   * ok, why = FafOnline_PartyInvite(id): invites that player into this player's party (making one); only its owner
+   * invites. FafOnline_PartyAccept(id): joins the party of the player who invited this one. FafOnline_PartyDecline(id):
+   * forgets that invite. FafOnline_PartyKick(id): the owner removes a member. FafOnline_PartyLeave(): leaves the party.
+   */
+  int PartyInviteBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    auto result = PartyReady(s, id, true);
+    if (result && s.haveMe && id == s.me.id) {
+      result = std::unexpected(std::string("you're in your own party already"));
+    } else if (result && !s.partyOwner.empty() && !(s.haveMe && s.partyOwner == s.me.id)) {
+      result = std::unexpected(std::string("only the party's owner invites"));
+    }
+    if (result) {
+      result = s.lobby.Send(JsonObject({{"command", JsonString("invite_to_party")}, {"recipient_id", JsonDigits(id)}}));
+      if (result) {
+        s.partyNote.clear();
+        LogLine(("party: invited " + id).c_str());
+      }
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  int PartyAcceptBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    auto result = PartyReady(s, id, true);
+    if (result && !s.partyInvites.contains(id)) {
+      result = std::unexpected(std::string("that player hasn't invited you"));
+    }
+    if (result) {
+      result =
+        s.lobby.Send(JsonObject({{"command", JsonString("accept_party_invite")}, {"sender_id", JsonDigits(id)}}));
+      if (result) {
+        s.partyInvites.erase(id);
+        s.partyNote.clear();
+        LogLine(("party: accepted the invite of " + id).c_str());
+      }
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  int PartyDeclineBody(
+    lua_State* const L
+  )
+  {
+    // The lobby has no decline: the invite is forgotten here, and it lapses there after a day.
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    s.partyInvites.erase(id);
+    PushResult(L, std::expected<void, std::string>{});
+    return 2;
+  }
+
+  int PartyKickBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    const std::string id = lua_isstring(L, 1) ? lua_tostring(L, 1) : "";
+    auto result = PartyReady(s, id, true);
+    if (result && !(s.haveMe && s.partyOwner == s.me.id)) {
+      result = std::unexpected(std::string("only the party's owner removes members"));
+    }
+    if (result) {
+      result = s.lobby.Send(
+        JsonObject({{"command", JsonString("kick_player_from_party")}, {"kicked_player_id", JsonDigits(id)}})
+      );
+      if (result) {
+        LogLine(("party: removed " + id).c_str());
+      }
+    }
+    PushResult(L, result);
+    return 2;
+  }
+
+  int PartyLeaveBody(
+    lua_State* const L
+  )
+  {
+    Service& s = TheService();
+    auto result = PartyReady(s, "", false);
+    if (result && s.partyOwner.empty()) {
+      result = std::unexpected(std::string("you're in no party"));
+    }
+    if (result) {
+      result = s.lobby.Send(JsonObject({{"command", JsonString("leave_party")}}));
+      if (result) {
+        // The lobby sends this player no update after a leave; the party is gone from here at once.
+        s.partyOwner.clear();
+        s.partyMembers.clear();
+        s.partyNote = "You left the party.";
+        LogLine("party: left");
       }
     }
     PushResult(L, result);
@@ -2787,6 +2987,54 @@ namespace
       "<global>",
       "bool, string FafOnline_SetFactions(list) - the factions the matchmaker may give this player."
     );
+    static CScrLuaBinder party(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_Party",
+      &Binding<&PartyBody>,
+      nullptr,
+      "<global>",
+      "table FafOnline_Party() - this player's matchmaker party: owner, members, invites."
+    );
+    static CScrLuaBinder partyInvite(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_PartyInvite",
+      &Binding<&PartyInviteBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_PartyInvite(id) - invites a player into this player's matchmaker party."
+    );
+    static CScrLuaBinder partyAccept(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_PartyAccept",
+      &Binding<&PartyAcceptBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_PartyAccept(id) - joins the party of the player who invited this one."
+    );
+    static CScrLuaBinder partyDecline(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_PartyDecline",
+      &Binding<&PartyDeclineBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_PartyDecline(id) - forgets a party invite."
+    );
+    static CScrLuaBinder partyKick(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_PartyKick",
+      &Binding<&PartyKickBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_PartyKick(id) - the party's owner removes a member."
+    );
+    static CScrLuaBinder partyLeave(
+      moho::SCR_UserLuaInitSet(),
+      "FafOnline_PartyLeave",
+      &Binding<&PartyLeaveBody>,
+      nullptr,
+      "<global>",
+      "bool, string FafOnline_PartyLeave() - leaves the matchmaker party."
+    );
     static CScrLuaBinder server(
       moho::SCR_UserLuaInitSet(),
       "FafOnline_Server",
@@ -2981,6 +3229,10 @@ void moho::ONLINE_Frame()
     s.askedQueues = false;
     s.searching.clear();
     s.matchmaking = "idle";
+    // The lobby drops a party member whose connection ends (party_service.py on_connection_lost).
+    s.partyOwner.clear();
+    s.partyMembers.clear();
+    s.partyInvites.clear();
   }
   for (const JsonNode& message : s.lobby.TakeMessages()) {
     const std::string command = message.String("command");
@@ -3071,6 +3323,50 @@ void moho::ONLINE_Frame()
       LogLine("matchmaker: the match was cancelled");
       s.matchmaking = "cancelled";
       s.searching.clear();
+    } else if (command == "update_party") {
+      // The whole party each time: its owner and members with their factions; one member or none when it broke up.
+      s.partyMembers.clear();
+      if (
+        const JsonNode* const members = message.Get("members");
+        members != nullptr && members->kind == JsonNode::Kind::Array
+      ) {
+        for (const JsonNode& member : members->items) {
+          Service::PartyMember kept;
+          if (const JsonNode* const id = member.Get("player"); id != nullptr) {
+            kept.id = id->text;
+          }
+          if (
+            const JsonNode* const factions = member.Get("factions");
+            factions != nullptr && factions->kind == JsonNode::Kind::Array
+          ) {
+            for (const JsonNode& faction : factions->items) {
+              kept.factions.push_back(Lower(faction.text));
+            }
+          }
+          if (!kept.id.empty()) {
+            s.partyMembers.push_back(std::move(kept));
+          }
+        }
+      }
+      const JsonNode* const owner = message.Get("owner");
+      s.partyOwner = s.partyMembers.size() > 1 && owner != nullptr ? owner->text : "";
+      if (s.partyMembers.size() <= 1) {
+        s.partyMembers.clear();
+      }
+      s.partyInvites.erase(s.partyOwner);
+      LogLine(("party: " + std::to_string(s.partyMembers.size()) + " members, owner " +
+               (s.partyOwner.empty() ? std::string("none") : s.partyOwner))
+                .c_str());
+    } else if (command == "party_invite") {
+      if (const JsonNode* const sender = message.Get("sender"); sender != nullptr && !sender->text.empty()) {
+        s.partyInvites[sender->text] = std::chrono::steady_clock::now();
+        LogLine(("party: invited by " + sender->text).c_str());
+      }
+    } else if (command == "kicked_from_party") {
+      s.partyOwner.clear();
+      s.partyMembers.clear();
+      s.partyNote = "You were removed from the party.";
+      LogLine("party: removed from the party");
     } else if (command == "notice") {
       s.notice = message.String("text");
     } else if (command == "game_launch") {

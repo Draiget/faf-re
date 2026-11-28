@@ -21,15 +21,13 @@ local kTabOfCategory = {
 }
 -- Categories that say where a post shows, not what it is about.
 local kHiddenCategories = { newshub = true, advertisement = true, uncategorized = true }
-local kLinks = {
-    { 'Website', 'globe', 'https://www.faforever.com' },
-    { 'Forum', 'chat', 'https://forum.faforever.com' },
-    { 'Wiki', 'book', 'https://wiki.faforever.com/' },
-    { 'Discord', 'users', 'https://discord.gg/PfGcWas' },
-    { 'Unit database', 'units', 'https://unitdb.faforever.com/' },
-    { 'Rules', 'shield', 'https://www.faforever.com/rules' },
-    { 'Support FAF', 'star', 'https://www.patreon.com/faf' },
-}
+-- FAF's sites, the Links page's list (linkspage.lua), less the two video channels.
+local kLinks = {}
+for _, link in import('/fafengine/modules/lua/ui/launcher/linkspage.lua').Links() do
+    if link[1] ~= 'Twitch' and link[1] ~= 'YouTube' then
+        table.insert(kLinks, link)
+    end
+end
 
 ------------------------------------------------------------------------------------------------------------------------
 -- The posts' HTML as the launcher's text blocks.
