@@ -40,6 +40,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/PipelineDefer.h"
 #include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/common/UsedTextureTable.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
@@ -504,6 +505,11 @@ namespace gpg::gal
     // Engine addition (ren_AsyncPipelines, gpg/gal/PipelineDefer.h): pipelines building on worker threads, by key.
     std::unordered_map<std::string, std::future<VkPipeline>> mPendingPipelines;
     void CollectPendingPipelines() noexcept;
+    // Engine addition: the pipelines the driver refused for want of memory, tried again later (PipelineDefer.h).
+    PipelineRetries mPipelineRetries;
+    /** Keeps a build's pipeline in mPipelines, a failure as null; true when it is tried again instead, and its draws
+     * wait meanwhile. */
+    bool KeepBuilt(const std::string& key, VkPipeline built, PipelineBuildEnd end);
     /** Everything mPipelines' string key is built from; see PipelineMemo. */
     struct PipelineInputs
     {
